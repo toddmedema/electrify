@@ -96,8 +96,9 @@ export default function MultiplayerRoot() {
 
   useEffect(() => {
     // Let the couch shell unmount and release its controls before joining online.
-    if (!couchOpen) deferredInvite.current?.();
-  }, [couchOpen]);
+    if (!couchOpen && !lobbyId && !hasView && !state.busy)
+      deferredInvite.current?.();
+  }, [couchOpen, lobbyId, hasView, state.busy]);
 
   /** Choosing together ends with the lobby; scenario screens go back to single player. */
   const syncCoop = useCallback(() => {
@@ -283,6 +284,11 @@ export default function MultiplayerRoot() {
                 submit: (command) => session.submit(command),
                 activity: (reason) => session.setActivity(reason),
                 leave: (options) => session.leave(options),
+                exportSave: () => session.exportSave(),
+                subscribeStatus: session.subscribe,
+                deviceSaveTime: () => session.getSnapshot().lobby.savedAt,
+                onlineSaveTime: () => session.getSnapshot().lobby.sharedAt,
+                reconnect,
               });
               setOpen(false);
               sync();
@@ -364,12 +370,17 @@ export default function MultiplayerRoot() {
     });
     const acceptInvite = (invite: string) => {
       if (!live) return;
-      if (localSession.current) {
+      const current = session.getSnapshot();
+      if (
+        localSession.current ||
+        current.lobby.lobbyId ||
+        current.view ||
+        current.busy
+      ) {
         deferredInvite.current = () => acceptInvite(invite);
         return;
       }
       deferredInvite.current = undefined;
-      if (session.getSnapshot().view) return;
       choosing.current = false;
       setOpen(true);
       setEntryInviteCode(invite);
@@ -402,7 +413,7 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, copyCode, desktop]);
+  }, [session, syncCoop, leaveLobby, copyCode, desktop, reconnect]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {
@@ -493,7 +504,13 @@ export default function MultiplayerRoot() {
   const endingKey = ending ? `${state.view?.matchId}:${ending.month}` : "";
   const showResult =
     hasView && (complete || (!!ending && watching !== endingKey));
-  const host = state.lobby.hostId === state.lobby.selfId;
+  const host =
+    !!state.lobby.selfId && state.lobby.hostId === state.lobby.selfId;
+  const recoverHere =
+    hasView &&
+    host &&
+    state.lobby.recoveryAvailable &&
+    session.hasOnlineAuthority();
 
   return (
     <>
@@ -508,7 +525,9 @@ export default function MultiplayerRoot() {
         </Suspense>
       )}
       <HostConnectionWarning
-        waiting={hasView && state.waitingForHost}
+        waiting={
+          hasView && state.waitingForHost && !state.lobby.recoveryAvailable
+        }
         synchronizing={state.synchronizing}
         onReconnect={reconnect}
         onDisconnect={disconnect}
@@ -558,28 +577,36 @@ export default function MultiplayerRoot() {
           }}
         />
       )}
-      {hasView &&
-        state.lobby.recoveryAvailable &&
-        state.lobby.selfId === state.lobby.hostId && (
-          <dialog
-            open
-            aria-label="Recover multiplayer campaign"
-            className="coopRecovery"
-          >
+      {recoverHere && (
+        <dialog
+          open
+          aria-label="Recover multiplayer campaign"
+          className="coopRecovery"
+        >
+          <p>
+            Resume from the last confirmed online save when the original players
+            reconnect.
+          </p>
+          {state.lobby.sharedAt && (
             <p>
-              Resume from the last confirmed online save when the original
-              players reconnect.
+              Confirmed save {new Date(state.lobby.sharedAt).toLocaleString()}.
             </p>
-            <button
-              disabled={!session.canRecover()}
-              onClick={() => {
-                void session.recover().catch(() => undefined);
-              }}
-            >
-              Resume campaign
-            </button>
-          </dialog>
-        )}
+          )}
+          {state.view &&
+            state.lobby.confirmedRevision !== undefined &&
+            state.view.revision > state.lobby.confirmedRevision && (
+              <p>Progress after that checkpoint will be rolled back.</p>
+            )}
+          <button
+            disabled={!session.canRecover()}
+            onClick={() => {
+              void session.recover().catch(() => undefined);
+            }}
+          >
+            Resume campaign
+          </button>
+        </dialog>
+      )}
       {showResult && (
         <CoopResult
           ending={ending}

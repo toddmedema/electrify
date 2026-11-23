@@ -231,6 +231,16 @@ export default function SavesDialog({
         onClose={() => setMenu(undefined)}
         disableRestoreFocus={!!deleting}
       >
+        {session.onlineCampaigns && (
+          <MenuItem
+            onClick={() => {
+              if (menu) void run(() => session.exportSave(menu.id));
+              setMenu(undefined);
+            }}
+          >
+            Download confirmed save
+          </MenuItem>
+        )}
         <MenuItem
           sx={{ color: "error.main" }}
           onClick={() => {
@@ -239,7 +249,7 @@ export default function SavesDialog({
             setMenu(undefined);
           }}
         >
-          Delete
+          {session.onlineCampaigns ? "Withdraw from campaign" : "Delete"}
         </MenuItem>
       </Menu>
       <Dialog
@@ -258,14 +268,18 @@ export default function SavesDialog({
         }}
       >
         <DialogTitle id="delete-campaign-title">
-          Delete multiplayer save?
+          {session.onlineCampaigns
+            ? "Withdraw from this campaign?"
+            : "Delete multiplayer save?"}
         </DialogTitle>
         <DialogContent>
           <Typography
             id="delete-campaign-message"
             sx={{ overflowWrap: "anywhere" }}
           >
-            “{deleting?.name}” will be permanently deleted.
+            {session.onlineCampaigns
+              ? `You will lose access to “${deleting?.name}”. The original roster may be unable to resume without you.`
+              : `“${deleting?.name}” will be permanently deleted.`}
           </Typography>
           {failure && (
             <Alert severity="error" sx={{ mt: 2 }}>
@@ -295,7 +309,11 @@ export default function SavesDialog({
                 });
             }}
           >
-            {loadingSaves ? "Deleting…" : "Delete"}
+            {loadingSaves
+              ? "Working…"
+              : session.onlineCampaigns
+                ? "Withdraw"
+                : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

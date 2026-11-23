@@ -1,7 +1,7 @@
 const { createHash } = require("node:crypto");
 const { canonicalRuleJson } = require("../../src/helpers/RuleIdentity");
 const { loadSimData } = require("../../src/testing/SimData");
-const { decodeWire } = require("../../src/multiplayer/WireJson");
+const { decodeWire, encodeWire } = require("../../src/multiplayer/WireJson");
 const {
   hydrateWorld,
   matchScenario,
@@ -22,6 +22,13 @@ function validateCheckpoint(json) {
   const scenarioDigest = createHash("sha256")
     .update(canonicalRuleJson(spec))
     .digest("hex");
+  // A lifecycle pause changes the clock projection without advancing the simulation revision.
+  const stable = { ...input };
+  for (const key of ["ready", "readyRequired", "paused", "reason", "speed"])
+    delete stable[key];
+  const stateDigest = createHash("sha256")
+    .update(encodeWire(stable))
+    .digest("hex");
   return {
     matchId,
     epoch,
@@ -34,6 +41,7 @@ function validateCheckpoint(json) {
       .filter(({ id }) => !input.outcomes[id])
       .map(({ id }) => id),
     scenarioDigest,
+    stateDigest,
   };
 }
 

@@ -24,10 +24,11 @@ function roomId(value) {
 function rolledInvite(now) {
   const inviteCode = Buffer.from(randomSecret(10), "base64url").toString("hex");
   const inviteToken = randomSecret(16);
+  const version = randomSecret(12);
   return {
-    secret: { inviteCode, inviteToken },
+    secret: { inviteCode, inviteToken, version },
     invite: {
-      version: randomSecret(12),
+      version,
       codeHash: hash(inviteCode),
       linkHash: hash(inviteToken),
       expiresAt: now + INVITE_MS,
@@ -124,7 +125,8 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
           ? { type: initialGuard }
           : initialGuard;
       const type = guard.type;
-      if (type !== "invite") requireValue(self, 403, "forbidden");
+      if (type !== "invite" && type !== "cancelInvite")
+        requireValue(self, 403, "forbidden");
       if (type === "active" || type === "host") {
         requireValue(
           self.active &&
@@ -370,7 +372,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
       requireValue(body.rules === room.rules, 409, "incompatible");
       const member = room.members.find(({ id }) => id === self.id);
       if (
-        room.requiredIds.some((id) =>
+        (room.head?.activeSeatIds ?? room.requiredIds).some((id) =>
           room.members.some((entry) => entry.id === id && entry.withdrawn),
         )
       ) {
@@ -393,6 +395,10 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
         room.leaseUntil = now + LEASE_MS;
         room.epoch = randomUUID();
         room.restoreHead = room.head;
+        if (room.head?.activeSeatIds)
+          room.requiredIds = Array.from(
+            new Set([...room.head.activeSeatIds, self.id]),
+          );
         room.signals = {};
         room.members.forEach((entry) => {
           delete entry.ready;
@@ -570,6 +576,28 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
         } else withOnlyRoom();
         const withdraw = operation === "room/withdraw";
         const leave = operation === "room/leave";
+        if (leave) {
+          const loaded = await loadRoom(id);
+          if (loaded && !accountSeat(loaded.room, actor.account)) {
+            const cancelled = await edit(
+              id,
+              actor,
+              "cancelInvite",
+              (room, approved) => {
+                if (approved) return { value: false };
+                const pending = room.pending.filter(
+                  (request) =>
+                    request.account !== actor.account ||
+                    request.binding !== actor.binding,
+                );
+                return pending.length === room.pending.length
+                  ? { value: true }
+                  : { room: { ...room, pending }, value: true };
+              },
+            );
+            if (cancelled) return {};
+          }
+        }
         await edit(
           id,
           actor,
@@ -596,7 +624,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
               delete member.ready;
               if (withdraw) member.withdrawn = true;
             }
-            if (room.hostId === member.id) {
+            if (room.hostId === member.id && operation !== "room/suspend") {
               room.leaseUntil = now;
               if (!room.locked && leave) room.expiresAt = now;
             }

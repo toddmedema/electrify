@@ -41,6 +41,12 @@ export type WorkerRequest =
     }
   | { kind: "disconnect"; sender: string }
   | { kind: "baseline"; to: string }
+  | {
+      kind: "baseline-dispatched";
+      to: string;
+      index: number;
+      delivered: boolean;
+    }
   /** Shell-only lifecycle state; never exposed through a seat port. */
   | {
       kind: "blockers";

@@ -8,6 +8,13 @@ const OPERATIONS = /^[a-z]+\/[a-z]+(?:-[a-z]+)*$/;
 const WINDOW_MS = 60_000;
 const JSON_LIMIT = 128 * 1024;
 const TRANSFER_LIMIT = 8 * 1024 * 1024 + 4096;
+const BULK_OPERATIONS = new Set([
+  "save/read",
+  "save/download",
+  "save/publish",
+  "transfer/get",
+  "transfer/put",
+]);
 const AUDIT = new Set([
   "auth/revoke",
   "room/approve",
@@ -31,6 +38,7 @@ function createCrossplay({
   quotaKey,
   extensions,
   isStopped = async () => false,
+  healthy = async () => true,
   onRoomChanged,
   audit = () => undefined,
   clock = Date.now,
@@ -86,7 +94,11 @@ function createCrossplay({
         return;
       }
       if (request.method === "GET" && operation === "healthz") {
-        requireValue(!(await isStopped()), 503, "unavailable");
+        requireValue(
+          !(await isStopped()) && (await healthy()),
+          503,
+          "unavailable",
+        );
         response.status(200).json({ status: "ok" });
         return;
       }
@@ -103,15 +115,20 @@ function createCrossplay({
         415,
         "invalid_request",
       );
-      const maxBytes = /^(save|transfer)\//.test(operation)
-        ? TRANSFER_LIMIT
-        : JSON_LIMIT;
+      const bulk = /^(save|transfer)\//.test(operation);
+      requireValue(!bulk || BULK_OPERATIONS.has(operation), 404, "not_found");
+      const maxBytes = bulk ? TRANSFER_LIMIT : JSON_LIMIT;
       requireValue(
         Buffer.isBuffer(request.rawBody) && request.rawBody.length <= maxBytes,
         413,
         "payload_too_large",
       );
       requireValue(!(await isStopped()), 503, "unavailable");
+      const exchange =
+        operation === "auth/google" || operation === "auth/steam";
+      const authorization = request.get("authorization");
+      const actor = exchange ? undefined : await identity.auth(authorization);
+      if (actor && bulk) await limit("bulk", actor.account, 20);
       let requestBody;
       try {
         requestBody = JSON.parse(request.rawBody.toString("utf8"));
@@ -120,7 +137,7 @@ function createCrossplay({
       }
 
       let result;
-      if (operation === "auth/google" || operation === "auth/steam") {
+      if (exchange) {
         const provider = operation.slice(5);
         requireValue(
           provider === "google" ? !!origin : !origin,
@@ -132,10 +149,9 @@ function createCrossplay({
           provider,
           requestBody,
           limit,
-          request.get("authorization"),
+          authorization,
         );
       } else {
-        const actor = await identity.auth(request.get("authorization"));
         if (operation === "auth/revoke") {
           keys(requestBody);
           await store.revoke(actor.account, actor.tokenHash);
@@ -146,6 +162,14 @@ function createCrossplay({
           if (operation === "room/join")
             await limit("join-ip", hashedIp(request), 80);
           result = await rooms.handle(operation, actor, requestBody, limit);
+          if (bulk) {
+            requireValue(
+              !response.destroyed && !(await isStopped()),
+              503,
+              "unavailable",
+            );
+            await identity.auth(authorization);
+          }
         }
       }
       if (AUDIT.has(operation)) audit({ operation, status: 200 });

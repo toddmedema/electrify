@@ -302,14 +302,34 @@ export default function Lobby({
                   </Stack>
                 ))}
                 {lobby.members.map((member) => (
-                  <Typography key={member.id} sx={{ overflowWrap: "anywhere" }}>
-                    {member.name} ·{" "}
-                    {member.id === lobby.selfId
-                      ? "Host"
-                      : connected(member.id)
-                        ? "Connected"
-                        : "Connecting"}
-                  </Typography>
+                  <Stack
+                    key={member.id}
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Typography sx={{ overflowWrap: "anywhere" }}>
+                      {member.name} ·{" "}
+                      {member.id === lobby.selfId
+                        ? "Host"
+                        : connected(member.id)
+                          ? "Connected"
+                          : "Connecting"}
+                    </Typography>
+                    {member.id !== lobby.selfId && (
+                      <Button
+                        aria-label={`Remove ${member.name}`}
+                        onClick={() =>
+                          run(() => session.removePlayer(member.id), "host")
+                        }
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </Stack>
                 ))}
                 <Button
                   variant="contained"
@@ -336,7 +356,9 @@ export default function Lobby({
               <Typography>
                 The campaign resumes with its original players.
               </Typography>
-              {host && lobby.recoveryAvailable ? (
+              {host &&
+              lobby.recoveryAvailable &&
+              session.hasOnlineAuthority() ? (
                 <Button
                   variant="contained"
                   disabled={!session.canRecover()}
@@ -371,6 +393,18 @@ export default function Lobby({
                         : `Connecting to ${hostName}…`}
                 </Typography>
               </Stack>
+            )}
+          {mode === "waiting" &&
+            session.onlineCampaigns &&
+            !lobby.campaignLocked &&
+            !lobby.joinPending &&
+            !session.hasOnlineAuthority() && (
+              <Button
+                variant="outlined"
+                onClick={() => run(() => session.reconnect(), "join")}
+              >
+                Reconnect
+              </Button>
             )}
           {mode === "campaign" && pendingCampaign && (
             <CampaignSlots

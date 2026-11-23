@@ -65,8 +65,9 @@ bundle. The same compatible build must ship to the Steam depot.
   Firebase player identities cannot list or read objects. Review staging
   lifecycle and soft deletion together with the final retention period.
 - Obtain provider-backed limits or prove that shutdown bounds outstanding TURN
-  allocations. The service limits application-issued grants to 120, with a
-  drain period. Cloudflare's published limits are per allocation. One grant can
+  allocations. The service admits two live rooms and limits application-issued grants to 120
+  with a ten-minute drain period. The conservative room cap reserves space for
+  routine credential rotation. Cloudflare's published limits are per allocation. One grant can
   allow separate allocations, and traffic on a live allocation has continued
   after revocation or the nominal credential expiry in diagnostics. The
   grant limit alone cannot establish a maximum billed spend. For shutdown,

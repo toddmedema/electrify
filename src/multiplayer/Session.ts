@@ -337,9 +337,16 @@ export class MultiplayerSession {
         this.completion = undefined;
         this.queued = [];
         this.pending = undefined;
+        for (const request of this.saveRequests.values()) request.reject(error);
+        this.saveRequests.clear();
         this.sequence = 0;
         this.receiptSequence = 0;
-        this.state = { ...this.state, pending: false, waitingForHost: true };
+        this.state = {
+          ...this.state,
+          pending: false,
+          busy: false,
+          waitingForHost: true,
+        };
       }
       this.update({ lobby: event.state });
       if (this.worker) this.relayAuthority();
@@ -474,7 +481,11 @@ export class MultiplayerSession {
             payload: { kind: "save-result", requestId, error },
           });
         const suspended = event.payload.suspended === true;
-        void this.save(suspended, suspended)
+        void this.save(
+          suspended || event.payload.pause === true,
+          true,
+          suspended,
+        )
           .then(
             () => respond(),
             (error) => respond(error.message),
@@ -903,13 +914,28 @@ export class MultiplayerSession {
           }
         }
         await this.request({ kind: "send", to, payload });
+        if (this.onlineCampaigns && current() && payload.kind === "baseline")
+          this.post({
+            kind: "baseline-dispatched",
+            to,
+            index: payload.index,
+            delivered: true,
+          });
       });
     this.replicationSends.set(to, send);
     void send.catch((error: unknown) => {
       // The transport's disconnect notice can follow this rejected send.
       // A baseline on that dead channel would only spend the replica's recovery budget.
-      if (current() && !(error instanceof PeerDisconnectedError))
-        this.post({ kind: "baseline", to });
+      if (current() && !(error instanceof PeerDisconnectedError)) {
+        if (this.onlineCampaigns && payload.kind === "baseline")
+          this.post({
+            kind: "baseline-dispatched",
+            to,
+            index: payload.index,
+            delivered: false,
+          });
+        else this.post({ kind: "baseline", to });
+      }
     });
   }
   /** Menu transitions cannot be dropped while a purchase or another command is in flight. */
@@ -1132,8 +1158,19 @@ export class MultiplayerSession {
       lobby: await this.request({ kind: "approve", requestId, approve }),
     });
   }
+  async removePlayer(seatId: string) {
+    this.update({ lobby: await this.request({ kind: "remove", seatId }) });
+  }
+  async exportSave(id?: string) {
+    if (!this.services.checkpoints.export)
+      throw new Error("Multiplayer export is unavailable.");
+    await this.services.checkpoints.export(id);
+  }
   async rotateInvite() {
     this.update({ lobby: await this.request({ kind: "rotate-invite" }) });
+  }
+  hasOnlineAuthority() {
+    return !!this.services.authority?.();
   }
   canRecover() {
     const { campaignLocked, recoveryAvailable, members, requiredPlayers } =
@@ -1147,7 +1184,11 @@ export class MultiplayerSession {
       this.isHost() &&
       !this.state.busy &&
       this.authorityIsCurrent() &&
-      !this.rosterError(members, required)
+      required.every(
+        ({ id }) =>
+          id === this.state.lobby.selfId ||
+          this.state.lobby.connected.includes(id),
+      )
     );
   }
   recover() {
@@ -1183,6 +1224,16 @@ export class MultiplayerSession {
   async prepareResume(id: string, name: string) {
     if (this.onlineCampaigns) {
       await this.reconnect(id);
+      if (
+        this.isHost() &&
+        !this.worker &&
+        this.state.lobby.campaignLocked &&
+        !this.state.lobby.recoveryAvailable
+      )
+        this.event({
+          kind: "state",
+          state: await this.request({ kind: "restart-host" }),
+        });
       return;
     }
     const generation = ++this.campaignGeneration;
@@ -1559,8 +1610,8 @@ export class MultiplayerSession {
       throw error;
     }
   }
-  async save(pause = false, keepOpen = false) {
-    if (keepOpen) {
+  async save(pause = false, keepOpen = false, suspended = keepOpen) {
+    if (suspended) {
       // Unsent pre-sleep readiness cannot count as fresh consent after the safety checkpoint.
       // Already sent envelopes keep their sequence/receipt identity and precede the checkpoint.
       this.queued = this.queued.filter((queued) => {
@@ -1595,7 +1646,8 @@ export class MultiplayerSession {
             payload: {
               kind: "save-request",
               requestId,
-              ...(keepOpen ? { suspended: true } : {}),
+              ...(suspended ? { suspended: true } : {}),
+              ...(pause && this.onlineCampaigns && { pause: true }),
             },
           }).catch(reject);
         });
@@ -1619,7 +1671,7 @@ export class MultiplayerSession {
           kind: "checkpoint",
           requestId,
           pause,
-          ...(keepOpen ? { suspended: true } : {}),
+          ...(suspended ? { suspended: true } : {}),
         });
       });
     } catch (error) {
@@ -1648,7 +1700,7 @@ export class MultiplayerSession {
     this.campaignGeneration++;
     this.closing = true;
     try {
-      if (!skipSave) await this.save(!!this.worker);
+      if (!skipSave) await this.save(!!this.worker || this.onlineCampaigns);
     } catch (error) {
       // The player stays in the match to retry or to leave without saving.
       this.closing = false;

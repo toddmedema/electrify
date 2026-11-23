@@ -1,3 +1,4 @@
+import { downloadJson } from "../SaveFile";
 import { getScenario } from "../data/Scenarios";
 import { browserCheckpoints } from "./BrowserCheckpoints";
 import type { CrossplayApi } from "./CrossplayApi";
@@ -7,10 +8,9 @@ import type {
   WireMessage,
 } from "./SessionTransport";
 import type { World } from "./Types";
-import { decodeWire, encodeWire } from "./WireJson";
+import { encodeWire } from "./WireJson";
+import type { EncodedSnapshot, SnapshotJob } from "./SnapshotCodec";
 
-const MAX_COMPRESSED_BYTES = 6 * 1024 * 1024;
-const MAX_DECODED_BYTES = 32 * 1024 * 1024;
 const ONLINE_AUTOSAVE_MS = 30_000;
 const TRANSFER_KINDS = new Set(["baseline", "scenario"]);
 
@@ -21,77 +21,55 @@ interface TransferPeer {
   generation: string;
 }
 
-interface EncodedSnapshot {
-  content: string;
-  digest: string;
-}
+let queuedSnapshots = 0;
+let snapshotQueue: Promise<unknown> = Promise.resolve();
 
-async function digest(bytes: Uint8Array<ArrayBuffer>) {
-  const hash = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(hash), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-}
-
-async function readBounded(stream: ReadableStream<Uint8Array>, limit: number) {
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
+async function runSnapshot(job: SnapshotJob, signal?: AbortSignal) {
+  signal?.throwIfAborted();
+  const { createSnapshotWorker } = await import("./WorkerClient");
+  signal?.throwIfAborted();
+  const worker = createSnapshotWorker();
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let abort: (() => void) | undefined;
   try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.length;
-      if (size > limit) throw new Error("Multiplayer data is too large.");
-      chunks.push(value);
-    }
+    return await new Promise<unknown>((resolve, reject) => {
+      abort = () => reject(new Error("Multiplayer transfer cancelled."));
+      signal?.addEventListener("abort", abort, { once: true });
+      deadline = setTimeout(
+        () => reject(new Error("Multiplayer transfer took too long.")),
+        5_000,
+      );
+      worker.onmessage = ({ data }) => {
+        if (data.ok) resolve(data.value);
+        else reject(new Error("Invalid multiplayer transfer."));
+      };
+      worker.onerror = () =>
+        reject(new Error("Multiplayer transfer worker stopped."));
+      worker.postMessage(job);
+    });
   } finally {
-    await reader.cancel().catch(() => undefined);
-    reader.releaseLock();
+    clearTimeout(deadline);
+    if (abort) signal?.removeEventListener("abort", abort);
+    worker.terminate();
   }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return bytes;
 }
 
-async function encodeSnapshot(snapshot: unknown): Promise<EncodedSnapshot> {
-  const json = new TextEncoder().encode(encodeWire(snapshot));
-  if (json.length > MAX_DECODED_BYTES)
-    throw new Error("Multiplayer data is too large.");
-  const compressed = await readBounded(
-    new Blob([json]).stream().pipeThrough(new CompressionStream("gzip")),
-    MAX_COMPRESSED_BYTES,
-  );
-  let content = "";
-  for (let offset = 0; offset < compressed.length; offset += 0x6000)
-    content += btoa(
-      String.fromCharCode(...compressed.subarray(offset, offset + 0x6000)),
-    );
-  return { content, digest: await digest(compressed) };
+function queueSnapshot(job: SnapshotJob, signal?: AbortSignal) {
+  if (queuedSnapshots >= 8)
+    throw new Error("Multiplayer transfer capacity was reached.");
+  queuedSnapshots++;
+  const scheduled = snapshotQueue
+    .then(() => runSnapshot(job, signal))
+    .finally(() => queuedSnapshots--);
+  snapshotQueue = scheduled.catch(() => undefined);
+  return scheduled;
 }
 
-async function decodeSnapshot({ content, digest: expected }: EncodedSnapshot) {
-  if (
-    typeof content !== "string" ||
-    content.length > (MAX_COMPRESSED_BYTES / 3) * 4 ||
-    !/^[a-f0-9]{64}$/.test(expected)
-  )
-    throw new Error("Invalid multiplayer data.");
-  const bytes = Uint8Array.from(atob(content), (character) =>
-    character.charCodeAt(0),
-  );
-  if ((await digest(bytes)) !== expected)
-    throw new Error("Multiplayer data failed its integrity check.");
-  const json = await readBounded(
-    new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip")),
-    MAX_DECODED_BYTES,
-  );
-  return decodeWire(new TextDecoder("utf-8", { fatal: true }).decode(json));
-}
+const encodeSnapshot = (value: unknown, signal?: AbortSignal) =>
+  queueSnapshot({ kind: "encode", value }, signal) as Promise<EncodedSnapshot>;
+
+const decodeSnapshot = (value: EncodedSnapshot, signal?: AbortSignal) =>
+  queueSnapshot({ kind: "decode", value }, signal);
 
 export async function storeTransfer(
   api: CrossplayApi,
@@ -105,7 +83,7 @@ export async function storeTransfer(
     "transfer/put",
     {
       ...peer,
-      ...(await encodeSnapshot(payload)),
+      ...(await encodeSnapshot(payload, signal)),
     },
     { signal },
   );
@@ -126,7 +104,7 @@ export async function readTransfer(
     },
     { signal },
   );
-  const payload = (await decodeSnapshot(result)) as WireMessage;
+  const payload = (await decodeSnapshot(result, signal)) as WireMessage;
   if (!payload || !TRANSFER_KINDS.has(payload.kind))
     throw new Error("Invalid multiplayer transfer.");
   return payload;
@@ -160,6 +138,29 @@ export function onlineCheckpoints(
       });
       return (await decodeSnapshot(result)) as World;
     },
+    async export(id) {
+      const { roomId, seatId } = scope();
+      const target = id ?? roomId;
+      if (!target)
+        throw new Error("There is no multiplayer campaign to export.");
+      const local =
+        !id && seatId
+          ? await browserCheckpoints(seatId)
+              .read()
+              .catch(() => null)
+          : null;
+      const world =
+        local ??
+        (await decodeSnapshot(
+          await api.request<EncodedSnapshot>("save/download", {
+            roomId: target,
+          }),
+        ));
+      downloadJson("electrify-multiplayer-campaign.json", {
+        format: "electrify-multiplayer",
+        world: JSON.parse(encodeWire(world)),
+      });
+    },
     async remove(id) {
       await api.request("room/withdraw", { roomId: id });
       return list(true);
@@ -192,7 +193,7 @@ export function onlineCheckpoints(
           roomId,
           ...(await encodeSnapshot(world)),
           explicit,
-          name,
+          ...(name && { name: name.slice(0, 72) }),
         },
       );
       published = {

@@ -294,8 +294,8 @@ function createTurnSignaling({
         if (name === "signal/reset") {
           const deadline =
             pair.offer && pair.answer
-              ? pair.createdAt + FAILED_GENERATION_MS
-              : pair.createdAt + ROTATION_WINDOW_MS;
+              ? pair.createdAt + ROTATION_WINDOW_MS
+              : pair.createdAt + FAILED_GENERATION_MS;
           if (now < deadline)
             throw new CrossplayError(429, "turn-rotation-limit");
           return {
@@ -348,8 +348,9 @@ function createTurnSignaling({
     const stop = all || settings.data()?.stopped === true;
     const snapshots = await grants.limit(MAX_GRANTS).get();
     const rooms = new Map();
+    let failures = 0;
     for (let index = 0; index < snapshots.docs.length; index += 8) {
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         snapshots.docs.slice(index, index + 8).map(async (snapshot) => {
           const grant = snapshot.data();
           const now = clock();
@@ -387,10 +388,14 @@ function createTurnSignaling({
           });
         }),
       );
+      failures += results.filter(
+        (result) => result.status === "rejected",
+      ).length;
     }
+    if (failures) throw new Error("TURN grant cleanup needs retry");
   }
 
-  return { handle, revokeRoom, reap };
+  return { handle, revokeRoom, reap, configured: !!relay };
 }
 
 module.exports = { activeSignalPair, createTurnSignaling };

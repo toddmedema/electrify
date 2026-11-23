@@ -2,15 +2,8 @@ const { createHash, randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Worker } = require("node:worker_threads");
-const { gunzip: decompress } = require("node:zlib");
-const { promisify } = require("node:util");
 const { CrossplayError } = require("./crossplay-errors.cjs");
-const {
-  MAX_COMPRESSED_BYTES,
-  MAX_DECODED_BYTES,
-  snapshotJson,
-} = require("./coop-checkpoint-wire.cjs");
-const gunzip = promisify(decompress);
+const { MAX_COMPRESSED_BYTES } = require("./coop-checkpoint-wire.cjs");
 const { activeSignalPair } = require("./coop-signaling.cjs");
 
 const CHECKPOINT_VALIDATION_MS = 8_000;
@@ -18,10 +11,11 @@ const defaultValidatorPath = path.join(
   __dirname,
   "build/runtime/server/checkpoint.cjs",
 );
-let validating = false;
+let validating = Promise.resolve();
+let waitingValidators = 0;
 const TRANSFER_MS = 60_000;
 const CHECKPOINT_INTERVAL_MS = 10_000;
-const TRANSFERS_PER_MINUTE = 8;
+const TRANSFERS_PER_MINUTE = 12;
 const STAGING_GRACE_MS = 60_000;
 const CHECKPOINT_ORPHAN_AGE_MS = 10 * 60_000;
 const REAP_BATCH = 300;
@@ -56,33 +50,30 @@ function compressedBody(body) {
   return { bytes, digest: body.digest };
 }
 
-async function decode(body) {
-  const packed = compressedBody(body);
-  let snapshot;
-  try {
-    const decoded = await gunzip(packed.bytes, {
-      maxOutputLength: MAX_DECODED_BYTES,
-    });
-    snapshot = JSON.parse(snapshotJson(decoded));
-  } catch {
-    refuse("invalid-snapshot");
-  }
-  return { ...packed, snapshot };
-}
-
 function checkpointValidatorReady(runtimePath = defaultValidatorPath) {
   return fs.existsSync(runtimePath);
 }
 
-async function validateCheckpoint(bytes, runtimePath = defaultValidatorPath) {
-  if (!checkpointValidatorReady(runtimePath))
-    refuse("checkpoint-validator-unavailable", 503);
-  if (validating) refuse("checkpoint-validator-busy", 429);
-  validating = true;
+function validateInWorker(bytes, options, invalidCode) {
+  if (waitingValidators >= 3) refuse("checkpoint-validator-busy", 429);
+  waitingValidators++;
+  const requested = Date.now();
+  const result = validating
+    .then(() => {
+      if (Date.now() - requested > 12_000)
+        refuse("checkpoint-validator-busy", 429);
+      return validateSnapshot(bytes, options, invalidCode);
+    })
+    .finally(() => waitingValidators--);
+  validating = result.catch(() => undefined);
+  return result;
+}
+
+async function validateSnapshot(bytes, options, invalidCode) {
   let worker;
   try {
     worker = new Worker(path.join(__dirname, "coop-checkpoint-worker.cjs"), {
-      workerData: { runtimePath, bytes },
+      workerData: { ...options, bytes },
       resourceLimits: {
         maxOldGenerationSizeMb: 160,
         maxYoungGenerationSizeMb: 16,
@@ -90,19 +81,24 @@ async function validateCheckpoint(bytes, runtimePath = defaultValidatorPath) {
     });
     let deadline;
     const result = await new Promise((resolve, reject) => {
-      const fail = () => reject(new CrossplayError(400, "invalid-checkpoint"));
+      const fail = () => reject(new CrossplayError(400, invalidCode));
       deadline = setTimeout(fail, CHECKPOINT_VALIDATION_MS);
       worker.once("message", resolve);
       worker.once("exit", fail);
       worker.once("error", fail);
     }).finally(() => clearTimeout(deadline));
     if (result.unavailable) refuse("checkpoint-validator-unavailable", 503);
-    if (!result.fields) refuse("invalid-checkpoint");
+    if (!result.fields) refuse(invalidCode);
     return result.fields;
   } finally {
     await worker?.terminate().catch(() => {});
-    validating = false;
   }
+}
+
+async function validateCheckpoint(bytes, runtimePath = defaultValidatorPath) {
+  if (!checkpointValidatorReady(runtimePath))
+    refuse("checkpoint-validator-unavailable", 503);
+  return validateInWorker(bytes, { runtimePath }, "invalid-checkpoint");
 }
 
 function validateWorld(world, room) {
@@ -251,6 +247,7 @@ async function publish(context, body) {
     gameSchema,
     rules,
     scenarioDigest,
+    stateDigest,
   } = fields;
   function requireAdvance(head) {
     if (
@@ -260,7 +257,9 @@ async function publish(context, body) {
         !head.seats.every(
           (entry, index) => entry.id === fields.seats[index]?.id,
         ) ||
-        (head.epoch === epoch && head.revision >= revision))
+        (head.epoch === epoch &&
+          (head.revision > revision ||
+            (head.revision === revision && head.stateDigest !== stateDigest))))
     )
       refuse("checkpoint-conflict", 409);
   }
@@ -285,6 +284,7 @@ async function publish(context, body) {
     schema,
     gameSchema,
     scenarioDigest,
+    stateDigest,
     seats: fields.seats,
     activeSeatIds: fields.activeSeatIds,
     savedAt: now,
@@ -381,7 +381,7 @@ async function read(context, exporting) {
 
 async function storeTransfer(context, body) {
   requireHost(context);
-  await context.limit?.("coop-transfer-upload", 8);
+  await context.limit?.("coop-transfer-upload", TRANSFERS_PER_MINUTE);
   const bucket = bucketFor(context);
   await context.updateRoom(
     (room, _now, projected) => {
@@ -397,14 +397,12 @@ async function storeTransfer(context, body) {
     },
     { type: "host", peerId: body.to },
   );
-  const result = await decode(body);
-  const { snapshot } = result;
-  if (
-    !snapshot ||
-    (snapshot.kind !== "baseline" && snapshot.kind !== "scenario") ||
-    (snapshot.kind === "baseline" && snapshot.epoch !== body.epoch)
-  )
-    refuse("invalid-transfer");
+  const result = compressedBody(body);
+  await validateInWorker(
+    result.bytes,
+    { epoch: body.epoch },
+    "invalid-transfer",
+  );
   const reference = randomUUID();
   const metadata = metadataFor(result);
   Object.assign(metadata.metadata, {

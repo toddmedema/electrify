@@ -73,6 +73,9 @@ jobs:
       - name: Install mailing-list function dependencies
         run: npm ci --prefix firebase/functions
 
+      - name: Build multiplayer checkpoint validator
+        run: node scripts/build-coop-checkpoint-validator.js
+
       - name: Deploy Firestore and Firebase functions
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}

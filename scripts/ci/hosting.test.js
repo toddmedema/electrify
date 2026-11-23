@@ -280,6 +280,7 @@ function fakeDeployment(
   const build = path.join(directory, "build");
   fs.mkdirSync(bin);
   fs.mkdirSync(build);
+  fs.mkdirSync(path.join(directory, "firebase/functions"), { recursive: true });
   fs.writeFileSync(
     path.join(build, "sitemap.xml"),
     "<urlset><url><loc>https://electrifygame.com/</loc></url></urlset>",
@@ -375,6 +376,7 @@ require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args:
     PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     FIREBASE_SERVICE_ACCOUNT: "fixture",
     REACT_APP_FIREBASE_API_KEY: "fixture",
+    ...options.env,
   };
   const script = path.resolve("scripts/hosting/deploy.js");
   const run = (args = [], entry = script) =>
@@ -434,6 +436,11 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
   const fixture = fakeDeployment(t, distribution(), undefined, "", {
     args: ["--preflight"],
     state: { denied: "get-distribution-config" },
+    env: {
+      STEAM_APP_ID: "123456",
+      COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
+      COOP_TURN_RELAY_CIDRS: "141.101.64.0/18",
+    },
   });
   const { jobs } = parse(
     fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
@@ -448,6 +455,14 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
   );
   const publish = steps.findIndex(
     ({ run }) => run === "./scripts/deploy.sh ci-prod",
+  );
+  const serviceReady = steps.findIndex(({ run }) =>
+    run?.includes("/coopV2/healthz"),
+  );
+  assert.ok(firebase < serviceReady && serviceReady < publish);
+  assert.match(
+    steps[firebase].run,
+    /functions:mailing-list:coopV2,functions:mailing-list:coopV2Reap/,
   );
   assert.ok(
     credentials >= 0 &&

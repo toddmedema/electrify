@@ -234,6 +234,20 @@ test("pins the campaign setup and disallows conflicting bytes at the same revisi
   assert.equal(objects.size, 1);
 });
 
+test("an explicit pause can publish at the most recent confirmed revision", async () => {
+  const { context, world, state } = fixture();
+  await handle("save/publish", context(), {
+    ...encoded(world),
+    explicit: false,
+  });
+  const previous = state.head.id;
+  const paused = { ...world, reason: "Host saved and stopped the match" };
+  await handle("save/publish", context(), encoded(paused));
+  assert.equal(state.head.revision, world.revision);
+  assert.notEqual(state.head.id, previous);
+  assert.equal(state.explicitHead.id, state.head.id);
+});
+
 test("requires the same restore generation after reading from storage", async () => {
   const { context, world, state } = fixture();
   await handle("save/publish", context(), encoded(world));

@@ -29,6 +29,7 @@ export interface LobbyState {
   connected: string[];
   savedAt?: number | null;
   sharedAt?: number | null;
+  confirmedRevision?: number;
   error?: string;
 }
 export interface SharedSaveLibrary {
@@ -81,7 +82,12 @@ export type WireMessage =
       applied: number;
       reason: string;
     }
-  | { kind: "save-request"; requestId: string; suspended?: boolean }
+  | {
+      kind: "save-request";
+      requestId: string;
+      suspended?: boolean;
+      pause?: boolean;
+    }
   | { kind: "save-result"; requestId: string; error?: string }
   | { kind: "command"; envelope: CommandEnvelope }
   | { kind: "browse"; browse: BrowseState }
@@ -89,10 +95,11 @@ export type WireMessage =
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type SessionRequest =
   | {
-      kind: "state" | "leave" | "unlock" | "rotate-invite";
+      kind: "state" | "leave" | "unlock" | "rotate-invite" | "restart-host";
     }
   | { kind: "reconnect"; roomId?: string }
   | { kind: "approve"; requestId: string; approve: boolean }
+  | { kind: "remove"; seatId: string }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready" | "slot"; value: string }
@@ -114,6 +121,8 @@ type LobbyRequest =
   | "member"
   | "unlock"
   | "approve"
+  | "remove"
+  | "restart-host"
   | "rotate-invite";
 
 type SessionReplies = {
@@ -141,6 +150,7 @@ export interface CheckpointStore {
   read(id?: string): Promise<World | null>;
   list(sync: boolean): Promise<SharedSaveLibrary>;
   remove(id: string): Promise<SharedSaveLibrary>;
+  export?(id?: string): Promise<void>;
   /** Supply the version read at startup when saving a restored world. */
   write(
     world: World,

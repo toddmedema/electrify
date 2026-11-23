@@ -396,3 +396,66 @@ test("expired host loses publication rights and a single original seat acquires 
     503,
   );
 });
+
+test("a guest can cancel pending approval and reclaim their approved seat on another device", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  await ctx.join(room, guest);
+  const state = await ctx.call("room/state", { roomId }, { token: host });
+  const [request] = state.body.lobby.pendingApprovals;
+  assert.equal(
+    (await ctx.call("room/leave", { roomId }, { token: guest })).status,
+    200,
+  );
+  assert.equal(
+    (
+      await ctx.call(
+        "room/approve",
+        {
+          roomId,
+          requestId: request.id,
+          approve: true,
+        },
+        { token: host },
+      )
+    ).status,
+    404,
+  );
+  const approved = await ctx.approve(room, host, guest);
+  const newDevice = await ctx.login("guest", { device: "e".repeat(43) });
+  const reclaimed = await ctx.join(room, newDevice);
+  assert.equal(reclaimed.status, 200);
+  assert.equal(reclaimed.body.lobby.selfId, approved.lobby.selfId);
+});
+
+test("a late suspend cannot invalidate a newer foreground binding", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  const old = room.authority.presence;
+  assert.equal(
+    (await ctx.call("room/suspend", { roomId, presence: old }, { token: host }))
+      .status,
+    200,
+  );
+  const paused = await ctx.call("room/state", { roomId }, { token: host });
+  assert.equal(paused.body.authority.leaseRemainingMs, 0);
+  const reconnected = await ctx.call(
+    "room/reconnect",
+    { roomId, rules: RULES },
+    { token: host },
+  );
+  assert.equal(reconnected.body.authority.epoch, room.authority.epoch);
+  assert.notEqual(reconnected.body.authority.presence, old);
+  assert.equal(
+    (await ctx.call("room/suspend", { roomId, presence: old }, { token: host }))
+      .status,
+    200,
+  );
+  const current = await ctx.call("room/state", { roomId }, { token: host });
+  assert.ok(current.body.authority.leaseRemainingMs > 0);
+});

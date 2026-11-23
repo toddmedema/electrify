@@ -24,7 +24,7 @@ interface RoomAuthority {
   leaseRemainingMs: number;
   requiredIds: string[];
   locked: boolean;
-  head: { savedAt: number; epoch: string } | null;
+  head: { savedAt: number; revision: number; epoch: string } | null;
 }
 
 interface RoomReply {
@@ -240,6 +240,7 @@ export function onlineSessionServices(
         ...result.lobby,
         savedAt: lobby.savedAt,
         sharedAt: grant.head?.savedAt,
+        confirmedRevision: grant.head?.revision,
         inviteCode: refreshedInvite?.code,
         inviteToken: refreshedInvite?.token,
         authorityEpoch: grant.epoch,
@@ -267,6 +268,7 @@ export function onlineSessionServices(
         ...result.lobby,
         authorityEpoch: grant?.epoch,
         campaignLocked: grant?.locked,
+        confirmedRevision: grant?.head?.revision,
         requiredPlayers: grant?.requiredIds,
         recoveryAvailable: grant?.locked && !!grant.head,
         connected: [],
@@ -371,6 +373,20 @@ export function onlineSessionServices(
             },
             true,
           ).finally(() => schedule())) as Reply;
+        }
+        if (input.kind === "restart-host") {
+          if (!roomId || !presence || lobby.hostId !== lobby.selfId)
+            throw new CrossplayApiError("authority_changed");
+          const campaign = roomId;
+          await api.request("room/leave", { roomId: campaign });
+          return (await roomRequest(
+            "reconnect",
+            {
+              roomId: campaign,
+              rules: manifest.multiplayerCompatibilityId,
+            },
+            true,
+          )) as Reply;
         }
         const { kind, ...body } = input;
         return (await roomRequest(

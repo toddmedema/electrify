@@ -1,3 +1,4 @@
+import { multiplayerRuntime } from "../../multiplayer/Registry";
 import { CouchPlayerText } from "../../couch/PlayerColor";
 import { useMoney } from "./CurrencyContext";
 import { useGameWorkspaceLayout } from "./GameWorkspaceContext";
@@ -315,6 +316,17 @@ export function GameAppBar(props: Props) {
             Next tutorial
           </MenuItem>
         )}
+        {inMultiplayer && <OnlineSaveStatus />}
+        {inMultiplayer && multiplayerRuntime()?.reconnect && (
+          <MenuItem
+            onClick={() => {
+              handleMenuClose();
+              multiplayerRuntime()?.reconnect?.();
+            }}
+          >
+            Reconnect to campaign
+          </MenuItem>
+        )}
         <MenuItem onClick={handleQuit}>
           {isTutorial ? "Main menu" : "Save & Quit"}
         </MenuItem>
@@ -564,5 +576,32 @@ const GameAppBarContainer = connectToStore(
   mapStateToProps,
   mapDispatchToProps,
 )(GameAppBar);
+
+const noSaveTime = () => undefined;
+const noSaveSubscription = () => () => {};
+const saveTime = (timestamp?: number | null) =>
+  timestamp ? new Date(timestamp).toLocaleString() : "Unavailable";
+
+function OnlineSaveStatus() {
+  const runtime = multiplayerRuntime();
+  const device = React.useSyncExternalStore(
+    runtime?.subscribeStatus ?? noSaveSubscription,
+    runtime?.deviceSaveTime ?? noSaveTime,
+  );
+  const confirmed = React.useSyncExternalStore(
+    runtime?.subscribeStatus ?? noSaveSubscription,
+    runtime?.onlineSaveTime ?? noSaveTime,
+  );
+  if (!runtime?.onlineSaveTime) return null;
+  return (
+    <li role="presentation" className="onlineSaveStatus">
+      <small>Device save {saveTime(device)}</small>
+      <small>Confirmed online save {saveTime(confirmed)}</small>
+      <small>
+        Save &amp; Quit pauses play until the required players return.
+      </small>
+    </li>
+  );
+}
 
 export default GameAppBarContainer;

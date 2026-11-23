@@ -145,6 +145,7 @@ function crossplayUserAction(operation) {
   return (
     operation === "room/create" ||
     operation === "room/join" ||
+    operation === "room/list" ||
     operation === "room/reconnect"
   );
 }

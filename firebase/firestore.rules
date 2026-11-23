@@ -354,7 +354,7 @@ service cloud.firestore {
             || guard().type == 'bound' && boundActor(resource.data));
       }
       function inviteMutation() {
-        return liveHost()
+        return (guard().type == 'cancelInvite' || liveHost())
           && !resource.data.room.locked
           && afterLeaseSameOwner()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'writeGuard'])
@@ -371,7 +371,7 @@ service cloud.firestore {
         && ((guard().type in ['active', 'host'] && liveMutation())
           || (guard().type == 'acquire' && acquire())
           || (guard().type in ['member', 'bound'] && lifecycleMutation())
-          || (guard().type == 'invite' && inviteMutation()));
+          || (guard().type in ['invite', 'cancelInvite'] && inviteMutation()));
       allow read, delete: if false;
     }
 

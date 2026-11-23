@@ -307,3 +307,10 @@ html[data-couch-seat] #appbar #topbar {
     min-height: 44px;
   }
 }
+
+.onlineSaveStatus {
+  display: grid;
+  gap: 4px;
+  padding: 8px 16px;
+  color: var(--text-secondary, inherit);
+}

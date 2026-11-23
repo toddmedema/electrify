@@ -36,6 +36,7 @@ let hostSeat: string | undefined;
 let recovery: ReplicaRecovery | undefined;
 let online = false;
 let replicationOpen = true;
+let requestedMembership: string[] | undefined;
 let authority: Extract<WorkerRequest, { kind: "heartbeat" }>["authority"];
 let authorityPaused = false;
 
@@ -47,6 +48,16 @@ function hasAuthority(epoch: string) {
         authority.monotonicDeadline &&
       Date.now() < authority.wallDeadline)
   );
+}
+
+function openReplication(running: World) {
+  if (replicationOpen || !requestedMembership || !hasAuthority(running.epoch))
+    return;
+  const connected = requestedMembership;
+  requestedMembership = undefined;
+  replicationOpen = true;
+  recovery?.connected(connected);
+  for (const to of connected) sendBaseline(to);
 }
 
 function enforceAuthority(running: World) {
@@ -123,16 +134,18 @@ function flushRecords() {
   });
   const bytes = (items: ReplicaRecord[]) =>
     new TextEncoder().encode(recordJson(message(items))).byteLength;
+  // Leave room for the generation and epoch in the TURN packet envelope.
+  const maxRecordBytes = online ? 60 * 1024 : 64 * 1024;
   for (const record of batch.records) {
     if (
       records.length &&
-      (records.length === 256 || bytes([...records, record]) > 65536)
+      (records.length === 256 || bytes([...records, record]) > maxRecordBytes)
     ) {
       post(message(records));
       from += records.length;
       records = [];
     }
-    if (!records.length && bytes([record]) > 65536)
+    if (!records.length && bytes([record]) > maxRecordBytes)
       throw new Error("A multiplayer record exceeds the network limit");
     records.push(record);
   }
@@ -321,6 +334,7 @@ async function startMatch(
         requestViews();
       },
       error: fault,
+      waitForDispatch: online,
     });
     recoveryTimer = setInterval(() => {
       try {
@@ -361,10 +375,8 @@ function handle(request: WorkerRequest, running: World) {
     requestRecords(true);
     requestViews({ force: true });
   } else if (request.kind === "replication-open") {
-    if (replicationOpen || !hasAuthority(running.epoch)) return;
-    replicationOpen = true;
-    recovery?.connected(request.connected);
-    for (const to of request.connected) sendBaseline(to);
+    requestedMembership = request.connected;
+    openReplication(running);
   } else if (request.kind === "command") {
     if (!replicationOpen || !enforceAuthority(running)) return;
     const previousSpeed = running.speed;
@@ -406,7 +418,10 @@ function handle(request: WorkerRequest, running: World) {
     requestViews({ force: true });
   } else if (request.kind === "baseline") {
     sendBaseline(request.to);
+  } else if (request.kind === "baseline-dispatched") {
+    recovery?.dispatched(request.to, request.index, request.delivered);
   } else if (request.kind === "replica-peers") {
+    if (requestedMembership) requestedMembership = request.connected;
     recovery?.connected(request.connected);
   } else if (request.kind === "progress") {
     recovery?.progress(request);
@@ -436,7 +451,7 @@ worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
   if (request.kind === "heartbeat") {
     lastControlHeartbeat = performance.now();
     authority = request.authority;
-    if (online && world) enforceAuthority(world);
+    if (online && world && enforceAuthority(world)) openReplication(world);
     return;
   }
   if (request.kind === "views-applied") {

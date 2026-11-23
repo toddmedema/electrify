@@ -3,7 +3,9 @@ const { CrossplayError } = require("./crossplay-errors.cjs");
 
 const COLLECTION = "coopRooms";
 const WRITER_UID = "electrify-coop-authority-v2";
-const MAX_LIVE_ROOMS = 24;
+// Four players use six grants per generation. Allow space for routine renewal
+// of both admitted rooms during the ten-minute grant drain and for a few retries.
+const MAX_LIVE_ROOMS = 2;
 
 function toMillis(value) {
   return value?.toMillis?.() ?? value ?? 0;

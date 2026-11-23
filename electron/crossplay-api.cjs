@@ -79,6 +79,7 @@ const REQUESTS = {
   "signal/turn": [pair],
   "signal/reset": [pair],
   "save/read": [room],
+  "save/download": [room],
   "save/publish": [
     { ...room, content: encoded, digest, explicit: flag },
     { name: text(72) },

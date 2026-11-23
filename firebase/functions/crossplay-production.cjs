@@ -32,11 +32,8 @@ function registerCrossplay(adminApp) {
     if (!/^\d{1,10}$/.test(steamAppId) || !checkpointBucket || !relayCidrs)
       throw new CrossplayError(503, "unavailable");
 
-    const store = createStore({
-      db,
-      projectId,
-      writerToken: createWriter({ auth, apiKey: secrets.writer.value() }),
-    });
+    const writerToken = createWriter({ auth, apiKey: secrets.writer.value() });
+    const store = createStore({ db, projectId, writerToken });
 
     const { createTurnSignaling } = require("./coop-signaling.cjs");
     const signaling = createTurnSignaling({
@@ -65,6 +62,18 @@ function registerCrossplay(adminApp) {
       origins: ["https://electrifygame.com", "https://www.electrifygame.com"],
       quotaKey: secrets.quota.value(),
       isStopped,
+      healthy: async () => {
+        const [, [metadata]] = await Promise.all([
+          writerToken(),
+          bucket.getMetadata(),
+        ]);
+        return (
+          checkpoints.checkpointValidatorReady() &&
+          signaling.configured &&
+          metadata.iamConfiguration?.publicAccessPrevention === "enforced" &&
+          metadata.iamConfiguration?.uniformBucketLevelAccess?.enabled === true
+        );
+      },
       extensions: {
         signal: (operation, context, body) =>
           signaling.handle(operation, context, body),

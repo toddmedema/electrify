@@ -132,9 +132,11 @@ export function validTurnPayload(
     case "save-request":
       return (
         !senderIsHost &&
-        exact(value, ["kind", "requestId", "suspended"]) &&
+        exact(value, ["kind", "requestId", "suspended", "pause"]) &&
         id(value.requestId) &&
-        (value.suspended === undefined || typeof value.suspended === "boolean")
+        (value.suspended === undefined ||
+          typeof value.suspended === "boolean") &&
+        (value.pause === undefined || typeof value.pause === "boolean")
       );
     case "keepalive":
       return (

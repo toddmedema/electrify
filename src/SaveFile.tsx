@@ -33,7 +33,7 @@ export function downloadSaveRecovery(id: string, raw: unknown): void {
   downloadJson(`electrify-recovery-${fragment || "save"}.json`, raw);
 }
 
-function downloadJson(filename: string, raw: unknown): void {
+export function downloadJson(filename: string, raw: unknown): void {
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(raw)], { type: "application/json" }),
   );
