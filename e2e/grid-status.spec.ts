@@ -36,7 +36,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(dialog).toBeVisible();
     await expect(
-      dialog.getByRole("heading", { name: "Grid status", exact: true }),
+      dialog.getByRole("button", { name: "View supply forecast" }),
     ).toBeFocused();
     await expect(
       dialog.getByRole("heading", { name: "Now · Stable" }),

@@ -134,6 +134,26 @@ test("the host kicks a guest from the name chip after it offers Kick?", () => {
   expect(screen.queryByRole("button", { name: "Kick Alice" })).toBeNull();
 });
 
+test("a tap reveals Kick? and a second tap removes the guest", () => {
+  const host = coop({
+    role: "host",
+    players: coop().players.map((player) => ({ ...player, connected: true })),
+  });
+  render(<CoopBrowseBar coop={host} />);
+  const cleo = screen.getByRole("button", { name: "Kick Cleo" });
+  // Touch sends pointerdown, then a compatibility mouseenter, then click.
+  fireEvent.pointerDown(cleo, { pointerType: "touch" });
+  fireEvent.mouseEnter(cleo);
+  fireEvent.focus(cleo);
+  fireEvent.click(cleo, { detail: 1 });
+  expect(controls.kick).not.toHaveBeenCalled();
+  expect(cleo).toHaveTextContent("Kick?");
+  fireEvent.pointerDown(cleo, { pointerType: "touch" });
+  fireEvent.click(cleo, { detail: 1 });
+  expect(controls.kick).toHaveBeenCalledTimes(1);
+  expect(controls.kick).toHaveBeenCalledWith("c");
+});
+
 test("an online host waits until every guest is ready", () => {
   const onStart = jest.fn();
   const players = coop().players.map((player) => ({

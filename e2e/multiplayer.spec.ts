@@ -622,16 +622,16 @@ test(
     await expect(warning).toHaveAccessibleDescription(
       /(?:waiting for the host|connection .* was interrupted).*Reconnect to continue this session.*won't create a new save.*Play with friends → Multiplayer saves/i,
     );
-    await expect(warning.getByRole("heading")).toBeFocused();
+    const reconnect = warning.getByRole("button", {
+      name: "Reconnect",
+      exact: true,
+    });
+    await expect(reconnect).toBeFocused();
     await expect(
       warning.getByRole("button", { name: "Return to main menu", exact: true }),
     ).toBeVisible();
     await guest.keyboard.press("Escape");
     await expect(warning).toBeVisible();
-    const reconnect = warning.getByRole("button", {
-      name: "Reconnect",
-      exact: true,
-    });
     await campaign.fixture.disconnect(guest);
     await reconnect.click();
     await expect
