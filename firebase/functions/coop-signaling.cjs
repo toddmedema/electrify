@@ -94,6 +94,7 @@ function formatPairs(pairs, seatId, now) {
   const format = (pair) => ({
     generation: pair.generation,
     remainingMs: Math.max(0, pair.expiresAt - now),
+    negotiation: pair.negotiation ?? 0,
     offer: pair.offer,
     answer: pair.answer,
   });
@@ -374,7 +375,11 @@ function createTurnSignaling({
             now < pair.renegotiatedAt + RENEGOTIATE_MS
           )
             throw new CrossplayError(429, "turn-rotation-limit");
-          const cleared = { ...pair, renegotiatedAt: now };
+          const cleared = {
+            ...pair,
+            renegotiatedAt: now,
+            negotiation: (pair.negotiation ?? 0) + 1,
+          };
           delete cleared.offer;
           delete cleared.answer;
           delete cleared.drained;
@@ -383,13 +388,25 @@ function createTurnSignaling({
             delete cleared.successor;
             return update(cleared, dropped);
           }
-          const retained = { ...current, successor: cleared };
+          const retained = {
+            ...current,
+            successor: cleared,
+            negotiation: (current.negotiation ?? 0) + 1,
+          };
           delete retained.drained;
           return update(retained);
         }
         if (name === "signal/drained") {
           // A vote after renegotiate must not complete the next handoff.
-          if (!isCurrent || !current.offer || !current.answer)
+          const vote = Number.isSafeInteger(body.negotiation)
+            ? body.negotiation
+            : 0;
+          if (
+            !isCurrent ||
+            !current.offer ||
+            !current.answer ||
+            vote !== (current.negotiation ?? 0)
+          )
             return { value: null };
           const drained = { ...(current.drained ?? {}), [seatId]: true };
           if (

@@ -65,6 +65,8 @@ export function onlineSessionServices(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   let hidden = document.visibilityState === "hidden";
+  let hiddenRoster: string[] | undefined;
+  let presenceSeq = 0;
   let active = false;
   const listeners = new Set<(event: SessionEvent) => void>();
   const relayAuthority = () =>
@@ -110,8 +112,13 @@ export function onlineSessionServices(
         listener({ kind: "message", sender, payload });
     },
     status: (ids) => {
-      // A hidden tab keeps the last relay roster. Clearing it looks like a drop.
-      if (hidden) return;
+      // Publish only reports changes, so a roster learned while hidden must be
+      // stored and applied when the tab returns.
+      if (hidden) {
+        hiddenRoster = ids;
+        return;
+      }
+      hiddenRoster = undefined;
       connected = ids;
       publish({ ...lobby, connected });
     },
@@ -177,6 +184,7 @@ export function onlineSessionServices(
     const current = version;
     const sequence = ++lastRequest;
     const monotonic = performance.now();
+    const wall = Date.now();
     const action = operation !== "state";
     if (action) {
       latestAction = sequence;
@@ -245,16 +253,19 @@ export function onlineSessionServices(
     if (granted && grant && roomId && selfId && hostId) {
       if (authority && authority.epoch !== grant.epoch) expire();
       const remaining = Math.min(12_000, grant.leaseRemainingMs);
-      const started = performance.now();
+      const elapsed = performance.now() - monotonic;
       authority = {
         epoch: grant.epoch,
-        monotonicDeadline: performance.timeOrigin + started + remaining,
-        wallDeadline: Date.now() + remaining,
+        monotonicDeadline: performance.timeOrigin + monotonic + remaining,
+        wallDeadline: wall + remaining,
       };
       clearTimeout(expiry);
-      expiry = setTimeout(() => {
-        expire("Connection to the multiplayer service was interrupted.");
-      }, remaining);
+      expiry = setTimeout(
+        () => {
+          expire("Connection to the multiplayer service was interrupted.");
+        },
+        Math.max(0, remaining - elapsed),
+      );
       publish({
         ...lobbyView,
         sharedAt: grant.head?.savedAt,
@@ -271,10 +282,13 @@ export function onlineSessionServices(
             binding: grant.binding,
             leaseRemainingMs: remaining,
           },
-          started,
+          monotonic,
         );
       }
-    } else if (fresh) {
+    } else if (
+      fresh ||
+      (grant && authority && grant.epoch !== authority.epoch)
+    ) {
       expire();
       publish({ ...lobbyView, connected: [] });
     } else if (relayAuthority()) {
@@ -293,19 +307,32 @@ export function onlineSessionServices(
     // still lets another player acquire the room.
     if (roomId && presence)
       void api
-        .request("room/suspend", { roomId, presence })
+        .request("room/suspend", {
+          roomId,
+          presence,
+          seq: ++presenceSeq,
+        })
         .catch(() => undefined);
   }
 
   function resume() {
     const wasHidden = hidden;
     hidden = document.visibilityState === "hidden";
+    if (wasHidden && !hidden && hiddenRoster) {
+      connected = hiddenRoster;
+      hiddenRoster = undefined;
+      publish({ ...lobby, connected });
+    }
     if (!wasHidden || hidden || !roomId) return;
     const current = roomId;
     const token = presence;
     void (
       token
-        ? api.request("room/resume", { roomId: current, presence: token })
+        ? api.request("room/resume", {
+            roomId: current,
+            presence: token,
+            seq: ++presenceSeq,
+          })
         : Promise.resolve()
     )
       .catch(() => undefined)

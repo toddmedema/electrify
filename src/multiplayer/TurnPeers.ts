@@ -74,6 +74,7 @@ interface Options {
 interface Generation {
   generation: string;
   remainingMs: number;
+  negotiation?: number;
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
 }
@@ -105,6 +106,7 @@ interface Link {
   current: Leg;
   successor?: Leg;
   handoff?: Handoff;
+  negotiation?: number;
 }
 
 interface CredentialReply {
@@ -435,18 +437,24 @@ export class TurnPeers {
     let link = this.links.get(peerId);
     if (link && link.current.generation !== generation) {
       const promoted = link.successor;
-      if (promoted?.generation === generation) {
+      const predecessor = link.current.peer;
+      const transferPending =
+        !!predecessor &&
+        (predecessor.readingTransfer ||
+          predecessor.outgoingTransfer ||
+          predecessor.pending.length > 0);
+      if (promoted?.generation === generation && !transferPending) {
         this.closeLeg(link.current);
         link.current = promoted;
         link.successor = undefined;
         if (!this.handoffComplete(link) && link.handoff) {
-          // The server has retired the predecessor. Keep the successor open.
+          // The predecessor transfer has finished. The successor can take sends.
           link.handoff.sentDrained = true;
           link.handoff.receivedDrained = true;
           link.handoff.release?.(true);
         }
         link.handoff = undefined;
-      } else {
+      } else if (!transferPending) {
         this.closeLink(link);
         this.publish();
         link = undefined;
@@ -456,6 +464,8 @@ export class TurnPeers {
       link = { to: peerId, current: { generation } };
       this.links.set(peerId, link);
     }
+    if (link.current.generation === generation)
+      link.negotiation = signal.negotiation ?? 0;
     if (link.successor && link.successor.generation !== successor?.generation) {
       // The far end can reset a staged leg independently. Once either barrier
       // has crossed, using the old stream again could skip or duplicate data.
@@ -704,6 +714,7 @@ export class TurnPeers {
         roomId: authority.roomId,
         to: link.to,
         generation: link.current.generation,
+        negotiation: link.negotiation ?? 0,
       })
       .catch(() => undefined);
   }
@@ -790,6 +801,8 @@ export class TurnPeers {
       this.publish();
       return;
     }
+    if (control === DRAIN || control === DRAINED || control === CONFIRMED)
+      return;
     // New-channel gameplay can arrive only after this side acknowledged that
     // the old ordered stream, including asynchronous downloads, has drained.
     if (

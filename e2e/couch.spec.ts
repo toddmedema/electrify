@@ -126,9 +126,28 @@ async function startCouch<Actor extends Page | Frame>(
   await page.getByRole("option", { name: "Carbon Fee", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(duration).toContainText("12 years");
+  // The default peaker covers the whole month by itself, so pausing an extra
+  // coal plant never creates the future shortfall these specs assert.
+  // Replace it with a small gas plant plus a larger coal plant.
   await page
-    .getByRole("combobox", { name: "Facility type", exact: true })
+    .getByRole("button", { name: "Remove Natural Gas Peaker", exact: true })
     .click();
+  const facilityType = page.getByRole("combobox", {
+    name: "Facility type",
+    exact: true,
+  });
+  const facilitySize = page.getByRole("combobox", {
+    name: "Facility size",
+    exact: true,
+  });
+  await facilityType.click();
+  await page
+    .getByRole("option", { name: "Natural Gas CC", exact: true })
+    .click();
+  await facilitySize.click();
+  await page.getByRole("option", { name: "250MW", exact: true }).click();
+  await page.getByRole("button", { name: "Add facility", exact: true }).click();
+  await facilityType.click();
   await page.getByRole("option", { name: "Coal", exact: true }).click();
   await page.getByRole("button", { name: "Add facility", exact: true }).click();
   const startForEveryone = page.getByRole("button", {

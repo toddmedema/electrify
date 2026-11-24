@@ -57,6 +57,14 @@ function activeMember(member, account, now) {
   );
 }
 
+function acceptPresenceSeq(member, seq) {
+  if (seq === undefined) return member.presenceSeq === undefined;
+  if (!Number.isSafeInteger(seq) || seq < 1 || seq > 1_000_000) return false;
+  if (seq <= (member.presenceSeq ?? 0)) return false;
+  member.presenceSeq = seq;
+  return true;
+}
+
 function forgetPair(room, seatId) {
   if (room.hostId === seatId) room.signals = {};
   else if (room.signals) delete room.signals[seatId];
@@ -575,9 +583,18 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
         break;
       }
       case "room/resume": {
-        keys(body, "roomId", "presence");
+        keys(
+          body,
+          "roomId",
+          "presence",
+          ...(body?.seq === undefined ? [] : ["seq"]),
+        );
         requireValue(ROOM_ID.test(body.presence));
-        await edit(id, actor, "bound", (room, self, now) => {
+        requireValue(
+          acceptPresenceSeq({ presenceSeq: 0 }, body.seq) ||
+            body.seq === undefined,
+        );
+        await edit(id, actor, "bound", async (room, self, now) => {
           const member = room.members.find(
             ({ account }) => account === actor.account,
           );
@@ -587,9 +604,16 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
             "seat_reclaim_required",
           );
           if (member.presence !== body.presence) return {};
+          if (!acceptPresenceSeq(member, body.seq)) return {};
           delete member.away;
           member.seenAt = now;
           member.active = true;
+          if (room.hostId === member.id && room.leaseUntil > now) {
+            await reserve(id, now);
+            room.leaseUntil = now + LEASE_MS;
+            if (!room.locked)
+              room.expiresAt = Math.max(room.expiresAt, now + LOBBY_MS);
+          }
           return { room };
         });
         return response(id, actor);
@@ -598,8 +622,19 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
       case "room/leave":
       case "room/withdraw": {
         if (operation === "room/suspend") {
-          keys(body, "roomId", "presence");
+          keys(
+            body,
+            "roomId",
+            "presence",
+            ...(body?.seq === undefined ? [] : ["seq"]),
+          );
           requireValue(ROOM_ID.test(body.presence));
+          requireValue(
+            body.seq === undefined ||
+              (Number.isSafeInteger(body.seq) &&
+                body.seq >= 1 &&
+                body.seq <= 1_000_000),
+          );
         } else withOnlyRoom();
         const withdraw = operation === "room/withdraw";
         const leave = operation === "room/leave";
@@ -618,7 +653,8 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
             );
             if (
               operation === "room/suspend" &&
-              member.presence !== body.presence
+              (member.presence !== body.presence ||
+                !acceptPresenceSeq(member, body.seq))
             )
               return {};
             if (operation === "room/suspend") {

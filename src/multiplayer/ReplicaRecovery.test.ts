@@ -117,6 +117,23 @@ test("a delivered online baseline can take a minute to install before it counts 
   expect(f.baselines()).toHaveLength(2);
 });
 
+test("two slow online baseline deliveries still exhaust the failure budget", () => {
+  const f = fixture(digest, 2, true);
+  f.time(0);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.time(50_000);
+  f.recovery.dispatched("1", f.baselines()[0].baseline.index, true);
+  f.time(110_000);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.time(160_000);
+  f.recovery.dispatched("1", f.baselines()[1].baseline.index, true);
+  f.time(220_000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  expect(worldBlockers(f.host.world)).toEqual([
+    "Player 1 could not stay in sync. Save and resume the match.",
+  ]);
+});
+
 test("an online baseline dispatch failure leaves time for the transfer service to recover", () => {
   const f = fixture(digest, 2, true);
   expect(f.recovery.baseline("1")).toBe(true);

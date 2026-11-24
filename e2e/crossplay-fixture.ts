@@ -64,6 +64,7 @@ type Signal = {
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
   renegotiatedAt?: number;
+  negotiation?: number;
   drained?: Record<string, boolean>;
 };
 // Keep these aligned with firebase/functions/coop-signaling.cjs.
@@ -658,6 +659,7 @@ export function crossplayFixture() {
       const format = (pair: Signal) => ({
         generation: pair.generation,
         remainingMs: pair.expiresAt - now,
+        negotiation: pair.negotiation ?? 0,
         offer: pair.offer,
         answer: pair.answer,
       });
@@ -722,10 +724,19 @@ export function crossplayFixture() {
         delete pair.answer;
         delete pair.drained;
         delete current.drained;
+        pair.negotiation = (pair.negotiation ?? 0) + 1;
         pair.renegotiatedAt = now;
         if (!staged) delete current.successor;
+        else current.negotiation = (current.negotiation ?? 0) + 1;
       } else if (operation === "signal/drained") {
-        if (!staged && current.offer && current.answer) {
+        const vote =
+          typeof body.negotiation === "number" ? body.negotiation : 0;
+        if (
+          !staged &&
+          current.offer &&
+          current.answer &&
+          vote === (current.negotiation ?? 0)
+        ) {
           current.drained = { ...current.drained, [seatId]: true };
           if (
             current.successor &&

@@ -71,6 +71,32 @@ test("browser extras and an IPv6 relay become the canonical description", () => 
   expect(offer.sdp).toContain("c=IN IP4 0.0.0.0");
 });
 
+test("public neighbors of reserved /24 ranges stay eligible relays", () => {
+  const relay = (address: string) =>
+    relayDescription({
+      type: "offer",
+      sdp: [
+        "v=0",
+        "o=- 1 1 IN IP4 127.0.0.1",
+        "s=-",
+        "t=0 0",
+        "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+        "c=IN IP4 0.0.0.0",
+        `a=candidate:1 1 udp 1 ${address} 3478 typ relay`,
+        "a=ice-ufrag:iA22",
+        "a=ice-pwd:FtboouybttTfOsvwT8PvWx",
+        "a=fingerprint:sha-256 AA:BB",
+        "a=setup:actpass",
+        "a=mid:0",
+        "a=sctp-port:5000",
+      ].join("\r\n"),
+    });
+  expect(relay("198.51.101.1").sdp).toContain("198.51.101.1");
+  expect(relay("192.0.1.1").sdp).toContain("192.0.1.1");
+  expect(() => relay("198.51.100.1")).toThrow(/eligible relay/);
+  expect(() => relay("192.0.2.1")).toThrow(/eligible relay/);
+});
+
 test("the selected pair must match both authenticated relay endpoints", async () => {
   const local = relayDescription({ type: "offer", sdp });
   const remote = relayDescription({

@@ -19,6 +19,8 @@ const text = (maximum) => (value) =>
 const list = (value) =>
   Array.isArray(value) && value.length <= 4 && value.every(id);
 const flag = (value) => typeof value === "boolean";
+const seq = (value) =>
+  Number.isSafeInteger(value) && value >= 1 && value <= 1_000_000;
 const invite = (value) =>
   typeof value === "string" &&
   (/^[a-z0-9]{6}$/i.test(value) ||
@@ -71,8 +73,8 @@ const REQUESTS = {
   "room/lock": [{ ...room, ids: list, requiredIds: list }],
   "room/unlock": [room],
   "room/leave": [room],
-  "room/suspend": [{ ...room, presence: id }],
-  "room/resume": [{ ...room, presence: id }],
+  "room/suspend": [{ ...room, presence: id }, { seq }],
+  "room/resume": [{ ...room, presence: id }, { seq }],
   "room/withdraw": [room],
   "room/remove": [{ ...room, seatId: id }],
   "signal/read": [room],

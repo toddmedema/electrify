@@ -113,9 +113,12 @@ export class ReplicaRecovery {
     // An unapplied transfer counts only after its retry window elapses.
     if (peer.baseline) peer.failedAttempts.push(peer.baseline.startedAt);
     peer.verifyingBaselineSince = undefined;
-    const attemptWindow = this.options.waitForDispatch ? 210_000 : 60_000;
+    // Two slow online transfers can each take the dispatch wait plus the
+    // minute allowed to install. The window has to cover both starts.
+    const attemptWindow = this.options.waitForDispatch ? 360_000 : 60_000;
+    const justFailed = peer.baseline?.startedAt;
     peer.failedAttempts = peer.failedAttempts.filter(
-      (time) => now - time < attemptWindow,
+      (time) => time === justFailed || now - time < attemptWindow,
     );
     peer.startedAttempts = peer.startedAttempts.filter(
       (time) => now - time < attemptWindow,

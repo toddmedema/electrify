@@ -731,6 +731,51 @@ test("a hidden host does not renew the lease until they return", async () => {
   assert.ok(ctx.documents.get(roomId).leaseUntil > parked);
 });
 
+test("a late suspend cannot mark a returned host away", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  const presence = room.authority.presence;
+  assert.equal(
+    (
+      await ctx.call(
+        "room/suspend",
+        { roomId, presence, seq: 1 },
+        { token: host },
+      )
+    ).status,
+    200,
+  );
+  assert.equal(ctx.documents.get(roomId).members[0].away, true);
+  ctx.advance(5_000);
+  const parked = ctx.documents.get(roomId).leaseUntil;
+  assert.equal(
+    (
+      await ctx.call(
+        "room/resume",
+        { roomId, presence, seq: 2 },
+        { token: host },
+      )
+    ).status,
+    200,
+  );
+  assert.ok(ctx.documents.get(roomId).leaseUntil > parked);
+  const extended = ctx.documents.get(roomId).leaseUntil;
+  assert.equal(
+    (
+      await ctx.call(
+        "room/suspend",
+        { roomId, presence, seq: 1 },
+        { token: host },
+      )
+    ).status,
+    200,
+  );
+  assert.equal(ctx.documents.get(roomId).members[0].away, undefined);
+  assert.equal(ctx.documents.get(roomId).leaseUntil, extended);
+});
+
 test("rate limits use the address appended by the front end", async () => {
   const ctx = setup();
   const body = { token: "google.com:caller", device: DEVICE };
