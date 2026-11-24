@@ -34,11 +34,17 @@ function registerCrossplay(adminApp) {
     const store = createStore({ db, projectId, writerToken });
 
     const { createTurnSignaling } = require("./coop-signaling.cjs");
+    const { createRelayPolicy } = require("./coop-signaling-sdp.cjs");
+    const relayCidrs = process.env.COOP_TURN_RELAY_CIDRS ?? "";
+    const relayPolicy = relayCidrs ? createRelayPolicy(relayCidrs) : null;
+    if (relayCidrs && !relayPolicy)
+      throw new CrossplayError(503, "unavailable");
     const signaling = createTurnSignaling({
       db,
       keyId: secrets.turnId.value(),
       keyToken: secrets.turnToken.value(),
       loadRoom: (id) => service.loadRoom(id),
+      relayPolicy,
     });
     const checkpoints = require("./coop-checkpoints.cjs");
     const campaignRules = require("./build/compatibility.json");

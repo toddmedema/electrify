@@ -72,6 +72,7 @@ const REQUESTS = {
   "room/unlock": [room],
   "room/leave": [room],
   "room/suspend": [{ ...room, presence: id }],
+  "room/resume": [{ ...room, presence: id }],
   "room/withdraw": [room],
   "room/remove": [{ ...room, seatId: id }],
   "signal/read": [room],
@@ -79,6 +80,8 @@ const REQUESTS = {
   "signal/turn": [pair],
   "signal/prepare": [pair],
   "signal/reset": [pair],
+  "signal/renegotiate": [pair],
+  "signal/drained": [pair],
   "save/read": [room],
   "save/download": [room],
   "save/publish": [

@@ -1,16 +1,35 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { createCrossplay } = require("./crossplay-http.cjs");
+const { createTurnSignaling } = require("./coop-signaling.cjs");
 
 const ORIGIN = "https://electrifygame.com";
 const RULES = `coop-2-${"a".repeat(64)}`;
 const DEVICE = "d".repeat(43);
 
-function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
+function setup({
+  steamEnabled = true,
+  collisions = 0,
+  campaignRules,
+  turn = false,
+} = {}) {
   let now = 10_000;
+  const signaling = turn
+    ? createTurnSignaling({
+        db: {
+          collection: () => ({ doc: () => ({}) }),
+          doc: () => ({}),
+        },
+        keyId: "key",
+        keyToken: "test-token",
+        loadRoom: async () => null,
+        clock: () => now,
+      })
+    : null;
   let stopped = false;
   let inviteFailures = 0;
   const documents = new Map();
+  const quotas = [];
   const inviteCodes = new Map();
   const accounts = new Map();
   const tickets = new Set();
@@ -41,7 +60,10 @@ function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
     store: {
       account: async (id) => accounts.get(id),
       accounts: async (ids) => ids.map((id) => accounts.get(id)),
-      consume: async () => true,
+      consume: async (entries) => {
+        quotas.push(...entries.map((entry) => entry.id));
+        return true;
+      },
       consumeTicket: async (digest) => {
         if (tickets.has(digest)) return false;
         tickets.add(digest);
@@ -125,7 +147,10 @@ function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
           return { room, value: room.head };
         }, "host");
       },
-      signal: (_operation, { seatId }) => ({ seatId }),
+      signal: signaling
+        ? (operation, context, body) =>
+            signaling.handle(operation, context, body)
+        : (_operation, { seatId }) => ({ seatId }),
     },
   });
 
@@ -213,6 +238,8 @@ function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
     failInvites(count) {
       inviteFailures = count;
     },
+    documents,
+    quotas,
   };
 }
 
@@ -646,13 +673,17 @@ test("a late suspend cannot invalidate a newer foreground binding", async () => 
   const room = await ctx.create(host);
   const roomId = room.lobby.lobbyId;
   const old = room.authority.presence;
+  ctx.documents.get(roomId).signals = { keep: { generation: "stay" } };
   assert.equal(
     (await ctx.call("room/suspend", { roomId, presence: old }, { token: host }))
       .status,
     200,
   );
+  assert.equal(ctx.documents.get(roomId).signals.keep.generation, "stay");
+  assert.equal(ctx.documents.get(roomId).members[0].away, true);
   const paused = await ctx.call("room/state", { roomId }, { token: host });
-  assert.equal(paused.body.authority.leaseRemainingMs, 0);
+  assert.ok(paused.body.authority.leaseRemainingMs > 0);
+  assert.equal(ctx.documents.get(roomId).signals.keep.generation, "stay");
   const reconnected = await ctx.call(
     "room/reconnect",
     { roomId, rules: RULES },
@@ -660,11 +691,113 @@ test("a late suspend cannot invalidate a newer foreground binding", async () => 
   );
   assert.equal(reconnected.body.authority.epoch, room.authority.epoch);
   assert.notEqual(reconnected.body.authority.presence, old);
+  ctx.documents.get(roomId).signals = { keep: { generation: "stay" } };
   assert.equal(
     (await ctx.call("room/suspend", { roomId, presence: old }, { token: host }))
       .status,
     200,
   );
+  assert.equal(ctx.documents.get(roomId).signals.keep.generation, "stay");
   const current = await ctx.call("room/state", { roomId }, { token: host });
   assert.ok(current.body.authority.leaseRemainingMs > 0);
+  assert.equal(ctx.documents.get(roomId).signals.keep.generation, "stay");
+  assert.notEqual(ctx.documents.get(roomId).members[0].away, true);
+});
+
+test("a hidden host does not renew the lease until they return", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  const presence = room.authority.presence;
+  ctx.advance(5_000);
+  assert.equal(
+    (await ctx.call("room/suspend", { roomId, presence }, { token: host }))
+      .status,
+    200,
+  );
+  const parked = ctx.documents.get(roomId).leaseUntil;
+  await ctx.call("room/state", { roomId }, { token: host });
+  assert.equal(ctx.documents.get(roomId).leaseUntil, parked);
+  assert.equal(ctx.documents.get(roomId).members[0].away, true);
+  assert.equal(
+    (await ctx.call("room/resume", { roomId, presence }, { token: host }))
+      .status,
+    200,
+  );
+  assert.equal(ctx.documents.get(roomId).members[0].away, undefined);
+  ctx.advance(5_000);
+  await ctx.call("room/state", { roomId }, { token: host });
+  assert.ok(ctx.documents.get(roomId).leaseUntil > parked);
+});
+
+test("rate limits use the address appended by the front end", async () => {
+  const ctx = setup();
+  const body = { token: "google.com:caller", device: DEVICE };
+  const addresses = async (forwarded) => {
+    const before = ctx.quotas.length;
+    assert.equal(
+      (
+        await ctx.call("auth/google", body, {
+          headers: { "x-forwarded-for": forwarded },
+        })
+      ).status,
+      200,
+    );
+    return ctx.quotas.slice(before).filter((id) => id.startsWith("auth-ip-"));
+  };
+  const spoofed = await addresses("198.51.100.9, 203.0.113.10");
+  const again = await addresses("203.0.113.44, 203.0.113.10");
+  const other = await addresses("203.0.113.10, 203.0.113.11");
+  assert.equal(spoofed[0], again[0]);
+  assert.notEqual(spoofed[0], other[0]);
+  process.env.COOP_TRUSTED_PROXY_HOPS = "1";
+  try {
+    const skipped = await addresses("198.51.100.9, 203.0.113.10, 192.0.2.8");
+    assert.equal(skipped[0], spoofed[0]);
+  } finally {
+    delete process.env.COOP_TRUSTED_PROXY_HOPS;
+  }
+});
+
+test("a hidden guest keeps the relay pair while the host lease is live", async () => {
+  const ctx = setup({ turn: true });
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  const joined = await ctx.joinPlayer(room, guest);
+  const guestId = joined.lobby.selfId;
+  const first = await ctx.call("signal/read", { roomId }, { token: host });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  const generation = first.body.pairs.find(
+    (pair) => pair.peerId === guestId,
+  ).generation;
+  assert.equal(
+    (
+      await ctx.call(
+        "room/suspend",
+        { roomId, presence: joined.authority.presence },
+        { token: guest },
+      )
+    ).status,
+    200,
+  );
+  ctx.advance(5_000);
+  const renewed = await ctx.call("room/state", { roomId }, { token: host });
+  assert.equal(renewed.status, 200);
+  assert.ok(renewed.body.authority.leaseRemainingMs > 0);
+  ctx.advance(8_000);
+  const still = await ctx.call("room/state", { roomId }, { token: host });
+  assert.ok(still.body.authority.leaseRemainingMs > 0);
+  const read = await ctx.call("signal/read", { roomId }, { token: host });
+  assert.equal(read.status, 200, JSON.stringify(read.body));
+  assert.equal(
+    read.body.pairs.find((pair) => pair.peerId === guestId)?.generation,
+    generation,
+  );
+  assert.equal(
+    ctx.documents.get(roomId).signals[guestId].generation,
+    generation,
+  );
 });

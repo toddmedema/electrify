@@ -16,6 +16,7 @@ interface Peer {
   baseline?: { index: number; startedAt: number; retryAt: number };
   verifyingBaselineSince?: number;
   failedAttempts: number[];
+  startedAttempts: number[];
   minimumVerify: number;
   compared: number;
   report?: { index: number; hash: string };
@@ -58,6 +59,7 @@ export class ReplicaRecovery {
           applied: 0,
           progressedAt: this.now(),
           failedAttempts: [],
+          startedAttempts: [],
           minimumVerify: 1,
           compared: 0,
         });
@@ -111,9 +113,21 @@ export class ReplicaRecovery {
     // An unapplied transfer counts only after its retry window elapses.
     if (peer.baseline) peer.failedAttempts.push(peer.baseline.startedAt);
     peer.verifyingBaselineSince = undefined;
+    const attemptWindow = this.options.waitForDispatch ? 210_000 : 60_000;
     peer.failedAttempts = peer.failedAttempts.filter(
-      (time) => now - time < (this.options.waitForDispatch ? 210_000 : 60_000),
+      (time) => now - time < attemptWindow,
     );
+    peer.startedAttempts = peer.startedAttempts.filter(
+      (time) => now - time < attemptWindow,
+    );
+    if (peer.startedAttempts.length >= 8) {
+      peer.baseline = undefined;
+      peer.stopped = `${this.name(to)} could not stay in sync. Save and resume the match.`;
+      if (!this.host.world.outcomes[to]) this.host.pause(peer.stopped);
+      this.blockers();
+      this.options.changed();
+      return false;
+    }
     peer.live = false;
     peer.report = undefined;
     peer.heldAt = undefined;
@@ -131,6 +145,7 @@ export class ReplicaRecovery {
     // The preceding stream, baseline and its verify must enter the transport in this order.
     this.options.flush();
     const baseline = this.host.baseline();
+    peer.startedAttempts.push(now);
     peer.baseline = {
       index: baseline.index,
       startedAt: now,
@@ -146,7 +161,7 @@ export class ReplicaRecovery {
     const baseline = this.peers.get(to)?.baseline;
     if (!this.options.waitForDispatch || !baseline || baseline.index !== index)
       return;
-    baseline.retryAt = this.now() + (delivered ? 25_000 : 2_000);
+    baseline.retryAt = this.now() + (delivered ? 60_000 : 2_000);
   }
   progress(report: Progress) {
     if (this.terminal) return;

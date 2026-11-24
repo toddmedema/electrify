@@ -1,6 +1,9 @@
 const { BlockList, isIP } = require("node:net");
 
 const nonPublic = new BlockList();
+// A separate list: putting ::ffff:0:0/96 on the IPv4 list blocks every IPv4 address.
+const mapped = new BlockList();
+mapped.addSubnet("::ffff:0:0", 96, "ipv6");
 for (const [address, bits] of [
   ["0.0.0.0", 8],
   ["10.0.0.0", 8],
@@ -17,11 +20,21 @@ for (const [address, bits] of [
   ["203.0.113.0", 24],
   ["224.0.0.0", 3],
 ]) {
-  nonPublic.addSubnet(address, bits);
+  nonPublic.addSubnet(address, bits, "ipv4");
+}
+for (const [address, bits] of [
+  ["::", 128],
+  ["::1", 128],
+  ["fe80::", 10],
+  ["fc00::", 7],
+  ["ff00::", 8],
+  ["2001:db8::", 32],
+]) {
+  nonPublic.addSubnet(address, bits, "ipv6");
 }
 
 const candidate =
-  /^a=candidate:[a-zA-Z0-9+/]{1,32} 1 udp (\d{1,10}) (\d{1,3}(?:\.\d{1,3}){3}) (\d{1,5}) typ relay$/;
+  /^a=candidate:[a-zA-Z0-9+/]{1,32} 1 udp (\d{1,10}) ([0-9a-f:.]+) (\d{1,5}) typ relay$/i;
 const origin =
   /^o=(?:-|mozilla\.\.\.THIS_IS_SDPARTA-[\w.-]+) \d{1,20} \d{1,20} IN IP4 0\.0\.0\.0$/;
 const data = /^m=application (\d{1,5}) UDP\/DTLS\/SCTP webrtc-datachannel$/;
@@ -36,7 +49,14 @@ const direct = new Set(["v=0", "s=-", "t=0 0", "a=sctp-port:5000"]);
 const optional = new Set(["a=msid-semantic: WMS", "a=end-of-candidates"]);
 
 function isPublicRelayAddress(address) {
-  return isIP(address) === 4 && !nonPublic.check(address);
+  const version = isIP(address);
+  if (version === 4) return !nonPublic.check(address, "ipv4");
+  if (version === 6) {
+    // Mapped text compares as IPv4 on the shared list, so it has its own prefix.
+    if (mapped.check(address, "ipv6")) return false;
+    return !nonPublic.check(address, "ipv6");
+  }
+  return false;
 }
 
 function createRelayPolicy(config) {
@@ -44,19 +64,33 @@ function createRelayPolicy(config) {
   const ips = new BlockList();
   for (const range of config.trim().split(/[\s,]+/)) {
     const [address, mask, extra] = range.split("/");
+    const version = isIP(address);
+    const bits = Number(mask);
+    const prefix =
+      version === 4
+        ? bits >= 16 && bits <= 32
+        : version === 6 && bits >= 8 && bits <= 128;
     if (
       extra !== undefined ||
       !isPublicRelayAddress(address) ||
-      !/^(?:1[6-9]|2\d|3[0-2])$/.test(mask)
+      !Number.isInteger(bits) ||
+      !prefix
     ) {
       return null;
     }
-    ips.addSubnet(address, Number(mask));
+    ips.addSubnet(address, bits, version === 6 ? "ipv6" : "ipv4");
   }
-  return (address) => isPublicRelayAddress(address) && ips.check(address);
+  return (address) => {
+    const version = isIP(address);
+    if (version !== 4 && version !== 6) return false;
+    return (
+      isPublicRelayAddress(address) &&
+      ips.check(address, version === 6 ? "ipv6" : "ipv4")
+    );
+  };
 }
 
-function validateDescription(value, type) {
+function validateDescription(value, type, relayPolicy = null) {
   if (
     value?.type !== type ||
     Object.keys(value).length !== 2 ||
@@ -80,7 +114,7 @@ function validateDescription(value, type) {
       if (
         endpoints.size >= 16 ||
         endpoints.has(key) ||
-        !isPublicRelayAddress(address) ||
+        !(relayPolicy ? relayPolicy(address) : isPublicRelayAddress(address)) ||
         Number(priority) > 0xffffffff ||
         Number(port) < 1 ||
         Number(port) > 65535

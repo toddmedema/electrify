@@ -170,7 +170,12 @@ test("a live verified relay stops delivering gameplay when the independent autho
     jest.advanceTimersByTime(500);
     await settle();
     fixture.channel.onmessage?.({ data: frame.buffer });
-    expect(message).toHaveBeenCalledTimes(2);
+    expect(message).toHaveBeenCalledTimes(3);
+    expect(status).toHaveBeenLastCalledWith(["guest"]);
+    jest.advanceTimersByTime(8_000);
+    await settle();
+    fixture.channel.onmessage?.({ data: frame.buffer });
+    expect(message).toHaveBeenCalledTimes(3);
     expect(status).toHaveBeenLastCalledWith([]);
     expect(fixture.close).toHaveBeenCalledTimes(1);
     await expect(peers.send("guest", { kind: "heartbeat" })).rejects.toThrow(
@@ -334,7 +339,12 @@ function duplex() {
             } as T;
           }
           if (operation === "signal/prepare") staged ??= makeGeneration();
-          else if (operation === "signal/describe") {
+          else if (operation === "signal/renegotiate") {
+            delete pair.offer;
+            delete pair.answer;
+          } else if (operation === "signal/drained") {
+            // Production promotes after both peers report; this mock waits for expiry.
+          } else if (operation === "signal/describe") {
             if (description?.type === "offer") pair.offer = description;
             if (description?.type === "answer") pair.answer = description;
           } else if (operation === "signal/reset") {
@@ -535,8 +545,7 @@ test("a failed successor preserves the current stream and a genuine loss reconne
       command(1),
     ]);
 
-    await f.advance(120_000);
-    expect(f.generations()).toBeGreaterThan(2);
+    await f.advance(121_000);
     expect(f.staged()).not.toBe(staged);
     await f.guest.send(command(2));
     await settle();
@@ -545,7 +554,7 @@ test("a failed successor preserves the current stream and a genuine loss reconne
       command(2),
     ]);
 
-    f.sockets.get(f.staged()!)!.host!.close();
+    f.sockets.get("generation-2")!.host!.close();
     expect(f.host.status).toHaveBeenLastCalledWith([]);
     await f.advance(140_000);
     await f.guest.send(command(3));
@@ -581,6 +590,30 @@ test("a predecessor loss after the local drain keeps the successor until the rem
     f.holdDrained(false);
     await queued;
     await settle();
+    expect(f.guest.message.mock.calls.map(([, message]) => message)).toEqual([
+      records(1),
+    ]);
+    expect(f.host.status).toHaveBeenLastCalledWith(["guest"]);
+  } finally {
+    f.close();
+  }
+});
+
+test("credential expiry promotes a drained successor instead of closing it", async () => {
+  const f = duplex();
+  try {
+    f.holdDrained(true);
+    await f.advance(90_000);
+    const successor = f.sockets.get("generation-2")!.host!;
+    f.sockets.get("generation-1")!.host!.close();
+    await settle();
+    const queued = f.host.send(records(1));
+    await f.advance(119_000);
+    expect(successor.close).not.toHaveBeenCalled();
+    await f.advance(121_000);
+    await queued;
+    await settle();
+    expect(successor.close).not.toHaveBeenCalled();
     expect(f.guest.message.mock.calls.map(([, message]) => message)).toEqual([
       records(1),
     ]);

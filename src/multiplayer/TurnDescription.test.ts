@@ -32,6 +32,45 @@ test("the exchanged SDP keeps the relay and strips local network details", () =>
   );
 });
 
+test("browser extras and an IPv6 relay become the canonical description", () => {
+  const noisy = [
+    "v=0",
+    "o=mozilla...THIS_IS_SDPARTA-99 1 2 IN IP4 127.0.0.1",
+    "s=-",
+    "t=0 0",
+    "a=group:BUNDLE 0",
+    "a=extmap-allow-mixed",
+    "a=msid-semantic: WMS",
+    "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+    "c=IN IP6 2606:4700:4700::1111",
+    "a=rtcp-mux",
+    "a=rtcp:9 IN IP4 0.0.0.0",
+    "a=ice-ufrag:iA22",
+    "a=ice-pwd:FtboouybttTfOsvwT8PvWx",
+    "a=ice-options:trickle",
+    "a=fingerprint:sha-256 AA:BB",
+    "a=setup:actpass",
+    "a=mid:0",
+    "a=sendrecv",
+    "a=sctp-port:5000",
+    "a=max-message-size:262144",
+    "a=candidate:7 1 udp 1 2606:4700:4700::1111 3478 typ relay",
+    "a=candidate:8 1 udp 1 fe80::1 3478 typ relay",
+    "a=candidate:9 1 udp 1 2001:db8::1 3478 typ relay",
+    "a=candidate:10 1 udp 1 0:0:0:0:0:ffff:808:808 3478 typ relay",
+    "a=end-of-candidates",
+  ].join("\r\n");
+  const offer = relayDescription({ type: "offer", sdp: noisy });
+  expect(offer.sdp).toContain("a=group:BUNDLE 0");
+  expect(offer.sdp).toContain(
+    "a=candidate:7 1 udp 1 2606:4700:4700::1111 3478 typ relay",
+  );
+  expect(offer.sdp).not.toMatch(
+    /rtcp|trickle|extmap|sendrecv|fe80|127\.0|2001:db8|ffff/,
+  );
+  expect(offer.sdp).toContain("c=IN IP4 0.0.0.0");
+});
+
 test("the selected pair must match both authenticated relay endpoints", async () => {
   const local = relayDescription({ type: "offer", sdp });
   const remote = relayDescription({

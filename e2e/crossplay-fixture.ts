@@ -63,9 +63,12 @@ type Signal = {
   successor?: Signal;
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
+  renegotiatedAt?: number;
+  drained?: Record<string, boolean>;
 };
 // Keep these aligned with firebase/functions/coop-signaling.cjs.
-const PREPARE_WINDOW_MS = 36_000;
+const PREPARE_WINDOW_MS = 56_000;
+const RENEGOTIATE_MS = 10_000;
 const ROTATION_WINDOW_MS = 25_000;
 const FAILED_GENERATION_MS = 15_000;
 type BrowserPlayer = {
@@ -644,7 +647,7 @@ export function crossplayFixture() {
         guestId: guest.id,
         guestBinding: guest.binding,
         createdAt: now,
-        expiresAt: now + 120_000,
+        expiresAt: now + 140_000,
       });
       const eligible = (pair: Signal, guest: RoomMember) =>
         pair.epoch === room.epoch &&
@@ -709,6 +712,28 @@ export function crossplayFixture() {
           throw new CrossplayError(429, "turn-rotation-limit");
         if (staged) current.successor = freshPair(guest);
         else delete signals[pair.guestId];
+      } else if (operation === "signal/renegotiate") {
+        if (
+          pair.renegotiatedAt !== undefined &&
+          now < pair.renegotiatedAt + RENEGOTIATE_MS
+        )
+          throw new CrossplayError(429, "turn-rotation-limit");
+        delete pair.offer;
+        delete pair.answer;
+        delete pair.drained;
+        delete current.drained;
+        pair.renegotiatedAt = now;
+        if (!staged) delete current.successor;
+      } else if (operation === "signal/drained") {
+        if (!staged && current.offer && current.answer) {
+          current.drained = { ...current.drained, [seatId]: true };
+          if (
+            current.successor &&
+            current.drained[current.hostId] &&
+            current.drained[current.guestId]
+          )
+            signals[current.guestId] = current.successor;
+        }
       } else {
         const description = body.description as RTCSessionDescriptionInit;
         if (description?.type === "offer" && seatId === host.id)

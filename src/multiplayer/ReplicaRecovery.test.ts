@@ -91,6 +91,32 @@ function fixture(
   };
 }
 
+test("repeated transport drops stop recovery after eight baseline starts", () => {
+  const f = fixture(digest, 2, true);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    f.time(attempt * 1_000);
+    expect(f.recovery.baseline("1")).toBe(true);
+    f.recovery.connected([]);
+    f.recovery.connected(["1"]);
+  }
+  f.time(8_000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  expect(worldBlockers(f.host.world)).toEqual([
+    "Player 1 could not stay in sync. Save and resume the match.",
+  ]);
+});
+
+test("a delivered online baseline can take a minute to install before it counts as failed", () => {
+  const f = fixture(digest, 2, true);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.recovery.dispatched("1", f.baselines()[0].baseline.index, true);
+  f.time(40_000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  f.time(60_000);
+  expect(f.recovery.baseline("1")).toBe(true);
+  expect(f.baselines()).toHaveLength(2);
+});
+
 test("an online baseline dispatch failure leaves time for the transfer service to recover", () => {
   const f = fixture(digest, 2, true);
   expect(f.recovery.baseline("1")).toBe(true);

@@ -16,7 +16,7 @@ import {
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import type { MultiplayerSession } from "./Session";
 import { seatAssignments } from "./Slots";
-import { CrossplayApiError } from "./CrossplayApi";
+import { crossplayFailure } from "./CrossplayApi";
 import { parseCrossplayInvite } from "./CrossplayInvite";
 import CoopInviteCode from "../components/base/CoopInviteCode";
 import "./Lobby.css";
@@ -109,11 +109,7 @@ export default function Lobby({
     setEntryAttempt(attempt);
     setFailure(undefined);
     void action().catch((error) => {
-      if (error instanceof CrossplayApiError && error.code === "invalid_invite")
-        setFailure("This invitation is no longer available.");
-      else if (error instanceof CrossplayApiError && error.code === "room_full")
-        setFailure("This game is full.");
-      else setFailure(error instanceof Error ? error.message : "Try again.");
+      setFailure(crossplayFailure(error, "Try again."));
     });
   };
   const notice = failure || error || lobby.error;
@@ -507,7 +503,7 @@ function CampaignSlots({
   const run = (action: () => Promise<unknown>) => {
     onFailure(undefined);
     void action().catch((error) =>
-      onFailure(error instanceof Error ? error.message : "Try again."),
+      onFailure(crossplayFailure(error, "Try again.")),
     );
   };
   return (

@@ -11,13 +11,14 @@ import {
 
 const AUTHORITY_MS = 4_000;
 const STATS_MS = 1_000;
+const PROOF_STALE_MS = 10_000;
+const RENEGOTIATE_REMAINING_MS = 20_000;
 const SIGNAL_POLL_MS = 1_000;
 const SIGNAL_IDLE_MS = 2_000;
 const NEGOTIATION_MS = 30_000;
 const GATHER_MS = 9_000;
 const RENEW_MS = 35_000;
 const HANDOFF_WAITERS = 128;
-const HANDOFF_ACK_MS = 15_000;
 const MAX_BUFFERED_BYTES = 128 * 1024;
 const MAX_PENDING_BYTES = 384 * 1024;
 const TURN_URLS = [
@@ -96,7 +97,7 @@ interface Handoff {
   acknowledgement?: Promise<boolean>;
   release?: (delivered: boolean) => void;
   waiters: number;
-  deadline?: number;
+  reported?: boolean;
 }
 
 interface Link {
@@ -126,6 +127,8 @@ interface Peer {
   checking: boolean;
   localVerified: boolean;
   remoteVerified: boolean;
+  sawLocal: boolean;
+  sawRemote: boolean;
   local?: RTCSessionDescriptionInit;
   remote?: RTCSessionDescriptionInit;
   channel?: RTCDataChannel;
@@ -207,9 +210,8 @@ export class TurnPeers {
     }
     const now = performance.now();
     this.authority = authority;
-    this.until =
-      Math.min(now, requestedAt) +
-      Math.min(AUTHORITY_MS, authority.leaseRemainingMs);
+    const leaseMs = Math.min(12_000, Math.max(0, authority.leaseRemainingMs));
+    this.until = Math.min(now, requestedAt) + leaseMs;
     this.wallUntil = Date.now() + (this.until - now);
     if (!this.current()) {
       this.close();
@@ -223,8 +225,7 @@ export class TurnPeers {
     return (
       !!this.authority &&
       performance.now() < this.until &&
-      Date.now() < this.wallUntil &&
-      document.visibilityState !== "hidden"
+      Date.now() < this.wallUntil
     );
   }
 
@@ -284,8 +285,6 @@ export class TurnPeers {
   }
 
   private closeLink(link: Link) {
-    if (link.handoff?.deadline !== undefined)
-      window.clearTimeout(link.handoff.deadline);
     link.handoff?.release?.(false);
     link.handoff = undefined;
     this.closeLeg(link.current);
@@ -295,21 +294,6 @@ export class TurnPeers {
   /** Local drain is on the successor; keep that channel until the remote drain arrives. */
   private holdingSuccessor(link: Link) {
     return !!(link.handoff?.sentDrained && !this.handoffComplete(link));
-  }
-
-  private boundHandoff(link: Link) {
-    const handoff = link.handoff;
-    if (!handoff || handoff.deadline !== undefined) return;
-    handoff.deadline = window.setTimeout(() => {
-      if (
-        this.links.get(link.to) !== link ||
-        link.handoff !== handoff ||
-        handoff.receivedDrained
-      )
-        return;
-      this.closeLink(link);
-      this.publish();
-    }, HANDOFF_ACK_MS);
   }
 
   private handoffComplete(link: Link) {
@@ -322,8 +306,9 @@ export class TurnPeers {
     const handoffStarted =
       link.handoff?.acknowledgement || link.handoff?.receivedDrain;
     if (leg === link.current && this.holdingSuccessor(link)) {
+      // The predecessor credential is the server's bound. Closing here would
+      // drop the successor in the same turn the room promotes it.
       this.closeLeg(leg);
-      this.boundHandoff(link);
     } else if (
       (leg === link.successor && !handoffStarted) ||
       (leg === link.current && this.handoffComplete(link))
@@ -359,7 +344,7 @@ export class TurnPeers {
         if (!peer) continue;
         if (
           !this.usable(peer) ||
-          (peer.localVerified && now - peer.proofAt > 2 * STATS_MS) ||
+          (peer.localVerified && now - peer.proofAt > PROOF_STALE_MS) ||
           (now - peer.createdAt > NEGOTIATION_MS && !this.ready(peer))
         ) {
           this.retire(peer);
@@ -416,7 +401,7 @@ export class TurnPeers {
   }
 
   private signalAction(
-    action: "prepare" | "reset",
+    action: "prepare" | "reset" | "renegotiate",
     authority: TurnAuthority,
     link: Link,
     leg: Leg,
@@ -450,18 +435,17 @@ export class TurnPeers {
     let link = this.links.get(peerId);
     if (link && link.current.generation !== generation) {
       const promoted = link.successor;
-      if (
-        promoted?.generation === generation &&
-        (this.handoffComplete(link) || !!link.handoff?.sentDrained)
-      ) {
+      if (promoted?.generation === generation) {
         this.closeLeg(link.current);
         link.current = promoted;
         link.successor = undefined;
-        if (this.handoffComplete(link)) {
-          if (link.handoff?.deadline !== undefined)
-            window.clearTimeout(link.handoff.deadline);
-          link.handoff = undefined;
-        } else this.boundHandoff(link);
+        if (!this.handoffComplete(link) && link.handoff) {
+          // The server has retired the predecessor. Keep the successor open.
+          link.handoff.sentDrained = true;
+          link.handoff.receivedDrained = true;
+          link.handoff.release?.(true);
+        }
+        link.handoff = undefined;
       } else {
         this.closeLink(link);
         this.publish();
@@ -519,17 +503,35 @@ export class TurnPeers {
     if (!Number.isFinite(signal.remainingMs) || signal.remainingMs < 0) return;
     const localIsHost = authority.selfId === authority.hostId;
     const peer = leg.peer;
+    const signalLocal = localIsHost ? signal.offer : signal.answer;
+    const signalRemote = localIsHost ? signal.answer : signal.offer;
     if (peer) {
       peer.confirmedUntil = startedAt + AUTHORITY_MS;
       peer.expiresAt = Math.min(peer.expiresAt, startedAt + signal.remainingMs);
+      if (signalLocal) peer.sawLocal = true;
+      if (signalRemote) peer.sawRemote = true;
+      if (
+        (peer.sawLocal && !signalLocal) ||
+        (peer.sawRemote && !signalRemote)
+      ) {
+        this.retire(peer);
+        return;
+      }
       if (localIsHost && signal.answer) this.acceptAnswer(peer, signal.answer);
       return;
     }
-    const alreadyNegotiated = localIsHost ? signal.offer : signal.answer;
-    if (alreadyNegotiated || leg.retired) {
-      this.signalAction("reset", authority, link, leg);
+    if (signalLocal) {
+      // The local peer connection is gone. Reuse this generation's credential
+      // while it still has time; the rotation cooldown stays on signal/reset.
+      this.signalAction(
+        signal.remainingMs > RENEGOTIATE_REMAINING_MS ? "renegotiate" : "reset",
+        authority,
+        link,
+        leg,
+      );
       return;
     }
+    if (leg.retired) leg.retired = false;
     if (!localIsHost && !signal.offer) return;
     const candidate: Peer = {
       address: {
@@ -551,6 +553,8 @@ export class TurnPeers {
       checking: false,
       localVerified: false,
       remoteVerified: false,
+      sawLocal: false,
+      sawRemote: false,
       pending: [],
       pendingBytes: 0,
     };
@@ -666,11 +670,11 @@ export class TurnPeers {
     void selectedRelayPair(pc, peer.local, peer.remote)
       .then((valid) => {
         if (!this.usable(peer)) return;
-        if (!valid || performance.now() - peer.candidateCheck > 2 * STATS_MS) {
+        if (!valid) {
           this.retire(peer);
           return;
         }
-        peer.proofAt = peer.candidateCheck;
+        peer.proofAt = performance.now();
         if (!peer.localVerified) {
           channel.send(new Uint8Array([CONFIRMED]));
           peer.localVerified = true;
@@ -682,6 +686,26 @@ export class TurnPeers {
       .finally(() => {
         peer.checking = false;
       });
+  }
+
+  private reportDrained(link: Link) {
+    const handoff = link.handoff;
+    const authority = this.authority;
+    if (
+      !handoff ||
+      !authority ||
+      handoff.reported ||
+      !this.handoffComplete(link)
+    )
+      return;
+    handoff.reported = true;
+    void this.api
+      .request("signal/drained", {
+        roomId: authority.roomId,
+        to: link.to,
+        generation: link.current.generation,
+      })
+      .catch(() => undefined);
   }
 
   private advanceHandoff(link: Link) {
@@ -720,6 +744,7 @@ export class TurnPeers {
       } catch {
         this.retire(successor);
       }
+      this.reportDrained(link);
     }
   }
 
@@ -760,11 +785,8 @@ export class TurnPeers {
       (staged || (handoff.sentDrained && leg === link.current))
     ) {
       handoff.receivedDrained = true;
-      if (handoff.deadline !== undefined) {
-        window.clearTimeout(handoff.deadline);
-        handoff.deadline = undefined;
-      }
       handoff.release?.(true);
+      this.reportDrained(link);
       this.publish();
       return;
     }

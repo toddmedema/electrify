@@ -52,7 +52,7 @@ function activeMember(member, account, now) {
   return (
     !!member?.active &&
     !member.withdrawn &&
-    now - member.seenAt < PRESENCE_MS &&
+    (member.away || now - member.seenAt < PRESENCE_MS) &&
     bindingCurrent(member, account, now)
   );
 }
@@ -367,7 +367,7 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
               actor,
               renew ? "host" : "active",
               async (room, seat, now) => {
-                if (now - seat.seenAt < HEARTBEAT_MS) return {};
+                if (now - seat.seenAt < HEARTBEAT_MS || seat.away) return {};
                 let roll = false;
                 if (renew) {
                   await reserve(id, now);
@@ -377,7 +377,8 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
                     roll = inviteExpired(room, now);
                   }
                 }
-                room.members.find(({ id }) => id === seat.id).seenAt = now;
+                const present = room.members.find(({ id }) => id === seat.id);
+                present.seenAt = now;
                 return { room, value: roll };
               },
             )) === true;
@@ -462,10 +463,12 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
           delete entry.slot;
         });
         guard = "acquire";
-      } else {
+      } else if (member.binding !== actor.binding) {
+        // A new device must not inherit the previous device's relay descriptions.
         forgetPair(room, self.id);
       }
       member.binding = actor.binding;
+      delete member.away;
       member.presence = randomUUID();
       member.seenAt = now;
       member.active = true;
@@ -571,6 +574,26 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
         });
         break;
       }
+      case "room/resume": {
+        keys(body, "roomId", "presence");
+        requireValue(ROOM_ID.test(body.presence));
+        await edit(id, actor, "bound", (room, self, now) => {
+          const member = room.members.find(
+            ({ account }) => account === actor.account,
+          );
+          requireValue(
+            self.binding === actor.binding,
+            409,
+            "seat_reclaim_required",
+          );
+          if (member.presence !== body.presence) return {};
+          delete member.away;
+          member.seenAt = now;
+          member.active = true;
+          return { room };
+        });
+        return response(id, actor);
+      }
       case "room/suspend":
       case "room/leave":
       case "room/withdraw": {
@@ -598,6 +621,11 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
               member.presence !== body.presence
             )
               return {};
+            if (operation === "room/suspend") {
+              // Hiding the tab pauses renewal. The open relay and its credential stay.
+              member.away = true;
+              return { room };
+            }
             forgetPair(room, member.id);
             if (
               !room.locked &&

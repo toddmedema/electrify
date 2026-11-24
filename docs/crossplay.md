@@ -25,11 +25,11 @@ WebRTC DTLS encrypts gameplay traffic in transit.
 
 The managed Functions runtime buffers request bodies before the handler applies its
 128 KiB limit for ordinary JSON and 8 MiB + 4 KiB limit for bulk requests. The published second-generation HTTP limit is
-32 MB uncompressed. Per-client IP quotas also depend on ingress: the current
-socket-address bucket can combine callers behind a Google proxy. The public function
-has no verified forwarding-hop contract for selecting a caller address. Enforcing
-smaller limits before buffering and isolating IP buckets requires a trusted ingress
-that all public routes traverse. [Functions limits](https://docs.cloud.google.com/functions/quotas)
+32 MB uncompressed. Per-client quotas use the address the Cloud Run front end
+appends to `X-Forwarded-For`. Earlier entries are caller-supplied and are ignored.
+`COOP_TRUSTED_PROXY_HOPS` skips additional proxies operated in front of that
+front end. When the header is absent, the quota uses the socket address.
+[Functions limits](https://docs.cloud.google.com/functions/quotas)
 · [Request headers](https://docs.cloud.google.com/functions/docs/reference/headers)
 
 The browser posts authenticated JSON to the fixed `coopV2` HTTPS function. Steam
@@ -46,12 +46,20 @@ Joining requires a valid invite and an authenticated account. Once locked, a
 room cannot add a different account.
 
 Firestore stores the roster, lease, epoch, and checkpoint manifests. The
-12-second lease renews using a write-time expiry guard. A client accepts
-authority grants for at most four seconds from its request start. An active
-host and guest bind authenticated SDP to a connection generation and both
-verify the selected candidate pair as relay–relay. Before TURN credentials
-expire, the pair prepares a verified successor and drains ordered gameplay
-traffic before moving it to the new channel. TURN permits UDP and TLS over
+12-second lease renews using a write-time expiry guard. A verified relay stays
+up until that lease ends or the epoch changes. A room response older than four
+seconds does not extend the lease. Hiding the tab stops renewal without
+closing the relay. A lost peer connection clears the descriptions and reuses
+that generation's TURN credential while more than 20 seconds remain. Replacing
+a live credential still waits for the rotation cooldown. An active host and
+guest bind authenticated SDP to a connection generation and both verify the
+selected candidate pair as relay–relay. Before TURN credentials expire, the
+pair prepares a verified successor and drains ordered gameplay traffic before
+moving it to the new channel. Credentials last 140 seconds, including 20
+seconds of grace after the previous renewal point, and both peers can promote
+the successor once the drain is acknowledged. A provider HTTP refusal releases
+its grant reservation. A timeout keeps the reservation because the credential
+may already exist. TURN permits UDP and TLS over
 port 443. HTTPS handles large replication baselines, scenario snapshots and
 checkpoints. Checkpoints are pinned to an immutable Cloud Storage generation
 and checked against the room epoch, roster, compatibility ID and head.
@@ -71,10 +79,14 @@ The deployment checks co-op health before publishing the
 website. The operator can stop the service with `coopSettings/runtime.stopped`
 in Firestore.
 
-Signaling accepts data-only descriptions with public IPv4 relay candidates.
-It rejects direct candidates and private or reserved addresses. The web rollout
-accepts that a player can supply a public destination and cause TURN to send
-connectivity checks there.
+Signaling accepts canonical data-only descriptions. Browsers strip attributes
+outside that description before sending. Relay candidates must be public IPv4
+or IPv6 addresses. Direct candidates and private or reserved addresses are
+rejected. When `COOP_TURN_RELAY_CIDRS` lists the provider's allocation ranges,
+candidates outside those ranges are rejected too. An invalid list prevents the
+function from starting. Without that list, a player can still supply a public
+destination and cause TURN to send connectivity checks there, so admission
+stays at two rooms until the ranges are configured.
 
 After deployment, use two signed-in browsers to verify direct join by link and
 code, play through three credential renewals, Save & Quit, and recovery under a

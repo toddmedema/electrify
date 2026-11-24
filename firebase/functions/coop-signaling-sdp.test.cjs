@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { validateDescription } = require("./coop-signaling-sdp.cjs");
+const {
+  createRelayPolicy,
+  validateDescription,
+} = require("./coop-signaling-sdp.cjs");
 
 const fingerprint = Array(32).fill("C2").join(":");
 const sdp = [
@@ -64,6 +67,8 @@ test("rejects malformed, private and reserved relay candidate addresses", () => 
     "999.8.8.8",
     "8.008.8.8",
     "::ffff:8.8.8.8",
+    "0:0:0:0:0:ffff:808:808",
+    "2001:db8::1",
     "relay.example.com",
     "0.0.0.0",
     "10.0.0.1",
@@ -86,4 +91,46 @@ test("rejects malformed, private and reserved relay candidate addresses", () => 
     };
     assert.equal(validateDescription(offer, "offer"), null, address);
   }
+});
+
+test("accepts a public IPv6 relay and rejects a link-local one", () => {
+  const v6 = sdp
+    .replace("m=application 12212", "m=application 9")
+    .replace("c=IN IP4 8.8.8.8", "c=IN IP4 0.0.0.0")
+    .replace(
+      "a=candidate:455721 1 udp 30298521 8.8.8.8 12212 typ relay",
+      "a=candidate:455721 1 udp 30298521 2606:4700:4700::1111 12212 typ relay",
+    );
+  assert.ok(validateDescription({ type: "offer", sdp: v6 }, "offer"));
+  assert.equal(
+    validateDescription(
+      {
+        type: "offer",
+        sdp: v6.replace("2606:4700:4700::1111", "fe80::1"),
+      },
+      "offer",
+    ),
+    null,
+  );
+});
+
+test("an IPv6 allocation prefix is part of the relay policy", () => {
+  const policy = createRelayPolicy("2606:4700:4700::/48");
+  assert.equal(typeof policy, "function");
+  assert.equal(policy("2606:4700:4700::1111"), true);
+  assert.equal(policy("2606:4700:4800::1"), false);
+  assert.equal(createRelayPolicy("2606:4700:4700::/129"), null);
+});
+
+test("a configured relay policy rejects public addresses outside its ranges", () => {
+  const policy = createRelayPolicy("8.8.8.0/24");
+  assert.ok(validateDescription({ type: "offer", sdp }, "offer", policy));
+  assert.equal(
+    validateDescription(
+      { type: "offer", sdp: sdp.replaceAll("8.8.8.8", "1.1.1.1") },
+      "offer",
+      policy,
+    ),
+    null,
+  );
 });

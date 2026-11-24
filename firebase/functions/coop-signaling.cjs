@@ -9,11 +9,14 @@ const MAX_GRANTS = 120;
 // Split capacity between two live rooms, then between three host/guest pairs.
 const MAX_ROOM_GRANTS = MAX_GRANTS / 2;
 const MAX_PAIR_GRANTS = MAX_ROOM_GRANTS / 3;
-const GENERATION_MS = 120_000;
+const GENERATION_MS = 140_000;
 const ALLOCATION_DRAIN_MS = 600_000;
-const PREPARE_WINDOW_MS = 36_000;
+// Prepare during the last 56 seconds so the successor is up 36 seconds before the
+// previous 120-second mark, with 20 seconds of credential grace for the drain.
+const PREPARE_WINDOW_MS = 56_000;
 const ROTATION_WINDOW_MS = 25_000;
 const FAILED_GENERATION_MS = 15_000;
+const RENEGOTIATE_MS = 10_000;
 const IDENTIFIER = /^[\w-]{1,128}$/;
 const CREDENTIAL = /^[a-zA-Z0-9._~+/=-]{1,256}$/;
 const millis = (value) =>
@@ -116,6 +119,7 @@ function createTurnSignaling({
   keyId,
   keyToken,
   loadRoom,
+  relayPolicy = null,
   fetchImpl = fetch,
   clock = Date.now,
 }) {
@@ -165,6 +169,20 @@ function createTurnSignaling({
     await Promise.allSettled(snapshots.map(revoke));
   }
 
+  /** A definite provider refusal never created a credential, so it must not occupy the cap. */
+  async function releaseReservation(ref) {
+    await db.runTransaction(async (transaction) => {
+      const [latest, count] = await transaction.getAll(ref, operation);
+      if (!latest.exists || latest.data()?.ice) return;
+      transaction.delete(ref);
+      transaction.set(
+        operation,
+        { count: Math.max(0, (count.data()?.count ?? 1) - 1) },
+        { merge: true },
+      );
+    });
+  }
+
   async function issue(context, pair, to) {
     if (!configured) throw new CrossplayError(503, "turn-unavailable");
     const { roomId, seatId } = context;
@@ -212,8 +230,30 @@ function createTurnSignaling({
     });
     let ice = claimed.existing?.ice;
     if (!claimed.existing) {
-      // The reservation survives provider timeouts, so an ambiguous issuance cannot be retried.
-      const response = await provider("generate-ice-servers", 201, { ttl });
+      // A timeout can hide a credential Cloudflare already created. An HTTP refusal cannot.
+      let response;
+      try {
+        response = await fetchImpl(
+          `${TURN_API}/${keyId}/credentials/generate-ice-servers`,
+          {
+            method: "POST",
+            redirect: "error",
+            headers: {
+              Authorization: `Bearer ${keyToken}`,
+              "Content-Type": "application/json",
+            },
+            signal: AbortSignal.timeout(6_000),
+            body: JSON.stringify({ ttl }),
+          },
+        );
+      } catch {
+        throw new CrossplayError(503, "turn-unavailable");
+      }
+      if (response.status !== 201) {
+        await response.body?.cancel().catch(() => undefined);
+        await releaseReservation(ref).catch(() => undefined);
+        throw new CrossplayError(503, "turn-unavailable");
+      }
       const { iceServers } = await response.json();
       const server =
         Array.isArray(iceServers) &&
@@ -328,6 +368,38 @@ function createTurnSignaling({
             throw new CrossplayError(429, "turn-rotation-limit");
           return update({ ...current, successor: create() });
         }
+        if (name === "signal/renegotiate") {
+          if (
+            pair.renegotiatedAt !== undefined &&
+            now < pair.renegotiatedAt + RENEGOTIATE_MS
+          )
+            throw new CrossplayError(429, "turn-rotation-limit");
+          const cleared = { ...pair, renegotiatedAt: now };
+          delete cleared.offer;
+          delete cleared.answer;
+          delete cleared.drained;
+          if (isCurrent) {
+            const dropped = current.successor ? [current.successor] : [];
+            delete cleared.successor;
+            return update(cleared, dropped);
+          }
+          const retained = { ...current, successor: cleared };
+          delete retained.drained;
+          return update(retained);
+        }
+        if (name === "signal/drained") {
+          // A vote after renegotiate must not complete the next handoff.
+          if (!isCurrent || !current.offer || !current.answer)
+            return { value: null };
+          const drained = { ...(current.drained ?? {}), [seatId]: true };
+          if (
+            drained[current.hostId] &&
+            drained[current.guestId] &&
+            current.successor
+          )
+            return update(current.successor, [current]);
+          return update({ ...current, drained });
+        }
         if (name === "signal/reset") {
           const deadline =
             pair.offer && pair.answer
@@ -344,7 +416,11 @@ function createTurnSignaling({
         if (name !== "signal/describe")
           throw new CrossplayError(404, "unknown-operation");
         const type = seatId === pair.hostId ? "offer" : "answer";
-        const description = validateDescription(body.description, type);
+        const description = validateDescription(
+          body.description,
+          type,
+          relayPolicy,
+        );
         if (!description || (type === "answer" && !pair.offer))
           throw new CrossplayError(400, "invalid-signaling");
         if (pair[type]) {
@@ -360,7 +436,7 @@ function createTurnSignaling({
       { type: "active", peerId: to },
     );
     if (name === "signal/turn") return issue(context, result, to);
-    if (name === "signal/reset")
+    if (Array.isArray(result))
       await Promise.allSettled(
         result.map((pair) => revokeGeneration(roomId, pair)),
       );

@@ -27,6 +27,7 @@ import {
   snackbarOpen,
 } from "../reducers/UI";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
+import { crossplayFailure } from "./CrossplayApi";
 import { HOST_LEFT, isConnectionLoss, MultiplayerSession } from "./Session";
 import {
   registerCoopControls,
@@ -320,7 +321,10 @@ export default function MultiplayerRoot() {
               dialogOpen({
                 open: true,
                 title: "Could not prepare multiplayer",
-                message: error.message,
+                message: crossplayFailure(
+                  error,
+                  "Could not prepare multiplayer.",
+                ),
               }),
             );
           });
@@ -355,7 +359,10 @@ export default function MultiplayerRoot() {
             dialogOpen({
               open: true,
               title: "Could not start the shared game",
-              message: error.message,
+              message: crossplayFailure(
+                error,
+                "Could not start the shared game.",
+              ),
             }),
           );
           syncCoop();
@@ -655,7 +662,10 @@ export default function MultiplayerRoot() {
                 dialogOpen({
                   open: true,
                   title: "Multiplayer save",
-                  message: error.message,
+                  message: crossplayFailure(
+                    error,
+                    "The multiplayer save did not finish.",
+                  ),
                   closeText: "OK",
                 }),
               );
