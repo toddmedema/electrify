@@ -1161,11 +1161,6 @@ export class MultiplayerSession {
       if (roomId) throw error;
     }
   }
-  async approve(requestId: string, approve: boolean) {
-    this.update({
-      lobby: await this.request({ kind: "approve", requestId, approve }),
-    });
-  }
   async removePlayer(seatId: string) {
     this.update({ lobby: await this.request({ kind: "remove", seatId }) });
   }
@@ -1173,9 +1168,6 @@ export class MultiplayerSession {
     if (!this.services.checkpoints.export)
       throw new Error("Multiplayer export is unavailable.");
     await this.services.checkpoints.export(id);
-  }
-  async rotateInvite() {
-    this.update({ lobby: await this.request({ kind: "rotate-invite" }) });
   }
   hasOnlineAuthority() {
     return !!this.services.authority?.();

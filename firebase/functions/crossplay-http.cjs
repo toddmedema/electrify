@@ -17,10 +17,9 @@ const BULK_OPERATIONS = new Set([
 ]);
 const AUDIT = new Set([
   "auth/revoke",
-  "room/approve",
+  "room/join",
   "room/reconnect",
   "room/remove",
-  "room/rotate-invite",
   "room/withdraw",
   "save/publish",
 ]);
@@ -37,6 +36,7 @@ function createCrossplay({
   origins,
   quotaKey,
   extensions,
+  campaignRules,
   isStopped = async () => false,
   healthy = async () => true,
   audit = () => undefined,
@@ -44,7 +44,12 @@ function createCrossplay({
 }) {
   requireValue(quotaKey?.length >= 24, 503, "unavailable");
   const identity = createIdentity({ store, verifyGoogle, verifySteam, clock });
-  const rooms = createRooms({ store, extensions });
+  const rooms = createRooms({
+    store,
+    inviteKey: quotaKey,
+    extensions,
+    campaignRules,
+  });
 
   function hashedIp(request) {
     // The direct network address cannot be selected using attacker-supplied

@@ -41,7 +41,7 @@ type Room = {
   members: RoomMember[];
   invite?: { codeHash: string; linkHash: string };
   head?: Checkpoint;
-  signals?: Record<string, Signal>;
+  signals?: Partial<Record<string, Signal>>;
 };
 type Account = {
   tokenHash: string;
@@ -59,6 +59,7 @@ type Signal = {
   guestId: string;
   guestBinding: string;
   expiresAt: number;
+  successor?: Signal;
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
 };
@@ -630,34 +631,46 @@ export function crossplayFixture() {
       );
       if (!host) throw new CrossplayError(409, "authority_changed");
       const signals = (draft.signals ??= {});
-      let changed = false;
+      const freshPair = (guest: RoomMember): Signal => ({
+        epoch: room.epoch,
+        generation: randomUUID(),
+        hostId: host.id,
+        hostBinding: host.binding,
+        guestId: guest.id,
+        guestBinding: guest.binding,
+        expiresAt: now + 120_000,
+      });
+      const eligible = (
+        pair: Signal | undefined,
+        guest: RoomMember,
+      ): pair is Signal =>
+        !!pair &&
+        pair.epoch === room.epoch &&
+        pair.hostId === host.id &&
+        pair.hostBinding === host.binding &&
+        pair.guestBinding === guest.binding &&
+        pair.expiresAt > now;
+      const format = (pair: Signal) => ({
+        generation: pair.generation,
+        remainingMs: pair.expiresAt - now,
+        offer: pair.offer,
+        answer: pair.answer,
+      });
       if (operation === "signal/read") {
+        let changed = false;
         const pairs = guests.map((guest) => {
           let pair = signals[guest.id];
-          if (
-            pair?.epoch !== room.epoch ||
-            pair.hostId !== host.id ||
-            pair.hostBinding !== host.binding ||
-            pair.guestBinding !== guest.binding ||
-            pair.expiresAt <= now
-          ) {
+          if (!eligible(pair, guest)) {
             changed = true;
-            pair = signals[guest.id] = {
-              epoch: room.epoch,
-              generation: randomUUID(),
-              hostId: host.id,
-              hostBinding: host.binding,
-              guestId: guest.id,
-              guestBinding: guest.binding,
-              expiresAt: now + 120_000,
-            };
+            const successor = pair?.successor;
+            pair = signals[guest.id] = eligible(successor, guest)
+              ? successor
+              : freshPair(guest);
           }
           return {
             peerId: seatId === host.id ? guest.id : host.id,
-            generation: pair.generation,
-            remainingMs: pair.expiresAt - now,
-            offer: pair.offer,
-            answer: pair.answer,
+            ...format(pair),
+            ...(pair.successor && { successor: format(pair.successor) }),
           };
         });
         return { room: changed ? draft : undefined, value: { pairs } };
@@ -665,20 +678,26 @@ export function crossplayFixture() {
       const guest = guests.find(
         ({ id }) => (seatId === host.id ? id : host.id) === body.to,
       );
-      const pair = guest && signals[guest.id];
+      const current = guest && signals[guest.id];
+      const staged = current?.generation !== body.generation;
+      const pair = staged ? current?.successor : current;
       if (
-        !pair ||
-        pair.epoch !== room.epoch ||
-        pair.generation !== body.generation ||
-        pair.hostBinding !== host.binding ||
-        pair.guestBinding !== guest.binding ||
-        pair.expiresAt <= now
+        !guest ||
+        !current ||
+        !eligible(pair, guest) ||
+        pair.generation !== body.generation
       )
         throw new CrossplayError(409, "obsolete-connection");
       if (operation === "signal/turn")
         return { value: { iceServers, remainingMs: pair.expiresAt - now } };
-      if (operation === "signal/reset") delete signals[pair.guestId];
-      else {
+      if (operation === "signal/prepare") {
+        if (staged || !pair.offer || !pair.answer)
+          throw new CrossplayError(409, "obsolete-connection");
+        current.successor ??= freshPair(guest);
+      } else if (operation === "signal/reset") {
+        if (staged) current.successor = freshPair(guest);
+        else delete signals[pair.guestId];
+      } else {
         const description = body.description as RTCSessionDescriptionInit;
         if (description?.type === "offer" && seatId === host.id)
           pair.offer = description;
@@ -709,6 +728,7 @@ export function crossplayFixture() {
     );
   };
 
+  const reservedCodes = new Map<string, number>();
   const service = createCrossplay({
     origins: [fakeOrigin],
     quotaKey: "playwright-crossplay-fixture-only",
@@ -746,6 +766,15 @@ export function crossplayFixture() {
           accounts.set(id, { ...previous, revoked: true });
       },
       reserveRoom: async () => true,
+      reserveInviteCode: async (
+        digest: string,
+        _id: string,
+        expiresAt: number,
+      ) => {
+        if ((reservedCodes.get(digest) ?? 0) > Date.now()) return false;
+        reservedCodes.set(digest, expiresAt);
+        return true;
+      },
       getRoom: async (id: string) => currentRoom(id),
       findInvite: async (digest: string) => {
         const room = [...rooms.values()].find(

@@ -2,8 +2,10 @@
 
 Open **Play with friends** to host or join a private game for two to four players.
 The website uses Google sign-in and the Steam edition uses your signed-in Steam
-account. Share the lobby's invite link or code. The host approves requests before
-the game starts. Each approved account keeps its company for the campaign.
+account. Hosting opens the custom game editor. Share the invite link or
+six-character code so friends can join directly. The host can remove a player
+before the game starts. Each player keeps their company for the campaign.
+Existing campaigns can be resumed from **Multiplayer saves**.
 
 Any player can host. The host's device runs the simulation and each guest's
 device replays the records to produce its own views. Backgrounding or losing a
@@ -12,7 +14,7 @@ reconnect to acquire it and resume from the last confirmed online save. Progress
 since that save can be lost. **Save & Quit** asks the host for a fresh confirmed
 save and pauses the campaign until the original players return.
 
-Private co-op is unranked. Approved players receive the entire world and can keep
+Private co-op is unranked. Joined players receive the entire world and can keep
 an offline copy after leaving. The host can change or stall the simulation.
 Google and Steam provide identity to the service. Other players see an opaque
 seat ID and your display name. The service handles room and connection metadata.
@@ -38,16 +40,18 @@ a configured Steam App ID. The launch argument opens a prompt.
 
 Firebase verifies Google accounts and Valve verifies Steam ticket proofs. A
 bearer expires in five minutes. Each account has one active device binding.
-Seats and invites belong to a room. Invite links contain 128 bits and invite
-codes contain 80 bits of randomness, expire after 15 minutes, and request
-approval. The host can replace an invite. Once locked, a room cannot add a
-different account.
+Seats and invites belong to a room. Invite links contain 128 bits of randomness.
+Invite codes use six lowercase letters or digits. Both expire after 15 minutes.
+Joining requires a valid invite and an authenticated account. Once locked, a
+room cannot add a different account.
 
 Firestore stores the roster, lease, epoch, and checkpoint manifests. The
 12-second lease renews using a write-time expiry guard. A client accepts
 authority grants for at most four seconds from its request start. An active
-host and guest use authenticated SDP bound to one generation and must both
-verify the selected candidate pair as relay–relay. TURN permits UDP and TLS over
+host and guest bind authenticated SDP to a connection generation and both
+verify the selected candidate pair as relay–relay. Before TURN credentials
+expire, the pair prepares a verified successor and drains ordered gameplay
+traffic before moving it to the new channel. TURN permits UDP and TLS over
 port 443. HTTPS handles large replication baselines, scenario snapshots and
 checkpoints. Checkpoints are pinned to an immutable Cloud Storage generation
 and checked against the room epoch, roster, compatibility ID and head.
@@ -62,8 +66,8 @@ validation consume the budget even if validation fails.
 
 Use `https://electrifygame.com` and leave the Actions variable `STEAM_APP_ID`
 unset. Firebase deploys co-op with the four web/TURN secrets. Any player who
-signs in with Google can host. Joining a private lobby requires its invite and
-the host's approval. The deployment checks co-op health before publishing the
+signs in with Google can host. Joining a private lobby requires its invite.
+The deployment checks co-op health before publishing the
 website. The operator can stop the service with `coopSettings/runtime.stopped`
 in Firestore.
 
@@ -72,9 +76,11 @@ It rejects direct candidates and private or reserved addresses. The web rollout
 accepts that a player can supply a public destination and cause TURN to send
 connectivity checks there.
 
-After deployment, use two signed-in browsers to verify host approval, play,
-Save & Quit, and recovery under a different host. Verify the selected TURN
-relay path on a normal connection and over TLS with UDP blocked.
+After deployment, use two signed-in browsers to verify direct join by link and
+code, play through three credential renewals, Save & Quit, and recovery under a
+different host. Send gameplay commands across each renewal and check that the
+game keeps running without a reconnect dialog. Verify the selected TURN relay
+path on a normal connection and over TLS with UDP blocked.
 
 ## Release access
 
@@ -153,7 +159,7 @@ deployment and inspect aggregate logs.
 
 1. Over an ordinary network, rotate hosting through each of the four devices.
    Join by code and link, including **Open in Steam** with the game closed and
-   already running. Confirm host approval and play through a late checkpoint.
+   already running. Verify direct join and play through a late checkpoint.
    Record the selected relay-to-relay path on the host and all three guests.
    Repeat on the UDP-blocked network and confirm the selected TCP 443 TLS path.
 2. On the same locked roster, background and reconnect a required mobile

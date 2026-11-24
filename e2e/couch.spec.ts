@@ -106,9 +106,9 @@ async function startCouch<Actor extends Page | Frame>(
   await page
     .getByRole("button", { name: "Choose a game", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "View Carbon Fee details", exact: true })
-    .click();
+  await expect(
+    page.getByRole("heading", { name: "Custom setup" }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Start for everyone", exact: true })
     .click();

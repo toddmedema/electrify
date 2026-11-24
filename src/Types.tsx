@@ -1976,6 +1976,7 @@ export interface CoopSelectionType {
   viewing?: string;
   /** Host only: the code friends can enter to join. */
   inviteCode?: string;
+  hasInviteLink?: boolean;
   /** Host only: this computer has multiplayer saves to load instead. */
   hasSaves?: boolean;
 }

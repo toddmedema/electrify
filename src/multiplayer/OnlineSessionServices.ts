@@ -152,9 +152,7 @@ export function onlineSessionServices(
             expire();
             publish({
               ...INITIAL_LOBBY,
-              error: lobby.joinPending
-                ? "This invitation is no longer available."
-                : "This multiplayer room is no longer available.",
+              error: "This multiplayer room is no longer available.",
             });
           } else if (
             error.code === "unauthenticated" ||

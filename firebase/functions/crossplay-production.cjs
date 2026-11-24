@@ -41,6 +41,7 @@ function registerCrossplay(adminApp) {
       loadRoom: (id) => service.loadRoom(id),
     });
     const checkpoints = require("./coop-checkpoints.cjs");
+    const campaignRules = require("./build/compatibility.json");
     const bucket = getStorage(adminApp).bucket(checkpointBucket);
     const transfer = (operation, context, body) =>
       checkpoints.handle(operation, { ...context, bucket }, body);
@@ -49,6 +50,7 @@ function registerCrossplay(adminApp) {
       (await db.doc("coopSettings/runtime").get()).data()?.stopped === true;
     const service = createCrossplay({
       store,
+      campaignRules,
       verifyGoogle: (token) => auth.verifyIdToken(token, true),
       verifySteam: steamKey
         ? (ticket) =>

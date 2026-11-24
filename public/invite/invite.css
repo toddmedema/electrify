@@ -18,43 +18,15 @@ main {
   margin: 0 auto;
   padding: 24px;
 }
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 20px 0;
-}
-.actions a {
-  padding: 10px 16px;
-  border: 1px solid currentColor;
-  border-radius: 8px;
+a {
   color: #075ace;
-}
-.actions a:first-child {
-  color: #fff;
-  background: #075ace;
-  border-color: #075ace;
-}
-.actions a[hidden],
-section[hidden] {
-  display: none;
-}
-label {
-  display: block;
-  margin-bottom: 4px;
-}
-input {
-  box-sizing: border-box;
-  max-width: 100%;
-  padding: 8px;
-  font: inherit;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     color: #e0e8f5;
     background: #0b1016;
   }
-  .actions a {
+  a {
     color: #a1c8ff;
   }
 }

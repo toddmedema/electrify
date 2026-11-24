@@ -198,7 +198,30 @@ function createStore({ db, projectId, writerToken, fetchImpl = fetch }) {
     async getRoom(id) {
       return roomData(await rooms.doc(id).get());
     },
-    async findInvite(digest) {
+    async reserveInviteCode(digest, roomId, expiresAt, now) {
+      const ref = db.collection("coopLimits").doc("invite-codes");
+      return db.runTransaction(async (tx) => {
+        const codes = (await tx.get(ref)).data()?.codes ?? {};
+        if (codes[digest]?.expiresAt > now) return false;
+        const live = Object.fromEntries(
+          Object.entries(codes).filter(([, code]) => code.expiresAt > now),
+        );
+        live[digest] = { roomId, expiresAt };
+        tx.set(ref, { codes: live });
+        return true;
+      });
+    },
+    async findInvite(digest, shortCode) {
+      if (shortCode) {
+        const snapshot = await db
+          .collection("coopLimits")
+          .doc("invite-codes")
+          .get();
+        const entry = snapshot.data()?.codes?.[digest];
+        if (!entry || entry.expiresAt <= toMillis(snapshot.readTime))
+          return null;
+        return roomData(await rooms.doc(entry.roomId).get());
+      }
       const result = await rooms
         .where("inviteHashes", "array-contains", digest)
         .limit(2)

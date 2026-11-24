@@ -306,12 +306,16 @@ test.beforeEach(async ({ page }, info) => {
         },
       },
     ];
-    const pendingLobby: LobbyState = {
+    const joinedLobby: LobbyState = {
       available: true,
       lobbyId: "fe2b3691-dbef-4db3-bc2c-87760dddbc56",
-      members: [],
+      hostId: "friend-host",
+      selfId,
+      members: [
+        { id: "friend-host", name: "Friend" },
+        { id: selfId, name: "Deck player" },
+      ],
       connected: [],
-      joinPending: true,
     };
     window.electrifyDesktop = {
       apiVersion: 1,
@@ -342,7 +346,7 @@ test.beforeEach(async ({ page }, info) => {
       },
       crossplayRequest: async (operation, body, _requestId, userAction) => {
         if (operation === "room/state")
-          return { ok: true, value: { lobby: pendingLobby, authority: null } };
+          return { ok: true, value: { lobby: joinedLobby, authority: null } };
         if (
           operation === "room/join" &&
           userAction &&
@@ -352,7 +356,7 @@ test.beforeEach(async ({ page }, info) => {
           typeof body.invite === "string"
         ) {
           document.documentElement.dataset.mockJoinedInvite = body.invite;
-          return { ok: true, value: { lobby: pendingLobby, authority: null } };
+          return { ok: true, value: { lobby: joinedLobby, authority: null } };
         }
         return { ok: false, code: "unavailable" };
       },
@@ -1077,7 +1081,7 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
     "data-mock-text-input",
     /Invite code/,
   );
-  const invite = "0123456789abcdef0123";
+  const invite = "a1b2z3";
   await submitText(page, invite, code);
   if (process.env.REVIEW_SCREENSHOT_DIR)
     await page.screenshot({
@@ -1094,9 +1098,7 @@ test("controller opens Workshop and enters a multiplayer invite with Steam text 
     invite,
   );
   await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: "Waiting for the host to approve your request…" }),
+    page.getByRole("status").filter({ hasText: "Connecting to Friend…" }),
   ).toBeVisible();
 });
 

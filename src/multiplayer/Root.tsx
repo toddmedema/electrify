@@ -14,6 +14,7 @@ import { firebaseAppAuth, login } from "../Globals";
 import type { GameType } from "../Types";
 import { initEconomy } from "../data/Economy";
 import { initFuelPrices } from "../data/FuelPrices";
+import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import { initWeather } from "../data/Weather";
 import { waitForLoad } from "../helpers/WaitForLoad";
 import { store, useAppSelector } from "../Store";
@@ -46,6 +47,7 @@ import {
   captureCrossplayInvite,
   clearCrossplayInvite,
   crossplayInviteLink,
+  steamInviteLink,
 } from "./CrossplayInvite";
 import { onlineSessionServices } from "./OnlineSessionServices";
 
@@ -96,6 +98,10 @@ export default function MultiplayerRoot() {
   const lobbyId = state.lobby.lobbyId;
   const pendingCampaignId = state.pendingCampaign?.id;
   const coop = useAppSelector((app) => app.ui.coop);
+  const discardInvite = () => {
+    clearCrossplayInvite();
+    setEntryInviteCode(undefined);
+  };
   const reconnect = useCallback(() => {
     void session.reconnect();
   }, [session]);
@@ -133,6 +139,10 @@ export default function MultiplayerRoot() {
       store.dispatch(uiDelta({ coop: next }));
     if (view) return;
     if (host) {
+      if (isBrowseCard(app.card.name) && app.card.name !== "CUSTOM_GAME") {
+        store.dispatch(navigate("CUSTOM_GAME"));
+        return;
+      }
       const selection = hostSelection(
         store.getState(),
         unlockedDifficulty(achievementJournal.getSnapshot().progress),
@@ -182,7 +192,7 @@ export default function MultiplayerRoot() {
     setOpen(false);
     const card = store.getState().card.name;
     choosing.current = true;
-    if (!isBrowseCard(card)) store.dispatch(navigate("NEW_GAME"));
+    if (card !== "CUSTOM_GAME") store.dispatch(navigate("CUSTOM_GAME"));
     syncCoop();
     // The saves bar appears once this computer's multiplayer saves are known, including one
     // just written by the match that ended.
@@ -322,6 +332,12 @@ export default function MultiplayerRoot() {
     const stopProgress = achievementJournal.subscribe(syncCoop);
     registerCoopControls({
       start: (spec) => {
+        if (
+          spec.scenarioId !== CUSTOM_SCENARIO_ID ||
+          !spec.customScenario ||
+          spec.customScenario.mod
+        )
+          return;
         const selection = hostSelection(
           store.getState(),
           unlockedDifficulty(achievementJournal.getSnapshot().progress),
@@ -368,6 +384,7 @@ export default function MultiplayerRoot() {
         );
       },
       copyCode,
+      copyLink,
       manageLobby: showMultiplayerLobby,
       openSaves: () => setSavesOpen(true),
     });
@@ -388,6 +405,11 @@ export default function MultiplayerRoot() {
       setOpen(true);
       setEntryInviteCode(invite);
     };
+    const acceptWebInvite = () => {
+      const invite = captureCrossplayInvite(true);
+      if (invite) acceptInvite(invite);
+    };
+    window.addEventListener("hashchange", acceptWebInvite);
     desktop
       ?.takeCrossplayInvite?.()
       .then((invite) => {
@@ -408,6 +430,7 @@ export default function MultiplayerRoot() {
       deferredInvite.current = undefined;
       stop();
       stopInvites?.();
+      window.removeEventListener("hashchange", acceptWebInvite);
       stopCoop();
       stopStore();
       stopProgress();
@@ -416,7 +439,7 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, copyCode, desktop, reconnect]);
+  }, [session, syncCoop, leaveLobby, copyCode, copyLink, desktop, reconnect]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {
@@ -537,13 +560,16 @@ export default function MultiplayerRoot() {
         <Lobby
           session={session}
           initialInviteCode={entryInviteCode}
+          steamInvite={
+            !desktop && entryInviteCode
+              ? steamInviteLink(entryInviteCode)
+              : undefined
+          }
           canAuthenticate={canAuthenticate}
           onAuthorize={authorize}
-          onJoined={() => {
-            clearCrossplayInvite();
-            setEntryInviteCode(undefined);
-          }}
-          onChooseGame={startChoosing}
+          onJoined={discardInvite}
+          onDiscardInvite={discardInvite}
+          onHosted={startChoosing}
           onOpenSaves={() => setSavesOpen(true)}
           onCopyLink={() => void copyLink()}
           onChooseNew={() => {
@@ -552,6 +578,7 @@ export default function MultiplayerRoot() {
           }}
           onCopyCode={copyCode}
           onClose={() => {
+            discardInvite();
             setOpen(false);
             if (!state.lobby.lobbyId) choosing.current = false;
           }}

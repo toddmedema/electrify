@@ -14,6 +14,7 @@ import "./app.scss";
 import "./InterfaceLayout.scss";
 import { getPendingInstallPrompt } from "./InstallPromptEvent";
 import { waitForAppStyles } from "./StartupStyles";
+import { captureCrossplayInvite } from "./multiplayer/CrossplayInvite";
 import { showBootstrapFailure } from "./StartupFailure";
 
 export function Home() {
@@ -92,6 +93,14 @@ export function Home() {
     },
     [],
   );
+  React.useEffect(() => {
+    const acceptInvite = () => {
+      if (captureCrossplayInvite(true)) void run();
+    };
+    window.addEventListener("hashchange", acceptInvite);
+    acceptInvite();
+    return () => window.removeEventListener("hashchange", acceptInvite);
+  }, [run]);
   const closeFeedback = () => {
     feedbackActive.current = false;
     setFeedbackDialog(undefined);

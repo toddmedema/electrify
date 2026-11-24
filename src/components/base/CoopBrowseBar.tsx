@@ -123,6 +123,9 @@ export default function CoopBrowseBar({
                   code={coop.inviteCode}
                   prominent={alone}
                   onCopy={() => coopControls()?.copyCode()}
+                  onCopyLink={
+                    coop.hasInviteLink ? coopControls()?.copyLink : undefined
+                  }
                 />
               )}
               {host && coopControls()?.manageLobby && (

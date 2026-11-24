@@ -11,6 +11,7 @@ const MAX_ROOM_GRANTS = MAX_GRANTS / 2;
 const MAX_PAIR_GRANTS = MAX_ROOM_GRANTS / 3;
 const GENERATION_MS = 120_000;
 const ALLOCATION_DRAIN_MS = 600_000;
+const PREPARE_WINDOW_MS = 36_000;
 const ROTATION_WINDOW_MS = 25_000;
 const FAILED_GENERATION_MS = 15_000;
 const IDENTIFIER = /^[\w-]{1,128}$/;
@@ -40,9 +41,21 @@ function activeSignalPair(room, seatId, to, generation, now) {
     return null;
   const guestId = room.hostId === seatId ? to : seatId;
   const pair = room.signals?.[guestId];
-  return pair?.generation === generation && livePair(room, pair, now)
-    ? pair
-    : null;
+  return (
+    [pair, pair?.successor].find(
+      (candidate) =>
+        candidate?.generation === generation && livePair(room, candidate, now),
+    ) ?? null
+  );
+}
+
+function currentPair(room, pair, now) {
+  const successor = pair?.successor;
+  const liveSuccessor = livePair(room, successor, now);
+  if (!livePair(room, pair, now)) return liveSuccessor ? successor : undefined;
+  if (!successor || liveSuccessor) return pair;
+  const { successor: _expired, ...current } = pair;
+  return current;
 }
 
 function buildPair(room, guest, now) {
@@ -58,32 +71,33 @@ function buildPair(room, guest, now) {
   };
 }
 
-function presentPairs(room, seatId, now) {
+function presentPairs(room, seatId, now, current) {
   const host = member(room, room.hostId);
   if (!host || millis(room.leaseUntil) <= now) return {};
   const peers = room.members.filter(
     (entry) => entry.active && entry.id !== host.id,
   );
-  const old = room.signals ?? {};
   return Object.fromEntries(
     peers
       .filter((guest) => seatId === host.id || guest.id === seatId)
       .map((guest) => [
         guest.id,
-        livePair(room, old[guest.id], now)
-          ? old[guest.id]
-          : buildPair(room, guest, now),
+        current[guest.id] ?? buildPair(room, guest, now),
       ]),
   );
 }
 
 function formatPairs(pairs, seatId, now) {
-  return Object.values(pairs).map((pair) => ({
-    peerId: seatId === pair.hostId ? pair.guestId : pair.hostId,
+  const format = (pair) => ({
     generation: pair.generation,
     remainingMs: Math.max(0, pair.expiresAt - now),
     offer: pair.offer,
     answer: pair.answer,
+  });
+  return Object.values(pairs).map((pair) => ({
+    peerId: seatId === pair.hostId ? pair.guestId : pair.hostId,
+    ...format(pair),
+    ...(pair.successor && { successor: format(pair.successor) }),
   }));
 }
 
@@ -258,19 +272,17 @@ function createTurnSignaling({
     const { roomId, seatId } = context;
     if (name === "signal/read") {
       const { pairs, at } = await context.updateRoom((room, now, projected) => {
-        const pairs = presentPairs(projected, seatId, now);
         const old = room.signals ?? {};
         const next = Object.fromEntries(
-          Object.entries(old).filter(([, pair]) =>
-            livePair(projected, pair, now),
-          ),
+          Object.values(old).flatMap((pair) => {
+            const current = currentPair(projected, pair, now);
+            return current ? [[current.guestId, current]] : [];
+          }),
         );
+        const pairs = presentPairs(projected, seatId, now, next);
         Object.assign(next, pairs);
-        const obsolete = Object.values(old).filter(
-          (pair) => next[pair.guestId]?.generation !== pair.generation,
-        );
         const changed =
-          obsolete.length ||
+          Object.keys(next).length !== Object.keys(old).length ||
           Object.keys(next).some((id) => next[id] !== old[id]);
         return {
           ...(changed ? { room: { ...room, signals: next } } : {}),
@@ -294,6 +306,28 @@ function createTurnSignaling({
         const pair = activeSignalPair(projected, seatId, to, generation, now);
         if (!pair) throw aborted();
         if (name === "signal/turn") return { value: pair };
+        const current = currentPair(
+          projected,
+          room.signals?.[pair.guestId],
+          now,
+        );
+        const isCurrent = current.generation === pair.generation;
+        const update = (next, value = null) => ({
+          room: {
+            ...room,
+            signals: { ...room.signals, [pair.guestId]: next },
+          },
+          value,
+        });
+        const create = () =>
+          buildPair(projected, member(projected, pair.guestId), now);
+        if (name === "signal/prepare") {
+          if (!isCurrent || !pair.offer || !pair.answer) throw aborted();
+          if (current.successor) return { value: null };
+          if (pair.expiresAt - now > PREPARE_WINDOW_MS)
+            throw new CrossplayError(429, "turn-rotation-limit");
+          return update({ ...current, successor: create() });
+        }
         if (name === "signal/reset") {
           const deadline =
             pair.offer && pair.answer
@@ -301,20 +335,11 @@ function createTurnSignaling({
               : pair.createdAt + FAILED_GENERATION_MS;
           if (now < deadline)
             throw new CrossplayError(429, "turn-rotation-limit");
-          return {
-            room: {
-              ...room,
-              signals: {
-                ...room.signals,
-                [pair.guestId]: buildPair(
-                  projected,
-                  member(projected, pair.guestId),
-                  now,
-                ),
-              },
-            },
-            value: pair,
-          };
+          // A failed successor can be replaced while the current channel is live.
+          // A reset of the current channel abandons both ends of an in-flight handoff.
+          return isCurrent
+            ? update(create(), [pair, current.successor].filter(Boolean))
+            : update({ ...current, successor: create() }, [pair]);
         }
         if (name !== "signal/describe")
           throw new CrossplayError(404, "unknown-operation");
@@ -326,22 +351,19 @@ function createTurnSignaling({
           if (pair[type].sdp !== description.sdp) throw aborted();
           return { value: null };
         }
-        return {
-          room: {
-            ...room,
-            signals: {
-              ...room.signals,
-              [pair.guestId]: { ...pair, [type]: description },
-            },
-          },
-          value: null,
-        };
+        return update(
+          isCurrent
+            ? { ...current, [type]: description }
+            : { ...current, successor: { ...pair, [type]: description } },
+        );
       },
       { type: "active", peerId: to },
     );
     if (name === "signal/turn") return issue(context, result, to);
     if (name === "signal/reset")
-      await revokeGeneration(roomId, result).catch(() => undefined);
+      await Promise.allSettled(
+        result.map((pair) => revokeGeneration(roomId, pair)),
+      );
     return {};
   }
 

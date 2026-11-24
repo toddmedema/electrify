@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { createTurnSignaling } = require("./coop-signaling.cjs");
+const {
+  activeSignalPair,
+  createTurnSignaling,
+} = require("./coop-signaling.cjs");
 
 // Model only the Firestore operations used by the service, with the provider and
 // clock injected. Grant identity, issuance, pair validation and cleanup run normally.
@@ -101,14 +104,15 @@ function fixture() {
       return result.value;
     },
   };
-  const read = () => signaling.handle("signal/read", context, {});
-  const issue = (to, actor = context) =>
-    signaling.handle("signal/turn", actor, {
-      to,
-      generation: room.signals[to].generation,
-    });
+  const read = (actor = context) => signaling.handle("signal/read", actor, {});
+  const issue = (
+    to,
+    actor = context,
+    generation = room.signals[to].generation,
+  ) => signaling.handle("signal/turn", actor, { to, generation });
   return {
     context,
+    handle: signaling.handle,
     issue,
     read,
     room,
@@ -142,6 +146,109 @@ test("confirmation replaces only the obsolete pair and defers provider calls unt
   assert.deepEqual(f.requests, ["generate-ice-servers"]);
   await f.reap();
   assert.deepEqual(f.requests, ["generate-ice-servers", "revoke"]);
+});
+
+function description(type) {
+  const address = type === "offer" ? "8.8.8.8" : "9.9.9.9";
+  return {
+    type,
+    sdp: [
+      "v=0",
+      "o=- 4321 2 IN IP4 0.0.0.0",
+      "s=-",
+      "t=0 0",
+      "m=application 12212 UDP/DTLS/SCTP webrtc-datachannel",
+      `c=IN IP4 ${address}`,
+      `a=candidate:455721 1 udp 30298521 ${address} 12212 typ relay`,
+      "a=ice-ufrag:iA22",
+      "a=ice-pwd:FtboouybttTfOsvwT8PvWx",
+      `a=fingerprint:sha-256 ${Array(32).fill("C2").join(":")}`,
+      `a=setup:${type === "offer" ? "actpass" : "active"}`,
+      "a=mid:0",
+      "a=sctp-port:5000",
+      "",
+    ].join("\r\n"),
+  };
+}
+
+async function negotiated(f) {
+  await f.read();
+  const guest = { ...f.context, seatId: "guest-a" };
+  const { generation } = f.room.signals["guest-a"];
+  await f.handle("signal/describe", f.context, {
+    to: "guest-a",
+    generation,
+    description: description("offer"),
+  });
+  await f.handle("signal/describe", guest, {
+    to: "host",
+    generation,
+    description: description("answer"),
+  });
+  return { guest, generation, address: { to: "guest-a", generation } };
+}
+
+test("preparing a successor preserves both grants until the old generation expires", async () => {
+  const f = fixture();
+  const { guest, generation, address } = await negotiated(f);
+  const stillEarly = f.handle("signal/prepare", f.context, address);
+  await assert.rejects(stillEarly, { code: "turn-rotation-limit" });
+  await f.issue("guest-a");
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  const next = f.room.signals["guest-a"].successor.generation;
+  await f.handle("signal/prepare", guest, { to: "host", generation });
+  await f.issue("guest-a", f.context, next);
+  const { pairs } = await f.read(guest);
+  assert.equal(pairs[0].generation, generation);
+  assert.equal(pairs[0].successor.generation, next);
+  assert.ok(activeSignalPair(f.room, "guest-a", "host", next, 86_000));
+  assert.ok(activeSignalPair(f.room, "guest-a", "host", generation, 86_000));
+  await f.reap();
+  assert.deepEqual(f.requests, [
+    "generate-ice-servers",
+    "generate-ice-servers",
+  ]);
+
+  f.advance(35_000);
+  assert.equal((await f.read(guest)).pairs[0].generation, next);
+  await assert.rejects(f.issue("guest-a", f.context, generation), {
+    code: "obsolete-connection",
+  });
+  await f.reap();
+  assert.deepEqual(f.requests, [
+    "generate-ice-servers",
+    "generate-ice-servers",
+    "revoke",
+  ]);
+  assert.ok(activeSignalPair(f.room, "guest-a", "host", next, 121_000));
+});
+
+test("a failed staged generation can be reset without disrupting its predecessor", async () => {
+  const f = fixture();
+  const { generation, address } = await negotiated(f);
+  await f.issue("guest-a");
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  const staged = f.room.signals["guest-a"].successor.generation;
+  await f.issue("guest-a", f.context, staged);
+  f.advance(15_000);
+  await f.handle("signal/reset", f.context, { ...address, generation: staged });
+  const { pairs } = await f.read();
+  const first = pairs.find((pair) => pair.peerId === "guest-a");
+  assert.equal(first.generation, generation);
+  assert.notEqual(first.successor.generation, staged);
+  assert.deepEqual(f.requests, [
+    "generate-ice-servers",
+    "generate-ice-servers",
+    "revoke",
+  ]);
+  f.room.members[1].binding = "different-device";
+  for (const id of [generation, staged, first.successor.generation]) {
+    await assert.rejects(f.issue("guest-a", f.context, id), {
+      code: "obsolete-connection",
+    });
+  }
 });
 
 test("an occupied pair budget leaves grants available for a different pair", async () => {

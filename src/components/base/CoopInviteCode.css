@@ -23,3 +23,15 @@
 .coopInviteCode .MuiButton-root {
   flex-shrink: 0;
 }
+
+.coopInviteCodeWithLink {
+  gap: 8px;
+}
+
+.coopInviteCodeWithLink .coopInviteValue {
+  margin-inline-end: auto;
+}
+
+.coopInviteCodeWithLink .MuiButton-root {
+  white-space: nowrap;
+}

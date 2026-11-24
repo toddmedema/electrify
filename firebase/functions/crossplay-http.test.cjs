@@ -6,10 +6,11 @@ const ORIGIN = "https://electrifygame.com";
 const RULES = `coop-2-${"a".repeat(64)}`;
 const DEVICE = "d".repeat(43);
 
-function setup({ steamEnabled = true } = {}) {
+function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
   let now = 10_000;
   let stopped = false;
   const documents = new Map();
+  const inviteCodes = new Map();
   const accounts = new Map();
   const tickets = new Set();
   const steamCalls = [];
@@ -22,6 +23,7 @@ function setup({ steamEnabled = true } = {}) {
   const service = createCrossplay({
     origins: [ORIGIN],
     quotaKey: "fixture-does-not-leave-unit-tests",
+    campaignRules,
     clock: () => now,
     audit: (event) => audits.push(event),
     isStopped: async () => stopped,
@@ -64,8 +66,21 @@ function setup({ steamEnabled = true } = {}) {
         if (data?.tokenHash === tokenHash) data.revoked = true;
       },
       reserveRoom: async () => true,
+      reserveInviteCode: async (digest, id, expiresAt) => {
+        if (collisions > 0) {
+          collisions--;
+          return false;
+        }
+        if (inviteCodes.get(digest)?.expiresAt > now) return false;
+        inviteCodes.set(digest, { id, expiresAt });
+        return true;
+      },
       getRoom: async (id) => current(id),
-      findInvite: async (digest) => {
+      findInvite: async (digest, shortCode) => {
+        if (shortCode) {
+          const code = inviteCodes.get(digest);
+          return code?.expiresAt > now ? current(code.id) : null;
+        }
         const selected = [...documents.values()].find(
           (room) =>
             room.invite?.codeHash === digest ||
@@ -97,6 +112,8 @@ function setup({ steamEnabled = true } = {}) {
             revision: 1,
             matchId: "match",
             schema: 3,
+            gameSchema: 27,
+            rules: room.rules,
             epoch: room.epoch,
             savedAt: now,
           };
@@ -168,24 +185,10 @@ function setup({ steamEnabled = true } = {}) {
     );
   }
 
-  async function approve(room, host, guest) {
-    const roomId = room.lobby.lobbyId;
-    const pending = await join(room, guest);
-    assert.equal(pending.body.lobby.joinPending, true);
-    assert.deepEqual(pending.body.lobby.members, []);
-    const reply = await call("room/state", { roomId }, { token: host });
-    const [request] = reply.body.lobby.pendingApprovals;
-    const accepted = await call(
-      "room/approve",
-      {
-        roomId,
-        requestId: request.id,
-        approve: true,
-      },
-      { token: host },
-    );
-    assert.equal(accepted.status, 200);
-    return (await call("room/state", { roomId }, { token: guest })).body;
+  async function joinPlayer(room, token, invite) {
+    const reply = await join(room, token, invite);
+    assert.equal(reply.status, 200);
+    return reply.body;
   }
 
   return {
@@ -197,7 +200,7 @@ function setup({ steamEnabled = true } = {}) {
     },
     audits,
     steamCalls,
-    approve,
+    joinPlayer,
     call,
     create,
     join,
@@ -253,7 +256,7 @@ test("web-only deployment lets Google players host and join without Steam config
     ).status,
     404,
   );
-  const approved = await ctx.approve(room, host, guest);
+  const approved = await ctx.joinPlayer(room, guest);
   assert.ok(approved.lobby.selfId);
   assert.equal(approved.lobby.members.length, 2);
 
@@ -266,13 +269,13 @@ test("web-only deployment lets Google players host and join without Steam config
   assert.equal(ctx.steamCalls.length, 0);
 });
 
-test("only host approval exposes the opaque roster and invite rotation invalidates previous requests", async () => {
-  const ctx = setup();
+test("authenticated invitations admit directly and keep lobby identity and secrets private", async () => {
+  const ctx = setup({ collisions: 1 });
   const host = await ctx.login("host-id");
   const guest = await ctx.login("guest-id");
   const room = await ctx.create(host);
   const roomId = room.lobby.lobbyId;
-  assert.match(room.lobby.inviteCode, /^[a-f0-9]{20}$/);
+  assert.match(room.lobby.inviteCode, /^[a-z0-9]{6}$/);
   assert.match(room.lobby.inviteToken, /^[A-Za-z0-9_-]{22}$/);
   assert.ok(room.lobby.inviteVersion);
   for (const operation of ["room/state", "signal/read", "save/read"]) {
@@ -283,35 +286,72 @@ test("only host approval exposes the opaque roster and invite rotation invalidat
     );
     assert.ok([403, 404].includes(unauthorized.status));
   }
-  const pending = await ctx.join(room, guest, room.lobby.inviteToken);
-  assert.deepEqual(pending.body, {
-    lobby: {
-      available: true,
-      lobbyId: roomId,
-      members: [],
-      connected: [],
-      joinPending: true,
-    },
-    authority: null,
-    connections: [],
+  const rejected = await ctx.call("room/join", {
+    name: "Guest",
+    rules: RULES,
+    invite: room.lobby.inviteToken,
   });
-  assert.equal(
-    (await ctx.call("signal/read", { roomId }, { token: guest })).status,
-    403,
+  assert.equal(rejected.status, 401);
+  assert.equal((await ctx.join(room, guest, "nope")).status, 404);
+  const joined = await ctx.joinPlayer(
+    room,
+    guest,
+    room.lobby.inviteCode.toUpperCase(),
   );
-  const rotated = (
-    await ctx.call("room/rotate-invite", { roomId }, { token: host })
-  ).body;
-  assert.notEqual(rotated.lobby.inviteVersion, room.lobby.inviteVersion);
-  assert.equal((await ctx.join(room, guest)).status, 404);
-  const approval = await ctx.approve(rotated, host, guest);
-  assert.equal(approval.lobby.members.length, 2);
-  assert.match(approval.lobby.selfId, /^[a-f0-9-]{36}$/);
-  assert.equal(approval.lobby.inviteToken, undefined);
+  assert.equal(joined.lobby.members.length, 2);
+  assert.match(joined.lobby.selfId, /^[a-f0-9-]{36}$/);
+  assert.equal(joined.lobby.inviteToken, undefined);
   assert.doesNotMatch(
-    JSON.stringify(approval),
+    JSON.stringify(joined),
     /host-id|guest-id|tokenHash|codeHash/,
   );
+  const fromLink = await ctx.joinPlayer(
+    room,
+    await ctx.login("from-link"),
+    room.lobby.inviteToken,
+  );
+  assert.equal(fromLink.lobby.members.length, 3);
+  const race = await Promise.all(
+    (await Promise.all([ctx.login("first"), ctx.login("second")])).map(
+      (token) => ctx.join(room, token),
+    ),
+  );
+  assert.deepEqual(race.map(({ status }) => status).sort(), [200, 409]);
+  assert.equal(
+    race.find(({ status }) => status === 409).body.error,
+    "room_full",
+  );
+});
+
+test("the host renews an expired lobby invite while the old link and code stop working", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  let token = host;
+  let state;
+  for (let index = 1; index <= 225; index++) {
+    ctx.advance(4000);
+    if (index % 60 === 0) token = await ctx.login("host", { token });
+    state = await ctx.call("room/state", { roomId }, { token });
+    assert.equal(state.status, 200);
+  }
+  assert.notEqual(state.body.lobby.inviteVersion, room.lobby.inviteVersion);
+  assert.match(state.body.lobby.inviteCode, /^[a-z0-9]{6}$/);
+  const retried = await ctx.call("room/state", { roomId }, { token });
+  assert.equal(retried.body.lobby.inviteCode, state.body.lobby.inviteCode);
+  assert.equal(retried.body.lobby.inviteToken, state.body.lobby.inviteToken);
+  const freshGuest = await ctx.login("guest");
+  assert.notEqual(freshGuest, guest);
+  assert.equal((await ctx.join(room, freshGuest)).status, 404);
+  assert.equal(
+    (await ctx.join(room, freshGuest, room.lobby.inviteToken)).status,
+    404,
+  );
+  const joined = await ctx.joinPlayer(state.body, freshGuest);
+  assert.equal(joined.lobby.inviteCode, undefined);
+  assert.equal(joined.lobby.inviteToken, undefined);
 });
 
 test("same-device renewal preserves a seat, and a fenced device cannot renew back into play", async () => {
@@ -364,13 +404,54 @@ test("same-device renewal preserves a seat, and a fenced device cannot renew bac
   assert.notEqual(acquired.body.authority.epoch, room.authority.epoch);
 });
 
+test("only an original player can upgrade an expired saved campaign to the deployed build", async () => {
+  const current = `coop-2-${"b".repeat(64)}`;
+  const ctx = setup({ campaignRules: { current, published: { [RULES]: 27 } } });
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const outsider = await ctx.login("outsider");
+  const room = await ctx.create(host);
+  const { lobby } = await ctx.joinPlayer(room, guest);
+  const roomId = lobby.lobbyId;
+  const ids = lobby.members.map(({ id }) => id);
+  const resume = (token, rules = current) =>
+    ctx.call("room/reconnect", { roomId, rules }, { token });
+  assert.equal(
+    (
+      await ctx.call(
+        "room/lock",
+        { roomId, ids, requiredIds: ids },
+        { token: host },
+      )
+    ).status,
+    200,
+  );
+  const published = await ctx.call("save/publish", { roomId }, { token: host });
+  assert.equal(published.status, 200);
+  assert.deepEqual((await resume(guest)).body, { error: "incompatible" });
+  ctx.advance(12_001);
+  assert.equal((await resume(outsider)).status, 403);
+  assert.deepEqual((await resume(guest, `coop-2-${"c".repeat(64)}`)).body, {
+    error: "incompatible",
+  });
+  const upgraded = await resume(guest);
+  assert.equal(upgraded.status, 200);
+  assert.notEqual(upgraded.body.authority.epoch, room.authority.epoch);
+  assert.deepEqual(upgraded.body.authority.head, published.body);
+  assert.deepEqual((await resume(host, RULES)).body, { error: "incompatible" });
+  assert.equal(
+    (await resume(host)).body.authority.epoch,
+    upgraded.body.authority.epoch,
+  );
+});
+
 test("expired host loses publication rights and a single original seat acquires the pinned checkpoint", async () => {
   const ctx = setup();
   const host = await ctx.login("host");
   const guest = await ctx.login("guest");
   const outsider = await ctx.login("elsewhere");
   const room = await ctx.create(host);
-  const active = await ctx.approve(room, host, guest);
+  const active = await ctx.joinPlayer(room, guest);
   const roomId = room.lobby.lobbyId;
   const ids = active.lobby.members.map(({ id }) => id);
   assert.equal(
@@ -437,38 +518,31 @@ test("expired host loses publication rights and a single original seat acquires 
   );
 });
 
-test("a guest can cancel pending approval and reclaim their approved seat on another device", async () => {
+test("a guest can reclaim their seat and the host can remove them from that lobby", async () => {
   const ctx = setup();
   const host = await ctx.login("host");
   const guest = await ctx.login("guest");
   const room = await ctx.create(host);
   const roomId = room.lobby.lobbyId;
-  await ctx.join(room, guest);
-  const state = await ctx.call("room/state", { roomId }, { token: host });
-  const [request] = state.body.lobby.pendingApprovals;
-  assert.equal(
-    (await ctx.call("room/leave", { roomId }, { token: guest })).status,
-    200,
-  );
-  assert.equal(
-    (
-      await ctx.call(
-        "room/approve",
-        {
-          roomId,
-          requestId: request.id,
-          approve: true,
-        },
-        { token: host },
-      )
-    ).status,
-    404,
-  );
-  const approved = await ctx.approve(room, host, guest);
+  const joined = await ctx.joinPlayer(room, guest);
   const newDevice = await ctx.login("guest", { device: "e".repeat(43) });
   const reclaimed = await ctx.join(room, newDevice);
   assert.equal(reclaimed.status, 200);
-  assert.equal(reclaimed.body.lobby.selfId, approved.lobby.selfId);
+  assert.equal(reclaimed.body.lobby.selfId, joined.lobby.selfId);
+  const removed = await ctx.call(
+    "room/remove",
+    { roomId, seatId: joined.lobby.selfId },
+    { token: host },
+  );
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.lobby.members.length, 1);
+  assert.equal((await ctx.join(room, newDevice)).status, 404);
+  assert.equal(
+    (await ctx.join(room, newDevice, room.lobby.inviteToken)).status,
+    404,
+  );
+  const anotherGuest = await ctx.login("another");
+  assert.equal((await ctx.join(room, anotherGuest)).status, 200);
 });
 
 test("an expired guest presence cannot borrow the live host lease", async () => {
@@ -477,7 +551,7 @@ test("an expired guest presence cannot borrow the live host lease", async () => 
   const guest = await ctx.login("guest");
   const room = await ctx.create(host);
   const roomId = room.lobby.lobbyId;
-  await ctx.approve(room, host, guest);
+  await ctx.joinPlayer(room, guest);
   ctx.advance(7000);
   const hostState = await ctx.call("room/state", { roomId }, { token: host });
   assert.ok(hostState.body.authority.leaseRemainingMs > 6000);

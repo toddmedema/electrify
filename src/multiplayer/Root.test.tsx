@@ -9,6 +9,7 @@ import { createGame } from "../testing/Simulator";
 import { MultiplayerSession, SessionState } from "./Session";
 import { showMultiplayerLobby } from "./Registry";
 import MultiplayerRoot from "./Root";
+import { CrossplayApiError } from "./CrossplayApi";
 
 jest.mock("../DesktopState", () => ({ useDesktopState: jest.fn() }));
 jest.mock("./WorkerClient", () => ({}));
@@ -123,15 +124,34 @@ function renderWithSteamInvites(online = true) {
   return { join: session.join, invite };
 }
 
-test("an incoming Steam link fills the join prompt and waits for consent", async () => {
+test("an incoming Steam link opens a join prompt without exposing its token", async () => {
   const { join, invite } = renderWithSteamInvites();
   await invite(invitation);
   expect(join).not.toHaveBeenCalled();
-  expect(screen.getByRole("textbox", { name: "Invite code" })).toHaveValue(
-    invitation,
-  );
+  const dialog = screen.getByRole("dialog", { name: "Play with friends" });
+  expect(
+    screen.queryByRole("textbox", { name: "Invite code" }),
+  ).not.toBeInTheDocument();
+  expect(dialog.outerHTML).not.toContain(invitation);
   await userEvent.click(screen.getByRole("button", { name: "Join" }));
   expect(join).toHaveBeenCalledWith(invitation);
+});
+
+test("an invalid link can be replaced with a manual code", async () => {
+  const { join, invite } = renderWithSteamInvites();
+  const user = userEvent.setup();
+  join.mockRejectedValueOnce(new CrossplayApiError("invalid_invite"));
+  await invite(invitation);
+  await user.click(screen.getByRole("button", { name: "Join" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "This invitation is no longer available.",
+  );
+  await user.click(screen.getByRole("button", { name: "Enter another code" }));
+  const code = screen.getByRole("textbox", { name: "Invite code" });
+  expect(code).toHaveValue("");
+  await user.type(code, "A1Z2Q3");
+  await user.click(screen.getByRole("button", { name: "Join" }));
+  expect(join).toHaveBeenLastCalledWith("a1z2q3");
 });
 
 test("the unified lobby accepts a pasted link and a code", async () => {
@@ -148,14 +168,14 @@ test("the unified lobby accepts a pasted link and a code", async () => {
   await user.click(screen.getByRole("button", { name: "Join" }));
   expect(join).toHaveBeenCalledWith(invitation);
   await user.clear(code);
-  await user.type(code, "001122334455AABBCCDD");
+  await user.type(code, "AA1B2Z");
   await user.click(screen.getByRole("button", { name: "Join" }));
-  expect(join).toHaveBeenLastCalledWith("001122334455aabbccdd");
+  expect(join).toHaveBeenLastCalledWith("aa1b2z");
 });
 
 test("Steam Offline Mode disables online play and keeps Local Co-op available", async () => {
-  const { join, invite } = renderWithSteamInvites(false);
-  await invite(invitation);
+  const { join } = renderWithSteamInvites(false);
+  act(showMultiplayerLobby);
   expect(screen.getByRole("button", { name: "Host a game" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Join" })).toBeDisabled();
   expect(
@@ -180,9 +200,12 @@ test("a couch session keeps the latest invitation until local play closes", asyn
   await user.click(leave);
   expect(leave).not.toBeInTheDocument();
   expect(join).not.toHaveBeenCalled();
-  expect(screen.getByRole("textbox", { name: "Invite code" })).toHaveValue(
-    newerInvitation,
-  );
+  expect(
+    screen.queryByRole("textbox", { name: "Invite code" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("dialog", { name: "Play with friends" }).outerHTML,
+  ).not.toContain(newerInvitation);
   await user.click(screen.getByRole("button", { name: "Join" }));
   expect(join).toHaveBeenCalledWith(newerInvitation);
 });

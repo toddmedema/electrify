@@ -124,6 +124,7 @@ interface CoopControls {
   back: () => void;
   /** Host: copy the lobby code for friends to enter. */
   copyCode: () => void;
+  copyLink?: () => void;
   manageLobby?: () => void;
   /** Host: choose a multiplayer save to resume instead. */
   openSaves: () => void;

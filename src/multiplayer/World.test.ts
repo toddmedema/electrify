@@ -577,6 +577,11 @@ const publishedCoopIdentities = [
     24,
     "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7",
   ],
+  // Master 76a4d72f shipped the first online TURN campaigns.
+  [
+    27,
+    "coop-2-de9ea918f8428eb38ff0526c7510eaa62f1ec291f40f82033b8f1f69062ddf76",
+  ],
 ] as const;
 
 test.each(publishedCoopIdentities)(

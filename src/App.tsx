@@ -66,7 +66,10 @@ import {
   screenEdgePaddingPixels,
 } from "./ScreenEdgePadding";
 import { getDesktop, isDesktopApp } from "./Desktop";
-import { captureCrossplayInvite } from "./multiplayer/CrossplayInvite";
+import {
+  captureCrossplayInvite,
+  currentInviteFragment,
+} from "./multiplayer/CrossplayInvite";
 import {
   multiplayerStartupRequested,
   subscribeMultiplayerStartup,
@@ -84,7 +87,14 @@ function MultiplayerEntry() {
     subscribeMultiplayerStartup,
     multiplayerStartupRequested,
   );
-  const [invited] = useState(() => !!captureCrossplayInvite());
+  const [invited, setInvited] = useState(() => !!captureCrossplayInvite());
+  useEffect(() => {
+    const onInvite = () => {
+      if (currentInviteFragment()) setInvited(true);
+    };
+    window.addEventListener("hashchange", onInvite);
+    return () => window.removeEventListener("hashchange", onInvite);
+  }, []);
   if (!requested && !invited && !isDesktopApp()) return null;
   return (
     <Suspense fallback={null}>

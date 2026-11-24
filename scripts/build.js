@@ -1,10 +1,16 @@
 const { deferStyles } = require("./site/defer-styles");
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
-const fs = require("node:fs");
 const { buildVersion, writeBuildVersion } = require("./build-version");
 const { verifyEditionBundle } = require("./verify-edition-bundle");
 const { coopRelayUrl } = require("../electron/coop-relay-url.cjs");
+
+const steamAppId = process.env.REACT_APP_STEAM_APP_ID;
+if (
+  steamAppId &&
+  (!/^[1-9][0-9]{0,9}$/.test(steamAppId) || Number(steamAppId) > 2147483647)
+)
+  throw new Error("Invalid Steam App ID for multiplayer invitations");
 
 const site = spawnSync(
   process.execPath,
@@ -34,18 +40,5 @@ const result = spawnSync(
 if (result.error) throw result.error;
 if (result.status !== 0) process.exit(result.status || 1);
 deferStyles(path.resolve(output, "index.html"));
-const steamAppId = process.env.REACT_APP_STEAM_APP_ID;
-if (steamAppId) {
-  if (!/^[1-9][0-9]{0,9}$/.test(steamAppId) || Number(steamAppId) > 2147483647)
-    throw new Error("Invalid Steam App ID for the invitation landing page");
-  const invitePath = path.resolve(output, "invite/index.html");
-  const invite = fs
-    .readFileSync(invitePath, "utf8")
-    .replace(
-      'name="electrify-steam-app" content=""',
-      `name="electrify-steam-app" content="${steamAppId}"`,
-    );
-  fs.writeFileSync(invitePath, invite);
-}
 writeBuildVersion(version, output);
 verifyEditionBundle(output, "web");

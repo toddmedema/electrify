@@ -126,6 +126,67 @@ test("clients and the restricted service writer have no direct lobby or account 
   );
 });
 
+test("an invite write adds only a single bound seat while the unlocked host lease is live", async () => {
+  const before = room();
+  before.room.locked = false;
+  before.inviteHashes = ["issued-code-hash", "issued-link-hash"];
+  const members = [
+    { id: HOST, account: "host-account", binding: "host-device" },
+  ];
+  before.room.members = members;
+  before.accounts = ["host-account"];
+  delete before.bindings[GUEST];
+  const proposed = {
+    ...before,
+    room: {
+      ...before.room,
+      members: [
+        ...members,
+        { id: GUEST, account: "guest-account", binding: "guest-device" },
+      ],
+    },
+    accounts: [...before.accounts, "guest-account"],
+    bindings: { ...before.bindings, [GUEST]: guest() },
+    writeGuard: {
+      ...before.writeGuard,
+      type: "invite",
+      seatId: GUEST,
+      account: "guest-account",
+      binding: "guest-device",
+      tokenHash: "guest-token",
+      inviteHash: "issued-code-hash",
+    },
+  };
+  await seed(before);
+  await assertFails(
+    setDoc(doc(writer(), "coopRooms", ID), {
+      ...proposed,
+      writeGuard: { ...proposed.writeGuard, inviteHash: "unknown-code-hash" },
+    }),
+  );
+  await assertFails(
+    setDoc(doc(writer(), "coopRooms", ID), {
+      ...proposed,
+      room: { ...proposed.room, epoch: "unexpected-epoch" },
+    }),
+  );
+  await assertFails(
+    setDoc(doc(writer(), "coopRooms", ID), {
+      ...proposed,
+      bindings: { ...proposed.bindings, [HOST]: { ...host(), active: false } },
+    }),
+  );
+  await assertSucceeds(setDoc(doc(writer(), "coopRooms", ID), proposed));
+  before.room.removedAccounts = ["guest-account"];
+  await seed(before);
+  await assertFails(
+    setDoc(doc(writer(), "coopRooms", ID), {
+      ...proposed,
+      room: { ...proposed.room, removedAccounts: before.room.removedAccounts },
+    }),
+  );
+});
+
 test("host renewal and publication fail at the authoritative write after the original lease expires", async () => {
   const expired = room(-1000);
   await seed(expired);
@@ -163,6 +224,30 @@ test("host renewal and publication fail at the authoritative write after the ori
       leaseExpiry: at(8000),
     }),
   );
+});
+
+test("a build change during host acquisition preserves the confirmed checkpoint", async () => {
+  const expired = room(-1000);
+  expired.room.rules = "published";
+  await seed(expired);
+  const owned = {
+    ...expired,
+    leaseExpiry: at(8000),
+    room: {
+      ...expired.room,
+      epoch: "epoch-after",
+      rules: "deployed",
+      restoreHead: expired.room.head,
+    },
+    writeGuard: { ...expired.writeGuard, type: "acquire" },
+  };
+  await assertFails(
+    setDoc(doc(writer(), "coopRooms", ID), {
+      ...owned,
+      room: { ...owned.room, head: { revision: 6 } },
+    }),
+  );
+  await assertSucceeds(setDoc(doc(writer(), "coopRooms", ID), owned));
 });
 
 test("locking requires active bindings for every required seat at commit", async () => {

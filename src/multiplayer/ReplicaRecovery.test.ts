@@ -105,6 +105,66 @@ test("an online baseline dispatch failure leaves time for the transfer service t
   expect(f.baselines()).toHaveLength(2);
 });
 
+test("acknowledged baselines and abandoned channels leave the failure budget available", async () => {
+  const f = fixture(digest, 2, true);
+  for (const now of [0, 101_000, 202_000]) {
+    f.time(now);
+    expect(f.recovery.baseline("1")).toBe(true);
+    f.progress();
+  }
+  f.time(203_000);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.recovery.connected([]);
+  f.recovery.connected(["1"]);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.recovery.dispatched("1", f.baselines().at(-1)!.baseline.index, false);
+  f.time(205_000);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.recovery.dispatched("1", f.baselines().at(-1)!.baseline.index, true);
+  f.time(230_000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  expect(f.baselines()).toHaveLength(6);
+  await settle();
+});
+
+test("two hash mismatches after baseline install exhaust the budget despite applied receipts", async () => {
+  const f = fixture(
+    () => Promise.resolve(new Uint8Array(32).fill(1).buffer),
+    2,
+    true,
+  );
+  const report = async (hash: string) => {
+    const { index } = f.baselines().at(-1)!.baseline;
+    f.progress(index); // ReplicaRuntime reports the install before hashing the verify record.
+    await settle();
+    f.progress(index + 1, { index: index + 1, hash });
+    await settle();
+  };
+  for (const now of [0, 101_000, 202_000]) {
+    f.time(now);
+    expect(f.recovery.baseline("1")).toBe(true);
+    await report("01".repeat(32));
+  }
+
+  f.time(203_000);
+  f.command("0", { kind: "rate", value: 0.15 });
+  f.recovery.pulse();
+  await settle();
+  const divergentIndex = f.host.index;
+  f.progress(divergentIndex, {
+    index: divergentIndex,
+    hash: "00".repeat(32),
+  });
+  expect(f.baselines()).toHaveLength(4);
+  await report("00".repeat(32));
+  expect(f.baselines()).toHaveLength(5);
+  await report("00".repeat(32));
+  expect(f.baselines()).toHaveLength(5);
+  expect(worldBlockers(f.host.world)).toEqual([
+    "Player 1 could not stay in sync. Save and resume the match.",
+  ]);
+});
+
 test("a deliberately altered replica recovers at a hash boundary and a pending purchase applies exactly once", async () => {
   const f = fixture();
   const replica = new Replica();
@@ -252,7 +312,7 @@ test("idle paused live replicas never recover or generate unchanged verify traff
   await settle();
 });
 
-test("disconnected and retired peers cannot hold time, and a third baseline stops recovery durably", async () => {
+test("disconnected and retired peers cannot hold time, and two failed baselines stop recovery durably", async () => {
   const f = fixture();
   f.recovery.baseline("1");
   f.progress();
@@ -277,7 +337,10 @@ test("disconnected and retired peers cannot hold time, and a third baseline stop
   expect(f.recovery.baseline("1")).toBe(true);
   f.time(16000);
   f.recovery.pulse();
-  expect(f.baselines()).toHaveLength(2);
+  expect(f.baselines()).toHaveLength(3);
+  f.time(26000);
+  f.recovery.pulse();
+  expect(f.baselines()).toHaveLength(3);
   const reason = "Player 1 could not stay in sync. Save and resume the match.";
   expect(f.host.world.reason).toBe(reason);
   expect(f.host.world.readyRequired).toBe(true);

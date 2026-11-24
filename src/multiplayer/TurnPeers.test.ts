@@ -1,6 +1,7 @@
 import { TextDecoder, TextEncoder } from "util";
 import { TurnPeers } from "./TurnPeers";
 import { turnFrames } from "./TurnWire";
+import type { WireMessage } from "./SessionTransport";
 
 Object.assign(globalThis, { TextDecoder, TextEncoder });
 
@@ -26,10 +27,42 @@ const answer = {
   sdp: offer.sdp.replaceAll("8.8.8.8", "9.9.9.9").replaceAll("2000", "3000"),
 } satisfies RTCSessionDescriptionInit;
 
+const relayStats = (host: boolean) =>
+  new Map<string, object>([
+    ["transport", { type: "transport", selectedCandidatePairId: "pair" }],
+    [
+      "pair",
+      {
+        type: "candidate-pair",
+        state: "succeeded",
+        localCandidateId: "local",
+        remoteCandidateId: "remote",
+      },
+    ],
+    [
+      "local",
+      {
+        type: "local-candidate",
+        candidateType: "relay",
+        address: host ? "8.8.8.8" : "9.9.9.9",
+        port: host ? 2000 : 3000,
+      },
+    ],
+    [
+      "remote",
+      {
+        type: "remote-candidate",
+        candidateType: "relay",
+        address: host ? "9.9.9.9" : "8.8.8.8",
+        port: host ? 3000 : 2000,
+      },
+    ],
+  ]);
+
 class PeerFixture {
   connectionState: RTCPeerConnectionState = "connecting";
   iceGatheringState: RTCIceGatheringState = "complete";
-  localDescription = offer;
+  localDescription: RTCSessionDescriptionInit = offer;
   channel = {
     readyState: "connecting",
     bufferedAmount: 0,
@@ -41,42 +74,12 @@ class PeerFixture {
   close = jest.fn();
   createDataChannel = jest.fn(() => this.channel);
   createOffer = async () => offer;
-  setLocalDescription = async () => undefined;
+  setLocalDescription = async (): Promise<void> => undefined;
   setRemoteDescription = async () => {
     this.connectionState = "connected";
     this.channel.readyState = "open";
   };
-  getStats = async () =>
-    new Map<string, object>([
-      ["transport", { type: "transport", selectedCandidatePairId: "pair" }],
-      [
-        "pair",
-        {
-          type: "candidate-pair",
-          state: "succeeded",
-          localCandidateId: "local",
-          remoteCandidateId: "remote",
-        },
-      ],
-      [
-        "local",
-        {
-          type: "local-candidate",
-          candidateType: "relay",
-          address: "8.8.8.8",
-          port: 2000,
-        },
-      ],
-      [
-        "remote",
-        {
-          type: "remote-candidate",
-          candidateType: "relay",
-          address: "9.9.9.9",
-          port: 3000,
-        },
-      ],
-    ]);
+  getStats = async () => relayStats(true);
 }
 
 async function settle() {
@@ -177,5 +180,346 @@ test("a live verified relay stops delivering gameplay when the independent autho
     peers.close();
     Object.assign(globalThis, { RTCPeerConnection: priorPeer });
     jest.useRealTimers();
+  }
+});
+
+type Side = "host" | "guest";
+type TestGeneration = {
+  generation: string;
+  expiresAt: number;
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+};
+
+function duplex() {
+  jest.useFakeTimers();
+  const priorPeer = globalThis.RTCPeerConnection;
+  const sockets = new Map<string, Partial<Record<Side, Connection>>>();
+  const other = (side: Side) => (side === "host" ? "guest" : "host");
+  class Connection extends PeerFixture {
+    localInstalled = false;
+    remoteInstalled = false;
+    onconnectionstatechange?: () => void;
+    constructor(config: RTCConfiguration) {
+      super();
+      const [side, id] = (config.iceServers![0].username as string).split(
+        ":",
+      ) as [Side, string];
+      this.side = side;
+      const pair = sockets.get(id) ?? {};
+      pair[side] = this;
+      sockets.set(id, pair);
+      this.pair = pair;
+      this.localDescription = side === "host" ? offer : answer;
+      this.channel.send.mockImplementation((frame: Uint8Array<ArrayBuffer>) => {
+        const target = pair[other(side)];
+        void Promise.resolve().then(() => {
+          if (target?.channel.readyState === "open")
+            target.channel.onmessage?.({ data: frame.buffer });
+        });
+      });
+      this.close.mockImplementation(() => {
+        this.connectionState = "closed";
+        this.channel.readyState = "closed";
+        this.onconnectionstatechange?.();
+      });
+    }
+    private side: Side;
+    private pair: Partial<Record<Side, Connection>>;
+
+    createAnswer = async () => answer;
+    setLocalDescription = async () => {
+      this.localInstalled = true;
+      this.connect();
+    };
+    setRemoteDescription = async () => {
+      this.remoteInstalled = true;
+      this.connect();
+    };
+    getStats = async () => relayStats(this.side === "host");
+
+    private connect() {
+      const partner = this.pair[other(this.side)];
+      if (
+        !partner ||
+        !this.localInstalled ||
+        !this.remoteInstalled ||
+        !partner.localInstalled ||
+        !partner.remoteInstalled
+      )
+        return;
+      for (const socket of [this, partner]) {
+        socket.connectionState = "connected";
+        socket.channel.readyState = "open";
+        socket.onconnectionstatechange?.();
+      }
+    }
+  }
+  Object.assign(globalThis, { RTCPeerConnection: Connection });
+  let created = 0;
+  const makeGeneration = () => ({
+    generation: "generation-" + ++created,
+    expiresAt: performance.now() + 120_000,
+  });
+  let current: TestGeneration = makeGeneration();
+  let staged: TestGeneration | undefined;
+  let rejectStagedCredential = false;
+  const signal = (value: TestGeneration) => ({
+    ...value,
+    remainingMs: value.expiresAt - performance.now(),
+  });
+  const room = new Map<string, WireMessage>();
+  const guestDownload = jest.fn((_: unknown, reference: string) =>
+    Promise.resolve(room.get(reference)!),
+  );
+  const hostUpload = jest.fn((_: unknown, payload: WireMessage) => {
+    room.set("baseline", payload);
+    return Promise.resolve("baseline");
+  });
+
+  function player(side: Side) {
+    const status = jest.fn();
+    const message = jest.fn();
+    const peers = new TurnPeers(
+      {
+        async request<T>(operation: string, body: unknown): Promise<T> {
+          const { generation, description } = body as {
+            generation?: string;
+            description?: RTCSessionDescriptionInit;
+          };
+          if (operation === "signal/read") {
+            if (current.expiresAt <= performance.now()) {
+              current = staged ?? makeGeneration();
+              staged = undefined;
+            }
+            return {
+              pairs: [
+                {
+                  peerId: other(side),
+                  ...signal(current),
+                  ...(staged && { successor: signal(staged) }),
+                },
+              ],
+            } as T;
+          }
+          const pair = generation === current.generation ? current : staged;
+          if (!pair || generation !== pair.generation)
+            throw new Error("obsolete generation");
+          if (operation === "signal/turn") {
+            if (pair === staged && rejectStagedCredential) {
+              rejectStagedCredential = false;
+              throw new Error("TURN is unavailable");
+            }
+            return {
+              iceServers: [
+                {
+                  urls: [
+                    "turn:turn.cloudflare.com:3478",
+                    "turns:turn.cloudflare.com:443",
+                  ],
+                  username: side + ":" + generation,
+                  credential: "temporary-password",
+                },
+              ],
+              remainingMs: signal(pair).remainingMs,
+            } as T;
+          }
+          if (operation === "signal/prepare") staged ??= makeGeneration();
+          else if (operation === "signal/describe") {
+            if (description?.type === "offer") pair.offer = description;
+            if (description?.type === "answer") pair.answer = description;
+          } else if (operation === "signal/reset") {
+            if (pair === staged) staged = makeGeneration();
+            else {
+              current = makeGeneration();
+              staged = undefined;
+            }
+          } else throw new Error(operation);
+          return {} as T;
+        },
+      },
+      {
+        status,
+        message,
+        storeTransfer: hostUpload,
+        readTransfer: guestDownload,
+      },
+    );
+    return {
+      peers,
+      status,
+      message,
+      send: (payload: WireMessage) => peers.send(other(side), payload),
+      renew: () =>
+        peers.update(
+          {
+            ...authority,
+            selfId: side,
+            binding: side + "-device",
+          },
+          performance.now(),
+        ),
+    };
+  }
+  const host = player("host");
+  const guest = player("guest");
+  return {
+    host,
+    guest,
+    hostUpload,
+    guestDownload,
+    sockets,
+    generations: () => created,
+    rejectSuccessor: () => {
+      rejectStagedCredential = true;
+    },
+    async advance(target: number) {
+      while (performance.now() < target) {
+        host.renew();
+        guest.renew();
+        await settle();
+        jest.advanceTimersByTime(250);
+        await settle();
+      }
+    },
+    close() {
+      host.peers.close();
+      guest.peers.close();
+      Object.assign(globalThis, { RTCPeerConnection: priorPeer });
+      jest.useRealTimers();
+    },
+  };
+}
+
+function command(sequence: number): WireMessage {
+  return {
+    kind: "command",
+    envelope: {
+      matchId: "game",
+      epoch: "epoch",
+      sequence,
+      command: { kind: "pause" },
+    },
+  };
+}
+
+function records(from: number): WireMessage {
+  return {
+    kind: "records",
+    matchId: "game",
+    epoch: "epoch",
+    from,
+    records: [{ t: "verify" }],
+  };
+}
+
+test("three TURN renewals keep both seats connected and deliver commands and records", async () => {
+  const f = duplex();
+  try {
+    let index = 0;
+    for (let now = 4_000; now <= 280_000; now += 4_000) {
+      await f.advance(now);
+      index++;
+      await f.guest.send(command(index));
+      await f.host.send(records(index));
+      await settle();
+    }
+    const expected = Array.from({ length: index }, (_, i) => i + 1);
+    expect(f.host.message.mock.calls.map(([, msg]) => msg)).toEqual(
+      expected.map(command),
+    );
+    expect(f.guest.message.mock.calls.map(([, msg]) => msg)).toEqual(
+      expected.map(records),
+    );
+    expect(f.host.status.mock.calls).toEqual([[["guest"]]]);
+    expect(f.guest.status.mock.calls).toEqual([[["host"]]]);
+    expect(f.generations()).toBe(4);
+    expect(f.sockets.get("generation-1")!.host!.close).toHaveBeenCalled();
+    const used = f.host.message.mock.calls.map(([, , peer]) => peer.generation);
+    expect(new Set(used).size).toBe(4);
+  } finally {
+    f.close();
+  }
+});
+
+test("a renewal preserves the old baseline and ordered records while a download is in flight", async () => {
+  const f = duplex();
+  try {
+    await f.advance(82_000);
+    const baseline: WireMessage = {
+      kind: "baseline",
+      matchId: "game",
+      epoch: "epoch",
+      index: 1,
+      world: { matchId: "game", epoch: "epoch" } as Extract<
+        WireMessage,
+        { kind: "baseline" }
+      >["world"],
+      blockers: [],
+    };
+    let finishDownload!: (payload: WireMessage) => void;
+    f.guestDownload.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishDownload = resolve;
+        }),
+    );
+    await f.host.send(baseline);
+    await f.host.send(records(2));
+    await settle();
+    expect(f.guestDownload).toHaveBeenCalledTimes(1);
+    expect(f.guest.message).not.toHaveBeenCalled();
+
+    await f.advance(96_000);
+    let sent = false;
+    const queued = f.host.send(records(3)).then(() => {
+      sent = true;
+    });
+    await f.guest.send(command(1));
+    await settle();
+    expect(sent).toBe(false);
+    expect(f.host.message).toHaveBeenCalledTimes(1);
+    expect(f.guest.message).not.toHaveBeenCalled();
+
+    finishDownload(baseline);
+    await queued;
+    await settle();
+    expect(f.guest.message.mock.calls.map(([, message]) => message)).toEqual([
+      baseline,
+      records(2),
+      records(3),
+    ]);
+    expect(f.host.status.mock.calls).toEqual([[["guest"]]]);
+    expect(f.guest.status.mock.calls).toEqual([[["host"]]]);
+  } finally {
+    f.close();
+  }
+});
+
+test("a failed successor preserves the current stream and a genuine loss reconnects", async () => {
+  const f = duplex();
+  try {
+    await f.advance(82_000);
+    f.rejectSuccessor();
+    await f.advance(96_000);
+    await f.guest.send(command(1));
+    await f.host.send(records(1));
+    await settle();
+    expect(f.host.status.mock.calls).toEqual([[["guest"]]]);
+    expect(f.guest.status.mock.calls).toEqual([[["host"]]]);
+    expect(f.generations()).toBe(3);
+
+    f.sockets.get("generation-3")!.host!.close();
+    expect(f.host.status).toHaveBeenLastCalledWith([]);
+    await f.advance(112_000);
+    await f.guest.send(command(2));
+    await settle();
+    expect(f.host.status).toHaveBeenLastCalledWith(["guest"]);
+    expect(f.host.message.mock.calls.map(([, message]) => message)).toEqual([
+      command(1),
+      command(2),
+    ]);
+  } finally {
+    f.close();
   }
 });

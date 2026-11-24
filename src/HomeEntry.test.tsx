@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Home, showHome } from "./HomeEntry";
 import { root } from "./Root";
+import {
+  captureCrossplayInvite,
+  clearCrossplayInvite,
+} from "./multiplayer/CrossplayInvite";
 const mockAction = jest.fn();
 const mockUnlock = jest.fn();
 jest.mock("./AudioContext", () => ({ unlockAudioContext: () => mockUnlock() }));
@@ -120,4 +124,20 @@ it("can reopen feedback after a manual action suppresses its download and then f
   expect(
     await screen.findByRole("textbox", { name: "Your feedback" }),
   ).toBeVisible();
+});
+
+it("hands a same-tab invitation from the lightweight home straight to the game", async () => {
+  const invite = "abcdefghijklmnopqrstuvwxyz".slice(0, 22);
+  render(<Home />);
+  try {
+    window.history.replaceState(null, "", "/#invite=" + invite);
+    fireEvent(window, new HashChangeEvent("hashchange"));
+    await waitFor(() =>
+      expect(screen.getByRole("main")).toHaveAttribute("aria-busy", "true"),
+    );
+    expect(window.location.hash).toBe("");
+    expect(captureCrossplayInvite()).toBe(invite);
+  } finally {
+    clearCrossplayInvite();
+  }
 });

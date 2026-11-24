@@ -83,7 +83,7 @@ export const mapStateToProps = (
 export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
-      if (coopRole() === "guest") {
+      if (coopRole()) {
         coopControls()?.back();
         return;
       }

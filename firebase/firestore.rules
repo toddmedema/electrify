@@ -342,7 +342,6 @@ service cloud.firestore {
           && (resource.data.room.locked || !request.resource.data.room.locked || requiredSeatsActive())
           && activeActor(resource.data)
           && (guard().peerId == '' || activeSeat(resource.data, guard().peerId))
-          && (guard().get('approvedId', '') == '' || activeSeat(request.resource.data, guard().approvedId))
           && (guard().type != 'host' || guard().seatId == resource.data.room.hostId);
       }
       function acquire() {
@@ -354,6 +353,10 @@ service cloud.firestore {
           && activeActor(request.resource.data)
           && (resource.data.room.hostId == guard().seatId
             || (resource.data.room.locked && resource.data.room.head != null))
+          && (request.resource.data.room.get('rules', '') == resource.data.room.get('rules', '')
+            || (resource.data.room.locked && resource.data.room.head != null
+              && request.resource.data.room.locked
+              && request.resource.data.room.head == resource.data.room.head))
           && request.resource.data.room.get('restoreHead', null) == resource.data.room.head;
       }
       function lifecycleMutation() {
@@ -364,11 +367,27 @@ service cloud.firestore {
             || guard().type == 'bound' && boundActor(resource.data));
       }
       function inviteMutation() {
-        return (guard().type == 'cancelInvite' || liveHost())
-          && !resource.data.room.locked
-          && afterLeaseSameOwner()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['room', 'writeGuard'])
-          && request.resource.data.room.diff(resource.data.room).affectedKeys().hasOnly(['pending']);
+        let before = resource.data;
+        let after = request.resource.data;
+        let seatId = guard().seatId;
+        let members = after.room.members;
+        let joined = members[members.size() - 1];
+        return liveHost()
+          && !before.room.locked
+          && guard().inviteHash in before.inviteHashes
+          && !(guard().account in before.room.get('removedAccounts', []))
+          && after.diff(before).affectedKeys().hasOnly(['room', 'accounts', 'bindings', 'writeGuard'])
+          && after.room.diff(before.room).affectedKeys().hasOnly(['members'])
+          && members.size() == before.room.members.size() + 1
+          && members.size() <= 4
+          && members.hasAll(before.room.members)
+          && joined.id == seatId
+          && joined.account == guard().account
+          && !(guard().account in before.accounts)
+          && after.accounts == before.accounts.concat([guard().account])
+          && !(seatId in before.bindings)
+          && after.bindings.diff(before.bindings).affectedKeys().hasOnly([seatId])
+          && activeActor(after);
       }
       allow create: if validGuard()
         && guard().type == 'create'
@@ -381,7 +400,7 @@ service cloud.firestore {
         && ((guard().type in ['active', 'host'] && liveMutation())
           || (guard().type == 'acquire' && acquire())
           || (guard().type in ['member', 'bound'] && lifecycleMutation())
-          || (guard().type in ['invite', 'cancelInvite'] && inviteMutation()));
+          || (guard().type == 'invite' && inviteMutation()));
       allow read, delete: if false;
     }
 
