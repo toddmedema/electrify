@@ -591,6 +591,7 @@ export function crossplayFixture() {
     status: number;
     startedMs: number;
     error?: string;
+    explicit?: boolean;
     durationMs?: number;
     leaseRemainingMs?: number;
   }[] = [];
@@ -763,8 +764,10 @@ export function crossplayFixture() {
         version: Room | null,
         room: Room,
         actor: Account & { account: string },
+        guard: { deadline: number },
       ) => {
         if (
+          guard.deadline <= Date.now() ||
           accounts.get(actor.account)?.tokenHash !== actor.tokenHash ||
           rooms.get(room.id) !== (version ?? undefined)
         )
@@ -834,6 +837,9 @@ export function crossplayFixture() {
       startedMs: started - fixtureStarted,
       status: result.status,
       leaseRemainingMs: authority?.leaseRemainingMs,
+      ...(operation === "save/publish" && {
+        explicit: (body as RequestData)?.explicit === true,
+      }),
       durationMs: Date.now() - started,
       ...(typeof result.body?.error === "string" && {
         error: result.body.error,
@@ -868,6 +874,8 @@ export function crossplayFixture() {
 
   return {
     operations,
+    elapsedMs: () => Date.now() - fixtureStarted,
+    hostSeat: (page: Page) => rooms.get(roomId(page) ?? "")?.hostId,
     // Compile outside the running campaign so the fixture cannot stall its lease clock.
     prepareCheckpoints: checkpointValidator,
     roomId,

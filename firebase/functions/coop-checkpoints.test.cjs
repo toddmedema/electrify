@@ -152,16 +152,19 @@ test("reserves bounded recovery uploads when ordinary checkpoint attempts run ou
     async limit(scope, max) {
       const key = scope + Math.floor(Date.now() / 60_000);
       const count = (counts.get(key) ?? 0) + 1;
-      assert.ok(count <= max, "same-account quota exhausted");
+      if (count > max) throw new Error("account quota exhausted");
       counts.set(key, count);
     },
   });
   const ordinary = encoded(world);
   for (let attempt = 0; attempt < 6; attempt++)
     await handle("save/publish", context(), ordinary);
-  await assert.rejects(handle("save/publish", context(), ordinary), {
-    code: "checkpoint-rate-limit",
-  });
+  const originalQuota = state.checkpointQuota;
+  await assert.rejects(
+    handle("save/publish", context(), ordinary),
+    /account quota exhausted/,
+  );
+  assert.equal(state.checkpointQuota, originalQuota);
 
   state.epoch = randomUUID();
   state.restoreHead = state.head;
@@ -179,11 +182,13 @@ test("reserves bounded recovery uploads when ordinary checkpoint attempts run ou
   await handle("save/publish", context(), recovery);
   assert.equal(state.head.epoch, state.epoch);
   assert.equal(state.restoreHead, null);
-  await assert.rejects(handle("save/publish", context(), recovery), {
-    code: "checkpoint-rate-limit",
-  });
+  await assert.rejects(
+    handle("save/publish", context(), recovery),
+    /account quota exhausted/,
+  );
 
-  state.hostId = world.seats[0].id;
+  counts.clear(); // A different host has account headroom but shares the room reserve.
+  state.hostId = world.seats[1].id;
   state.epoch = randomUUID();
   state.restoreHead = state.head;
   const nextRecovery = {

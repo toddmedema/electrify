@@ -201,7 +201,20 @@ async function publish(context, body) {
   if (typeof body.explicit !== "boolean") refuse("invalid-checkpoint");
   const bucket = bucketFor(context);
   const expected = context.room.head?.id ?? null;
-  const recovery = await context.updateRoom((room) => {
+  const isRecovery = (room) =>
+    !body.explicit &&
+    !!room.head &&
+    room.head.epoch !== room.epoch &&
+    room.restoreHead?.id === room.head.id;
+  const recovery = isRecovery(context.room);
+  await context.limit?.(
+    recovery ? "coop-checkpoint-recovery" : "coop-checkpoint-upload",
+    recovery
+      ? EXTRA_RECOVERY_UPLOADS_PER_MINUTE
+      : CHECKPOINT_UPLOADS_PER_MINUTE,
+  );
+  await context.updateRoom((room) => {
+    if (recovery !== isRecovery(room)) refuse("checkpoint-conflict", 409);
     if (!room.locked) refuse("roster-not-locked", 409);
     const now = Date.now();
     const current = room.checkpointQuota;
@@ -209,27 +222,14 @@ async function publish(context, body) {
       current?.until > now
         ? { ...current, count: current.count + 1 }
         : { until: now + TRANSFER_MS, count: 1 };
-    // A new host must commit its restored epoch before the room can play.
-    // Keep the reserve in the same room window across host changes.
-    const recovering =
-      !body.explicit &&
-      room.head &&
-      room.head.epoch !== room.epoch &&
-      room.restoreHead?.id === room.head.id;
     if (
       quota.count >
       CHECKPOINT_UPLOADS_PER_MINUTE +
-        (recovering ? EXTRA_RECOVERY_UPLOADS_PER_MINUTE : 0)
+        (recovery ? EXTRA_RECOVERY_UPLOADS_PER_MINUTE : 0)
     )
       refuse("checkpoint-rate-limit", 429);
-    return { room: { ...room, checkpointQuota: quota }, value: recovering };
+    return { room: { ...room, checkpointQuota: quota } };
   }, "host");
-  await context.limit?.(
-    recovery ? "coop-checkpoint-recovery" : "coop-checkpoint-upload",
-    recovery
-      ? EXTRA_RECOVERY_UPLOADS_PER_MINUTE
-      : CHECKPOINT_UPLOADS_PER_MINUTE,
-  );
   const result = compressedBody(body);
   const now = Date.now();
   const previous = context.room.head;

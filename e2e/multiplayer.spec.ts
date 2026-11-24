@@ -23,6 +23,7 @@ const grid = (page: Page) => page.locator(".facilities:visible");
 
 type MultiplayerWindow = Window & {
   observedRoomView?: RoomView;
+  viewSequence?: number;
   crossplayInvoke?: (
     operation: string,
     body: unknown,
@@ -160,7 +161,10 @@ class V2Campaign {
             this.addEventListener("message", ({ data }) => {
               if (data?.kind !== "views") return;
               const view = (Object.values(data.views) as RoomView[])[0];
-              if (view?.game) target.observedRoomView = view;
+              if (view?.game) {
+                target.observedRoomView = view;
+                target.viewSequence = (target.viewSequence ?? 0) + 1;
+              }
             });
           }
         };
@@ -273,12 +277,19 @@ class V2Campaign {
   }
 }
 
-async function startCustom(browser: Browser, count: number, compact: boolean) {
+async function startCustom(
+  browser: Browser,
+  count: number,
+  compact: boolean,
+  touchGuest = false,
+) {
   const campaign = new V2Campaign(browser);
   const host = await campaign.addPlayer(compact ? 390 : 1280);
   const invite = await campaign.create(host);
   for (let index = 1; index < count; index++) {
-    const guest = await campaign.addPlayer(compact || index === 3 ? 390 : 1280);
+    const guest = await campaign.addPlayer(
+      compact || touchGuest || index === 3 ? 390 : 1280,
+    );
     await campaign.requestJoin(guest, invite);
     await campaign.approve(host, guest);
   }
@@ -483,6 +494,9 @@ test(
     const confirmed = await campaign.fixture.checkpoint();
     expect(confirmed?.matchId).toBe(original[0].matchId);
     await campaign.resume(guest);
+    expect(campaign.fixture.hostSeat(guest)).toBe(
+      campaign.fixture.seatId(guest),
+    );
     for (const [index, page] of campaign.players.entries()) {
       const now = await captureState(page);
       expect(now.matchId).toBe(original[index].matchId);
@@ -499,6 +513,15 @@ test("V2 saves export the confirmed campaign and require confirmation to withdra
 }) => {
   const campaign = await startCustom(browser, 2, false);
   const [host, guest] = campaign.players;
+  const before = (await captureState(host)).facilities!;
+  await host.locator(".button-buildFacility").click();
+  await host
+    .getByRole("button", { name: "Review purchase of Wind", exact: true })
+    .click();
+  await host.getByRole("button", { name: "Take loan", exact: true }).click();
+  await expect
+    .poll(async () => (await captureState(host)).facilities)
+    .toBe(before + 1);
   await saveAndQuit(guest);
   await saveAndQuit(host);
   const confirmed = await campaign.fixture.checkpoint();
@@ -517,6 +540,8 @@ test("V2 saves export the confirmed campaign and require confirmation to withdra
     format: "electrify-multiplayer",
     world: { matchId: confirmed!.matchId, seats: confirmed!.seats },
   });
+
+  expect(exported.world.grids[0].facilities).toHaveLength(before + 1);
 
   const requestWithdrawal = async () => {
     await actions.click();
@@ -568,6 +593,9 @@ test(
     await expect(
       warning.getByRole("button", { name: "Disconnect", exact: true }),
     ).toBeVisible();
+    const viewSequence = () =>
+      guest.evaluate(() => (window as MultiplayerWindow).viewSequence ?? 0);
+    const beforeReconnect = await viewSequence();
     campaign.fixture.restoreAuthority(guest);
     await warning
       .getByRole("button", { name: "Reconnect", exact: true })
@@ -583,14 +611,16 @@ test(
       )
       .toBe(true);
     await expect(warning).toBeHidden();
+    await expect.poll(viewSequence).toBeGreaterThan(beforeReconnect);
     expect(await captureState(guest)).toMatchObject({
       epoch: original.epoch,
       matchId: original.matchId,
       seat: original.seat,
     });
-    for (const page of campaign.players) await selectSpeed(page, "slow speed");
     for (const page of campaign.players)
-      await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
+      await selectSpeed(page, "normal speed");
+    for (const page of campaign.players)
+      await expect(clock(page)).toHaveAttribute("data-active-speed", "NORMAL");
     expect(campaign.errors).toEqual([]);
   },
 );
@@ -598,20 +628,21 @@ test(
 test("V2 speed controls fit the toolbar and expose shared status across themes", async ({
   browser,
 }) => {
-  const campaign = await startCustom(browser, 2, false);
-  const [host] = campaign.players;
+  const campaign = await startCustom(browser, 2, false, true);
+  const [host, guest] = campaign.players;
   for (const page of campaign.players) await selectSpeed(page, "slow speed");
   for (const width of [1440, 1280, 800, 390, 360]) {
-    await host.setViewportSize({ width, height: 900 });
+    const player = width < 600 ? guest : host;
+    await player.setViewportSize({ width, height: 900 });
     for (const colorScheme of ["light", "dark"] as const) {
-      await host.emulateMedia({ colorScheme });
-      await expect(host.locator("html")).toHaveAttribute(
+      await player.emulateMedia({ colorScheme });
+      await expect(player.locator("html")).toHaveAttribute(
         "data-theme",
         colorScheme,
       );
-      await expect(clock(host)).toBeInViewport();
+      await expect(clock(player)).toBeInViewport();
       await expect(async () => {
-        const gap = await clock(host).evaluate((group) => {
+        const gap = await clock(player).evaluate((group) => {
           const toolbar = group.closest(".MuiToolbar-root")!;
           const edge =
             toolbar.getBoundingClientRect().right -
@@ -620,12 +651,12 @@ test("V2 speed controls fit the toolbar and expose shared status across themes",
         });
         expect(Math.abs(gap)).toBeLessThanOrEqual(1);
       }).toPass();
-      await expect(clock(host)).toHaveAccessibleDescription(
-        /WindyWren selected 1×/,
+      await expect(clock(player)).toHaveAccessibleDescription(
+        player === host ? /WindyWren selected 1×/ : /SolarSam selected 1×/,
       );
     }
   }
-  await reviewScreenshot(host.locator("#appbar"), {
+  await reviewScreenshot(guest.locator("#appbar"), {
     path: test.info().outputPath("v2-mobile-speed.png"),
     animations: "disabled",
   });
@@ -1332,7 +1363,19 @@ test("an unavailable V2 checkpoint leaves the match open until Save & Quit can r
   await expect(grid(guest)).toBeVisible();
   expect(await campaign.fixture.checkpoint()).toEqual(confirmed);
   campaign.fixture.failSaves();
+  const beforeRetry = campaign.fixture.elapsedMs();
   await error.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect
+    .poll(() =>
+      campaign.fixture.operations.some(
+        ({ startedMs, explicit, operation, status }) =>
+          startedMs >= beforeRetry &&
+          explicit &&
+          operation === "save/publish" &&
+          status === 200,
+      ),
+    )
+    .toBe(true);
 
   await expect(entry(guest)).toBeVisible();
   await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");

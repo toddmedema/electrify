@@ -22,7 +22,7 @@ WebRTC DTLS encrypts gameplay traffic in transit.
 ## Service contract
 
 The managed Functions runtime buffers request bodies before the handler applies its
-128 KiB JSON and bulk-transfer limits. The published second-generation HTTP limit is
+128 KiB limit for ordinary JSON and 8 MiB + 4 KiB limit for bulk requests. The published second-generation HTTP limit is
 32 MB uncompressed. Per-client IP quotas also depend on ingress: the current
 socket-address bucket can combine callers behind a Google proxy. The public function
 has no verified forwarding-hop contract for selecting a caller address. Enforcing

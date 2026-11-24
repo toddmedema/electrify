@@ -111,16 +111,17 @@ async function saveAndResume(
   guest: Page,
   fixture: ReturnType<typeof crossplayFixture>,
 ) {
-  const operationsBeforeQuit = fixture.operations.length;
+  const beforeQuit = fixture.elapsedMs();
   await saveAndQuit(guest);
   await expect
     .poll(() =>
-      fixture.operations
-        .slice(operationsBeforeQuit)
-        .some(
-          ({ operation, status }) =>
-            operation === "save/publish" && status === 200,
-        ),
+      fixture.operations.some(
+        ({ operation, status, startedMs, explicit }) =>
+          startedMs >= beforeQuit &&
+          explicit &&
+          operation === "save/publish" &&
+          status === 200,
+      ),
     )
     .toBe(true);
   await saveAndQuit(host);
@@ -188,7 +189,9 @@ for (const steamHost of [false, true]) {
       const guest = steamHost ? web : steam;
       await start(host, guest);
 
-      const operations = fixture.operations.map(({ operation }) => operation);
+      const operations = fixture.operations
+        .filter(({ status }) => status === 200)
+        .map(({ operation }) => operation);
       expect(operations).toEqual(
         expect.arrayContaining([
           "auth/google",

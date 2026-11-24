@@ -17,7 +17,7 @@ const workflow = () =>
   parse(fs.readFileSync(".github/workflows/workflow.yml", "utf8"));
 
 test("PR CI isolates three browser shards and retains every other build and test worker", () => {
-  const { jobs } = workflow();
+  const { jobs, env } = workflow();
   assert.deepEqual(Object.keys(jobs).sort(), [
     "browser",
     "build",
@@ -138,6 +138,10 @@ test("PR CI isolates three browser shards and retains every other build and test
     crossplayDownload.with.path,
     webCrossplay.env.CROSSPLAY_BUILD_DIR,
   );
+  const effectiveFlag = (step) =>
+    ({ ...env, ...jobs.desktop.env, ...step.env }).CROSSPLAY_WEB_ONLY;
+  assert.notEqual(effectiveFlag(desktopCrossplay), "1");
+  assert.equal(effectiveFlag(webCrossplay), "1");
   assert.match(desktopCrossplay.run, /npm run test:crossplay/);
   assert.match(webCrossplay.run, /npm run test:crossplay/);
   assert.equal(jobs.desktop.env.CROSSPLAY_TEST_RELAY_PORT, undefined);
