@@ -59,6 +59,8 @@ function renderRoot(
     },
     initialize,
     onlineCampaigns: true,
+    canLeaveInterruption: jest.fn(() => false),
+    hasStoppedReplica: () => false,
     dispose: () => {},
     setActivity: () => {},
     join: jest.fn().mockResolvedValue(undefined),
@@ -245,4 +247,39 @@ test("session status notifications do not replay a grid before sending the playe
   });
   expect(store.getState().game.dollarsPerkWh).toBe(0.15);
   unmount();
+});
+
+test("an unavailable guest room offers only the main menu and makes no save promise", async () => {
+  const { session, notify } = renderRoot();
+  session.canLeaveInterruption.mockReturnValue(true);
+  await notify({
+    view: {
+      matchId: "match",
+      epoch: "epoch",
+      revision: 1,
+      speed: "PAUSED",
+      reason: "Paused",
+      readyRequired: true,
+      ready: [],
+      disconnected: [],
+      lastSequence: 0,
+      grids: [],
+    },
+    lobby: {
+      available: true,
+      members: [],
+      connected: [],
+      error: "This multiplayer room is no longer available.",
+    },
+  });
+  const dialog = screen.getByRole("dialog", {
+    name: "Multiplayer session ended",
+  });
+  expect(dialog).toHaveAccessibleDescription(
+    "The multiplayer room is no longer available. Check Play with friends → Multiplayer saves in the main menu.",
+  );
+  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(
+    screen.getByRole("button", { name: "Return to main menu" }),
+  ).toBeVisible();
 });
