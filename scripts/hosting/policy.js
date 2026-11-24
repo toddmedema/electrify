@@ -8,6 +8,7 @@ const CACHE = {
 };
 
 function cacheControl(file) {
+  if (file === "invite/index.html") return "no-store";
   if (
     /^static\/(?:js|css)\/[^/]+\.[a-f0-9]{8,}(?:\.chunk)?\.(?:js|css)(?:\.map|\.LICENSE\.txt)?$/.test(
       file,
@@ -49,6 +50,10 @@ function requestCode(paths) {
   // Keep query parameters, including repeats, so campaign/scenario links survive.
   return `function handler(event) {
   var request = event.request;
+  if (request.uri === '/invite/') {
+    request.uri = '/invite/index.html';
+    return request;
+  }
   var redirects = ${JSON.stringify(redirects)};
   var target = Object.prototype.hasOwnProperty.call(redirects, request.uri) ? redirects[request.uri] : null;
   if (!target) return request;
@@ -71,6 +76,8 @@ function responseCode() {
   return `function handler(event) {
   var response = event.response;
   response.headers['strict-transport-security'] = { value: 'max-age=31536000' };
+  if (event.request.uri === '/invite/' || event.request.uri === '/invite/index.html')
+    response.headers['referrer-policy'] = { value: 'no-referrer' };
   if (event.request.uri.indexOf('/data/') === 0)
     response.headers['x-robots-tag'] = { value: 'noindex' };
   return response;

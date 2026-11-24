@@ -3,6 +3,9 @@ const test = require("node:test");
 const { runInNewContext } = require("node:vm");
 const { installTurnProbe } = require("../testing/cloudflare-turn-browser");
 const { inspectDescription } = require("../testing/cloudflare-turn");
+const {
+  createRelayPolicy,
+} = require("../../firebase/functions/coop-signaling-sdp.cjs");
 
 const candidate = "a=candidate:1 1 UDP 16777215 1.1.1.1 1234 typ relay";
 const offer = {
@@ -27,6 +30,26 @@ test("accepts an embedded public relay and SDP privacy placeholders", () => {
     );
     assert.deepEqual(result.endpoints, ["1.1.1.1:1234"]);
   }
+});
+
+test("a syntactically valid relay still needs to match the supplied allocation ranges", () => {
+  const isRelay = createRelayPolicy("141.101.64.0/18");
+  const inside = replace(
+    "1.1.1.1 1234 typ relay",
+    "141.101.64.1 1234 typ relay",
+  );
+  const description = {
+    ...inside,
+    sdp: inside.sdp.replace("c=IN IP4 1.1.1.1", "c=IN IP4 141.101.64.1"),
+  };
+  assert.deepEqual(
+    inspectDescription(description, "offer", isRelay).endpoints,
+    ["141.101.64.1:1234"],
+  );
+  assert.throws(
+    () => inspectDescription(offer, "offer", isRelay),
+    /allocation ranges/,
+  );
 });
 
 test("removes related addresses and ports before exchanging Firefox-style SDP", () => {

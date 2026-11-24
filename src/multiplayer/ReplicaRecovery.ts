@@ -13,7 +13,7 @@ interface Peer {
   live: boolean;
   applied: number;
   progressedAt: number;
-  baseline?: { index: number; sentAt: number };
+  baseline?: { index: number; retryAt: number };
   attempts: number[];
   minimumVerify: number;
   compared: number;
@@ -28,6 +28,7 @@ interface Options {
   error: (error: unknown) => void;
   now?: () => number;
   digest?: DigestFunction;
+  waitForDispatch?: boolean;
 }
 
 /** Host-only recovery policy. Every clock change still enters the ordinary record stream. */
@@ -104,8 +105,10 @@ export class ReplicaRecovery {
     const peer = this.peers.get(to);
     if (this.terminal || !peer?.connected || peer.stopped) return false;
     const now = this.now();
-    if (peer.baseline && now - peer.baseline.sentAt < 10000) return false;
-    peer.attempts = peer.attempts.filter((time) => now - time < 60000);
+    if (peer.baseline && now < peer.baseline.retryAt) return false;
+    peer.attempts = peer.attempts.filter(
+      (time) => now - time < (this.options.waitForDispatch ? 210_000 : 60_000),
+    );
     peer.live = false;
     peer.report = undefined;
     peer.heldAt = undefined;
@@ -124,12 +127,21 @@ export class ReplicaRecovery {
     // The preceding stream, baseline and its verify must enter the transport in this order.
     this.options.flush();
     const baseline = this.host.baseline();
-    peer.baseline = { index: baseline.index, sentAt: now };
+    peer.baseline = {
+      index: baseline.index,
+      retryAt: now + (this.options.waitForDispatch ? 80_000 : 10_000),
+    };
     peer.minimumVerify = baseline.index + 1;
     this.capture();
     this.options.send(to, baseline);
     this.options.changed();
     return true;
+  }
+  dispatched(to: string, index: number, delivered: boolean) {
+    const baseline = this.peers.get(to)?.baseline;
+    if (!this.options.waitForDispatch || !baseline || baseline.index !== index)
+      return;
+    baseline.retryAt = this.now() + (delivered ? 25_000 : 2_000);
   }
   progress(report: Progress) {
     if (this.terminal) return;
@@ -246,8 +258,7 @@ export class ReplicaRecovery {
     if (this.terminal) return;
     const now = this.now();
     for (const [id, peer] of this.peers)
-      if (peer.baseline && now - peer.baseline.sentAt >= 10000)
-        this.baseline(id);
+      if (peer.baseline && now >= peer.baseline.retryAt) this.baseline(id);
     this.lag();
     if (this.host.index > this.verifiedIndex && now - this.lastVerify >= 1000) {
       this.host.verify();

@@ -30,6 +30,15 @@ const { CouchViews } = require("./couch.cjs");
 const { coopRelayUrl } = require("./coop-relay-url.cjs");
 const { LocalCoopSaveClient } = require("./local-coop-save-client.cjs");
 const { SteamService } = require("./steam.cjs");
+const {
+  createSteamCrossplayApi,
+  trustedCrossplaySender,
+} = require("./crossplay-api.cjs");
+const {
+  loadSteamCrossplayFunctions,
+  observeSteamInvites,
+  withSteamWebTicket,
+} = require("./steam-crossplay.cjs");
 const { reserveSteamOverlayHotkey } = require("./steam-overlay.cjs");
 const { submitFeedback } = require("./feedback.cjs");
 const { openExternalUrl } = require("./external.cjs");
@@ -87,6 +96,9 @@ reserveSteamOverlayHotkey(app, config.mode === "steam");
 // the running game's rich presence, or clear it again while it exits.
 const primaryInstance = app.requestSingleInstanceLock();
 const steam = new SteamService();
+let crossplay;
+let confirmedInvite;
+let stopSteamInvites;
 let modStore;
 let workshop;
 
@@ -282,6 +294,8 @@ async function finishQuit() {
   // Keep the native close guard until confirmed settings have reached disk.
   // The queue blocks later inputs and treats already-reported failures as settled.
   await displayChanges.drain();
+  stopSteamInvites?.();
+  await crossplay?.dispose();
   quitting = true;
   app.quit();
 }
@@ -358,6 +372,61 @@ function handle(channel, callback) {
       throw new Error("Untrusted desktop request");
     return callback(...arguments_);
   });
+}
+
+ipcMain.handle(
+  "desktop:crossplay",
+  (event, operation, body, requestId, userAction) => {
+    if (!trustedCrossplaySender(event, window))
+      throw new Error("Untrusted cross-play request");
+    return (
+      crossplay?.request(operation, body, requestId, userAction) ?? {
+        ok: false,
+        code: "unavailable",
+      }
+    );
+  },
+);
+ipcMain.handle("desktop:crossplay-cancel", (event, requestId) => {
+  if (!trustedCrossplaySender(event, window))
+    throw new Error("Untrusted cross-play request");
+  crossplay?.cancel(requestId);
+});
+
+ipcMain.handle("desktop:crossplay-invite", (event) => {
+  if (!trustedCrossplaySender(event, window))
+    throw new Error("Untrusted cross-play request");
+  if (config.mode !== "steam") return undefined;
+  const pending = confirmedInvite;
+  confirmedInvite = undefined;
+  return pending?.expiresAt > Date.now() ? pending.token : undefined;
+});
+
+function configureSteamCrossplay() {
+  if (config.mode !== "steam" || !steam.dispatcher || !steam.user) return;
+  try {
+    const api = loadSteamCrossplayFunctions();
+    crossplay = createSteamCrossplayApi({
+      online: () => !steam.stopped && !!steam.native?.online(steam.user),
+      withTicket: (exchange, signal) =>
+        withSteamWebTicket(
+          { api, user: steam.user, dispatcher: steam.dispatcher, signal },
+          exchange,
+        ),
+    });
+    stopSteamInvites = observeSteamInvites(api, steam.dispatcher, (token) => {
+      if (
+        confirmedInvite?.token === token &&
+        confirmedInvite.expiresAt > Date.now()
+      )
+        return;
+      confirmedInvite = { token, expiresAt: Date.now() + 10 * 60_000 };
+      if (window && !window.isDestroyed())
+        window.webContents.send("desktop:crossplay-invite-available");
+    });
+  } catch {
+    console.warn("Steam cross-play is unavailable");
+  }
 }
 
 handle("desktop:state", () => {
@@ -962,10 +1031,14 @@ async function createWindow() {
   });
   await window.loadURL(APP_URL);
   let previousSteamState = JSON.stringify(steam.state());
+  let wasSteamOnline = steam.state().online;
   const steamTimer = setInterval(() => {
     steam.refreshActivity();
     steam.refreshAchievements();
-    const next = JSON.stringify(steam.state());
+    const state = steam.state();
+    if (wasSteamOnline && !state.online) void crossplay?.reset();
+    wasSteamOnline = state.online;
+    const next = JSON.stringify(state);
     if (next !== previousSteamState) {
       previousSteamState = next;
       publishState();
@@ -1006,6 +1079,7 @@ else {
       powerMonitor.on("resume", () => {
         if (power.phase === "suspended") publishPower("resuming");
       });
+      configureSteamCrossplay();
       return createWindow();
     })
     .catch((error) => {

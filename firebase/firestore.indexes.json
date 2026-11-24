@@ -1,6 +1,15 @@
 {
   "indexes": [
     {
+      "collectionGroup": "coopRooms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "savedAccounts", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "savedAt", "order": "DESCENDING" },
+        { "fieldPath": "roomExpiry", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "scores",
       "queryScope": "COLLECTION",
       "fields": [
@@ -82,6 +91,27 @@
     }
   ],
   "fieldOverrides": [
+    { "collectionGroup": "coopRooms", "fieldPath": "room", "indexes": [] },
+    { "collectionGroup": "coopRooms", "fieldPath": "bindings", "indexes": [] },
+    { "collectionGroup": "coopRooms", "fieldPath": "writeGuard", "indexes": [] },
+    {
+      "collectionGroup": "coopRooms",
+      "fieldPath": "roomExpiry",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "coopLimits",
+      "fieldPath": "deleteAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "coopUsedSteamTickets",
+      "fieldPath": "deleteAt",
+      "ttl": true,
+      "indexes": []
+    },
     { "collectionGroup": "sharedGames", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
     { "collectionGroup": "saveBlobs", "fieldPath": "expiresAt", "ttl": true, "indexes": [] },
     { "collectionGroup": "saveBlobs", "fieldPath": "data", "indexes": [] },

@@ -1,3 +1,4 @@
+import type { SessionServices } from "./SessionTransport";
 import { steamSessionServices } from "./SteamSessionServices";
 import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
 import "../Store";
@@ -54,7 +55,11 @@ const view = (update: Partial<RoomView> = {}): RoomView => ({
   grids: [],
   ...update,
 });
-function fixture(isHost = false, deferLeave = false) {
+function fixture(
+  isHost = false,
+  deferLeave = false,
+  overrides: Partial<SessionServices> = {},
+) {
   let event: (event: NativeEvent) => void = () => {};
   const requests: NativeRequest[] = [],
     posts: WorkerRequest[] = [];
@@ -209,7 +214,7 @@ function fixture(isHost = false, deferLeave = false) {
     (bytes) => webcrypto.subtle.digest("SHA-256", bytes),
   );
   const session = new MultiplayerSession(
-    steamSessionServices(bridge),
+    { ...steamSessionServices(bridge), ...overrides },
     async () => {
       if (failFactory) throw new Error("Factory failed");
       return worker as unknown as Worker;
@@ -1412,6 +1417,33 @@ test("a worker error after its first view preserves the established match", asyn
   expect(f.session.getSnapshot().error).toBe("Runtime failed");
   expect(f.worker.terminate).not.toHaveBeenCalled();
   expect(f.requests).not.toContainEqual({ kind: "unlock" });
+  f.session.dispose();
+});
+
+test("the first online checkpoint must commit before the match opens", async () => {
+  let live = true;
+  const f = fixture(true, false, {
+    onlineCampaigns: true,
+    authority: () =>
+      live
+        ? {
+            epoch: "epoch",
+            monotonicDeadline: Infinity,
+            wallDeadline: Infinity,
+          }
+        : undefined,
+  });
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  live = false;
+  f.worker.onmessage?.({
+    data: { kind: "checkpoint", world: { epoch: "epoch" } },
+  } as MessageEvent<WorkerResponse>);
+  await settle();
+  await settle();
+  expect(f.worker.terminate).toHaveBeenCalled();
+  expect(f.posts.some(({ kind }) => kind === "replication-open")).toBe(false);
+  expect(f.requests.some(({ kind }) => kind === "checkpoint")).toBe(false);
   f.session.dispose();
 });
 

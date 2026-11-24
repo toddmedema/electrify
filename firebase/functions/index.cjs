@@ -77,3 +77,8 @@ exports.submitGameFeedback = onCall(
     }
   },
 );
+
+Object.assign(
+  exports,
+  require("./crossplay-production.cjs").registerCrossplay(adminApp),
+);

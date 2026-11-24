@@ -1,4 +1,5 @@
 import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
+import type { AuthorityWindow } from "./SessionTransport";
 import type { HostReplicationRequest } from "./ReplicaProtocol";
 import type {
   CommandEnvelope,
@@ -9,11 +10,13 @@ import type {
 } from "./Types";
 /** Couch play projects every seat locally; online play projects only the host's company. */
 type WorkerMode =
-  { local: true; hostSeat?: never } | { local?: false; hostSeat: string };
+  | { local: true; hostSeat?: never }
+  | { local?: false; hostSeat: string; online?: boolean };
 export type WorkerRequest =
   | HostReplicationRequest
   | { kind: "replica-peers"; connected: string[] }
-  | { kind: "heartbeat" }
+  | { kind: "heartbeat"; authority?: AuthorityWindow }
+  | { kind: "replication-open"; connected: string[] }
   /** The shell consumed the previous view bundle; allow the newest projection to follow. */
   | { kind: "views-applied" }
   | (WorkerMode & {
@@ -38,6 +41,12 @@ export type WorkerRequest =
     }
   | { kind: "disconnect"; sender: string }
   | { kind: "baseline"; to: string }
+  | {
+      kind: "baseline-dispatched";
+      to: string;
+      index: number;
+      delivered: boolean;
+    }
   /** Shell-only lifecycle state; never exposed through a seat port. */
   | {
       kind: "blockers";

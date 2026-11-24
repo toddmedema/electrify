@@ -125,6 +125,11 @@ export default function CoopBrowseBar({
                   onCopy={() => coopControls()?.copyCode()}
                 />
               )}
+              {host && coopControls()?.manageLobby && (
+                <Button onClick={() => coopControls()?.manageLobby?.()}>
+                  Manage lobby
+                </Button>
+              )}
               <Button onClick={() => coopControls()?.back()}>Leave</Button>
             </div>
           )}

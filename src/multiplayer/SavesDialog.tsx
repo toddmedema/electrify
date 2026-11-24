@@ -33,6 +33,7 @@ export default function SavesDialog({
     session.getSnapshot,
   );
   const [failure, setFailure] = useState<string>();
+  const [withdrawalFailure, setWithdrawalFailure] = useState<string>();
   const [search, setSearch] = useState("");
   const [menu, setMenu] = useState<{
     anchor: HTMLElement;
@@ -231,15 +232,25 @@ export default function SavesDialog({
         onClose={() => setMenu(undefined)}
         disableRestoreFocus={!!deleting}
       >
+        {session.onlineCampaigns && (
+          <MenuItem
+            onClick={() => {
+              if (menu) void run(() => session.exportSave(menu.id));
+              setMenu(undefined);
+            }}
+          >
+            Download confirmed save
+          </MenuItem>
+        )}
         <MenuItem
           sx={{ color: "error.main" }}
           onClick={() => {
             if (menu) setDeleting({ id: menu.id, name: menu.name });
-            setFailure(undefined);
+            setWithdrawalFailure(undefined);
             setMenu(undefined);
           }}
         >
-          Delete
+          {session.onlineCampaigns ? "Withdraw from campaign" : "Delete"}
         </MenuItem>
       </Menu>
       <Dialog
@@ -258,18 +269,22 @@ export default function SavesDialog({
         }}
       >
         <DialogTitle id="delete-campaign-title">
-          Delete multiplayer save?
+          {session.onlineCampaigns
+            ? "Withdraw from this campaign?"
+            : "Delete multiplayer save?"}
         </DialogTitle>
         <DialogContent>
           <Typography
             id="delete-campaign-message"
             sx={{ overflowWrap: "anywhere" }}
           >
-            “{deleting?.name}” will be permanently deleted.
+            {session.onlineCampaigns
+              ? `You will lose access to “${deleting?.name}”. The original roster may be unable to resume without you.`
+              : `“${deleting?.name}” will be permanently deleted.`}
           </Typography>
-          {failure && (
+          {withdrawalFailure && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {failure}
+              {withdrawalFailure}
             </Alert>
           )}
         </DialogContent>
@@ -288,14 +303,23 @@ export default function SavesDialog({
             disabled={loadingSaves}
             onClick={() => {
               if (deleting)
-                void run(async () => {
-                  await session.deleteSharedSave(deleting.id);
-                  deleted.current = true;
-                  setDeleting(undefined);
-                });
+                void session.deleteSharedSave(deleting.id).then(
+                  () => {
+                    deleted.current = true;
+                    setDeleting(undefined);
+                  },
+                  (error) =>
+                    setWithdrawalFailure(
+                      error instanceof Error ? error.message : "Try again.",
+                    ),
+                );
             }}
           >
-            {loadingSaves ? "Deleting…" : "Delete"}
+            {loadingSaves
+              ? "Working…"
+              : session.onlineCampaigns
+                ? "Withdraw"
+                : "Delete"}
           </Button>
         </DialogActions>
       </Dialog>

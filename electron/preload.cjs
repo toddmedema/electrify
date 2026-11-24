@@ -10,11 +10,31 @@ const subscribe = (channel, callback) => {
   return () => ipcRenderer.removeListener(channel, listener);
 };
 
+const steamEdition = process.argv.includes("--electrify-steam-edition");
+
 contextBridge.exposeInMainWorld(
   "electrifyDesktop",
   Object.freeze({
     apiVersion: 1,
-    steamEdition: process.argv.includes("--electrify-steam-edition"),
+    steamEdition,
+    ...(steamEdition
+      ? {
+          crossplayRequest: (operation, body, requestId, userAction) =>
+            ipcRenderer.invoke(
+              "desktop:crossplay",
+              operation,
+              body,
+              requestId,
+              userAction,
+            ),
+          cancelCrossplayRequest: (requestId) =>
+            ipcRenderer.invoke("desktop:crossplay-cancel", requestId),
+          takeCrossplayInvite: () =>
+            ipcRenderer.invoke("desktop:crossplay-invite"),
+          onCrossplayInvite: (callback) =>
+            subscribe("desktop:crossplay-invite-available", callback),
+        }
+      : {}),
     coopRelayUrl: process.argv
       .find((argument) => argument.startsWith("--electrify-coop-relay="))
       ?.slice("--electrify-coop-relay=".length),

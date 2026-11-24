@@ -88,6 +88,7 @@ test("cache lifetimes follow content identity and mutable documents revalidate",
     "data/weather/index.json",
   ])
     assert.equal(cacheControl(file), CACHE.short, file);
+  assert.equal(cacheControl("invite/index.html"), "no-store");
   assert.equal(cacheControl("analytics.js"), CACHE.moderate);
   assert.equal(cacheControl("fonts/inter/inter.css"), CACHE.moderate);
   assert.equal(cacheControl("images/gameplay-preview.webp"), CACHE.media);
@@ -136,6 +137,16 @@ test("redirects cover authored clean URLs, preserve queries, and leave canonical
     response.headers.location.value,
     "/?scenario=108&campaign=heat%20wave&campaign=cold%2Bwind",
   );
+});
+
+test("the fixed invite route renders directly and drops referrers", () => {
+  const request = handler(requestCode(paths));
+  const response = handler(responseCode());
+  const origin = request({ request: { uri: "/invite/", querystring: {} } });
+  assert.equal(origin.uri, "/invite/index.html");
+  assert.equal(origin.headers, undefined);
+  const viewer = response({ request: origin, response: { headers: {} } });
+  assert.equal(viewer.headers["referrer-policy"].value, "no-referrer");
 });
 
 test("edge headers cover data without changing bodies, statuses, or existing headers", () => {
@@ -269,6 +280,7 @@ function fakeDeployment(
   const build = path.join(directory, "build");
   fs.mkdirSync(bin);
   fs.mkdirSync(build);
+  fs.mkdirSync(path.join(directory, "firebase/functions"), { recursive: true });
   fs.writeFileSync(
     path.join(build, "sitemap.xml"),
     "<urlset><url><loc>https://electrifygame.com/</loc></url></urlset>",
@@ -364,6 +376,7 @@ require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args:
     PATH: `${bin}${path.delimiter}${process.env.PATH}`,
     FIREBASE_SERVICE_ACCOUNT: "fixture",
     REACT_APP_FIREBASE_API_KEY: "fixture",
+    ...options.env,
   };
   const script = path.resolve("scripts/hosting/deploy.js");
   const run = (args = [], entry = script) =>
@@ -419,10 +432,81 @@ test("readiness succeeds without a build or any AWS writes", (t) => {
   assert.ok(calls.every(isRead));
 });
 
+function resolveDeploymentScripts(run) {
+  for (const script of [
+    "scripts/hosting/deploy.js",
+    "scripts/hosting/check-crossplay-config.js",
+  ])
+    run = run.replaceAll(`node ${script}`, `node ${path.resolve(script)}`);
+  return run;
+}
+
+test("production workflow rejects unusable cross-play configuration before Firebase deploy", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    env: {
+      STEAM_APP_ID: "123456",
+      COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
+    },
+  });
+  const { jobs } = parse(
+    fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
+  );
+  const firebase = resolveDeploymentScripts(
+    jobs.deploy.steps.find(({ run }) =>
+      run?.includes("firebase-tools@15 deploy"),
+    ).run,
+  );
+  for (const [variable, value] of [
+    ["STEAM_APP_ID", "2147483648"],
+    ["COOP_CHECKPOINT_BUCKET", "invalid/bucket"],
+    ["COOP_CHECKPOINT_BUCKET", ""],
+  ]) {
+    const result = fixture.runShell(
+      `export ${variable}="${value}"\n${firebase}`,
+    );
+    assert.equal(result.status, 1, variable);
+    assert.match(result.stderr, new RegExp(variable));
+    if (value) assert.ok(!result.stderr.includes(value));
+    assert.equal(
+      fixture.calls.filter(({ args }) => args[0] === "firebase").length,
+      0,
+    );
+  }
+});
+
+test("production workflow deploys the Firebase web service without a Steam App ID or relay CIDRs", (t) => {
+  const fixture = fakeDeployment(t, distribution(), undefined, "", {
+    args: ["--preflight"],
+    env: {
+      STEAM_APP_ID: "",
+      COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
+    },
+  });
+  const { jobs } = parse(
+    fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
+  );
+  const deploy = jobs.deploy.steps.find(({ run }) =>
+    run?.includes("firebase-tools@15 deploy"),
+  );
+  const result = fixture.runShell(
+    "unset COOP_TURN_RELAY_CIDRS\n" + resolveDeploymentScripts(deploy.run),
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    fixture.calls.filter(({ args }) => args[0] === "firebase").length,
+    1,
+  );
+});
+
 test("production workflow checks hosting readiness before Firebase or AWS mutations", (t) => {
   const fixture = fakeDeployment(t, distribution(), undefined, "", {
     args: ["--preflight"],
     state: { denied: "get-distribution-config" },
+    env: {
+      STEAM_APP_ID: "123456",
+      COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
+    },
   });
   const { jobs } = parse(
     fs.readFileSync(".github/workflows/deploy-prod.yml", "utf8"),
@@ -437,6 +521,14 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
   );
   const publish = steps.findIndex(
     ({ run }) => run === "./scripts/deploy.sh ci-prod",
+  );
+  const serviceReady = steps.findIndex(({ run }) =>
+    run?.includes("/coopV2/healthz"),
+  );
+  assert.ok(firebase < serviceReady && serviceReady < publish);
+  assert.match(
+    steps[firebase].run,
+    /functions:mailing-list:coopV2,functions:mailing-list:coopV2Reap/,
   );
   assert.ok(
     credentials >= 0 &&
@@ -462,10 +554,7 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
       );
   }
   const commands = [steps[preflight], steps[firebase]].map(({ run }) =>
-    run.replaceAll(
-      "node scripts/hosting/deploy.js",
-      `node ${path.resolve("scripts/hosting/deploy.js")}`,
-    ),
+    resolveDeploymentScripts(run),
   );
   const result = fixture.runShell(commands.join("\n"));
   assert.equal(result.status, 1);

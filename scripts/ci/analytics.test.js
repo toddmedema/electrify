@@ -360,6 +360,15 @@ function assertAnalyticsDocument(document, name) {
       script.getAttribute("src"),
     ),
   );
+  if (name === path.join("invite", "index.html")) {
+    assert.deepEqual(
+      scripts.map((script) => script.getAttribute("src")),
+      ["/invite/invite.js"],
+      "the invite page loads only the first-party fragment handler",
+    );
+    assert.equal(document.querySelectorAll("script:not([src])").length, 0);
+    return;
+  }
   if (name === "404.html") {
     assert.equal(
       shared.length,
@@ -404,7 +413,7 @@ function htmlFiles(root, relative = "") {
     });
 }
 
-test("every public HTML page uses the same runtime, including generated pages and privacy", (t) => {
+test("public pages load the shared analytics runtime and private entry documents preserve their own policy", (t) => {
   const publicRoot = path.join(ROOT, "public");
   for (const name of htmlFiles(publicRoot)) {
     const dom = new JSDOM(fs.readFileSync(path.join(publicRoot, name), "utf8"));

@@ -1,5 +1,9 @@
-const { BlockList, isIP } = require("node:net");
+const { isIP } = require("node:net");
 const { setTimeout: delay } = require("node:timers/promises");
+const {
+  createRelayPolicy,
+  isPublicRelayAddress,
+} = require("../../firebase/functions/coop-signaling-sdp.cjs");
 const {
   installTurnProbe,
   gatherDescription,
@@ -14,26 +18,6 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 const ROOM_URL = "http://localhost/turn-probe";
 const CONTROL_BYTES = 8192;
 const BURST = 8;
-
-// Reject locally scoped and special-use IPv4 addresses in observations. Provider allocation
-// provenance is a separate requirement and cannot be inferred from this public-address check.
-const nonPublic = new BlockList();
-for (const [address, bits] of [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 24],
-  ["192.0.2.0", 24],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
-  ["198.51.100.0", 24],
-  ["203.0.113.0", 24],
-  ["224.0.0.0", 3],
-])
-  nonPublic.addSubnet(address, bits);
 
 class ProbeError extends Error {}
 
@@ -109,7 +93,7 @@ function cloudflare(keyId, keyToken, interrupted) {
   };
 }
 
-function inspectDescription(description, type) {
+function inspectDescription(description, type, allocationPolicy) {
   if (
     description?.type !== type ||
     typeof description.sdp !== "string" ||
@@ -146,14 +130,17 @@ function inspectDescription(description, type) {
       protocol?.toLowerCase() !== "udp" ||
       typ !== "typ" ||
       candidateType !== "relay" ||
-      isIP(address) !== 4 ||
-      nonPublic.check(address) ||
+      !isPublicRelayAddress(address) ||
       !/^\d{1,5}$/.test(port) ||
       Number(port) < 1 ||
       Number(port) > 65535
     )
       throw new ProbeError(
         "A generated ICE candidate did not describe a Cloudflare-style IPv4 relay",
+      );
+    if (allocationPolicy && !allocationPolicy(address))
+      throw new ProbeError(
+        "A generated ICE candidate was outside the configured TURN allocation ranges",
       );
     relayAddresses.add(address);
     endpoints.push(`${address}:${Number(port)}`);
@@ -235,10 +222,11 @@ async function openBrowserPage(browser) {
   return page;
 }
 
-async function exchangeDescriptions(host, guest, id) {
+async function exchangeDescriptions(host, guest, id, allocationPolicy) {
   const offer = inspectDescription(
     await host.evaluate(gatherDescription, { id, type: "offer" }),
     "offer",
+    allocationPolicy,
   );
   await guest.evaluate(
     ({ id, offer }) => window.turnProbes[id].peer.setRemoteDescription(offer),
@@ -247,6 +235,7 @@ async function exchangeDescriptions(host, guest, id) {
   const answer = inspectDescription(
     await guest.evaluate(gatherDescription, { id, type: "answer" }),
     "answer",
+    allocationPolicy,
   );
   await host.evaluate(
     ({ id, answer }) => window.turnProbes[id].peer.setRemoteDescription(answer),
@@ -340,6 +329,7 @@ async function connectPair(
   protocol,
   id,
   delayedReceipts,
+  allocationPolicy,
 ) {
   const hostGrant = await provider.issue(protocol);
   const guestGrant = await provider.issue(protocol);
@@ -355,7 +345,12 @@ async function connectPair(
       receiptDelayMs: delayedReceipts ? 1200 : 0,
     }),
   ]);
-  const { offer, answer } = await exchangeDescriptions(host, guest, id);
+  const { offer, answer } = await exchangeDescriptions(
+    host,
+    guest,
+    id,
+    allocationPolicy,
+  );
   const selected = await Promise.all([
     confirmRelayPair(host, id, protocol, offer, answer),
     confirmRelayPair(guest, id, protocol, answer, offer),
@@ -363,7 +358,15 @@ async function connectPair(
   return { hostGrant, guestGrant, selected };
 }
 
-async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
+async function runPair(
+  provider,
+  host,
+  guest,
+  protocol,
+  id,
+  delayedReceipts,
+  allocationPolicy,
+) {
   const start = performance.now();
   const initial = await connectPair(
     provider,
@@ -372,6 +375,7 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
     protocol,
     id,
     delayedReceipts,
+    allocationPolicy,
   );
   const setupMs = Math.round(performance.now() - start);
   const burst = performance.now();
@@ -415,6 +419,7 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
     protocol,
     replacementId,
     delayedReceipts,
+    allocationPolicy,
   );
   const replacementMs = Math.round(performance.now() - replacementStart);
   await sendBurst(host, replacementId, 1);
@@ -447,6 +452,7 @@ async function runPair(provider, host, guest, protocol, id, delayedReceipts) {
     replacementMs,
     pairBytesReceived,
     beforeAndAfterRelayPairs: allPairs.every((pair) => pair.relayToRelay),
+    allocationCidrsChecked: Boolean(allocationPolicy),
     localRelayProtocols: allPairs.map((pair) => pair.relayProtocol),
     guestReceivedAfterRevocation,
     receiptsAfterRevocation,
@@ -489,6 +495,12 @@ async function main() {
     throw new ProbeError(
       "ELECTRIFY_TURN_BROWSERS must select four chromium, firefox or webkit browsers",
     );
+  const allocationCidrs = process.env.COOP_TURN_RELAY_CIDRS;
+  const allocationPolicy = createRelayPolicy(allocationCidrs);
+  if (allocationCidrs !== undefined && !allocationPolicy)
+    throw new ProbeError(
+      "COOP_TURN_RELAY_CIDRS must list the provider's public IPv4 allocation CIDRs",
+    );
   const transport = process.env.ELECTRIFY_TURN_TRANSPORT ?? "both";
   if (transport !== "both" && !Object.hasOwn(PROTOCOLS, transport))
     throw new ProbeError("ELECTRIFY_TURN_TRANSPORT must be both, udp or tls");
@@ -524,7 +536,15 @@ async function main() {
       step = `${protocol}: browser relay pairs`;
       const results = await Promise.allSettled(
         guests.map((guest, index) =>
-          runPair(provider, host, guest, protocol, index, index === 2),
+          runPair(
+            provider,
+            host,
+            guest,
+            protocol,
+            index,
+            index === 2,
+            allocationPolicy,
+          ),
         ),
       );
       for (const [index, result] of results.entries()) {

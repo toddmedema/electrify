@@ -4,6 +4,8 @@ import path from "node:path";
 const port = process.env.E2E_PORT || "3189";
 const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`;
 
+const build = process.env.CROSSPLAY_BUILD_DIR;
+
 export default defineConfig({
   testDir: ".",
   testMatch: "crossplay.spec.ts",
@@ -45,10 +47,21 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: "node scripts/ci/crossplay-test-server.js",
+        command: build ? "node scripts/ci/serve.js" : "npm start",
         cwd: path.resolve(__dirname, ".."),
         url: baseURL,
-        env: { E2E_PORT: port },
+        env: {
+          E2E_PORT: port,
+          ...(build
+            ? { E2E_BUILD_DIR: build }
+            : {
+                PORT: port,
+                HOST: "127.0.0.1",
+                BROWSER: "none",
+                ELECTRIFY_E2E: "1",
+                REACT_APP_DESKTOP: "true",
+              }),
+        },
         reuseExistingServer: false,
         timeout: 180_000,
       },

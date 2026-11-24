@@ -9,6 +9,11 @@ interface Runtime {
   activity: (reason: string | null) => void;
   /** Leaves the match; skipSave uses the last multiplayer save instead of a fresh checkpoint. */
   leave: (options?: { skipSave?: boolean }) => Promise<void>;
+  exportSave?: () => Promise<void>;
+  subscribeStatus?: (notify: () => void) => () => void;
+  deviceSaveTime?: () => number | null | undefined;
+  onlineSaveTime?: () => number | null | undefined;
+  reconnect?: () => void;
 }
 let runtime: Runtime | undefined;
 export const multiplayerRuntime = () => runtime;
@@ -18,6 +23,15 @@ export function registerMultiplayerRuntime(value: Runtime | undefined) {
 }
 let openLobby: (() => void) | undefined;
 let lobbyRequested = false;
+let multiplayerRequested = false;
+const multiplayerListeners = new Set<() => void>();
+export const multiplayerStartupRequested = () => multiplayerRequested;
+export const subscribeMultiplayerStartup = (listener: () => void) => {
+  multiplayerListeners.add(listener);
+  return () => {
+    multiplayerListeners.delete(listener);
+  };
+};
 export const registerLobbyOpener = (open?: () => void) => {
   openLobby = open;
   if (open && lobbyRequested) {
@@ -27,7 +41,12 @@ export const registerLobbyOpener = (open?: () => void) => {
 };
 export const showMultiplayerLobby = () => {
   if (openLobby) openLobby();
-  else lobbyRequested = true;
+  else {
+    lobbyRequested = true;
+    if (multiplayerRequested) return;
+    multiplayerRequested = true;
+    multiplayerListeners.forEach((listener) => listener());
+  }
 };
 // Cards that hold the shared clock while a player reads them. The construction catalogs are not
 // here: a shared clock is every company's, so one player shopping does not freeze it, and
@@ -105,6 +124,7 @@ interface CoopControls {
   back: () => void;
   /** Host: copy the lobby code for friends to enter. */
   copyCode: () => void;
+  manageLobby?: () => void;
   /** Host: choose a multiplayer save to resume instead. */
   openSaves: () => void;
 }

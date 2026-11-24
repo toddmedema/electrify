@@ -16,6 +16,8 @@ import {
 import { ReplicatedWorld } from "../multiplayer/Replication";
 import type { ReplicaRecord } from "../multiplayer/Replication";
 import { ReplicaRecovery } from "../multiplayer/ReplicaRecovery";
+import { fitsJsonShape } from "../multiplayer/TurnWire";
+import { encodeWire } from "../multiplayer/WireJson";
 import { ViewPublication } from "../multiplayer/ViewPublication";
 import {
   CHECKPOINT_INTERVAL_MS,
@@ -34,6 +36,48 @@ let local = false;
 let replicated: ReplicatedWorld | undefined;
 let hostSeat: string | undefined;
 let recovery: ReplicaRecovery | undefined;
+let online = false;
+let replicationOpen = true;
+let requestedMembership: string[] | undefined;
+let authority: Extract<WorkerRequest, { kind: "heartbeat" }>["authority"];
+let authorityPaused = false;
+
+function hasAuthority(epoch: string) {
+  return (
+    !online ||
+    (authority?.epoch === epoch &&
+      performance.timeOrigin + performance.now() <
+        authority.monotonicDeadline &&
+      Date.now() < authority.wallDeadline)
+  );
+}
+
+function openReplication(running: World) {
+  if (replicationOpen || !requestedMembership || !hasAuthority(running.epoch))
+    return;
+  const connected = requestedMembership;
+  requestedMembership = undefined;
+  replicationOpen = true;
+  recovery?.connected(connected);
+  for (const to of connected) sendBaseline(to);
+}
+
+function enforceAuthority(running: World) {
+  if (hasAuthority(running.epoch)) {
+    authorityPaused = false;
+    return true;
+  }
+  if (!authorityPaused) {
+    authorityPaused = true;
+    replicated!.pause(
+      "Host authority was interrupted. Reconnect and ready up before resuming.",
+    );
+    requestRecords(true);
+    requestViews({ force: true });
+  }
+  return false;
+}
+
 let recoveryTimer: ReturnType<typeof setInterval> | undefined;
 let recordTimer: ReturnType<typeof setTimeout> | undefined;
 let recordDue = Infinity;
@@ -58,20 +102,6 @@ async function data(spec: MatchSpec) {
     waitForLoad((done) => initWeather(location, done)),
   ]);
 }
-/** Exact numeric-tag overhead matters to the native 64 KiB records limit. World packing never
- * applies to ordinary command records, whose envelopes are separately size-limited natively. */
-function recordJson(value: unknown) {
-  return JSON.stringify(value, function (_key, item) {
-    if (
-      typeof item === "number" &&
-      (Object.is(item, -0) || !Number.isFinite(item))
-    )
-      return { $electrifyNumber: Object.is(item, -0) ? "-0" : String(item) };
-    if (item === undefined && Array.isArray(this))
-      return { $electrifyNumber: "undefined" };
-    return item;
-  });
-}
 function flushRecords() {
   clearTimeout(recordTimer);
   recordTimer = undefined;
@@ -90,18 +120,25 @@ function flushRecords() {
     from,
     records: items,
   });
-  const bytes = (items: ReplicaRecord[]) =>
-    new TextEncoder().encode(recordJson(message(items))).byteLength;
+  const fits = (items: ReplicaRecord[]) => {
+    const json = encodeWire(message(items));
+    return (
+      new TextEncoder().encode(json).byteLength <= maxRecordBytes &&
+      (!online || fitsJsonShape(json, 47, 8188))
+    );
+  };
+  // Leave room for the generation and epoch in the TURN packet envelope.
+  const maxRecordBytes = online ? 60 * 1024 : 64 * 1024;
   for (const record of batch.records) {
     if (
       records.length &&
-      (records.length === 256 || bytes([...records, record]) > 65536)
+      (records.length === 256 || !fits([...records, record]))
     ) {
       post(message(records));
       from += records.length;
       records = [];
     }
-    if (!records.length && bytes([record]) > 65536)
+    if (!records.length && !fits([record]))
       throw new Error("A multiplayer record exceeds the network limit");
     records.push(record);
   }
@@ -125,7 +162,7 @@ function requestRecords(urgent = false) {
   }, delay);
 }
 function sendBaseline(to: string) {
-  if (recovery?.baseline(to)) requestViews({ force: true });
+  if (replicationOpen && recovery?.baseline(to)) requestViews({ force: true });
 }
 /** Flush due seat projections and report a local summary from the same authoritative world.
  * Its date follows an active company, or the latest retired grid once the whole match has ended. */
@@ -234,7 +271,7 @@ function loop() {
       );
       requestRecords(true);
     }
-    replicated!.step();
+    if (enforceAuthority(world)) replicated!.step();
     requestRecords();
     requestViews();
     if (started - lastSave >= CHECKPOINT_INTERVAL_MS) {
@@ -258,6 +295,8 @@ async function startMatch(
 ) {
   busy = true;
   local = !!request.local;
+  online = !request.local && !!request.online;
+  replicationOpen = !online;
   if (local) {
     const { achievementHooks } = await import("../achievements/Achievements");
     installSimulationHooks(achievementHooks);
@@ -288,10 +327,11 @@ async function startMatch(
         requestViews();
       },
       error: fault,
+      waitForDispatch: online,
     });
     recoveryTimer = setInterval(() => {
       try {
-        recovery!.pulse();
+        if (replicationOpen) recovery!.pulse();
       } catch (error) {
         fault(error);
       }
@@ -327,7 +367,11 @@ function handle(request: WorkerRequest, running: World) {
     else replicated!.setBlockers(request.reasons);
     requestRecords(true);
     requestViews({ force: true });
+  } else if (request.kind === "replication-open") {
+    requestedMembership = request.connected;
+    openReplication(running);
   } else if (request.kind === "command") {
+    if (!replicationOpen || !enforceAuthority(running)) return;
     const previousSpeed = running.speed;
     const { error, recorded } = replicated!.command(
       request.sender,
@@ -367,10 +411,13 @@ function handle(request: WorkerRequest, running: World) {
     requestViews({ force: true });
   } else if (request.kind === "baseline") {
     sendBaseline(request.to);
+  } else if (request.kind === "baseline-dispatched") {
+    recovery?.dispatched(request.to, request.index, request.delivered);
   } else if (request.kind === "replica-peers") {
+    if (requestedMembership) requestedMembership = request.connected;
     recovery?.connected(request.connected);
   } else if (request.kind === "progress") {
-    recovery?.progress(request);
+    if (replicationOpen) recovery?.progress(request);
   } else if (request.kind === "resync") {
     if (request.matchId === running.matchId && request.epoch === running.epoch)
       sendBaseline(request.sender);
@@ -396,6 +443,8 @@ const refuse = (message: string) => post({ kind: "error", message });
 worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
   if (request.kind === "heartbeat") {
     lastControlHeartbeat = performance.now();
+    authority = request.authority;
+    if (online && world && enforceAuthority(world)) openReplication(world);
     return;
   }
   if (request.kind === "views-applied") {

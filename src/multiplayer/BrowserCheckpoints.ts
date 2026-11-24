@@ -9,7 +9,7 @@ const CAMPAIGNS = "campaigns";
 const WORLDS = "worlds";
 const MAX_SAVES = 32;
 
-export function browserCheckpoints(): CheckpointStore {
+export function browserCheckpoints(namespace?: string): CheckpointStore {
   async function transaction<Result>(
     mode: IDBTransactionMode,
     handle: (
@@ -20,7 +20,10 @@ export function browserCheckpoints(): CheckpointStore {
     ) => void,
   ): Promise<Result> {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("electrify-crossplay", 1);
+      const request = indexedDB.open(
+        namespace ? `electrify-coop-v2-${namespace}` : "electrify-crossplay",
+        1,
+      );
       request.onupgradeneeded = () => {
         request.result
           .createObjectStore(CAMPAIGNS, { keyPath: "id" })

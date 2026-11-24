@@ -11,3 +11,9 @@ export function createMultiplayerReplicaWorker(): Worker {
     { type: "module" },
   );
 }
+export function createSnapshotWorker(): Worker {
+  return new Worker(
+    new URL("../workers/MultiplayerSnapshot.worker.ts", import.meta.url),
+    { type: "module" },
+  );
+}

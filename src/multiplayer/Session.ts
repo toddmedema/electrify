@@ -43,6 +43,7 @@ import {
   COMMAND_RESEND_MS,
   HOST_SILENCE_MS,
   MAX_QUEUED_COMMANDS,
+  ONLINE_SAVE_TIMEOUT_MS,
   SAVE_TIMEOUT_MS,
   SESSION_PUMP_MS,
   VIEW_INTERVAL_MS,
@@ -178,6 +179,7 @@ export class MultiplayerSession {
   private connected = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private lifecycle = 0;
+  private lastHost?: { room: string; epoch: string };
   private startGeneration = 0;
   private campaignGeneration = 0;
   private startupCleanup: Promise<unknown> = Promise.resolve();
@@ -200,6 +202,17 @@ export class MultiplayerSession {
     private replicaFactory: () => Promise<Worker>,
   ) {}
   getSnapshot = () => this.state;
+  get onlineCampaigns() {
+    return this.services.onlineCampaigns === true;
+  }
+  private authorityIsCurrent(epoch?: string) {
+    if (!this.services.authority) return true;
+    const authority = this.services.authority();
+    return !!authority && (!epoch || epoch === authority.epoch);
+  }
+  private relayAuthority() {
+    this.post({ kind: "heartbeat", authority: this.services.authority?.() });
+  }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
     return () => {
@@ -245,7 +258,7 @@ export class MultiplayerSession {
     this.timer = setInterval(() => {
       // A Steam invitation can arrive while another lobby operation is awaiting IPC.
       deliverInvite();
-      if (this.worker) this.post({ kind: "heartbeat" });
+      if (this.worker) this.relayAuthority();
       else if (
         this.state.lobby.hostId &&
         this.state.lobby.hostId !== this.state.lobby.selfId &&
@@ -304,7 +317,47 @@ export class MultiplayerSession {
         this.handleHostLeft();
         return;
       }
+      if (
+        this.services.authority &&
+        this.lastHost &&
+        event.state.authorityEpoch &&
+        (this.lastHost.room !== event.state.lobbyId ||
+          this.lastHost.epoch !== event.state.authorityEpoch)
+      ) {
+        const error = new Error(
+          "Host changed. Actions from the previous session were discarded.",
+        );
+        this.startGeneration++;
+        this.worker?.terminate();
+        this.worker = undefined;
+        this.stopReplica();
+        this.replicaStream = undefined;
+        this.replicationSends.clear();
+        this.replicationConnections.clear();
+        this.completion?.reject(error);
+        this.queued.forEach((queued) => queued.reject(error));
+        this.completion = undefined;
+        this.queued = [];
+        this.pending = undefined;
+        for (const request of this.saveRequests.values()) request.reject(error);
+        this.saveRequests.clear();
+        this.sequence = 0;
+        this.receiptSequence = 0;
+        this.state = {
+          ...this.state,
+          pending: false,
+          busy: false,
+          waitingForHost: true,
+        };
+      }
+      if (!event.state.lobbyId) this.lastHost = undefined;
+      else if (event.state.authorityEpoch)
+        this.lastHost = {
+          room: event.state.lobbyId,
+          epoch: event.state.authorityEpoch,
+        };
       this.update({ lobby: event.state });
+      if (this.worker) this.relayAuthority();
       if (this.isHost()) {
         // A friend who just joined lands on the page the host is showing, straight away.
         const joined = event.state.connected.filter(
@@ -365,6 +418,12 @@ export class MultiplayerSession {
           error: CONNECTION_LOST,
         });
     } else if (event.kind === "message") {
+      if (
+        !this.authorityIsCurrent(
+          "epoch" in event.payload ? event.payload.epoch : undefined,
+        )
+      )
+        return;
       if (
         this.worker &&
         this.state.lobby.connected.includes(event.sender) &&
@@ -430,7 +489,11 @@ export class MultiplayerSession {
             payload: { kind: "save-result", requestId, error },
           });
         const suspended = event.payload.suspended === true;
-        void this.save(suspended, suspended)
+        void this.save(
+          suspended || event.payload.pause === true,
+          true,
+          suspended,
+        )
           .then(
             () => respond(),
             (error) => respond(error.message),
@@ -524,6 +587,7 @@ export class MultiplayerSession {
   }
   /** Apply a projection from the authoritative host worker or the guest's local replica. */
   private acceptView(view: RoomView) {
+    if (!this.authorityIsCurrent(view.epoch)) return;
     const terminalError = this.replicaStopped;
     const previous = this.state.view;
     if (
@@ -858,13 +922,28 @@ export class MultiplayerSession {
           }
         }
         await this.request({ kind: "send", to, payload });
+        if (this.onlineCampaigns && current() && payload.kind === "baseline")
+          this.post({
+            kind: "baseline-dispatched",
+            to,
+            index: payload.index,
+            delivered: true,
+          });
       });
     this.replicationSends.set(to, send);
     void send.catch((error: unknown) => {
       // The transport's disconnect notice can follow this rejected send.
       // A baseline on that dead channel would only spend the replica's recovery budget.
-      if (current() && !(error instanceof PeerDisconnectedError))
-        this.post({ kind: "baseline", to });
+      if (current() && !(error instanceof PeerDisconnectedError)) {
+        if (this.onlineCampaigns && payload.kind === "baseline")
+          this.post({
+            kind: "baseline-dispatched",
+            to,
+            index: payload.index,
+            delivered: false,
+          });
+        else this.post({ kind: "baseline", to });
+      }
     });
   }
   /** Menu transitions cannot be dropped while a purchase or another command is in flight. */
@@ -902,7 +981,12 @@ export class MultiplayerSession {
     );
   }
   private transmit() {
-    if (!this.pending || this.replicaStopped) return;
+    if (
+      !this.pending ||
+      this.replicaStopped ||
+      !this.authorityIsCurrent(this.pending.epoch)
+    )
+      return;
     // A guest whose host link is down cannot deliver anything. The command stays pending and the
     // pump resends it once the link returns; the lost connection is already reported once, so
     // each retry must not raise another error.
@@ -1055,9 +1139,12 @@ export class MultiplayerSession {
       this.update({ busy: false, entryOperation: undefined });
     }
   }
-  async reconnect() {
+  async reconnect(roomId?: string) {
     try {
-      const lobby = await this.request({ kind: "reconnect" });
+      const lobby = await this.request({
+        kind: "reconnect",
+        ...(roomId && { roomId }),
+      });
       this.update({ error: undefined });
       this.event({ kind: "state", state: lobby });
     } catch (error) {
@@ -1071,7 +1158,47 @@ export class MultiplayerSession {
           error: error instanceof Error ? error.message : "Could not reconnect",
         },
       });
+      if (roomId) throw error;
     }
+  }
+  async approve(requestId: string, approve: boolean) {
+    this.update({
+      lobby: await this.request({ kind: "approve", requestId, approve }),
+    });
+  }
+  async removePlayer(seatId: string) {
+    this.update({ lobby: await this.request({ kind: "remove", seatId }) });
+  }
+  async exportSave(id?: string) {
+    if (!this.services.checkpoints.export)
+      throw new Error("Multiplayer export is unavailable.");
+    await this.services.checkpoints.export(id);
+  }
+  async rotateInvite() {
+    this.update({ lobby: await this.request({ kind: "rotate-invite" }) });
+  }
+  hasOnlineAuthority() {
+    return !!this.services.authority?.();
+  }
+  canRecover() {
+    const { campaignLocked, recoveryAvailable, members, requiredPlayers } =
+      this.state.lobby;
+    const required = requiredPlayers ?? members.map(({ id }) => id);
+    return (
+      !!campaignLocked &&
+      !!recoveryAvailable &&
+      this.isHost() &&
+      !this.state.busy &&
+      this.authorityIsCurrent() &&
+      required.every(
+        (id) =>
+          id === this.state.lobby.selfId ||
+          this.state.lobby.connected.includes(id),
+      )
+    );
+  }
+  recover() {
+    return this.start({ recovery: true });
   }
   /** Reloads the multiplayer saves; only the newest request may replace the list. */
   async refreshSaves(sync = true) {
@@ -1101,6 +1228,20 @@ export class MultiplayerSession {
   }
   /** Selecting a campaign opens its invitation lobby before starting any saved grids. */
   async prepareResume(id: string, name: string) {
+    if (this.onlineCampaigns) {
+      await this.reconnect(id);
+      if (
+        this.isHost() &&
+        !this.worker &&
+        this.state.lobby.campaignLocked &&
+        !this.state.lobby.recoveryAvailable
+      )
+        this.event({
+          kind: "state",
+          state: await this.request({ kind: "restart-host" }),
+        });
+      return;
+    }
     const generation = ++this.campaignGeneration;
     const lifecycle = this.lifecycle;
     const current = () =>
@@ -1197,7 +1338,15 @@ export class MultiplayerSession {
       return "The lobby must contain only the saved match's players";
   }
   /** Starts the host's chosen scenario for the lobby, or resumes the last multiplayer save. */
-  async start(choice: { spec: MatchSpec } | { saved: true; id?: string }) {
+  async start(
+    choice:
+      { spec: MatchSpec } | { saved: true; id?: string } | { recovery: true },
+  ) {
+    const recovery = "recovery" in choice;
+    if (recovery && !this.canRecover())
+      throw new Error(
+        "Wait for the original players to connect before recovering.",
+      );
     const generation = ++this.startGeneration;
     const lifecycle = this.lifecycle;
     const current = () =>
@@ -1232,10 +1381,12 @@ export class MultiplayerSession {
       await this.startupCleanup;
       if (!current()) return;
       const world =
-        "saved" in choice
-          ? await this.services.checkpoints.read(choice.id)
+        "saved" in choice || recovery
+          ? await this.services.checkpoints.read(
+              "saved" in choice ? choice.id : undefined,
+            )
           : null;
-      if ("saved" in choice && !world)
+      if (("saved" in choice || recovery) && !world)
         throw new Error("No multiplayer save on this computer yet");
       const checkpointSource = world
         ? {
@@ -1264,25 +1415,32 @@ export class MultiplayerSession {
       const campaign = this.state.pendingCampaign;
       if (
         world &&
+        !recovery &&
         (!campaign || !("saved" in choice) || campaign.id !== choice.id)
       )
         throw new Error("Choose the multiplayer save again");
       // A resumed match hands each saved company to whoever claimed it; retired ones may stay away.
       const seats = world
-        ? resumeSeats(campaign!, members)
+        ? recovery
+          ? world.seats
+          : resumeSeats(campaign!, members)
         : members.map(({ id, name }) => ({ id, name }));
-      const rosterError = world
-        ? this.resumeBlocker()
-        : this.rosterError(seats, seats);
+      const requiredSeats = seats.filter(
+        (_, index) => !world?.outcomes?.[world.seats[index].id],
+      );
+      const rosterError =
+        world && !recovery
+          ? this.resumeBlocker()
+          : this.rosterError(seats, requiredSeats);
       if (rosterError) throw new Error(rosterError);
-      await this.request({
-        kind: "lock",
-        ids: seats.map((seat) => seat.id),
-        requiredIds: seats
-          .filter((_, index) => !world?.outcomes?.[world.seats[index].id])
-          .map((seat) => seat.id),
-      });
-      locked = true;
+      if (!recovery) {
+        await this.request({
+          kind: "lock",
+          ids: seats.map((seat) => seat.id),
+          requiredIds: requiredSeats.map((seat) => seat.id),
+        });
+        locked = true;
+      }
       if (!current()) {
         await this.request({ kind: "unlock" }).catch(() => undefined);
         return;
@@ -1295,7 +1453,17 @@ export class MultiplayerSession {
         worker.terminate();
         return;
       }
+      const onlineAuthority = this.services.authority?.();
+      if (this.services.authority && (!onlineAuthority || !this.isHost())) {
+        worker.terminate();
+        throw new Error("Host authority expired. Reconnect to continue.");
+      }
+      const epoch = onlineAuthority?.epoch ?? crypto.randomUUID();
       this.worker = worker;
+      this.relayAuthority();
+      let checkpointReady = !this.onlineCampaigns;
+      let initialCheckpoint = !checkpointReady;
+      let initialView: RoomView | undefined;
       this.connected = new Set(this.state.lobby.connected);
       this.worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
         if (!current() || this.worker !== worker) return;
@@ -1305,17 +1473,51 @@ export class MultiplayerSession {
           return;
         }
         if (data.kind === "checkpoint") {
+          const first = initialCheckpoint;
+          initialCheckpoint = false;
           this.saving = this.saving
             .catch(() => {})
-            .then(() =>
-              this.services.checkpoints.write(data.world, checkpointSource),
-            );
-          void this.saving.catch((error) =>
-            this.update({ error: `Multiplayer save failed: ${error.message}` }),
+            .then(async () => {
+              if (!current() || !this.authorityIsCurrent(data.world.epoch)) {
+                if (first || data.requestId)
+                  throw new Error(
+                    "Host authority changed before the checkpoint could be saved.",
+                  );
+                return;
+              }
+              await this.services.checkpoints.write(
+                data.world,
+                checkpointSource,
+                !!data.requestId,
+              );
+              if (data.requestId && !current())
+                throw new Error(
+                  "Host changed while the checkpoint was being saved.",
+                );
+            });
+          void this.saving.then(
+            () => {
+              if (!current() || !first) return;
+              checkpointReady = true;
+              if (initialView) {
+                receivedView = true;
+                this.acceptView(initialView);
+              }
+              this.relayAuthority();
+              this.post({
+                kind: "replication-open",
+                connected: [...this.state.lobby.connected],
+              });
+            },
+            (error) => {
+              if (!current()) return;
+              const message = `Multiplayer save failed: ${error.message}`;
+              if (first) rollback(message);
+              else this.update({ error: message });
+            },
           );
           if (data.requestId) {
             const request = this.saveRequests.get(data.requestId);
-            this.saveRequests.delete(data.requestId);
             void this.saving.then(
               () => request?.resolve(),
               (error) => request?.reject(error),
@@ -1325,12 +1527,17 @@ export class MultiplayerSession {
         }
         if (data.kind === "summary") return;
         if (data.kind === "records") {
+          if (!checkpointReady || !this.authorityIsCurrent(data.epoch)) return;
           for (const id of this.state.lobby.connected)
             if (id !== this.state.lobby.selfId) this.sendReplication(id, data);
           return;
         }
         if (data.kind === "baseline") {
-          this.sendReplication(data.to, { kind: "baseline", ...data.baseline });
+          if (checkpointReady && this.authorityIsCurrent(data.baseline.epoch))
+            this.sendReplication(data.to, {
+              kind: "baseline",
+              ...data.baseline,
+            });
           return;
         }
         if (data.kind === "rejected") {
@@ -1349,6 +1556,7 @@ export class MultiplayerSession {
           return;
         }
         if (data.kind === "keepalive") {
+          if (!checkpointReady || !this.authorityIsCurrent(data.epoch)) return;
           for (const id of this.state.lobby.connected)
             if (id !== this.state.lobby.selfId)
               void this.request({
@@ -1369,8 +1577,10 @@ export class MultiplayerSession {
                 !this.state.lobby.connected.includes(grid.seat.id),
             )
             .map((grid) => grid.seat.id);
-          receivedView = true;
-          this.acceptView(view);
+          if (checkpointReady) {
+            receivedView = true;
+            this.acceptView(view);
+          } else initialView = view;
           if (current() && this.worker === worker)
             this.post({
               kind: "replica-peers",
@@ -1389,13 +1599,13 @@ export class MultiplayerSession {
         if (!receivedView) rollback(error);
         else this.update({ busy: false, error });
       };
-      const epoch = crypto.randomUUID();
       this.post(
         world
           ? {
               kind: "restore",
               world,
               epoch,
+              online: this.onlineCampaigns,
               seats,
               hostSeat: this.state.lobby.selfId!,
             }
@@ -1405,6 +1615,7 @@ export class MultiplayerSession {
               seats,
               matchId: crypto.randomUUID(),
               epoch,
+              online: this.onlineCampaigns,
               hostSeat: this.state.lobby.selfId!,
             },
       );
@@ -1413,8 +1624,8 @@ export class MultiplayerSession {
       throw error;
     }
   }
-  async save(pause = false, keepOpen = false) {
-    if (keepOpen) {
+  async save(pause = false, keepOpen = false, suspended = keepOpen) {
+    if (suspended) {
       // Unsent pre-sleep readiness cannot count as fresh consent after the safety checkpoint.
       // Already sent envelopes keep their sequence/receipt identity and precede the checkpoint.
       this.queued = this.queued.filter((queued) => {
@@ -1441,7 +1652,9 @@ export class MultiplayerSession {
           this.saveRequests.set(requestId, { resolve, reject });
           timer = setTimeout(
             () => reject(new Error("The host could not finish the save")),
-            SAVE_TIMEOUT_MS,
+            this.onlineCampaigns
+              ? ONLINE_SAVE_TIMEOUT_MS + HOST_SILENCE_MS
+              : SAVE_TIMEOUT_MS,
           );
           void this.request({
             kind: "send",
@@ -1449,7 +1662,8 @@ export class MultiplayerSession {
             payload: {
               kind: "save-request",
               requestId,
-              ...(keepOpen ? { suspended: true } : {}),
+              ...(suspended ? { suspended: true } : {}),
+              ...(pause && this.onlineCampaigns && { pause: true }),
             },
           }).catch(reject);
         });
@@ -1467,13 +1681,13 @@ export class MultiplayerSession {
         this.saveRequests.set(requestId, { resolve, reject });
         timeout = setTimeout(
           () => reject(new Error("The host could not finish the save")),
-          SAVE_TIMEOUT_MS,
+          this.onlineCampaigns ? ONLINE_SAVE_TIMEOUT_MS : SAVE_TIMEOUT_MS,
         );
         this.post({
           kind: "checkpoint",
           requestId,
           pause,
-          ...(keepOpen ? { suspended: true } : {}),
+          ...(suspended ? { suspended: true } : {}),
         });
       });
     } catch (error) {
@@ -1502,7 +1716,7 @@ export class MultiplayerSession {
     this.campaignGeneration++;
     this.closing = true;
     try {
-      if (!skipSave) await this.save(!!this.worker);
+      if (!skipSave) await this.save(!!this.worker || this.onlineCampaigns);
     } catch (error) {
       // The player stays in the match to retry or to leave without saving.
       this.closing = false;
@@ -1622,22 +1836,22 @@ export class MultiplayerSession {
         payload: { kind: "browse", browse },
       }).catch(() => {});
       const scenario = this.state.scenarioSnapshot;
+      const selection = selectionKey(browse);
       if (
         browse.mod &&
         scenario &&
-        (to ||
-          lobby.members.find((member) => member.id === id)?.ready !==
-            selectionKey(browse))
-      )
+        this.outboundScenario.get(id) !== selection
+      ) {
+        this.outboundScenario.set(id, selection);
         void this.request({
           kind: "send",
           to: id,
-          payload: {
-            kind: "scenario",
-            selectionKey: selectionKey(browse),
-            scenario,
-          },
-        }).catch(() => {});
+          payload: { kind: "scenario", selectionKey: selection, scenario },
+        }).catch(() => {
+          if (this.outboundScenario.get(id) === selection)
+            this.outboundScenario.delete(id);
+        });
+      }
     }
   }
   private sendCampaign(to?: string[], clear = false) {
@@ -1767,10 +1981,9 @@ export class MultiplayerSession {
     if (!this.isHost()) return;
     this.closing = true;
     try {
-      // Keep the finished match's final state as the multiplayer save; a failed write isn't fatal.
-      if (this.worker) await this.save(true).catch(() => undefined);
+      if (this.worker) await this.save(true);
+      await this.request({ kind: "unlock" });
       this.endLocalMatch();
-      await this.request({ kind: "unlock" }).catch(() => undefined);
     } finally {
       this.closing = false;
     }

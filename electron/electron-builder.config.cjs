@@ -24,6 +24,7 @@ module.exports = {
     "src/helpers/ScenarioRulesSchema.js",
     "src/helpers/ScenarioText.js",
     "src/helpers/RuleIdentity.js",
+    "src/multiplayer/CrossplayHttp.js",
     "!electron/*.test.cjs",
     "!electron/electron-builder.config.cjs",
     "desktop-config.json",

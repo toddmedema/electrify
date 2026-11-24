@@ -218,17 +218,18 @@ also authorized concurrent allocations on both sides of each test pair. All thre
 UDP pairs still delivered eight messages and eight receipts in a burst sent 30 seconds
 after Cloudflare confirmed revocation. In a separate run with a 60-second credential
 TTL, all three pairs still delivered a burst sent 66 seconds after the initial exchange.
-Admission needs a shutdown mechanism whose measured allocation lifetime bounds exposure.
+If the rollout relies on the emergency stop to cap spend, measure how long
+existing allocations continue to carry traffic after the stop.
 
 The probe runs synthetic traffic with in-process signaling. Its delayed receipts measure
 one slow application participant. Deployed signaling, actual gameplay, native Steam,
 packet-level egress and provider billing require separate tests.
 The TLS run configures only TLS on port 443. With UDP blocked at the network boundary,
 set `ELECTRIFY_TURN_TRANSPORT=tls` to run that case in isolation. The diagnostic checks
-candidate types and public addresses. Production authorization needs independent Cloudflare
-relay-allocation provenance. Cloudflare documents TURN listeners, per-allocation limits
-and credential revocation. Production admission needs a provider-backed allocation
-policy and evidence of bounded aggregate spend and live allocation cutoff.
+candidate types and public addresses, as does production signaling. If the TURN
+provider supplies allocation ranges, the probe can also check them using
+`COOP_TURN_RELAY_CIDRS` in its local environment. Cloudflare documents TURN listeners,
+per-allocation limits and credential revocation.
 [Cloudflare TURN FAQ](https://developers.cloudflare.com/realtime/turn/faq/) ·
 [Service limits](https://developers.cloudflare.com/realtime/turn/#limits) ·
 [Credential revocation](https://developers.cloudflare.com/realtime/turn/generate-credentials/#revoke-credentials)

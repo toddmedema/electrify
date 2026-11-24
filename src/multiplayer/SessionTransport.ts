@@ -14,12 +14,22 @@ export interface LobbyState {
   available: boolean;
   lobbyId?: string;
   inviteCode?: string;
+  inviteToken?: string;
+  inviteExpiresAt?: number;
+  inviteVersion?: string;
+  pendingApprovals?: { id: string; name: string }[];
+  joinPending?: boolean;
+  campaignLocked?: boolean;
+  requiredPlayers?: string[];
+  recoveryAvailable?: boolean;
+  authorityEpoch?: string;
   hostId?: string;
   selfId?: string;
   members: LobbyMember[];
   connected: string[];
   savedAt?: number | null;
   sharedAt?: number | null;
+  confirmedRevision?: number;
   error?: string;
 }
 export interface SharedSaveLibrary {
@@ -72,7 +82,12 @@ export type WireMessage =
       applied: number;
       reason: string;
     }
-  | { kind: "save-request"; requestId: string; suspended?: boolean }
+  | {
+      kind: "save-request";
+      requestId: string;
+      suspended?: boolean;
+      pause?: boolean;
+    }
   | { kind: "save-result"; requestId: string; error?: string }
   | { kind: "command"; envelope: CommandEnvelope }
   | { kind: "browse"; browse: BrowseState }
@@ -80,8 +95,11 @@ export type WireMessage =
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type SessionRequest =
   | {
-      kind: "state" | "leave" | "reconnect" | "unlock";
+      kind: "state" | "leave" | "unlock" | "rotate-invite" | "restart-host";
     }
+  | { kind: "reconnect"; roomId?: string }
+  | { kind: "approve"; requestId: string; approve: boolean }
+  | { kind: "remove"; seatId: string }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
   | { kind: "member"; key: "ready" | "slot"; value: string }
@@ -95,7 +113,17 @@ export type SessionEvent =
   | { kind: "disconnected"; sender: string };
 
 type LobbyRequest =
-  "state" | "create" | "join" | "leave" | "reconnect" | "member" | "unlock";
+  | "state"
+  | "create"
+  | "join"
+  | "leave"
+  | "reconnect"
+  | "member"
+  | "unlock"
+  | "approve"
+  | "remove"
+  | "restart-host"
+  | "rotate-invite";
 
 type SessionReplies = {
   [Kind in SessionRequest["kind"]]: Kind extends LobbyRequest
@@ -122,14 +150,24 @@ export interface CheckpointStore {
   read(id?: string): Promise<World | null>;
   list(sync: boolean): Promise<SharedSaveLibrary>;
   remove(id: string): Promise<SharedSaveLibrary>;
+  export?(id?: string): Promise<void>;
   /** Supply the version read at startup when saving a restored world. */
   write(
     world: World,
     source?: Readonly<Pick<World, "matchId" | "epoch" | "revision">>,
+    explicit?: boolean,
   ): Promise<void>;
+}
+
+export interface AuthorityWindow {
+  epoch: string;
+  monotonicDeadline: number;
+  wallDeadline: number;
 }
 
 export interface SessionServices {
   transport: SessionTransport;
   checkpoints: CheckpointStore;
+  authority?: () => AuthorityWindow | undefined;
+  onlineCampaigns?: boolean;
 }
