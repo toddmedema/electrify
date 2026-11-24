@@ -32,10 +32,8 @@ export default function Lobby({
   onJoined,
   onDiscardInvite,
   onOpenSaves,
-  onCopyLink,
   canAuthenticate = true,
   onChooseNew,
-  onContinueSetup,
   onCopyCode,
   onClose,
   onLeave,
@@ -50,12 +48,9 @@ export default function Lobby({
   onJoined?: () => void;
   onDiscardInvite?: () => void;
   onOpenSaves?: () => void;
-  onCopyLink?: () => void;
   canAuthenticate?: boolean;
   /** Host: set the multiplayer save aside and choose a new game. */
   onChooseNew: () => void;
-  /** Host: reopen Custom setup for the room that is already open. */
-  onContinueSetup?: () => void;
   onCopyCode: () => void;
   onClose: () => void;
   onLeave: () => void;
@@ -316,50 +311,6 @@ export default function Lobby({
               )}
             </>
           )}
-          {mode === "waiting" &&
-            host &&
-            session.onlineCampaigns &&
-            !lobby.campaignLocked && (
-              <>
-                {lobby.inviteCode && (
-                  <CoopInviteCode
-                    code={lobby.inviteCode}
-                    onCopy={onCopyCode}
-                    onCopyLink={lobby.inviteToken ? onCopyLink : undefined}
-                  />
-                )}
-                {lobby.members.map((member) => (
-                  <Stack
-                    key={member.id}
-                    direction="row"
-                    spacing={1}
-                    sx={{
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography sx={{ overflowWrap: "anywhere" }}>
-                      {member.name} ·{" "}
-                      {member.id === lobby.selfId
-                        ? "Host"
-                        : connected(member.id)
-                          ? "Connected"
-                          : "Connecting"}
-                    </Typography>
-                    {member.id !== lobby.selfId && (
-                      <Button
-                        aria-label={`Remove ${member.name}`}
-                        onClick={() =>
-                          run(() => session.removePlayer(member.id), "host")
-                        }
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </Stack>
-                ))}
-              </>
-            )}
           {mode === "waiting" && lobby.campaignLocked && (
             <>
               <Typography>
@@ -387,25 +338,23 @@ export default function Lobby({
               )}
             </>
           )}
-          {mode === "waiting" &&
-            !lobby.campaignLocked &&
-            (!host || !session.onlineCampaigns) && (
-              <Stack
-                direction="row"
-                spacing={1}
-                role="status"
-                sx={{ alignItems: "center" }}
-              >
-                <CircularProgress size={20} />
-                <Typography>
-                  {host
-                    ? "Opening your lobby…"
-                    : connected(lobby.hostId!)
-                      ? `Waiting for ${hostName} to share the custom setup…`
-                      : `Connecting to ${hostName}…`}
-                </Typography>
-              </Stack>
-            )}
+          {mode === "waiting" && !lobby.campaignLocked && (
+            <Stack
+              direction="row"
+              spacing={1}
+              role="status"
+              sx={{ alignItems: "center" }}
+            >
+              <CircularProgress size={20} />
+              <Typography>
+                {host
+                  ? "Opening your lobby…"
+                  : connected(lobby.hostId!)
+                    ? `Waiting for ${hostName} to share the custom setup…`
+                    : `Connecting to ${hostName}…`}
+              </Typography>
+            </Stack>
+          )}
           {mode === "waiting" &&
             session.onlineCampaigns &&
             !lobby.campaignLocked &&
@@ -459,19 +408,6 @@ export default function Lobby({
       )}
       {mode !== "entry" && (
         <DialogActions>
-          {mode === "waiting" &&
-            host &&
-            session.onlineCampaigns &&
-            !lobby.campaignLocked && (
-              <>
-                {onContinueSetup && (
-                  <Button variant="contained" onClick={onContinueSetup}>
-                    Continue setup
-                  </Button>
-                )}
-                <Button onClick={onClose}>Close</Button>
-              </>
-            )}
           {mode === "campaign" && host && (
             <Button disabled={busy} onClick={onChooseNew}>
               Choose a new game

@@ -122,12 +122,11 @@ interface CoopControls {
   ready: (ready: boolean) => void;
   /** Leave the lobby, after confirming. */
   back: () => void;
-  /** Online host: leave the editor and show the lobby without ending the room. */
-  returnToLobby?: () => void;
   /** Host: copy the lobby code for friends to enter. */
   copyCode: () => void;
   copyLink?: () => void;
-  manageLobby?: () => void;
+  /** Host: remove a guest from the setup lobby. */
+  kick?: (playerId: string) => void;
   /** Host: choose a multiplayer save to resume instead. */
   openSaves: () => void;
 }

@@ -463,11 +463,14 @@ function IntertieUpgradeControl(props: {
   units: UnitSystemType;
   onUpgrade: (corridorId: string, financed: boolean) => void;
   context: IntertieAccessContext;
+  /** The action row shows the button. The notice above it shows status and shortfall. */
+  buttonOnly?: boolean;
 }): React.JSX.Element | null {
   const { currency } = useMoney();
   const { line, cash, year, interestRate, units, onUpgrade, context } = props;
   const [reviewing, setReviewing] = React.useState(false);
   if (line.upgrade) {
+    if (props.buttonOnly) return null;
     const years = line.upgrade.yearsToBuildLeft;
     return (
       <Typography variant="body2" color="textSecondary">
@@ -481,6 +484,7 @@ function IntertieUpgradeControl(props: {
   }
   const quote = intertieUpgradeQuote(line, year, 1, 1, context);
   if (!quote) {
+    if (props.buttonOnly) return null;
     // Say which ceiling was reached. "No further upgrades" on its own reads as a bug.
     const atStepLimit =
       intertieUpgradeCount(line, context) >= MAX_INTERTIE_UPGRADES;
@@ -508,13 +512,8 @@ function IntertieUpgradeControl(props: {
     context,
     quote.targetCapacityW,
   );
-  return (
-    <div className="transmissionUpgrade">
-      {shortfall && (
-        <Typography variant="caption" color="textSecondary" component="div">
-          {shortfall}
-        </Typography>
-      )}
+  const reviewButton = (
+    <>
       <Button
         size="small"
         variant="outlined"
@@ -580,8 +579,14 @@ function IntertieUpgradeControl(props: {
           }}
         />
       )}
-    </div>
+    </>
   );
+  if (props.buttonOnly) return reviewButton;
+  return shortfall ? (
+    <Typography variant="caption" color="textSecondary" component="div">
+      {shortfall}
+    </Typography>
+  ) : null;
 }
 
 export interface TransmissionPanelProps {
@@ -1401,8 +1406,23 @@ export default function TransmissionPanel({
                                         )}
                                       </Typography>
                                     )}
-                                    <div className="transmissionDecisionActions">
-                                      {availableAcquisition && onAcquire && (
+                                    <IntertieUpgradeControl
+                                      costIndex={getCostTableIndex(
+                                        game.date,
+                                        game.startingYear,
+                                        game.seed,
+                                      )}
+                                      line={line}
+                                      peerId={peer?.id}
+                                      context={accessContextForGame(game)}
+                                      cash={now?.cash}
+                                      year={game.date.year}
+                                      interestRate={game.interestRate}
+                                      units={units}
+                                      onUpgrade={onUpgrade}
+                                    />
+                                    {availableAcquisition && onAcquire && (
+                                      <div className="transmissionDecisionActions">
                                         <Button
                                           variant="contained"
                                           aria-label={`${acquisitionLabel} · ${availableAcquisition.name}`}
@@ -1414,7 +1434,19 @@ export default function TransmissionPanel({
                                         >
                                           {acquisitionLabel}
                                         </Button>
-                                      )}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                                {((building && onCancel) ||
+                                  (!building && onPause) ||
+                                  (!building && !inherited)) && (
+                                  <div
+                                    className="facilityActions"
+                                    role="group"
+                                    aria-label="Facility actions"
+                                  >
+                                    {!building && !inherited && (
                                       <IntertieUpgradeControl
                                         costIndex={getCostTableIndex(
                                           game.date,
@@ -1429,13 +1461,9 @@ export default function TransmissionPanel({
                                         interestRate={game.interestRate}
                                         units={units}
                                         onUpgrade={onUpgrade}
+                                        buttonOnly
                                       />
-                                    </div>
-                                  </>
-                                )}
-                                {((building && onCancel) ||
-                                  (!building && onPause)) && (
-                                  <div className="facilityActions">
+                                    )}
                                     {building && onCancel && (
                                       <Button
                                         className="facilityCancelConstruction"

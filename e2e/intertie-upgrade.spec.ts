@@ -54,7 +54,22 @@ for (const theme of ["light", "dark"] as const) {
     const review = line.getByRole("button", {
       name: "Review upgrade of Northern intertie",
     });
+    const pause = line.getByRole("button", {
+      name: "Pause Northern intertie",
+    });
     await expect(review).toBeVisible();
+    await expect(pause).toBeVisible();
+    const sameActionLine = await review.evaluate((upgrade, pauseLabel) => {
+      const actions = upgrade.closest(".facilityActions");
+      const pauseButton = actions?.querySelector(
+        `[aria-label="${pauseLabel}"]`,
+      );
+      if (!actions || !pauseButton) return false;
+      const upgradeBox = upgrade.getBoundingClientRect();
+      const pauseBox = pauseButton.getBoundingClientRect();
+      return Math.abs(upgradeBox.top - pauseBox.top) < 8;
+    }, "Pause Northern intertie");
+    expect(sameActionLine).toBe(true);
     expect((await review.boundingBox())!.height).toBeGreaterThanOrEqual(
       testInfo.project.use.hasTouch ? 44 : 40,
     );

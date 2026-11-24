@@ -244,7 +244,7 @@ test("the host starts the exact frozen selection only after every guest is ready
   });
   const { rerender, store } = setup(selection);
   expect(
-    screen.getByRole("button", { name: "Start for everyone" }),
+    screen.getByRole("button", { name: "Waiting for players" }),
   ).toBeDisabled();
   const ready = {
     ...selection,

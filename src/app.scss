@@ -6129,6 +6129,16 @@ $homeSmokeCycle: 5.6s;
   .facilityActionNote {
     align-self: center;
   }
+
+  .facilityRetrofitInline {
+    display: contents;
+  }
+
+  .facilityRetrofitInline p {
+    flex-basis: 100%;
+    order: 1;
+    margin: 0;
+  }
 }
 
 @media (pointer: coarse) {
@@ -8297,6 +8307,37 @@ img[src$="/transmission.svg"] {
       border-radius: var(--radius-sm);
       font-size: var(--font-size-caption);
     }
+
+    li:has(.coopBrowseKickTarget) {
+      padding: 0;
+    }
+  }
+
+  .coopBrowseKickTarget {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: $space-1;
+    min-height: 40px;
+    margin: 0;
+    padding: $space-1 $space-2;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--interactive-blue);
+      outline-offset: 2px;
+    }
+  }
+
+  .coopBrowseKick {
+    color: var(--delta-bad);
+    font-weight: 600;
   }
 
   .coopBrowseState {
@@ -8399,6 +8440,7 @@ img[src$="/transmission.svg"] {
 
 @media (pointer: coarse) {
   .coopBrowseBar .MuiButton-root,
+  .coopBrowseBar .coopBrowseKickTarget,
   .coopSavesBar .MuiButton-root {
     min-height: 44px;
   }
