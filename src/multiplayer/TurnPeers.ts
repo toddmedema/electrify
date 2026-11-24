@@ -489,7 +489,7 @@ export class TurnPeers {
     void selectedRelayPair(pc, peer.local, peer.remote)
       .then((valid) => {
         if (!this.usable(peer)) return;
-        if (!valid) {
+        if (!valid || performance.now() - peer.candidateCheck > 2 * STATS_MS) {
           this.retire(peer);
           return;
         }

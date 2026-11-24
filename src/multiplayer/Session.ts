@@ -1478,19 +1478,21 @@ export class MultiplayerSession {
           this.saving = this.saving
             .catch(() => {})
             .then(async () => {
-              const authorized = () =>
-                current() && this.authorityIsCurrent(data.world.epoch);
-              if (authorized()) {
-                await this.services.checkpoints.write(
-                  data.world,
-                  checkpointSource,
-                  !!data.requestId,
-                );
-                if (!data.requestId || authorized()) return;
+              if (!current() || !this.authorityIsCurrent(data.world.epoch)) {
+                if (first || data.requestId)
+                  throw new Error(
+                    "Host authority changed before the checkpoint could be saved.",
+                  );
+                return;
               }
-              if (data.requestId)
+              await this.services.checkpoints.write(
+                data.world,
+                checkpointSource,
+                !!data.requestId,
+              );
+              if (data.requestId && !current())
                 throw new Error(
-                  "Host authority changed before the save finished.",
+                  "Host changed while the checkpoint was being saved.",
                 );
             });
           void this.saving.then(
