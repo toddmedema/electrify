@@ -35,6 +35,7 @@ export default function Lobby({
   onCopyLink,
   canAuthenticate = true,
   onChooseNew,
+  onContinueSetup,
   onCopyCode,
   onClose,
   onLeave,
@@ -53,6 +54,8 @@ export default function Lobby({
   canAuthenticate?: boolean;
   /** Host: set the multiplayer save aside and choose a new game. */
   onChooseNew: () => void;
+  /** Host: reopen Custom setup for the room that is already open. */
+  onContinueSetup?: () => void;
   onCopyCode: () => void;
   onClose: () => void;
   onLeave: () => void;
@@ -459,7 +462,16 @@ export default function Lobby({
           {mode === "waiting" &&
             host &&
             session.onlineCampaigns &&
-            !lobby.campaignLocked && <Button onClick={onClose}>Close</Button>}
+            !lobby.campaignLocked && (
+              <>
+                {onContinueSetup && (
+                  <Button variant="contained" onClick={onContinueSetup}>
+                    Continue setup
+                  </Button>
+                )}
+                <Button onClick={onClose}>Close</Button>
+              </>
+            )}
           {mode === "campaign" && host && (
             <Button disabled={busy} onClick={onChooseNew}>
               Choose a new game

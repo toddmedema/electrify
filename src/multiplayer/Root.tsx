@@ -615,6 +615,7 @@ export default function MultiplayerRoot() {
             session.cancelCampaign();
             startChoosing();
           }}
+          onContinueSetup={startChoosing}
           onCopyCode={copyCode}
           onClose={() => {
             discardInvite();
