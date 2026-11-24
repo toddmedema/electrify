@@ -212,7 +212,10 @@ for (const steamHost of [false, true]) {
       if (!steamHost) {
         fixture.loseAuthority();
         await expect(
-          guest.getByRole("dialog", { name: "Multiplayer" }),
+          guest.getByRole("dialog", {
+            name: "Multiplayer connection",
+            exact: true,
+          }),
         ).toContainText(/connection|reconnect/i);
       }
     } catch (error) {
