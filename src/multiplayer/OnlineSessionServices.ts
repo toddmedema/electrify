@@ -65,15 +65,17 @@ export function onlineSessionServices(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let expiry: ReturnType<typeof setTimeout> | undefined;
   let hidden = document.visibilityState === "hidden";
+  let hiddenRoster: string[] | undefined;
+  let presenceSeq = 0;
   let active = false;
   const listeners = new Set<(event: SessionEvent) => void>();
-  const liveAuthority = () =>
+  const relayAuthority = () =>
     authority &&
-    !hidden &&
     performance.timeOrigin + performance.now() < authority.monotonicDeadline &&
     Date.now() < authority.wallDeadline
       ? authority
       : undefined;
+  const liveAuthority = () => (hidden ? undefined : relayAuthority());
 
   function publish(state: LobbyState) {
     lobby = state;
@@ -110,7 +112,14 @@ export function onlineSessionServices(
         listener({ kind: "message", sender, payload });
     },
     status: (ids) => {
-      connected = liveAuthority() ? ids : [];
+      // Publish only reports changes, so a roster learned while hidden must be
+      // stored and applied when the tab returns.
+      if (hidden) {
+        hiddenRoster = ids;
+        return;
+      }
+      hiddenRoster = undefined;
+      connected = ids;
       publish({ ...lobby, connected });
     },
     storeTransfer: (peer, payload, signal) =>
@@ -152,9 +161,7 @@ export function onlineSessionServices(
             expire();
             publish({
               ...INITIAL_LOBBY,
-              error: lobby.joinPending
-                ? "This invitation is no longer available."
-                : "This multiplayer room is no longer available.",
+              error: "This multiplayer room is no longer available.",
             });
           } else if (
             error.code === "unauthenticated" ||
@@ -220,16 +227,33 @@ export function onlineSessionServices(
     ) {
       refreshedInvite = undefined;
     }
-    if (
-      !hidden &&
+    const fresh = performance.now() - monotonic < MAX_AUTHORITY_MS;
+    const lobbyView = {
+      ...result.lobby,
+      savedAt:
+        lobby.lobbyId === result.lobby.lobbyId ? lobby.savedAt : undefined,
+      sharedAt: grant?.head?.savedAt ?? result.lobby.sharedAt,
+      confirmedRevision: grant?.head?.revision,
+      inviteCode: refreshedInvite?.code,
+      inviteToken: refreshedInvite?.token,
+      authorityEpoch: grant?.epoch,
+      campaignLocked: grant?.locked,
+      requiredPlayers: grant?.requiredIds,
+      recoveryAvailable: !!grant?.head && grant.head.epoch !== grant?.epoch,
+    };
+    const selfId = result.lobby.selfId;
+    const hostId = result.lobby.hostId;
+    const granted =
+      fresh &&
       grant &&
       roomId &&
-      result.lobby.selfId &&
-      result.lobby.hostId &&
-      grant.leaseRemainingMs > 0
-    ) {
+      selfId &&
+      hostId &&
+      grant.leaseRemainingMs > 0;
+    if (granted && grant && roomId && selfId && hostId) {
       if (authority && authority.epoch !== grant.epoch) expire();
-      const remaining = Math.min(MAX_AUTHORITY_MS, grant.leaseRemainingMs);
+      const remaining = Math.min(12_000, grant.leaseRemainingMs);
+      const elapsed = performance.now() - monotonic;
       authority = {
         epoch: grant.epoch,
         monotonicDeadline: performance.timeOrigin + monotonic + remaining,
@@ -240,28 +264,20 @@ export function onlineSessionServices(
         () => {
           expire("Connection to the multiplayer service was interrupted.");
         },
-        Math.max(0, remaining - (performance.now() - monotonic)),
+        Math.max(0, remaining - elapsed),
       );
       publish({
-        ...result.lobby,
-        savedAt:
-          lobby.lobbyId === result.lobby.lobbyId ? lobby.savedAt : undefined,
+        ...lobbyView,
         sharedAt: grant.head?.savedAt,
-        confirmedRevision: grant.head?.revision,
-        inviteCode: refreshedInvite?.code,
-        inviteToken: refreshedInvite?.token,
-        authorityEpoch: grant.epoch,
-        campaignLocked: grant.locked,
-        requiredPlayers: grant.requiredIds,
         recoveryAvailable: !!grant.head && grant.head.epoch !== grant.epoch,
         connected,
       });
-      if (liveAuthority()) {
+      if (relayAuthority()) {
         peers.update(
           {
             roomId,
-            selfId: result.lobby.selfId,
-            hostId: result.lobby.hostId,
+            selfId,
+            hostId,
             epoch: grant.epoch,
             binding: grant.binding,
             leaseRemainingMs: remaining,
@@ -269,20 +285,16 @@ export function onlineSessionServices(
           monotonic,
         );
       }
-    } else {
+    } else if (
+      fresh ||
+      (grant && authority && grant.epoch !== authority.epoch)
+    ) {
       expire();
-      publish({
-        ...result.lobby,
-        savedAt:
-          lobby.lobbyId === result.lobby.lobbyId ? lobby.savedAt : undefined,
-        sharedAt: grant?.head?.savedAt ?? result.lobby.sharedAt,
-        authorityEpoch: grant?.epoch,
-        campaignLocked: grant?.locked,
-        confirmedRevision: grant?.head?.revision,
-        requiredPlayers: grant?.requiredIds,
-        recoveryAvailable: grant?.locked && !!grant.head,
-        connected: [],
-      });
+      publish({ ...lobbyView, connected: [] });
+    } else if (relayAuthority()) {
+      publish({ ...lobbyView, connected });
+    } else {
+      publish({ ...lobbyView, connected: [] });
     }
     return lobby;
   }
@@ -290,26 +302,43 @@ export function onlineSessionServices(
   function suspend() {
     if (hidden) return;
     hidden = true;
-    if (roomId) version++;
     clearTimeout(timer);
-    expire();
+    // The relay stays up until the lease ends. Renewal stops, so a long hide
+    // still lets another player acquire the room.
     if (roomId && presence)
       void api
-        .request("room/suspend", { roomId, presence })
+        .request("room/suspend", {
+          roomId,
+          presence,
+          seq: ++presenceSeq,
+        })
         .catch(() => undefined);
   }
 
   function resume() {
     const wasHidden = hidden;
     hidden = document.visibilityState === "hidden";
-    if (wasHidden && !hidden && roomId) {
-      void roomRequest("reconnect", {
-        roomId,
-        rules: manifest.multiplayerCompatibilityId,
-      })
-        .catch(() => undefined)
-        .finally(() => schedule());
+    if (wasHidden && !hidden && hiddenRoster) {
+      connected = hiddenRoster;
+      hiddenRoster = undefined;
+      publish({ ...lobby, connected });
     }
+    if (!wasHidden || hidden || !roomId) return;
+    const current = roomId;
+    const token = presence;
+    void (
+      token
+        ? api.request("room/resume", {
+            roomId: current,
+            presence: token,
+            seq: ++presenceSeq,
+          })
+        : Promise.resolve()
+    )
+      .catch(() => undefined)
+      .finally(() => {
+        if (!hidden && roomId === current) schedule(0);
+      });
   }
 
   function onVisibility() {

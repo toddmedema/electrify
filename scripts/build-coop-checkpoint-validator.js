@@ -1,5 +1,5 @@
 const path = require("node:path");
-const { cpSync, mkdirSync } = require("node:fs");
+const { cpSync, mkdirSync, readFileSync, writeFileSync } = require("node:fs");
 const webpack = require("webpack");
 
 const root = path.resolve(__dirname, "..");
@@ -68,6 +68,14 @@ async function buildCheckpointValidator(output = defaultOutput) {
   cpSync(path.join(root, "public/data"), path.join(output, "public/data"), {
     recursive: true,
   });
+  const { multiplayerCompatibilityId } = JSON.parse(
+    readFileSync(path.join(root, "src/data/RunCompatibility.json"), "utf8"),
+  );
+  const published = require("../src/multiplayer/PublishedOnlineRules.json");
+  writeFileSync(
+    path.join(output, "compatibility.json"),
+    JSON.stringify({ current: multiplayerCompatibilityId, published }),
+  );
 }
 
 if (require.main === module)

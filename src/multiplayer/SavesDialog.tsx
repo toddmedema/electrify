@@ -17,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { crossplayFailure } from "./CrossplayApi";
 import type { MultiplayerSession } from "./Session";
 import "./Lobby.css";
 
@@ -49,7 +50,7 @@ export default function SavesDialog({
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
     return action().catch((error) =>
-      setFailure(error instanceof Error ? error.message : "Try again."),
+      setFailure(crossplayFailure(error, "Try again.")),
     );
   };
   useEffect(() => {
@@ -309,9 +310,7 @@ export default function SavesDialog({
                     setDeleting(undefined);
                   },
                   (error) =>
-                    setWithdrawalFailure(
-                      error instanceof Error ? error.message : "Try again.",
-                    ),
+                    setWithdrawalFailure(crossplayFailure(error, "Try again.")),
                 );
             }}
           >

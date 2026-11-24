@@ -2,9 +2,12 @@ import { captureInstallPrompt } from "./InstallPromptEvent";
 import "./app.scss";
 import "./InterfaceLayout.scss";
 import { canStartLightweightHome } from "./HomeEligibility";
+import { captureCrossplayInvite } from "./multiplayer/CrossplayInvite";
 import { showBootstrapFailure } from "./StartupFailure";
 
 captureInstallPrompt();
+// Consume the fragment before the game starts analytics or renders any lazy screens.
+const invited = !!captureCrossplayInvite();
 
 function loadGame() {
   return import(/* webpackChunkName: "game" */ "./GameEntry").catch(
@@ -13,6 +16,7 @@ function loadGame() {
 }
 // Desktop and direct links retain the full bootstrap. First-time visitors load it on intent.
 if (
+  !invited &&
   process.env.NODE_ENV === "production" &&
   process.env.REACT_APP_DESKTOP !== "true"
 ) {

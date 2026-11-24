@@ -71,6 +71,7 @@ export function coopSelection(
     viewing: viewing(browse),
     ...(host && {
       inviteCode: lobby.inviteCode,
+      hasInviteLink: !!lobby.inviteToken,
       hasSaves: !!library?.slots.length,
     }),
   };

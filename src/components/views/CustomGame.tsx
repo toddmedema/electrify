@@ -504,7 +504,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   return (
     <ScreenPage id="listCard" title="Custom setup" onBack={onBack}>
-      <CoopBrowseBar coop={props.coop} />
+      <CoopBrowseBar coop={props.coop} offerSaves />
       <div className="scrollable">
         <fieldset className="coopFieldset" disabled={guest}>
           <LocationPicker

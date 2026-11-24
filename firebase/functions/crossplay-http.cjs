@@ -17,10 +17,9 @@ const BULK_OPERATIONS = new Set([
 ]);
 const AUDIT = new Set([
   "auth/revoke",
-  "room/approve",
+  "room/join",
   "room/reconnect",
   "room/remove",
-  "room/rotate-invite",
   "room/withdraw",
   "save/publish",
 ]);
@@ -37,6 +36,7 @@ function createCrossplay({
   origins,
   quotaKey,
   extensions,
+  campaignRules,
   isStopped = async () => false,
   healthy = async () => true,
   audit = () => undefined,
@@ -44,14 +44,36 @@ function createCrossplay({
 }) {
   requireValue(quotaKey?.length >= 24, 503, "unavailable");
   const identity = createIdentity({ store, verifyGoogle, verifySteam, clock });
-  const rooms = createRooms({ store, extensions });
+  const rooms = createRooms({
+    store,
+    inviteKey: quotaKey,
+    extensions,
+    campaignRules,
+  });
+
+  function callerAddress(request) {
+    // Cloud Run's front end appends the peer it observed. Earlier entries are
+    // caller-supplied. COOP_TRUSTED_PROXY_HOPS skips extra proxies we operate
+    // after that front end; zero matches a function exposed directly on Cloud Run.
+    const configured = Number(process.env.COOP_TRUSTED_PROXY_HOPS ?? "0");
+    const hops =
+      Number.isInteger(configured) && configured >= 0 && configured <= 5
+        ? configured
+        : 0;
+    const forwarded = String(request.get?.("x-forwarded-for") ?? "")
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const selected = forwarded[forwarded.length - 1 - hops];
+    if (isIP(selected)) return selected;
+    const socketAddress = request.socket?.remoteAddress;
+    return isIP(socketAddress) ? socketAddress : "unknown";
+  }
 
   function hashedIp(request) {
-    // The direct network address cannot be selected using attacker-supplied
-    // X-Forwarded-For values. An ingress may group its requests into one bucket.
-    const address = request.socket?.remoteAddress;
-    const ip = isIP(address) ? address : "unknown";
-    return createHmac("sha256", quotaKey).update(ip).digest("hex");
+    return createHmac("sha256", quotaKey)
+      .update(callerAddress(request))
+      .digest("hex");
   }
 
   function limit(scope, value, max) {

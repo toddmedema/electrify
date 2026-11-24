@@ -1030,8 +1030,12 @@ test("the worker verifies changed records, routes authenticated recovery reports
       reason: "retry",
     });
     expect(baselines()).toHaveLength(2);
+    // The acknowledged opening baseline is not a failure. The divergent report
+    // starts one recovery transfer; two unanswered transfers then stop recovery.
     jest.advanceTimersByTime(10100);
-    expect(baselines()).toHaveLength(2);
+    expect(baselines()).toHaveLength(3);
+    jest.advanceTimersByTime(10100);
+    expect(baselines()).toHaveLength(3);
     const failure = "Guest could not stay in sync. Save and resume the match.";
     expect(world.reason).toBe(failure);
     await send({ kind: "blockers", reasons: ["System dialog"] });

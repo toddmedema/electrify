@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
-const { createTurnSignaling } = require("./coop-signaling.cjs");
+const {
+  activeSignalPair,
+  createTurnSignaling,
+} = require("./coop-signaling.cjs");
 
 // Model only the Firestore operations used by the service, with the provider and
 // clock injected. Grant identity, issuance, pair validation and cleanup run normally.
@@ -63,7 +66,9 @@ function fixture() {
     leaseUntil: Number.MAX_SAFE_INTEGER,
   };
   let revocationStatus = 204;
+  let generateStatus = 201;
   const requests = [];
+  const revoked = [];
   const signaling = createTurnSignaling({
     db,
     keyId: "key",
@@ -71,10 +76,20 @@ function fixture() {
     loadRoom: async () => room,
     clock: () => now,
     fetchImpl: async (url) => {
-      const operation = url.split("/").at(-1);
+      const parts = String(url).split("/");
+      const operation = parts.at(-1);
       requests.push(operation);
-      if (operation === "revoke") return { status: revocationStatus };
+      if (operation === "revoke") {
+        revoked.push(decodeURIComponent(parts.at(-2)));
+        return { status: revocationStatus };
+      }
       assert.equal(operation, "generate-ice-servers");
+      if (generateStatus === "throw") throw new Error("timeout");
+      if (generateStatus !== 201)
+        return {
+          status: generateStatus,
+          body: { cancel: async () => undefined },
+        };
       return {
         status: 201,
         json: async () => ({
@@ -101,18 +116,20 @@ function fixture() {
       return result.value;
     },
   };
-  const read = () => signaling.handle("signal/read", context, {});
-  const issue = (to, actor = context) =>
-    signaling.handle("signal/turn", actor, {
-      to,
-      generation: room.signals[to].generation,
-    });
+  const read = (actor = context) => signaling.handle("signal/read", actor, {});
+  const issue = (
+    to,
+    actor = context,
+    generation = room.signals[to].generation,
+  ) => signaling.handle("signal/turn", actor, { to, generation });
   return {
     context,
+    handle: signaling.handle,
     issue,
     read,
     room,
     requests,
+    revoked,
     reap: signaling.reap,
     values,
     advance: (ms) => {
@@ -120,6 +137,9 @@ function fixture() {
     },
     refuseRevocation: () => {
       revocationStatus = 503;
+    },
+    failGenerate: (status) => {
+      generateStatus = status;
     },
   };
 }
@@ -142,6 +162,239 @@ test("confirmation replaces only the obsolete pair and defers provider calls unt
   assert.deepEqual(f.requests, ["generate-ice-servers"]);
   await f.reap();
   assert.deepEqual(f.requests, ["generate-ice-servers", "revoke"]);
+});
+
+function description(type) {
+  const address = type === "offer" ? "8.8.8.8" : "9.9.9.9";
+  return {
+    type,
+    sdp: [
+      "v=0",
+      "o=- 4321 2 IN IP4 0.0.0.0",
+      "s=-",
+      "t=0 0",
+      "m=application 12212 UDP/DTLS/SCTP webrtc-datachannel",
+      `c=IN IP4 ${address}`,
+      `a=candidate:455721 1 udp 30298521 ${address} 12212 typ relay`,
+      "a=ice-ufrag:iA22",
+      "a=ice-pwd:FtboouybttTfOsvwT8PvWx",
+      `a=fingerprint:sha-256 ${Array(32).fill("C2").join(":")}`,
+      `a=setup:${type === "offer" ? "actpass" : "active"}`,
+      "a=mid:0",
+      "a=sctp-port:5000",
+      "",
+    ].join("\r\n"),
+  };
+}
+
+async function negotiated(f) {
+  await f.read();
+  const guest = { ...f.context, seatId: "guest-a" };
+  const { generation } = f.room.signals["guest-a"];
+  await f.handle("signal/describe", f.context, {
+    to: "guest-a",
+    generation,
+    description: description("offer"),
+  });
+  await f.handle("signal/describe", guest, {
+    to: "host",
+    generation,
+    description: description("answer"),
+  });
+  return { guest, generation, address: { to: "guest-a", generation } };
+}
+
+test("preparing a successor preserves both grants until the old generation expires", async () => {
+  const f = fixture();
+  const { guest, generation, address } = await negotiated(f);
+  const stillEarly = f.handle("signal/prepare", f.context, address);
+  await assert.rejects(stillEarly, { code: "turn-rotation-limit" });
+  const predecessor = await f.issue("guest-a");
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  const next = f.room.signals["guest-a"].successor.generation;
+  await f.handle("signal/prepare", guest, { to: "host", generation });
+  const successor = await f.issue("guest-a", f.context, next);
+  const { pairs } = await f.read(guest);
+  assert.equal(pairs[0].generation, generation);
+  assert.equal(pairs[0].successor.generation, next);
+  assert.ok(activeSignalPair(f.room, "guest-a", "host", next, 86_000));
+  assert.ok(activeSignalPair(f.room, "guest-a", "host", generation, 86_000));
+  await f.reap();
+  assert.deepEqual(f.requests, [
+    "generate-ice-servers",
+    "generate-ice-servers",
+  ]);
+
+  f.advance(35_000);
+  assert.equal((await f.read(guest)).pairs[0].generation, generation);
+  assert.equal((await f.read(guest)).pairs[0].successor.generation, next);
+  f.advance(20_000);
+  assert.equal((await f.read(guest)).pairs[0].generation, next);
+  await assert.rejects(f.issue("guest-a", f.context, generation), {
+    code: "obsolete-connection",
+  });
+  await f.reap();
+  assert.deepEqual(f.requests, [
+    "generate-ice-servers",
+    "generate-ice-servers",
+    "revoke",
+  ]);
+  assert.deepEqual(f.revoked, [predecessor.iceServers[0].username]);
+  assert.notEqual(
+    predecessor.iceServers[0].username,
+    successor.iceServers[0].username,
+  );
+  assert.ok(activeSignalPair(f.room, "guest-a", "host", next, 141_000));
+});
+
+test("both drain reports promote the successor before credential grace ends", async () => {
+  const f = fixture();
+  const { guest, generation, address } = await negotiated(f);
+  const predecessor = await f.issue("guest-a");
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  const next = f.room.signals["guest-a"].successor.generation;
+  await f.handle("signal/drained", f.context, address);
+  assert.equal(f.room.signals["guest-a"].generation, generation);
+  await f.handle("signal/drained", guest, { to: "host", generation });
+  assert.equal(f.room.signals["guest-a"].generation, next);
+  assert.deepEqual(f.revoked, [predecessor.iceServers[0].username]);
+});
+
+test("renegotiate forgets a previous drain vote", async () => {
+  const f = fixture();
+  const { guest, generation, address } = await negotiated(f);
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  await f.handle("signal/drained", f.context, address);
+  await f.handle("signal/renegotiate", f.context, address);
+  await f.handle("signal/describe", f.context, {
+    to: "guest-a",
+    generation,
+    description: description("offer"),
+  });
+  await f.handle("signal/describe", guest, {
+    to: "host",
+    generation,
+    description: description("answer"),
+  });
+  await f.handle("signal/prepare", f.context, address);
+  await f.handle("signal/drained", guest, { to: "host", generation });
+  assert.equal(f.room.signals["guest-a"].generation, generation);
+  assert.ok(f.room.signals["guest-a"].successor);
+  assert.equal(f.revoked.length, 0);
+});
+
+test("a drain vote that arrives after renegotiate does not complete the next handoff", async () => {
+  const f = fixture();
+  const { guest, generation, address } = await negotiated(f);
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  await f.handle("signal/drained", f.context, address);
+  await f.handle("signal/renegotiate", f.context, address);
+  await f.handle("signal/drained", guest, { to: "host", generation });
+  await f.handle("signal/describe", f.context, {
+    to: "guest-a",
+    generation,
+    description: description("offer"),
+  });
+  await f.handle("signal/describe", guest, {
+    to: "host",
+    generation,
+    description: description("answer"),
+  });
+  await f.handle("signal/prepare", f.context, address);
+  await f.handle("signal/drained", f.context, address);
+  assert.equal(f.room.signals["guest-a"].generation, generation);
+  assert.ok(f.room.signals["guest-a"].successor);
+  assert.equal(f.revoked.length, 0);
+});
+
+test("renegotiating the successor forgets the current drain vote", async () => {
+  const f = fixture();
+  const { guest, generation, address } = await negotiated(f);
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  const staged = f.room.signals["guest-a"].successor.generation;
+  await f.handle("signal/drained", f.context, address);
+  await f.handle("signal/renegotiate", f.context, {
+    to: "guest-a",
+    generation: staged,
+  });
+  await f.handle("signal/drained", guest, { to: "host", generation });
+  assert.equal(f.room.signals["guest-a"].generation, generation);
+  assert.equal(f.room.signals["guest-a"].successor.generation, staged);
+  assert.equal(f.revoked.length, 0);
+});
+
+test("a lost peer reuses the generation instead of minting a credential", async () => {
+  const f = fixture();
+  const { address } = await negotiated(f);
+  await f.issue("guest-a");
+  const before = f.requests.length;
+  await f.handle("signal/renegotiate", f.context, address);
+  assert.equal(f.room.signals["guest-a"].generation, address.generation);
+  assert.equal(f.room.signals["guest-a"].offer, undefined);
+  assert.equal(f.room.signals["guest-a"].answer, undefined);
+  assert.equal(f.requests.length, before);
+  const again = await f.issue("guest-a");
+  assert.equal(again.iceServers.length, 1);
+  assert.equal(f.requests.length, before);
+});
+
+test("a refused credential can be requested again and a timeout cannot", async () => {
+  const refused = fixture();
+  await refused.read();
+  refused.failGenerate(503);
+  await assert.rejects(refused.issue("guest-a"), { code: "turn-unavailable" });
+  assert.equal(refused.values.get("coopOperations/turn")?.count ?? 0, 0);
+  refused.failGenerate(201);
+  assert.equal((await refused.issue("guest-a")).iceServers.length, 1);
+
+  const timedOut = fixture();
+  await timedOut.read();
+  timedOut.failGenerate("throw");
+  await assert.rejects(timedOut.issue("guest-a"), { code: "turn-unavailable" });
+  assert.equal(timedOut.values.get("coopOperations/turn").count, 1);
+  timedOut.failGenerate(201);
+  await assert.rejects(timedOut.issue("guest-a"), { code: "turn-pending" });
+  assert.equal(
+    timedOut.requests.filter((name) => name === "generate-ice-servers").length,
+    1,
+  );
+});
+
+test("a failed staged generation can be reset without disrupting its predecessor", async () => {
+  const f = fixture();
+  const { generation, address } = await negotiated(f);
+  const predecessor = await f.issue("guest-a");
+  f.advance(85_000);
+  await f.handle("signal/prepare", f.context, address);
+  const staged = f.room.signals["guest-a"].successor.generation;
+  const successor = await f.issue("guest-a", f.context, staged);
+  f.advance(15_000);
+  await f.handle("signal/reset", f.context, { ...address, generation: staged });
+  const { pairs } = await f.read();
+  const first = pairs.find((pair) => pair.peerId === "guest-a");
+  assert.equal(first.generation, generation);
+  assert.notEqual(first.successor.generation, staged);
+  assert.deepEqual(f.requests, [
+    "generate-ice-servers",
+    "generate-ice-servers",
+    "revoke",
+  ]);
+  assert.deepEqual(f.revoked, [successor.iceServers[0].username]);
+  assert.notEqual(
+    predecessor.iceServers[0].username,
+    successor.iceServers[0].username,
+  );
+  f.room.members[1].binding = "different-device";
+  for (const id of [generation, staged, first.successor.generation]) {
+    await assert.rejects(f.issue("guest-a", f.context, id), {
+      code: "obsolete-connection",
+    });
+  }
 });
 
 test("an occupied pair budget leaves grants available for a different pair", async () => {
@@ -206,7 +459,7 @@ test("provider refusal remains retryable until the drain deadline releases the r
   f.refuseRevocation();
   await assert.rejects(f.reap(), /needs retry/);
   assert.equal(f.values.get("coopOperations/turn").count, 1);
-  f.advance(720_000);
+  f.advance(740_000);
   await f.reap();
   assert.deepEqual(f.requests, ["generate-ice-servers", "revoke"]);
   assert.equal(f.values.get("coopOperations/turn").count, 0);

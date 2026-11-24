@@ -11,11 +11,14 @@ import {
 
 const AUTHORITY_MS = 4_000;
 const STATS_MS = 1_000;
+const PROOF_STALE_MS = 10_000;
+const RENEGOTIATE_REMAINING_MS = 20_000;
 const SIGNAL_POLL_MS = 1_000;
 const SIGNAL_IDLE_MS = 2_000;
 const NEGOTIATION_MS = 30_000;
 const GATHER_MS = 9_000;
-const RENEW_MS = 20_000;
+const RENEW_MS = 35_000;
+const HANDOFF_WAITERS = 128;
 const MAX_BUFFERED_BYTES = 128 * 1024;
 const MAX_PENDING_BYTES = 384 * 1024;
 const TURN_URLS = [
@@ -24,6 +27,8 @@ const TURN_URLS = [
 ];
 const CHANNEL = "electrify-coop-v2";
 const CONFIRMED = 11;
+const DRAIN = 12;
+const DRAINED = 13;
 
 export interface TurnAuthority {
   roomId: string;
@@ -66,12 +71,42 @@ interface Options {
   ): Promise<WireMessage>;
 }
 
-interface Signal {
-  peerId: string;
+interface Generation {
   generation: string;
   remainingMs: number;
+  negotiation?: number;
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
+}
+
+interface Signal extends Generation {
+  peerId: string;
+  successor?: Generation;
+}
+
+interface Leg {
+  generation: string;
+  peer?: Peer;
+  retired?: boolean;
+  requestAt?: number;
+}
+
+interface Handoff {
+  receivedDrain?: boolean;
+  sentDrained?: boolean;
+  receivedDrained?: boolean;
+  acknowledgement?: Promise<boolean>;
+  release?: (delivered: boolean) => void;
+  waiters: number;
+  reported?: boolean;
+}
+
+interface Link {
+  to: string;
+  current: Leg;
+  successor?: Leg;
+  handoff?: Handoff;
+  negotiation?: number;
 }
 
 interface CredentialReply {
@@ -81,6 +116,8 @@ interface CredentialReply {
 
 interface Peer {
   address: TurnPeer;
+  leg: Leg;
+  link: Link;
   abort: AbortController;
   createdAt: number;
   localIsHost: boolean;
@@ -92,6 +129,8 @@ interface Peer {
   checking: boolean;
   localVerified: boolean;
   remoteVerified: boolean;
+  sawLocal: boolean;
+  sawRemote: boolean;
   local?: RTCSessionDescriptionInit;
   remote?: RTCSessionDescriptionInit;
   channel?: RTCDataChannel;
@@ -155,9 +194,7 @@ export class TurnPeers {
   private wallUntil = 0;
   private identity?: string;
   private connected: string[] = [];
-  private peers = new Map<string, Peer>();
-  private obsolete = new Map<string, string>();
-  private resetAt = new Map<string, number>();
+  private links = new Map<string, Link>();
   private poll?: AbortController;
   private nextReadAt = 0;
   private timer?: number;
@@ -171,15 +208,12 @@ export class TurnPeers {
     const nextIdentity = identity(authority);
     if (this.identity !== nextIdentity) {
       this.close();
-      this.obsolete.clear();
-      this.resetAt.clear();
       this.identity = nextIdentity;
     }
     const now = performance.now();
     this.authority = authority;
-    this.until =
-      Math.min(now, requestedAt) +
-      Math.min(AUTHORITY_MS, authority.leaseRemainingMs);
+    const leaseMs = Math.min(12_000, Math.max(0, authority.leaseRemainingMs));
+    this.until = Math.min(now, requestedAt) + leaseMs;
     this.wallUntil = Date.now() + (this.until - now);
     if (!this.current()) {
       this.close();
@@ -193,8 +227,7 @@ export class TurnPeers {
     return (
       !!this.authority &&
       performance.now() < this.until &&
-      Date.now() < this.wallUntil &&
-      document.visibilityState !== "hidden"
+      Date.now() < this.wallUntil
     );
   }
 
@@ -202,7 +235,7 @@ export class TurnPeers {
     const now = performance.now();
     return (
       this.current() &&
-      this.peers.get(peer.address.to) === peer &&
+      peer.leg.peer === peer &&
       now < peer.expiresAt &&
       now < peer.confirmedUntil
     );
@@ -220,9 +253,16 @@ export class TurnPeers {
   }
 
   private publish() {
-    const ids = Array.from(this.peers.values())
-      .filter((peer) => this.ready(peer))
-      .map((peer) => peer.address.to)
+    const ids = Array.from(this.links.values())
+      .filter((link) => {
+        const peer = (
+          this.handoffComplete(link) || link.handoff?.sentDrained
+            ? (link.successor ?? link.current)
+            : link.current
+        )?.peer;
+        return peer && this.ready(peer);
+      })
+      .map((link) => link.to)
       .sort();
     if (
       ids.length === this.connected.length &&
@@ -233,15 +273,52 @@ export class TurnPeers {
     this.options.status(ids);
   }
 
-  private retire(peer: Peer) {
-    if (this.peers.get(peer.address.to) !== peer) return;
-    this.peers.delete(peer.address.to);
-    this.obsolete.set(peer.address.to, peer.address.generation);
+  private closeLeg(leg: Leg | undefined) {
+    if (!leg) return;
+    const peer = leg.peer;
+    leg.peer = undefined;
+    leg.retired = true;
+    if (!peer) return;
     peer.abort.abort();
     peer.pending = [];
     peer.pendingBytes = 0;
     peer.channel?.close();
     peer.pc?.close();
+  }
+
+  private closeLink(link: Link) {
+    link.handoff?.release?.(false);
+    link.handoff = undefined;
+    this.closeLeg(link.current);
+    this.closeLeg(link.successor);
+  }
+
+  /** Local drain is on the successor; keep that channel until the remote drain arrives. */
+  private holdingSuccessor(link: Link) {
+    return !!(link.handoff?.sentDrained && !this.handoffComplete(link));
+  }
+
+  private handoffComplete(link: Link) {
+    return !!(link.handoff?.receivedDrained && link.handoff.sentDrained);
+  }
+
+  private retire(peer: Peer) {
+    const { link, leg } = peer;
+    if (leg.peer !== peer) return;
+    const handoffStarted =
+      link.handoff?.acknowledgement || link.handoff?.receivedDrain;
+    if (leg === link.current && this.holdingSuccessor(link)) {
+      // The predecessor credential is the server's bound. Closing here would
+      // drop the successor in the same turn the room promotes it.
+      this.closeLeg(leg);
+    } else if (
+      (leg === link.successor && !handoffStarted) ||
+      (leg === link.current && this.handoffComplete(link))
+    ) {
+      this.closeLeg(leg);
+    } else {
+      this.closeLink(link);
+    }
     this.publish();
   }
 
@@ -252,7 +329,9 @@ export class TurnPeers {
     this.nextReadAt = 0;
     window.clearInterval(this.timer);
     this.timer = undefined;
-    for (const peer of this.peers.values()) this.retire(peer);
+    for (const link of this.links.values()) this.closeLink(link);
+    this.links.clear();
+    this.publish();
   }
 
   private tick() {
@@ -261,15 +340,19 @@ export class TurnPeers {
       return;
     }
     const now = performance.now();
-    for (const peer of this.peers.values()) {
-      if (
-        !this.usable(peer) ||
-        (peer.localVerified && now - peer.proofAt > 2 * STATS_MS) ||
-        (now - peer.createdAt > NEGOTIATION_MS && !this.ready(peer))
-      ) {
-        this.retire(peer);
-      } else if (now - peer.candidateCheck > STATS_MS) {
-        this.verify(peer);
+    for (const link of this.links.values()) {
+      for (const leg of [link.current, link.successor]) {
+        const peer = leg?.peer;
+        if (!peer) continue;
+        if (
+          !this.usable(peer) ||
+          (peer.localVerified && now - peer.proofAt > PROOF_STALE_MS) ||
+          (now - peer.createdAt > NEGOTIATION_MS && !this.ready(peer))
+        ) {
+          this.retire(peer);
+        } else if (now - peer.candidateCheck > STATS_MS) {
+          this.verify(peer);
+        }
       }
     }
     if (!this.poll && now >= this.nextReadAt) void this.readSignals(now);
@@ -293,12 +376,24 @@ export class TurnPeers {
         performance.now() - startedAt >= AUTHORITY_MS
       )
         return;
-      const connected = new Set(pairs.map((pair) => pair.peerId));
-      for (const peer of this.peers.values()) {
-        if (!connected.has(peer.address.to)) this.retire(peer);
+      const confirmed = new Set(pairs.map((pair) => pair.peerId));
+      for (const [id, link] of this.links) {
+        if (!confirmed.has(id)) {
+          this.closeLink(link);
+          this.links.delete(id);
+        }
       }
+      this.publish();
       for (const signal of pairs) this.useSignal(authority, signal, startedAt);
-      if (pairs.every(({ peerId }) => this.connected.includes(peerId)))
+      if (
+        pairs.every(({ peerId }) => {
+          const link = this.links.get(peerId);
+          return (
+            this.connected.includes(peerId) &&
+            (!link?.successor || this.handoffComplete(link))
+          );
+        })
+      )
         this.nextReadAt = startedAt + SIGNAL_IDLE_MS;
     } catch {
       // The previous signal confirmation expires independently of the room lease.
@@ -307,15 +402,20 @@ export class TurnPeers {
     }
   }
 
-  private reset(signal: Signal, authority: TurnAuthority) {
+  private signalAction(
+    action: "prepare" | "reset" | "renegotiate",
+    authority: TurnAuthority,
+    link: Link,
+    leg: Leg,
+  ) {
     const now = performance.now();
-    if (now < (this.resetAt.get(signal.peerId) ?? 0)) return;
-    this.resetAt.set(signal.peerId, now + 5_000);
+    if (now < (leg.requestAt ?? 0)) return;
+    leg.requestAt = now + 5_000;
     void this.api
-      .request("signal/reset", {
+      .request(`signal/${action}`, {
         roomId: authority.roomId,
-        to: signal.peerId,
-        generation: signal.generation,
+        to: link.to,
+        generation: leg.generation,
       })
       .catch(() => undefined);
   }
@@ -325,44 +425,133 @@ export class TurnPeers {
     signal: Signal,
     startedAt: number,
   ) {
+    const { peerId, generation, successor } = signal;
     if (
-      signal.peerId === authority.selfId ||
-      (authority.selfId !== authority.hostId &&
-        signal.peerId !== authority.hostId)
+      peerId === authority.selfId ||
+      (authority.selfId !== authority.hostId && peerId !== authority.hostId) ||
+      !Number.isFinite(signal.remainingMs) ||
+      signal.remainingMs < 0
     )
       return;
-    if (!Number.isFinite(signal.remainingMs) || signal.remainingMs < 0) return;
 
-    const { peerId, generation } = signal;
-    const localIsHost = authority.selfId === authority.hostId;
-    let peer = this.peers.get(peerId);
-    if (peer && peer.address.generation !== generation) {
-      this.retire(peer);
-      peer = undefined;
+    let link = this.links.get(peerId);
+    if (link && link.current.generation !== generation) {
+      const promoted = link.successor;
+      const predecessor = link.current.peer;
+      const transferPending =
+        !!predecessor &&
+        (predecessor.readingTransfer ||
+          predecessor.outgoingTransfer ||
+          predecessor.pending.length > 0);
+      if (promoted?.generation === generation && !transferPending) {
+        this.closeLeg(link.current);
+        link.current = promoted;
+        link.successor = undefined;
+        if (!this.handoffComplete(link) && link.handoff) {
+          // The predecessor transfer has finished. The successor can take sends.
+          link.handoff.sentDrained = true;
+          link.handoff.receivedDrained = true;
+          link.handoff.release?.(true);
+        }
+        link.handoff = undefined;
+      } else if (!transferPending) {
+        this.closeLink(link);
+        this.publish();
+        link = undefined;
+      }
     }
+    if (!link) {
+      link = { to: peerId, current: { generation } };
+      this.links.set(peerId, link);
+    }
+    if (link.current.generation === generation)
+      link.negotiation = signal.negotiation ?? 0;
+    if (link.successor && link.successor.generation !== successor?.generation) {
+      // The far end can reset a staged leg independently. Once either barrier
+      // has crossed, using the old stream again could skip or duplicate data.
+      if (link.handoff?.acknowledgement || link.handoff?.receivedDrain) {
+        this.closeLink(link);
+        this.publish();
+      } else {
+        this.closeLeg(link.successor);
+      }
+      link.successor = undefined;
+    }
+    if (!link.successor && successor) {
+      link.successor = { generation: successor.generation };
+      link.handoff = { waiters: 0 };
+    }
+
+    const holdingSuccessor = this.holdingSuccessor(link);
+    if (link.current.peer || (!this.handoffComplete(link) && !holdingSuccessor))
+      this.useGeneration(authority, link, link.current, signal, startedAt);
+    if (
+      successor &&
+      link.successor &&
+      (!link.current.retired || this.handoffComplete(link) || holdingSuccessor)
+    )
+      this.useGeneration(authority, link, link.successor, successor, startedAt);
+
+    const peer = link.current.peer;
+    if (
+      !link.successor &&
+      peer &&
+      peer.localIsHost &&
+      this.ready(peer) &&
+      signal.remainingMs <= RENEW_MS
+    )
+      this.signalAction("prepare", authority, link, link.current);
+  }
+
+  private useGeneration(
+    authority: TurnAuthority,
+    link: Link,
+    leg: Leg,
+    signal: Generation,
+    startedAt: number,
+  ) {
+    if (!Number.isFinite(signal.remainingMs) || signal.remainingMs < 0) return;
+    const localIsHost = authority.selfId === authority.hostId;
+    const peer = leg.peer;
+    const signalLocal = localIsHost ? signal.offer : signal.answer;
+    const signalRemote = localIsHost ? signal.answer : signal.offer;
     if (peer) {
       peer.confirmedUntil = startedAt + AUTHORITY_MS;
       peer.expiresAt = Math.min(peer.expiresAt, startedAt + signal.remainingMs);
-      if (this.ready(peer) && signal.remainingMs <= RENEW_MS) {
-        this.reset(signal, authority);
-      } else if (localIsHost && signal.answer) {
-        this.acceptAnswer(peer, signal.answer);
+      if (signalLocal) peer.sawLocal = true;
+      if (signalRemote) peer.sawRemote = true;
+      if (
+        (peer.sawLocal && !signalLocal) ||
+        (peer.sawRemote && !signalRemote)
+      ) {
+        this.retire(peer);
+        return;
       }
+      if (localIsHost && signal.answer) this.acceptAnswer(peer, signal.answer);
       return;
     }
-    const alreadyNegotiated = localIsHost ? signal.offer : signal.answer;
-    if (alreadyNegotiated || this.obsolete.get(peerId) === generation) {
-      this.reset(signal, authority);
+    if (signalLocal) {
+      // The local peer connection is gone. Reuse this generation's credential
+      // while it still has time; the rotation cooldown stays on signal/reset.
+      this.signalAction(
+        signal.remainingMs > RENEGOTIATE_REMAINING_MS ? "renegotiate" : "reset",
+        authority,
+        link,
+        leg,
+      );
       return;
     }
+    if (leg.retired) leg.retired = false;
     if (!localIsHost && !signal.offer) return;
     const candidate: Peer = {
       address: {
         roomId: authority.roomId,
-        to: peerId,
-        generation,
+        to: link.to,
+        generation: leg.generation,
         epoch: authority.epoch,
       },
+      leg,
+      link,
       abort: new AbortController(),
       createdAt: performance.now(),
       localIsHost,
@@ -374,14 +563,16 @@ export class TurnPeers {
       checking: false,
       localVerified: false,
       remoteVerified: false,
+      sawLocal: false,
+      sawRemote: false,
       pending: [],
       pendingBytes: 0,
     };
-    this.peers.set(peerId, candidate);
+    leg.peer = candidate;
     void this.open(candidate, signal).catch(() => this.retire(candidate));
   }
 
-  private async open(peer: Peer, signal: Signal) {
+  private async open(peer: Peer, signal: Generation) {
     const startedAt = performance.now();
     const { address } = peer;
     const credential = await this.api.request<CredentialReply>(
@@ -489,15 +680,16 @@ export class TurnPeers {
     void selectedRelayPair(pc, peer.local, peer.remote)
       .then((valid) => {
         if (!this.usable(peer)) return;
-        if (!valid || performance.now() - peer.candidateCheck > 2 * STATS_MS) {
+        if (!valid) {
           this.retire(peer);
           return;
         }
-        peer.proofAt = peer.candidateCheck;
+        peer.proofAt = performance.now();
         if (!peer.localVerified) {
           channel.send(new Uint8Array([CONFIRMED]));
           peer.localVerified = true;
         }
+        this.advanceHandoff(peer.link);
         this.publish();
       })
       .catch(() => this.retire(peer))
@@ -506,19 +698,117 @@ export class TurnPeers {
       });
   }
 
+  private reportDrained(link: Link) {
+    const handoff = link.handoff;
+    const authority = this.authority;
+    if (
+      !handoff ||
+      !authority ||
+      handoff.reported ||
+      !this.handoffComplete(link)
+    )
+      return;
+    handoff.reported = true;
+    void this.api
+      .request("signal/drained", {
+        roomId: authority.roomId,
+        to: link.to,
+        generation: link.current.generation,
+        negotiation: link.negotiation ?? 0,
+      })
+      .catch(() => undefined);
+  }
+
+  private advanceHandoff(link: Link) {
+    const { handoff } = link;
+    const current = link.current.peer;
+    const successor = link.successor?.peer;
+    if (
+      !handoff ||
+      !current ||
+      !this.ready(current) ||
+      !successor ||
+      !this.ready(successor)
+    )
+      return;
+
+    if (!handoff.acknowledgement && !current.outgoingTransfer) {
+      handoff.acknowledgement = new Promise((resolve) => {
+        handoff.release = resolve;
+      });
+      try {
+        current.channel.send(new Uint8Array([DRAIN]));
+      } catch {
+        this.retire(current);
+        return;
+      }
+    }
+    if (
+      handoff.receivedDrain &&
+      !handoff.sentDrained &&
+      !current.readingTransfer &&
+      !current.pending.length
+    ) {
+      handoff.sentDrained = true;
+      try {
+        successor.channel.send(new Uint8Array([DRAINED]));
+      } catch {
+        this.retire(successor);
+      }
+      this.reportDrained(link);
+    }
+  }
+
   private receive(peer: Peer, frame: unknown) {
     if (!this.usable(peer)) return;
-    if (
-      frame instanceof ArrayBuffer &&
-      frame.byteLength === 1 &&
-      new Uint8Array(frame)[0] === CONFIRMED &&
-      !peer.remoteVerified
-    ) {
+    const control =
+      frame instanceof ArrayBuffer && frame.byteLength === 1
+        ? new Uint8Array(frame)[0]
+        : undefined;
+    if (control === CONFIRMED && !peer.remoteVerified) {
       peer.remoteVerified = true;
+      this.advanceHandoff(peer.link);
       this.publish();
       return;
     }
     if (!this.ready(peer)) {
+      this.retire(peer);
+      return;
+    }
+    const { link, leg } = peer;
+    const { handoff } = link;
+    const staged = leg === link.successor;
+    if (
+      control === DRAIN &&
+      !staged &&
+      link.successor?.peer &&
+      handoff &&
+      !handoff.receivedDrain
+    ) {
+      handoff.receivedDrain = true;
+      this.advanceHandoff(link);
+      return;
+    }
+    if (
+      control === DRAINED &&
+      handoff?.acknowledgement &&
+      !handoff.receivedDrained &&
+      (staged || (handoff.sentDrained && leg === link.current))
+    ) {
+      handoff.receivedDrained = true;
+      handoff.release?.(true);
+      this.reportDrained(link);
+      this.publish();
+      return;
+    }
+    if (control === DRAIN || control === DRAINED || control === CONFIRMED)
+      return;
+    // New-channel gameplay can arrive only after this side acknowledged that
+    // the old ordered stream, including asynchronous downloads, has drained.
+    if (
+      (staged && !handoff?.sentDrained) ||
+      (!staged && handoff?.receivedDrain)
+    ) {
       this.retire(peer);
       return;
     }
@@ -581,14 +871,47 @@ export class TurnPeers {
           peer.pendingBytes -= next.bytes;
           this.deliver(peer, next.message);
         }
+        this.advanceHandoff(peer.link);
       })
       .catch(() => this.retire(peer));
   }
 
   async send(to: string, message: WireMessage): Promise<void> {
-    const peer = this.peers.get(to);
+    const link = this.links.get(to);
+    if (!link) throw new PeerDisconnectedError("Connection is unavailable");
+    const handoff = link.handoff;
+    let peer = link.current.peer;
+    if (handoff?.acknowledgement) {
+      if (!handoff.receivedDrained) {
+        if (handoff.waiters >= HANDOFF_WAITERS) {
+          this.closeLink(link);
+          this.publish();
+          throw new PeerDisconnectedError("Multiplayer handoff is overloaded");
+        }
+        handoff.waiters++;
+        try {
+          if (!(await handoff.acknowledgement))
+            throw new PeerDisconnectedError("Connection was replaced");
+        } finally {
+          handoff.waiters--;
+        }
+      }
+      peer = link.successor?.peer ?? link.current.peer;
+    }
     if (!peer || !this.ready(peer))
       throw new PeerDisconnectedError("Connection is unavailable");
+    try {
+      await this.sendToPeer(peer, message);
+    } finally {
+      if (message.kind === "baseline" || message.kind === "scenario")
+        this.advanceHandoff(link);
+    }
+  }
+
+  private async sendToPeer(
+    peer: Peer & { channel: RTCDataChannel },
+    message: WireMessage,
+  ) {
     let outgoing: WireMessage | TurnTransfer = message;
     if (message.kind === "baseline" || message.kind === "scenario") {
       if (

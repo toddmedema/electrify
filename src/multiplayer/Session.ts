@@ -6,6 +6,7 @@ import type {
   RoomView,
   Seat,
 } from "./Types";
+import { crossplayFailure } from "./CrossplayApi";
 import { PeerDisconnectedError } from "./SessionTransport";
 import type {
   LobbyState,
@@ -498,7 +499,8 @@ export class MultiplayerSession {
         )
           .then(
             () => respond(),
-            (error) => respond(error.message),
+            (error) =>
+              respond(crossplayFailure(error, "The save did not finish.")),
           )
           .catch(() => undefined);
         return;
@@ -836,7 +838,13 @@ export class MultiplayerSession {
             this.replicaQueuedRecords -= records;
             this.replicaQueuedBytes -= bytes;
           }
-          this.update({ synchronizing: true, error: error.message });
+          this.update({
+            synchronizing: true,
+            error: crossplayFailure(
+              error,
+              "Could not synchronize with the host.",
+            ),
+          });
         }
       });
   }
@@ -1015,12 +1023,16 @@ export class MultiplayerSession {
         // The link dropped between the last lobby update and this send. Its disconnect notice
         // follows, and the command is resent on reconnect, so it is not a new failure.
         if (!(error instanceof PeerDisconnectedError))
-          this.update({ error: error.message });
+          this.update({
+            error: crossplayFailure(error, "Could not reach the other player."),
+          });
       });
   }
   command(command: Command) {
     void this.submit(command).catch((error) =>
-      this.update({ error: error.message }),
+      this.update({
+        error: crossplayFailure(error, "Could not send that command."),
+      }),
     );
   }
   submit(command: Command): Promise<void> {
@@ -1164,16 +1176,11 @@ export class MultiplayerSession {
         error: undefined,
         lobby: {
           ...this.state.lobby,
-          error: error instanceof Error ? error.message : "Could not reconnect",
+          error: crossplayFailure(error, "Could not reconnect"),
         },
       });
       if (roomId) throw error;
     }
-  }
-  async approve(requestId: string, approve: boolean) {
-    this.update({
-      lobby: await this.request({ kind: "approve", requestId, approve }),
-    });
   }
   async removePlayer(seatId: string) {
     this.update({ lobby: await this.request({ kind: "remove", seatId }) });
@@ -1182,9 +1189,6 @@ export class MultiplayerSession {
     if (!this.services.checkpoints.export)
       throw new Error("Multiplayer export is unavailable.");
     await this.services.checkpoints.export(id);
-  }
-  async rotateInvite() {
-    this.update({ lobby: await this.request({ kind: "rotate-invite" }) });
   }
   hasOnlineAuthority() {
     return !!this.services.authority?.();
@@ -1532,7 +1536,7 @@ export class MultiplayerSession {
             },
             (error) => {
               if (!current()) return;
-              const message = `Multiplayer save failed: ${error.message}`;
+              const message = `Multiplayer save failed: ${crossplayFailure(error, "The save did not finish.")}`;
               if (first) rollback(message);
               else this.update({ error: message });
             },
@@ -1641,7 +1645,9 @@ export class MultiplayerSession {
             },
       );
     } catch (error) {
-      rollback(error instanceof Error ? error.message : String(error));
+      rollback(
+        crossplayFailure(error, "Could not start the multiplayer game."),
+      );
       throw error;
     }
   }

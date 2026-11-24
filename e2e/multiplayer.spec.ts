@@ -63,7 +63,7 @@ class V2Campaign {
     private readonly names: readonly string[] = companies,
   ) {}
 
-  async addPlayer(width = 1280, open = true) {
+  async addPlayer(width = 1280, open = true, legacyScenario?: number) {
     const index = this.players.length;
     if (index === 0) await this.fixture.prepareCheckpoints();
     const name = this.names[index];
@@ -95,7 +95,7 @@ class V2Campaign {
       },
     );
     await page.addInitScript(
-      ({ name, index }) => {
+      ({ name, index, legacyScenario }) => {
         localStorage.setItem("audioEnabled", "false");
         localStorage.setItem("theme", "system");
         localStorage.setItem("musicVolume", "0.5");
@@ -167,9 +167,31 @@ class V2Campaign {
               }
             });
           }
+          postMessage(
+            message: unknown,
+            options?: Transferable[] | StructuredSerializeOptions,
+          ) {
+            // Recreate the checkpoint an older release published before new campaigns became
+            // custom-only. The actual simulation, save, recovery and browser views still run.
+            if (
+              legacyScenario &&
+              message &&
+              typeof message === "object" &&
+              "kind" in message &&
+              message.kind === "create" &&
+              "online" in message &&
+              message.online === true
+            )
+              message = {
+                ...message,
+                spec: { scenarioId: legacyScenario, difficulty: "Employee" },
+              };
+            if (Array.isArray(options)) super.postMessage(message, options);
+            else super.postMessage(message, options);
+          }
         };
       },
-      { name, index },
+      { name, index, legacyScenario },
     );
     await page.goto("/");
     if (open) await entry(page).click();
@@ -178,9 +200,12 @@ class V2Campaign {
 
   async create(host: Page) {
     await lobby(host).getByRole("button", { name: "Host a game" }).click();
-    return lobby(host)
-      .getByText(/^[0-9a-f]{20}$/i, { exact: true })
-      .innerText();
+    await expect(
+      host.getByRole("heading", { name: "Custom setup" }),
+    ).toBeVisible();
+    const code = await host.locator(".coopInviteDigits").innerText();
+    expect(code).toMatch(/^[a-z0-9]{6}$/);
+    return code;
   }
 
   async requestJoin(guest: Page, invite: string) {
@@ -192,21 +217,16 @@ class V2Campaign {
       .click();
   }
 
-  async approve(host: Page, guest: Page) {
+  async waitForGuest(host: Page, guest: Page) {
     const name = this.names[this.players.indexOf(guest)];
-    await expect(lobby(guest)).toContainText(/waiting for.*approv/i);
-    const row = lobby(host)
-      .getByText(`${name} asked to join`, { exact: true })
-      .locator("..");
-    await row.getByRole("button", { name: "Approve", exact: true }).click();
     await expect(
-      lobby(host).getByText(`${name} · Connected`, { exact: true }),
+      guest.getByRole("heading", { name: "Custom setup" }),
     ).toBeVisible();
-  }
-
-  async choose(host: Page) {
-    await lobby(host).getByRole("button", { name: "Choose a game" }).click();
-    await expect(host.getByTestId("mission-row-999")).toBeVisible();
+    await expect(
+      host
+        .getByRole("list", { name: "Players", exact: true })
+        .getByText(name, { exact: true }),
+    ).toBeVisible();
   }
 
   async start(host = this.players[0]) {
@@ -291,10 +311,8 @@ async function startCustom(
       compact || touchGuest || index === 3 ? 390 : 1280,
     );
     await campaign.requestJoin(guest, invite);
-    await campaign.approve(host, guest);
+    await campaign.waitForGuest(host, guest);
   }
-  await campaign.choose(host);
-  await host.getByTestId("mission-row-999").click();
   await campaign.start(host);
   return campaign;
 }
@@ -383,27 +401,31 @@ test("desktop menu keyboard journey includes Play with friends in both direction
   await verifyMenuKeyboard(page);
 });
 
-test("V2 requires host approval and a replaced invite cannot admit a guest", async ({
+test("V2 joins immediately by invite and lets the host remove a guest", async ({
   browser,
 }) => {
   const campaign = new V2Campaign(browser);
   const host = await campaign.addPlayer(),
     guest = await campaign.addPlayer(390);
-  const obsolete = await campaign.create(host);
+  const invite = await campaign.create(host);
+  await expect(host.getByTestId("mission-row-999")).toHaveCount(0);
   await expect(
-    lobby(host).getByRole("button", { name: "Choose a game" }),
+    host.getByRole("button", { name: "Invite a friend to start" }),
   ).toBeDisabled();
-  await lobby(host).getByRole("button", { name: "Replace invite" }).click();
-  const invite = lobby(host).getByText(/^[0-9a-f]{20}$/i, { exact: true });
-  await expect(invite).not.toHaveText(obsolete);
-  await campaign.requestJoin(guest, obsolete);
+  await campaign.requestJoin(guest, "000000" === invite ? "111111" : "000000");
   await expect(lobby(guest).getByRole("alert")).toBeVisible();
-  await campaign.requestJoin(guest, await invite.innerText());
-  await campaign.approve(host, guest);
-  await lobby(host).getByRole("button", { name: "Remove WindyWren" }).click();
-  await expect(
-    lobby(host).getByRole("button", { name: "Choose a game" }),
-  ).toBeDisabled();
+  await campaign.requestJoin(guest, invite);
+  await campaign.waitForGuest(host, guest);
+  await host.getByRole("button", { name: "Manage lobby", exact: true }).click();
+  const remove = lobby(host).getByRole("button", { name: "Remove WindyWren" });
+  await remove.click();
+  await expect(remove).toHaveCount(0);
+  await expect(entry(guest)).toBeVisible();
+  await entry(guest).click();
+  await campaign.requestJoin(guest, invite);
+  await expect(lobby(guest).getByRole("alert")).toHaveText(
+    /invitation is no longer available/i,
+  );
   expect(campaign.errors).toEqual([]);
 });
 
@@ -1161,124 +1183,35 @@ test(
 );
 
 for (const width of [1280, 360]) {
-  test(`a shared V2 mod stays unranked and survives removal from the host library at ${width}px`, async ({
+  test(`online co-op opens custom setup without a catalog at ${width}px`, async ({
     browser,
   }) => {
-    const hostMod = cooperativeMod(width === 1280);
     const names = ["W".repeat(18), "M".repeat(18)];
-    const campaign = new V2Campaign(browser, [[hostMod], []], names);
-    const host = await campaign.addPlayer(width),
-      guest = await campaign.addPlayer(width);
+    const campaign = new V2Campaign(
+      browser,
+      [[cooperativeMod(width === 1280)], []],
+      names,
+    );
+    const host = await campaign.addPlayer(width);
+    const guest = await campaign.addPlayer(width);
     const invite = await campaign.create(host);
     await campaign.requestJoin(guest, invite);
-    await campaign.approve(host, guest);
-    await campaign.choose(host);
-    await host.getByTestId("community-scenarios").click();
-    const chooseMod = async (difficulty: string) => {
-      await host
-        .getByRole("button", { name: "Play Cooperative Grid", exact: true })
-        .click();
-      const picker = host.getByRole("dialog", {
-        name: "Play Cooperative Grid",
-        exact: true,
-      });
-      await picker
-        .getByRole("button", { name: difficulty, exact: true })
-        .click();
-      await picker
-        .getByRole("button", { name: "Choose for everyone", exact: true })
-        .click();
-    };
-    await chooseMod("Easy");
-    const guestReady = guest.getByRole("button", {
-      name: "I'm ready",
-      exact: true,
-    });
-    await guestReady.click();
-    await expect(
-      guest.getByRole("button", { name: "Ready", exact: true }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await host
-      .getByRole("button", {
-        name: "Choose another community scenario",
-        exact: true,
-      })
-      .click();
-    await chooseMod("Medium");
-    await expect(guestReady).toBeEnabled();
+    await campaign.waitForGuest(host, guest);
+
     for (const page of campaign.players) {
-      const preview = page.locator(".coopModPreview");
-      await expect(
-        preview.getByRole("heading", { name: "Cooperative Grid" }),
-      ).toBeVisible();
-      await expect(preview).toContainText(
-        "Modded · Unranked · No achievements",
-      );
-      await expect(preview).toContainText("Keep bills affordable");
-      await expect(preview).toContainText("Grid funding");
-      await expect(preview).not.toContainText("Private surprise");
+      const setup = page.getByRole("heading", { name: "Custom setup" });
+      await expect(setup).toBeVisible();
+      await expect(page.getByTestId("community-scenarios")).toHaveCount(0);
+      await expect(page.getByTestId("mission-row-106")).toHaveCount(0);
+      const roster = page.getByRole("list", { name: "Players", exact: true });
+      await expect(roster).toContainText(names[0]);
+      await expect(roster).toContainText(names[1]);
       expect(
-        await preview.evaluate((node) => node.scrollWidth - node.clientWidth),
+        await roster.evaluate((node) => node.scrollWidth - node.clientWidth),
       ).toBeLessThanOrEqual(1);
     }
     await campaign.start();
-    const choices = campaign.players.map((page) =>
-      page.getByRole("dialog", { name: /Grid funding/ }),
-    );
-    for (const [index, choice] of choices.entries()) {
-      await expect(choice).toContainText(`Your company: ${names[index]}`);
-      const bounds = await choice.boundingBox();
-      expect(bounds!.x).toBeGreaterThanOrEqual(0);
-      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
-    }
-    await choices[0]
-      .getByRole("button", { name: "Accept funding", exact: true })
-      .click();
-    await expect(choices[1]).toContainText(`Still deciding: ${names[1]}`);
-    await choices[1]
-      .getByRole("button", { name: "Keep the current plan", exact: true })
-      .click();
-    await expect(choices[1]).toBeHidden();
-    await saveAndQuit(guest);
-    await saveAndQuit(host);
-    const initial = await campaign.fixture.checkpoint();
-    const digest = initial?.spec.customScenario?.mod?.runtimeDigest;
-    expect(digest).toBeTruthy();
-    expect(
-      initial?.grids.map(
-        (game) =>
-          game.worldEvents.occurrences.find(
-            (event) =>
-              event.attributes.choice === "accept" ||
-              event.attributes.choice === "decline",
-          )?.attributes.choice,
-      ),
-    ).toEqual(["accept", "decline"]);
-    await host.evaluate(async (key) => {
-      await (window as MultiplayerWindow).mockModsRequest!({
-        kind: "remove",
-        key,
-      });
-    }, hostMod.key);
-    await campaign.resume(host);
-    for (const page of campaign.players) {
-      const game = (await projection(page))!.game!;
-      expect(game.customScenario?.mod?.runtimeDigest).toBe(digest);
-      expect(game.runIdentity).toBeUndefined();
-      await expect(
-        page.getByRole("dialog", { name: /Grid funding/ }),
-      ).toBeHidden();
-      expect(
-        await page.evaluate(() => {
-          const target = window as MultiplayerWindow;
-          return [
-            target.scoreSubmissions ?? 0,
-            target.achievementSubmissions ?? 0,
-          ];
-        }),
-      ).toEqual([0, 0]);
-    }
-    expect(campaign.modRequests[1]).toEqual([]);
+    expect((await campaign.fixture.checkpoint())?.spec.scenarioId).toBe(999);
     expect(campaign.errors).toEqual([]);
   });
 }
@@ -1293,7 +1226,7 @@ for (const [scenarioId, width] of [
   }) => {
     test.setTimeout(240000);
     const campaign = new V2Campaign(browser);
-    const host = await campaign.addPlayer(width),
+    const host = await campaign.addPlayer(width, true, scenarioId),
       guest = await campaign.addPlayer(width);
     for (const page of campaign.players) {
       await observeNativeForecasts(page);
@@ -1303,10 +1236,7 @@ for (const [scenarioId, width] of [
     await entry(guest).click();
     const invite = await campaign.create(host);
     await campaign.requestJoin(guest, invite);
-    await campaign.approve(host, guest);
-    await campaign.choose(host);
-    await host.getByTestId(`mission-row-${scenarioId}`).click();
-    await host.getByRole("button", { name: "Easy", exact: true }).click();
+    await campaign.waitForGuest(host, guest);
     await campaign.start();
 
     const opening = await captureState(guest);

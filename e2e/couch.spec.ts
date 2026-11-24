@@ -106,12 +106,56 @@ async function startCouch<Actor extends Page | Frame>(
   await page
     .getByRole("button", { name: "Choose a game", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "Custom setup" }),
+  ).toBeVisible();
+  // Couch specs play the Carbon Fee world: a coal plant, the rising-fee
+  // forecast, and a 144-month term. Duration has to drop to 10 years before
+  // the event is selected, because that arc then extends the game to 12 years.
+  const duration = page.getByRole("combobox", {
+    name: "Duration",
+    exact: true,
+  });
+  await duration.click();
+  await page.getByRole("option", { name: "10 years", exact: true }).click();
+  const events = page.getByRole("combobox", {
+    name: "Scenario events",
+    exact: true,
+  });
+  await events.click();
+  await page.getByRole("option", { name: "Carbon Fee", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(duration).toContainText("12 years");
+  // The default peaker covers the whole month by itself, so pausing an extra
+  // coal plant never creates the future shortfall these specs assert.
+  // Replace it with a small gas plant plus a larger coal plant.
   await page
-    .getByRole("button", { name: "View Carbon Fee details", exact: true })
+    .getByRole("button", { name: "Remove Natural Gas Peaker", exact: true })
     .click();
+  const facilityType = page.getByRole("combobox", {
+    name: "Facility type",
+    exact: true,
+  });
+  const facilitySize = page.getByRole("combobox", {
+    name: "Facility size",
+    exact: true,
+  });
+  await facilityType.click();
   await page
-    .getByRole("button", { name: "Start for everyone", exact: true })
+    .getByRole("option", { name: "Natural Gas CC", exact: true })
     .click();
+  await facilitySize.click();
+  await page.getByRole("option", { name: "250MW", exact: true }).click();
+  await page.getByRole("button", { name: "Add facility", exact: true }).click();
+  await facilityType.click();
+  await page.getByRole("option", { name: "Coal", exact: true }).click();
+  await page.getByRole("button", { name: "Add facility", exact: true }).click();
+  const startForEveryone = page.getByRole("button", {
+    name: "Start for everyone",
+    exact: true,
+  });
+  await expect(startForEveryone).toBeEnabled();
+  await startForEveryone.click();
   const start = page
     .getByRole("dialog")
     .getByRole("button", { name: "Start for everyone", exact: true });

@@ -19,9 +19,13 @@ const text = (maximum) => (value) =>
 const list = (value) =>
   Array.isArray(value) && value.length <= 4 && value.every(id);
 const flag = (value) => typeof value === "boolean";
+const seq = (value) =>
+  Number.isSafeInteger(value) && value >= 1 && value <= 1_000_000;
 const invite = (value) =>
   typeof value === "string" &&
-  (/^[a-f0-9]{20}$/i.test(value) || /^[A-Za-z0-9_-]{22}$/.test(value));
+  (/^[a-z0-9]{6}$/i.test(value) ||
+    /^[a-f0-9]{20}$/i.test(value) ||
+    /^[A-Za-z0-9_-]{22}$/.test(value));
 
 function shape(value, required, optional = {}) {
   return (
@@ -69,15 +73,17 @@ const REQUESTS = {
   "room/lock": [{ ...room, ids: list, requiredIds: list }],
   "room/unlock": [room],
   "room/leave": [room],
-  "room/suspend": [{ ...room, presence: id }],
+  "room/suspend": [{ ...room, presence: id }, { seq }],
+  "room/resume": [{ ...room, presence: id }, { seq }],
   "room/withdraw": [room],
-  "room/approve": [{ ...room, requestId: id, approve: flag }],
-  "room/rotate-invite": [room],
   "room/remove": [{ ...room, seatId: id }],
   "signal/read": [room],
   "signal/describe": [{ ...pair, description }],
   "signal/turn": [pair],
+  "signal/prepare": [pair],
   "signal/reset": [pair],
+  "signal/renegotiate": [pair],
+  "signal/drained": [pair],
   "save/read": [room],
   "save/download": [room],
   "save/publish": [

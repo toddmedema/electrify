@@ -17,8 +17,6 @@ export interface LobbyState {
   inviteToken?: string;
   inviteExpiresAt?: number;
   inviteVersion?: string;
-  pendingApprovals?: { id: string; name: string }[];
-  joinPending?: boolean;
   campaignLocked?: boolean;
   requiredPlayers?: string[];
   recoveryAvailable?: boolean;
@@ -95,10 +93,9 @@ export type WireMessage =
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type SessionRequest =
   | {
-      kind: "state" | "leave" | "unlock" | "rotate-invite" | "restart-host";
+      kind: "state" | "leave" | "unlock" | "restart-host";
     }
   | { kind: "reconnect"; roomId?: string }
-  | { kind: "approve"; requestId: string; approve: boolean }
   | { kind: "remove"; seatId: string }
   | { kind: "create"; rules: string }
   | { kind: "join"; rules: string; lobbyId: string }
@@ -120,10 +117,8 @@ type LobbyRequest =
   | "reconnect"
   | "member"
   | "unlock"
-  | "approve"
   | "remove"
-  | "restart-host"
-  | "rotate-invite";
+  | "restart-host";
 
 type SessionReplies = {
   [Kind in SessionRequest["kind"]]: Kind extends LobbyRequest

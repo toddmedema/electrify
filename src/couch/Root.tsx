@@ -852,7 +852,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         },
       }),
     );
-    store.dispatch(navigate("NEW_GAME"));
+    store.dispatch(navigate("CUSTOM_GAME"));
   }, [stage, seats, bindings]);
 
   useEffect(() => {

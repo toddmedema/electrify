@@ -53,6 +53,7 @@ async function productionHealth({
       createWriter: () => async () => "fixture",
     },
     "./coop-checkpoints.cjs": { checkpointValidatorReady: () => true },
+    "./build/compatibility.json": { current: "fixture", published: {} },
   };
   const module = { exports: {} };
   loadProduction(

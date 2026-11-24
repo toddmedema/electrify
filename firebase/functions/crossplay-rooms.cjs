@@ -1,10 +1,13 @@
-const { randomUUID } = require("node:crypto");
+const { createHmac, randomUUID } = require("node:crypto");
 const { CrossplayError, requireValue } = require("./crossplay-errors.cjs");
 const { hash, keys, randomSecret, text } = require("./crossplay-identity.cjs");
 
 const ROOM_ID = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/;
 const RULES_ID = /^coop-\d+-[a-f0-9]{64}$/;
-const CODE = /^[a-f0-9]{20}$/i;
+const CODE = /^[a-z0-9]{6}$/i;
+const LEGACY_CODE = /^[a-f0-9]{20}$/i;
+const CODE_SPAN = 36n ** 6n;
+const INVITE_VERSION_PREFIX = "derived.";
 const LINK = /^[A-Za-z0-9_-]{22}$/;
 const MEMBER_DATA = /^[a-zA-Z0-9_.:|-]*$/;
 const MEMBERS = 4;
@@ -19,21 +22,6 @@ const CAMPAIGN_MS = 30 * 24 * 60 * 60_000;
 function roomId(value) {
   requireValue(typeof value === "string" && ROOM_ID.test(value));
   return value;
-}
-
-function rolledInvite(now) {
-  const inviteCode = Buffer.from(randomSecret(10), "base64url").toString("hex");
-  const inviteToken = randomSecret(16);
-  const version = randomSecret(12);
-  return {
-    secret: { inviteCode, inviteToken, version },
-    invite: {
-      version,
-      codeHash: hash(inviteCode),
-      linkHash: hash(inviteToken),
-      expiresAt: now + INVITE_MS,
-    },
-  };
 }
 
 function publicSeat({ id, name, ready, slot }) {
@@ -64,9 +52,17 @@ function activeMember(member, account, now) {
   return (
     !!member?.active &&
     !member.withdrawn &&
-    now - member.seenAt < PRESENCE_MS &&
+    (member.away || now - member.seenAt < PRESENCE_MS) &&
     bindingCurrent(member, account, now)
   );
+}
+
+function acceptPresenceSeq(member, seq) {
+  if (seq === undefined) return member.presenceSeq === undefined;
+  if (!Number.isSafeInteger(seq) || seq < 1 || seq > 1_000_000) return false;
+  if (seq <= (member.presenceSeq ?? 0)) return false;
+  member.presenceSeq = seq;
+  return true;
 }
 
 function forgetPair(room, seatId) {
@@ -78,7 +74,7 @@ function invalidInvite(condition) {
   requireValue(condition, 404, "invalid_invite");
 }
 
-function createRooms({ store, extensions = {} }) {
+function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
   async function loadRoom(id) {
     const result = await store.getRoom(id);
     if (!result.room || result.room.expiresAt <= result.now) return null;
@@ -113,6 +109,58 @@ function createRooms({ store, extensions = {} }) {
     );
   }
 
+  const keyedInviteHash = (purpose, value) =>
+    createHmac("sha256", inviteKey).update(
+      `electrify-coop-invite:${purpose}:${value}`,
+    );
+  const codeDigest = (code) => keyedInviteHash("lookup", code).digest("hex");
+
+  // Host polls can recover the same secrets without storing them in a room document.
+  function inviteSecrets(version) {
+    return {
+      inviteCode: (
+        keyedInviteHash("code", version).digest().readBigUInt64BE() % CODE_SPAN
+      )
+        .toString(36)
+        .padStart(6, "0"),
+      inviteToken: keyedInviteHash("link", version)
+        .digest()
+        .subarray(0, 16)
+        .toString("base64url"),
+    };
+  }
+
+  function inviteExpired(room, now) {
+    return (
+      !room.invite ||
+      room.invite.expiresAt <= now ||
+      (room.invite.version.startsWith(INVITE_VERSION_PREFIX) &&
+        !revealInvite(room.invite))
+    );
+  }
+
+  async function rollInvite(id, now) {
+    const expiresAt = now + INVITE_MS;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const version = INVITE_VERSION_PREFIX + randomSecret(12);
+      const { inviteCode, inviteToken } = inviteSecrets(version);
+      const codeHash = codeDigest(inviteCode);
+      if (await store.reserveInviteCode(codeHash, id, expiresAt, now))
+        return { version, codeHash, linkHash: hash(inviteToken), expiresAt };
+    }
+    throw new CrossplayError(503, "unavailable");
+  }
+
+  function revealInvite(invite) {
+    if (!invite.version.startsWith(INVITE_VERSION_PREFIX)) return undefined;
+    const secret = inviteSecrets(invite.version);
+    if (
+      codeDigest(secret.inviteCode) === invite.codeHash &&
+      hash(secret.inviteToken) === invite.linkHash
+    )
+      return secret;
+  }
+
   async function edit(id, actor, initialGuard, mutate) {
     for (let attempt = 0; attempt < 4; attempt++) {
       const loaded = await loadRoom(id);
@@ -125,8 +173,7 @@ function createRooms({ store, extensions = {} }) {
           ? { type: initialGuard }
           : initialGuard;
       const type = guard.type;
-      if (type !== "invite" && type !== "cancelInvite")
-        requireValue(self, 403, "forbidden");
+      if (type !== "invite") requireValue(self, 403, "forbidden");
       if (type === "active" || type === "host") {
         requireValue(
           self.active &&
@@ -150,10 +197,10 @@ function createRooms({ store, extensions = {} }) {
       if (!result?.room) return result?.value;
       const writeGuard = {
         type: result.guard ?? type,
-        seatId: self?.id ?? "",
+        seatId: result.seatId ?? self?.id ?? "",
         peerId: guard.peerId ?? "",
-        approvedId: result.approvedId ?? "",
-        deadline: now + GUARD_MS,
+        deadline: Math.min(now + GUARD_MS, result.deadline ?? Infinity),
+        ...(guard.inviteHash && { inviteHash: guard.inviteHash }),
       };
       if (await store.writeRoom(snapshot, result.room, actor, writeGuard)) {
         return result.value;
@@ -162,30 +209,13 @@ function createRooms({ store, extensions = {} }) {
     throw new CrossplayError(409, "authority_changed");
   }
 
-  async function response(id, actor, inviteSecret) {
+  async function response(id, actor) {
     const loaded = await loadRoom(id);
     requireValue(loaded, 404, "room_unavailable");
     const { now } = loaded;
     const room = await project(loaded.room, now);
     const self = accountSeat(room, actor.account);
-    if (!self) {
-      invalidInvite(
-        room.pending.some(
-          (item) => item.account === actor.account && item.expiresAt > now,
-        ),
-      );
-      return {
-        lobby: {
-          available: true,
-          lobbyId: id,
-          members: [],
-          connected: [],
-          joinPending: true,
-        },
-        authority: null,
-        connections: [],
-      };
-    }
+    invalidInvite(self);
     requireValue(self.binding === actor.binding, 409, "seat_reclaim_required");
     const host = room.members.find((member) => member.id === room.hostId);
     return {
@@ -199,15 +229,10 @@ function createRooms({ store, extensions = {} }) {
           .map(publicSeat),
         connected: [],
         ...(host?.id === self.id && {
-          pendingApprovals: room.pending
-            .filter((item) => item.expiresAt > now)
-            .map(({ id, name }) => ({ id, name })),
           ...(room.invite?.expiresAt > now && {
             inviteVersion: room.invite.version,
             inviteExpiresAt: room.invite.expiresAt,
-            ...(inviteSecret &&
-              hash(inviteSecret.inviteCode) === room.invite.codeHash &&
-              inviteSecret),
+            ...(self.active && isLive(room, now) && revealInvite(room.invite)),
           }),
         }),
         ...(room.head && {
@@ -241,8 +266,8 @@ function createRooms({ store, extensions = {} }) {
     const id = randomUUID();
     const seat = randomUUID();
     const { now } = await store.getRoom(id);
-    const { secret, invite } = rolledInvite(now);
     await reserve(id, now);
+    const invite = await rollInvite(id, now);
     const room = {
       id,
       rules: body.rules,
@@ -251,7 +276,6 @@ function createRooms({ store, extensions = {} }) {
       leaseUntil: now + LEASE_MS,
       expiresAt: now + LOBBY_MS,
       invite,
-      pending: [],
       members: [
         {
           id: seat,
@@ -273,13 +297,12 @@ function createRooms({ store, extensions = {} }) {
         type: "create",
         seatId: seat,
         peerId: "",
-        approvedId: "",
         deadline: now + GUARD_MS,
       }),
       409,
       "authority_changed",
     );
-    return response(id, actor, secret);
+    return response(id, actor);
   }
 
   async function join(actor, body, limit) {
@@ -291,43 +314,43 @@ function createRooms({ store, extensions = {} }) {
     );
     await limit("room-join", actor.account, 12);
     const token = typeof body.invite === "string" ? body.invite.trim() : "";
-    invalidInvite(CODE.test(token) || LINK.test(token));
-    const digest = hash(CODE.test(token) ? token.toLowerCase() : token);
-    const found = await store.findInvite(digest);
+    const shortCode = CODE.test(token);
+    const code = shortCode || LEGACY_CODE.test(token);
+    invalidInvite(code || LINK.test(token));
+    const digest = shortCode
+      ? codeDigest(token.toLowerCase())
+      : hash(code ? token.toLowerCase() : token);
+    const found = await store.findInvite(digest, shortCode);
     invalidInvite(found?.room);
     const id = found.room.id;
     await limit("room-invitations", id, 40);
     const reclaim = await edit(
       id,
       actor,
-      "invite",
+      { type: "invite", inviteHash: digest },
       (room, self, now, projected) => {
         invalidInvite(
           !room.locked &&
             room.rules === body.rules &&
             isLive(projected, now) &&
             room.invite?.expiresAt > now &&
-            [room.invite.codeHash, room.invite.linkHash].includes(digest),
+            [room.invite.codeHash, room.invite.linkHash].includes(digest) &&
+            !room.removedAccounts?.includes(actor.account),
         );
         if (self)
           return { value: self.binding !== actor.binding || !self.active };
-        room.pending = room.pending.filter((entry) => entry.expiresAt > now);
-        const previous = room.pending.find(
-          ({ account }) => account === actor.account,
-        );
-        if (previous?.binding === actor.binding) return { value: null };
-        invalidInvite(previous || room.pending.length < 8);
-        room.pending = room.pending.filter(
-          ({ account }) => account !== actor.account,
-        );
-        room.pending.push({
-          id: randomUUID(),
+        requireValue(room.members.length < MEMBERS, 409, "room_full");
+        const seatId = randomUUID();
+        room.members.push({
+          id: seatId,
           account: actor.account,
           binding: actor.binding,
+          presence: randomUUID(),
           name: body.name,
-          expiresAt: Math.min(room.invite.expiresAt, now + 5 * 60_000),
+          seenAt: now,
+          active: true,
         });
-        return { room };
+        return { room, seatId, deadline: room.invite.expiresAt };
       },
     );
     if (reclaim) return reconnect(id, actor, { roomId: id, rules: body.rules });
@@ -344,23 +367,47 @@ function createRooms({ store, extensions = {} }) {
         loaded.now - self.seenAt >= HEARTBEAT_MS &&
         loaded.room.leaseUntil > loaded.now
       ) {
-        await edit(
-          id,
-          actor,
-          renew ? "host" : "active",
-          async (room, seat, now) => {
-            if (now - seat.seenAt < HEARTBEAT_MS) return {};
-            if (renew) {
-              await reserve(id, now);
-              room.leaseUntil = now + LEASE_MS;
-              if (!room.locked) room.expiresAt = now + LOBBY_MS;
-            }
-            room.members.find(({ id }) => id === seat.id).seenAt = now;
-            return { room };
-          },
-        ).catch((error) => {
+        let replaceInvite = false;
+        try {
+          replaceInvite =
+            (await edit(
+              id,
+              actor,
+              renew ? "host" : "active",
+              async (room, seat, now) => {
+                if (now - seat.seenAt < HEARTBEAT_MS || seat.away) return {};
+                let roll = false;
+                if (renew) {
+                  await reserve(id, now);
+                  room.leaseUntil = now + LEASE_MS;
+                  if (!room.locked) {
+                    room.expiresAt = now + LOBBY_MS;
+                    roll = inviteExpired(room, now);
+                  }
+                }
+                const present = room.members.find(({ id }) => id === seat.id);
+                present.seenAt = now;
+                return { room, value: roll };
+              },
+            )) === true;
+        } catch (error) {
           if (error.code !== "authority_changed") throw error;
-        });
+        }
+        if (replaceInvite) {
+          // The lease is already committed. A failed code reservation must not
+          // roll that write back or fail the host's presence update.
+          await edit(id, actor, "host", async (room, _seat, now) => {
+            if (room.locked || !inviteExpired(room, now)) return {};
+            room.invite = await rollInvite(id, now);
+            return { room };
+          }).catch((error) => {
+            if (
+              error.code !== "authority_changed" &&
+              error.code !== "unavailable"
+            )
+              throw error;
+          });
+        }
       }
     }
     return response(id, actor);
@@ -370,7 +417,24 @@ function createRooms({ store, extensions = {} }) {
     keys(body, "roomId", "rules");
     requireValue(typeof body.rules === "string" && RULES_ID.test(body.rules));
     await edit(id, actor, "member", async (room, self, now) => {
-      requireValue(body.rules === room.rules, 409, "incompatible");
+      const upgrade = body.rules !== room.rules;
+      if (upgrade) {
+        const published = campaignRules?.published;
+        const checkpoint = room.head;
+        // Compatibility follows the published checkpoint. room.rules may name
+        // an intermediate build that acquired the room without publishing.
+        requireValue(
+          body.rules === campaignRules?.current &&
+            room.leaseUntil <= now &&
+            room.locked &&
+            checkpoint &&
+            published &&
+            Object.hasOwn(published, checkpoint.rules) &&
+            published[checkpoint.rules] === checkpoint.gameSchema,
+          409,
+          "incompatible",
+        );
+      }
       const member = room.members.find(({ id }) => id === self.id);
       if (
         (room.head?.activeSeatIds ?? room.requiredIds).some((id) =>
@@ -396,6 +460,7 @@ function createRooms({ store, extensions = {} }) {
         room.leaseUntil = now + LEASE_MS;
         room.epoch = randomUUID();
         room.restoreHead = room.head;
+        if (upgrade) room.rules = body.rules;
         if (room.head?.activeSeatIds)
           room.requiredIds = Array.from(
             new Set([...room.head.activeSeatIds, self.id]),
@@ -406,49 +471,18 @@ function createRooms({ store, extensions = {} }) {
           delete entry.slot;
         });
         guard = "acquire";
-      } else {
+      } else if (member.binding !== actor.binding) {
+        // A new device must not inherit the previous device's relay descriptions.
         forgetPair(room, self.id);
       }
       member.binding = actor.binding;
+      delete member.away;
       member.presence = randomUUID();
       member.seenAt = now;
       member.active = true;
       return { room, guard };
     });
     return response(id, actor);
-  }
-
-  async function approve(id, actor, body) {
-    keys(body, "roomId", "requestId", "approve");
-    requireValue(
-      ROOM_ID.test(body.requestId) && typeof body.approve === "boolean",
-    );
-    await edit(id, actor, "host", async (room, _self, now) => {
-      requireValue(!room.locked, 409, "roster_locked");
-      const pending = room.pending.find(({ id }) => id === body.requestId);
-      requireValue(pending?.expiresAt > now, 404, "invalid_invite");
-      room.pending = room.pending.filter(({ id }) => id !== pending.id);
-      let approvedId;
-      if (body.approve) {
-        requireValue(room.members.length < MEMBERS, 409, "room_full");
-        requireValue(
-          bindingCurrent(pending, await store.account(pending.account), now),
-          409,
-          "authority_changed",
-        );
-        approvedId = randomUUID();
-        room.members.push({
-          id: approvedId,
-          account: pending.account,
-          binding: pending.binding,
-          presence: randomUUID(),
-          name: pending.name,
-          seenAt: now,
-          active: true,
-        });
-      }
-      return { room, approvedId };
-    });
   }
 
   async function roomAction(operation, id, actor, body) {
@@ -459,25 +493,6 @@ function createRooms({ store, extensions = {} }) {
         return state(id, actor);
       case "room/reconnect":
         return reconnect(id, actor, body);
-      case "room/approve":
-        await approve(id, actor, body);
-        break;
-      case "room/rotate-invite": {
-        withOnlyRoom();
-        const inviteSecret = await edit(
-          id,
-          actor,
-          "host",
-          (room, _self, now) => {
-            requireValue(!room.locked, 409, "roster_locked");
-            const { secret, invite } = rolledInvite(now);
-            room.invite = invite;
-            room.pending = [];
-            return { room, value: secret };
-          },
-        );
-        return response(id, actor, inviteSecret);
-      }
       case "room/member":
         keys(body, "roomId", "key", "value");
         requireValue(
@@ -529,7 +544,6 @@ function createRooms({ store, extensions = {} }) {
           }
           room.locked = true;
           room.requiredIds = body.requiredIds;
-          room.pending = [];
           room.invite = null;
           room.expiresAt = now + CAMPAIGN_MS;
           return { room };
@@ -537,17 +551,16 @@ function createRooms({ store, extensions = {} }) {
         break;
       case "room/unlock": {
         withOnlyRoom();
-        const secret = await edit(id, actor, "host", (room, _self, now) => {
+        await edit(id, actor, "host", async (room, _self, now) => {
           requireValue(!room.head, 409, "roster_locked");
           room.members = room.members.filter((member) => !member.withdrawn);
           room.locked = false;
           room.requiredIds = [];
           room.expiresAt = now + LOBBY_MS;
-          const { invite, secret } = rolledInvite(now);
-          room.invite = invite;
-          return { room, value: secret };
+          room.invite = await rollInvite(id, now);
+          return { room };
         });
-        return response(id, actor, secret);
+        return response(id, actor);
       }
       case "room/remove": {
         keys(body, "roomId", "seatId");
@@ -560,45 +573,71 @@ function createRooms({ store, extensions = {} }) {
             target.active = false;
           } else {
             room.members = room.members.filter(({ id }) => id !== target.id);
-            room.pending = room.pending.filter(
-              ({ account }) => account !== target.account,
-            );
+            room.removedAccounts = [
+              ...(room.removedAccounts ?? []),
+              target.account,
+            ];
           }
           return { room };
         });
         break;
       }
+      case "room/resume": {
+        keys(
+          body,
+          "roomId",
+          "presence",
+          ...(body?.seq === undefined ? [] : ["seq"]),
+        );
+        requireValue(ROOM_ID.test(body.presence));
+        requireValue(
+          acceptPresenceSeq({ presenceSeq: 0 }, body.seq) ||
+            body.seq === undefined,
+        );
+        await edit(id, actor, "bound", async (room, self, now) => {
+          const member = room.members.find(
+            ({ account }) => account === actor.account,
+          );
+          requireValue(
+            self.binding === actor.binding,
+            409,
+            "seat_reclaim_required",
+          );
+          if (member.presence !== body.presence) return {};
+          if (!acceptPresenceSeq(member, body.seq)) return {};
+          delete member.away;
+          member.seenAt = now;
+          member.active = true;
+          if (room.hostId === member.id && room.leaseUntil > now) {
+            await reserve(id, now);
+            room.leaseUntil = now + LEASE_MS;
+            if (!room.locked)
+              room.expiresAt = Math.max(room.expiresAt, now + LOBBY_MS);
+          }
+          return { room };
+        });
+        return response(id, actor);
+      }
       case "room/suspend":
       case "room/leave":
       case "room/withdraw": {
         if (operation === "room/suspend") {
-          keys(body, "roomId", "presence");
+          keys(
+            body,
+            "roomId",
+            "presence",
+            ...(body?.seq === undefined ? [] : ["seq"]),
+          );
           requireValue(ROOM_ID.test(body.presence));
+          requireValue(
+            body.seq === undefined ||
+              (Number.isSafeInteger(body.seq) &&
+                body.seq >= 1 &&
+                body.seq <= 1_000_000),
+          );
         } else withOnlyRoom();
         const withdraw = operation === "room/withdraw";
         const leave = operation === "room/leave";
-        if (leave) {
-          const loaded = await loadRoom(id);
-          if (loaded && !accountSeat(loaded.room, actor.account)) {
-            const cancelled = await edit(
-              id,
-              actor,
-              "cancelInvite",
-              (room, approved) => {
-                if (approved) return { value: false };
-                const pending = room.pending.filter(
-                  (request) =>
-                    request.account !== actor.account ||
-                    request.binding !== actor.binding,
-                );
-                return pending.length === room.pending.length
-                  ? { value: true }
-                  : { room: { ...room, pending }, value: true };
-              },
-            );
-            if (cancelled) return {};
-          }
-        }
         await edit(
           id,
           actor,
@@ -614,9 +653,15 @@ function createRooms({ store, extensions = {} }) {
             );
             if (
               operation === "room/suspend" &&
-              member.presence !== body.presence
+              (member.presence !== body.presence ||
+                !acceptPresenceSeq(member, body.seq))
             )
               return {};
+            if (operation === "room/suspend") {
+              // Hiding the tab pauses renewal. The open relay and its credential stay.
+              member.away = true;
+              return { room };
+            }
             forgetPair(room, member.id);
             if (
               !room.locked &&

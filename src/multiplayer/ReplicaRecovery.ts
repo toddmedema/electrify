@@ -13,8 +13,10 @@ interface Peer {
   live: boolean;
   applied: number;
   progressedAt: number;
-  baseline?: { index: number; retryAt: number };
-  attempts: number[];
+  baseline?: { index: number; startedAt: number; retryAt: number };
+  verifyingBaselineSince?: number;
+  failedAttempts: number[];
+  startedAttempts: number[];
   minimumVerify: number;
   compared: number;
   report?: { index: number; hash: string };
@@ -56,7 +58,8 @@ export class ReplicaRecovery {
           live: false,
           applied: 0,
           progressedAt: this.now(),
-          attempts: [],
+          failedAttempts: [],
+          startedAttempts: [],
           minimumVerify: 1,
           compared: 0,
         });
@@ -69,6 +72,7 @@ export class ReplicaRecovery {
       if (!peer.connected) {
         peer.live = false;
         peer.baseline = undefined;
+        peer.verifyingBaselineSince = undefined;
         peer.report = undefined;
         peer.heldAt = undefined;
       }
@@ -106,13 +110,20 @@ export class ReplicaRecovery {
     if (this.terminal || !peer?.connected || peer.stopped) return false;
     const now = this.now();
     if (peer.baseline && now < peer.baseline.retryAt) return false;
-    peer.attempts = peer.attempts.filter(
-      (time) => now - time < (this.options.waitForDispatch ? 210_000 : 60_000),
+    // An unapplied transfer counts only after its retry window elapses.
+    if (peer.baseline) peer.failedAttempts.push(peer.baseline.startedAt);
+    peer.verifyingBaselineSince = undefined;
+    // Two slow online transfers can each take the dispatch wait plus the
+    // minute allowed to install. The window has to cover both starts.
+    const attemptWindow = this.options.waitForDispatch ? 360_000 : 60_000;
+    const justFailed = peer.baseline?.startedAt;
+    peer.failedAttempts = peer.failedAttempts.filter(
+      (time) => time === justFailed || now - time < attemptWindow,
     );
-    peer.live = false;
-    peer.report = undefined;
-    peer.heldAt = undefined;
-    if (peer.attempts.length >= 2) {
+    peer.startedAttempts = peer.startedAttempts.filter(
+      (time) => now - time < attemptWindow,
+    );
+    if (peer.startedAttempts.length >= 8) {
       peer.baseline = undefined;
       peer.stopped = `${this.name(to)} could not stay in sync. Save and resume the match.`;
       if (!this.host.world.outcomes[to]) this.host.pause(peer.stopped);
@@ -120,15 +131,27 @@ export class ReplicaRecovery {
       this.options.changed();
       return false;
     }
-    peer.attempts.push(now);
+    peer.live = false;
+    peer.report = undefined;
+    peer.heldAt = undefined;
+    if (peer.failedAttempts.length >= 2) {
+      peer.baseline = undefined;
+      peer.stopped = `${this.name(to)} could not stay in sync. Save and resume the match.`;
+      if (!this.host.world.outcomes[to]) this.host.pause(peer.stopped);
+      this.blockers();
+      this.options.changed();
+      return false;
+    }
     if (!this.host.world.outcomes[to])
       this.host.pause(`Synchronizing ${this.name(to)}`);
     this.blockers();
     // The preceding stream, baseline and its verify must enter the transport in this order.
     this.options.flush();
     const baseline = this.host.baseline();
+    peer.startedAttempts.push(now);
     peer.baseline = {
       index: baseline.index,
+      startedAt: now,
       retryAt: now + (this.options.waitForDispatch ? 80_000 : 10_000),
     };
     peer.minimumVerify = baseline.index + 1;
@@ -141,7 +164,7 @@ export class ReplicaRecovery {
     const baseline = this.peers.get(to)?.baseline;
     if (!this.options.waitForDispatch || !baseline || baseline.index !== index)
       return;
-    baseline.retryAt = this.now() + (delivered ? 25_000 : 2_000);
+    baseline.retryAt = this.now() + (delivered ? 60_000 : 2_000);
   }
   progress(report: Progress) {
     if (this.terminal) return;
@@ -160,7 +183,11 @@ export class ReplicaRecovery {
     if (report.applied > peer.applied || peer.baseline)
       peer.progressedAt = this.now();
     peer.applied = report.applied;
-    peer.baseline = undefined;
+    if (peer.baseline) {
+      // ReplicaRuntime reports the install before applying and hashing its verify record.
+      peer.verifyingBaselineSince = peer.baseline.startedAt;
+      peer.baseline = undefined;
+    }
     peer.live = true;
     const verified = report.verified;
     if (
@@ -185,7 +212,11 @@ export class ReplicaRecovery {
     if (!hash) return;
     peer.compared = report.index;
     peer.report = undefined;
-    if (hash !== report.hash) this.baseline(id);
+    const startedAt = peer.verifyingBaselineSince;
+    peer.verifyingBaselineSince = undefined;
+    if (hash === report.hash) return;
+    if (startedAt !== undefined) peer.failedAttempts.push(startedAt);
+    this.baseline(id);
   }
   /** Called synchronously at the verify boundary, before any further world mutation. */
   private capture() {

@@ -61,6 +61,7 @@ import {
 import { publicRateCap } from "../helpers/Customers";
 import { storyHash } from "../data/WorldEvents";
 import manifest from "../data/RunCompatibility.json";
+import publishedOnlineRules from "./PublishedOnlineRules.json";
 import { selectWeatherLocation } from "../data/Weather";
 import { currentTick } from "../helpers/GameSelectors";
 import reducer, {
@@ -1743,6 +1744,11 @@ function upgradeTerritoryWorld(value: unknown): unknown {
     SCHEMA_25_PUBLISHED_RULES.has(old.rules);
   const publishedSchema26 =
     old?.gameSchema === 26 && old.rules === SCHEMA_26_MASTER_RULES;
+  const publishedOnline =
+    typeof old?.rules === "string" &&
+    Object.hasOwn(publishedOnlineRules, old.rules) &&
+    old.gameSchema ===
+      publishedOnlineRules[old.rules as keyof typeof publishedOnlineRules];
   if (
     !old ||
     old.schema !== 3 ||
@@ -1789,7 +1795,8 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           old.rules === SCHEMA_23_MAP_RULES)) ||
       publishedSchema24 ||
       publishedSchema25 ||
-      publishedSchema26
+      publishedSchema26 ||
+      publishedOnline
     ) ||
     !Array.isArray(old.grids) ||
     !old.grids.every(
@@ -1807,6 +1814,7 @@ function upgradeTerritoryWorld(value: unknown): unknown {
           publishedSchema24 ||
           publishedSchema25 ||
           publishedSchema26 ||
+          publishedOnline ||
           isUtilityExpansionGame(grid)),
     )
   )
