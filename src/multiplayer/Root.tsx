@@ -304,10 +304,6 @@ export default function MultiplayerRoot() {
                 activity: (reason) => session.setActivity(reason),
                 leave: (options) => session.leave(options),
                 exportSave: () => session.exportSave(),
-                subscribeStatus: session.subscribe,
-                deviceSaveTime: () => session.getSnapshot().lobby.savedAt,
-                onlineSaveTime: () => session.getSnapshot().lobby.sharedAt,
-                reconnect,
               });
               setOpen(false);
               sync();
@@ -456,7 +452,7 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, copyCode, copyLink, desktop, reconnect]);
+  }, [session, syncCoop, leaveLobby, copyCode, copyLink, desktop]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {

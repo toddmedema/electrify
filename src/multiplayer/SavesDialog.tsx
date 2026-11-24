@@ -17,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { focusInitialDialogAction } from "../components/base/dialogFocus";
 import { crossplayFailure } from "./CrossplayApi";
 import type { MultiplayerSession } from "./Session";
 import "./Lobby.css";
@@ -43,7 +44,6 @@ export default function SavesDialog({
   }>();
   const [deleting, setDeleting] = useState<{ id: string; name: string }>();
   const [loaded, setLoaded] = useState(false);
-  const title = useRef<HTMLHeadingElement>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const deleteReturn = useRef<HTMLElement>();
   const deleted = useRef(false);
@@ -82,23 +82,14 @@ export default function SavesDialog({
         aria-labelledby="multiplayer-saves-title"
         slotProps={{
           transition: {
-            onEntered: () => {
+            onEntered: (node: HTMLElement) => {
               // Replace MUI's container autofocus, preserving navigation during the animation.
-              if (
-                document.activeElement ===
-                title.current?.closest('[role="dialog"]')
-              )
-                title.current?.focus();
+              focusInitialDialogAction(node);
             },
           },
         }}
       >
-        <DialogTitle
-          id="multiplayer-saves-title"
-          ref={title}
-          tabIndex={-1}
-          sx={{ outline: "none" }}
-        >
+        <DialogTitle id="multiplayer-saves-title">
           Multiplayer saves
         </DialogTitle>
         <DialogContent>
@@ -264,8 +255,18 @@ export default function SavesDialog({
         slotProps={{
           transition: {
             onEntered: () => cancelDelete.current?.focus(),
-            onExited: () =>
-              (deleted.current ? title.current : deleteReturn.current)?.focus(),
+            onExited: () => {
+              if (!deleted.current) {
+                deleteReturn.current?.focus();
+                return;
+              }
+              focusInitialDialogAction(
+                document
+                  .getElementById("multiplayer-saves-title")
+                  ?.closest<HTMLElement>('[role="dialog"]') ?? null,
+                { force: true },
+              );
+            },
           },
         }}
       >

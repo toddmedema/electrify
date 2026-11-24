@@ -19,6 +19,7 @@ import { seatAssignments } from "./Slots";
 import { crossplayFailure } from "./CrossplayApi";
 import { parseCrossplayInvite } from "./CrossplayInvite";
 import CoopInviteCode from "../components/base/CoopInviteCode";
+import { focusInitialDialogAction } from "../components/base/dialogFocus";
 import "./Lobby.css";
 
 /**
@@ -89,14 +90,29 @@ export default function Lobby({
     entryVersion.current++;
     onClose();
   }
-  const title = useRef<HTMLHeadingElement>(null);
   const mode =
     !lobby.lobbyId || entryOperation === "join"
       ? "entry"
       : pendingCampaign
         ? "campaign"
         : "waiting";
-  useEffect(() => title.current?.focus(), [mode]);
+  const openedMode = useRef<typeof mode | null>(null);
+  useEffect(() => {
+    // The opening animation moves focus itself, and only when the player has not
+    // already navigated. A later mode change moves to that mode's first action.
+    if (openedMode.current === null) {
+      openedMode.current = mode;
+      return;
+    }
+    if (openedMode.current === mode) return;
+    openedMode.current = mode;
+    focusInitialDialogAction(
+      document
+        .getElementById("multiplayer-lobby-title")
+        ?.closest<HTMLElement>('[role="dialog"]') ?? null,
+      { force: true },
+    );
+  }, [mode]);
   const host = !!lobby.selfId && lobby.selfId === lobby.hostId;
   const hostName =
     lobby.members.find((member) => member.id === lobby.hostId)?.name ||
@@ -137,13 +153,9 @@ export default function Lobby({
       aria-labelledby="multiplayer-lobby-title"
       slotProps={{
         transition: {
-          onEntered: () => {
+          onEntered: (node: HTMLElement) => {
             // Replace MUI's container autofocus, preserving navigation during the animation.
-            if (
-              document.activeElement ===
-              title.current?.closest('[role="dialog"]')
-            )
-              title.current?.focus();
+            focusInitialDialogAction(node);
           },
         },
       }}
@@ -169,9 +181,7 @@ export default function Lobby({
           component="h2"
           variant="h6"
           id="multiplayer-lobby-title"
-          ref={title}
-          tabIndex={-1}
-          sx={{ outline: "none", overflowWrap: "anywhere", minWidth: 0 }}
+          sx={{ overflowWrap: "anywhere", minWidth: 0 }}
         >
           {pendingCampaign ? "Pick your company" : "Play with friends"}
         </Typography>

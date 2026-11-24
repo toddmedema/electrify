@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { normalizeSaveName, SAVE_NAME_LIMIT } from "../../SaveModel";
 import { renameSavedGame } from "../../SaveSession";
+import { focusInitialDialogAction } from "./dialogFocus";
 
 export default function RenameSaveDialog(props: {
   save?: { id: string; name: string };
@@ -49,8 +50,9 @@ export default function RenameSaveDialog(props: {
       aria-labelledby="rename-save-title"
       slotProps={{
         transition: {
-          onEntered: () => {
+          onEntered: (node: HTMLElement) => {
             // Autofocus already ran; preserve any navigation during the animation.
+            focusInitialDialogAction(node);
             if (document.activeElement === input.current)
               input.current?.select();
           },

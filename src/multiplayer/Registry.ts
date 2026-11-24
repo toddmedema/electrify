@@ -10,10 +10,6 @@ interface Runtime {
   /** Leaves the match; skipSave uses the last multiplayer save instead of a fresh checkpoint. */
   leave: (options?: { skipSave?: boolean }) => Promise<void>;
   exportSave?: () => Promise<void>;
-  subscribeStatus?: (notify: () => void) => () => void;
-  deviceSaveTime?: () => number | null | undefined;
-  onlineSaveTime?: () => number | null | undefined;
-  reconnect?: () => void;
 }
 let runtime: Runtime | undefined;
 export const multiplayerRuntime = () => runtime;

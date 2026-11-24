@@ -31,7 +31,10 @@ test("a blocked player must choose an action to reconnect or leave", async () =>
   const view = warning();
   const dialog = screen.getByRole("dialog");
   const title = screen.getByRole("heading");
-  await waitFor(() => expect(title).toHaveFocus());
+  expect(title).not.toHaveAttribute("tabindex");
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Reconnect" })).toHaveFocus(),
+  );
   await user.keyboard("{Escape}");
   expect(dialog).toBeVisible();
   expect(screen.queryByRole("button", { name: "OK" })).not.toBeInTheDocument();
@@ -49,7 +52,9 @@ test("controller Back stays within the interruption dialog", async () => {
   try {
     const { onReturnToMenu, onReconnect } = warning();
     const dialog = screen.getByRole("dialog");
-    await waitFor(() => expect(screen.getByRole("heading")).toHaveFocus());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Reconnect" })).toHaveFocus(),
+    );
     expect(inputScope()).toBe(dialog);
     act(() => {
       backInput();
@@ -105,7 +110,9 @@ test("a checkpoint-only interruption offers only the main menu route", async () 
   expect(dialog).toHaveAccessibleDescription(
     /Play with friends → Multiplayer saves.*Changes since that save will be lost/,
   );
-  expect(screen.getByRole("heading")).toHaveFocus();
+  expect(
+    screen.getByRole("button", { name: "Return to main menu" }),
+  ).toHaveFocus();
   expect(screen.getAllByRole("button")).toHaveLength(1);
   expect(
     screen.getByRole("button", { name: "Return to main menu" }),
