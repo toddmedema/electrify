@@ -73,6 +73,10 @@ export default function Lobby({
     },
     [],
   );
+  useEffect(() => {
+    entryVersion.current++;
+    setAuthorizing(false);
+  }, [initialInviteCode]);
   async function authorized(action: () => Promise<void> | void) {
     const attempt = ++entryVersion.current;
     setAuthorizing(true);

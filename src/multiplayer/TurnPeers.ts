@@ -17,6 +17,7 @@ const NEGOTIATION_MS = 30_000;
 const GATHER_MS = 9_000;
 const RENEW_MS = 35_000;
 const HANDOFF_WAITERS = 128;
+const HANDOFF_ACK_MS = 15_000;
 const MAX_BUFFERED_BYTES = 128 * 1024;
 const MAX_PENDING_BYTES = 384 * 1024;
 const TURN_URLS = [
@@ -95,6 +96,7 @@ interface Handoff {
   acknowledgement?: Promise<boolean>;
   release?: (delivered: boolean) => void;
   waiters: number;
+  deadline?: number;
 }
 
 interface Link {
@@ -251,7 +253,9 @@ export class TurnPeers {
     const ids = Array.from(this.links.values())
       .filter((link) => {
         const peer = (
-          this.handoffComplete(link) ? link.successor : link.current
+          this.handoffComplete(link) || link.handoff?.sentDrained
+            ? (link.successor ?? link.current)
+            : link.current
         )?.peer;
         return peer && this.ready(peer);
       })
@@ -280,10 +284,32 @@ export class TurnPeers {
   }
 
   private closeLink(link: Link) {
+    if (link.handoff?.deadline !== undefined)
+      window.clearTimeout(link.handoff.deadline);
     link.handoff?.release?.(false);
     link.handoff = undefined;
     this.closeLeg(link.current);
     this.closeLeg(link.successor);
+  }
+
+  /** Local drain is on the successor; keep that channel until the remote drain arrives. */
+  private holdingSuccessor(link: Link) {
+    return !!(link.handoff?.sentDrained && !this.handoffComplete(link));
+  }
+
+  private boundHandoff(link: Link) {
+    const handoff = link.handoff;
+    if (!handoff || handoff.deadline !== undefined) return;
+    handoff.deadline = window.setTimeout(() => {
+      if (
+        this.links.get(link.to) !== link ||
+        link.handoff !== handoff ||
+        handoff.receivedDrained
+      )
+        return;
+      this.closeLink(link);
+      this.publish();
+    }, HANDOFF_ACK_MS);
   }
 
   private handoffComplete(link: Link) {
@@ -295,7 +321,10 @@ export class TurnPeers {
     if (leg.peer !== peer) return;
     const handoffStarted =
       link.handoff?.acknowledgement || link.handoff?.receivedDrain;
-    if (
+    if (leg === link.current && this.holdingSuccessor(link)) {
+      this.closeLeg(leg);
+      this.boundHandoff(link);
+    } else if (
       (leg === link.successor && !handoffStarted) ||
       (leg === link.current && this.handoffComplete(link))
     ) {
@@ -420,14 +449,19 @@ export class TurnPeers {
 
     let link = this.links.get(peerId);
     if (link && link.current.generation !== generation) {
+      const promoted = link.successor;
       if (
-        link.successor?.generation === generation &&
-        this.handoffComplete(link)
+        promoted?.generation === generation &&
+        (this.handoffComplete(link) || !!link.handoff?.sentDrained)
       ) {
         this.closeLeg(link.current);
-        link.current = link.successor;
+        link.current = promoted;
         link.successor = undefined;
-        link.handoff = undefined;
+        if (this.handoffComplete(link)) {
+          if (link.handoff?.deadline !== undefined)
+            window.clearTimeout(link.handoff.deadline);
+          link.handoff = undefined;
+        } else this.boundHandoff(link);
       } else {
         this.closeLink(link);
         this.publish();
@@ -454,12 +488,13 @@ export class TurnPeers {
       link.handoff = { waiters: 0 };
     }
 
-    if (!this.handoffComplete(link) || link.current.peer)
+    const holdingSuccessor = this.holdingSuccessor(link);
+    if (link.current.peer || (!this.handoffComplete(link) && !holdingSuccessor))
       this.useGeneration(authority, link, link.current, signal, startedAt);
     if (
       successor &&
       link.successor &&
-      (!link.current.retired || this.handoffComplete(link))
+      (!link.current.retired || this.handoffComplete(link) || holdingSuccessor)
     )
       this.useGeneration(authority, link, link.successor, successor, startedAt);
 
@@ -720,11 +755,15 @@ export class TurnPeers {
     }
     if (
       control === DRAINED &&
-      staged &&
       handoff?.acknowledgement &&
-      !handoff.receivedDrained
+      !handoff.receivedDrained &&
+      (staged || (handoff.sentDrained && leg === link.current))
     ) {
       handoff.receivedDrained = true;
+      if (handoff.deadline !== undefined) {
+        window.clearTimeout(handoff.deadline);
+        handoff.deadline = undefined;
+      }
       handoff.release?.(true);
       this.publish();
       return;
@@ -808,7 +847,6 @@ export class TurnPeers {
     const handoff = link.handoff;
     let peer = link.current.peer;
     if (handoff?.acknowledgement) {
-      peer = link.successor?.peer;
       if (!handoff.receivedDrained) {
         if (handoff.waiters >= HANDOFF_WAITERS) {
           this.closeLink(link);
@@ -823,6 +861,7 @@ export class TurnPeers {
           handoff.waiters--;
         }
       }
+      peer = link.successor?.peer ?? link.current.peer;
     }
     if (!peer || !this.ready(peer))
       throw new PeerDisconnectedError("Connection is unavailable");

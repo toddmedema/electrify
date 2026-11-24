@@ -58,11 +58,16 @@ type Signal = {
   hostBinding: string;
   guestId: string;
   guestBinding: string;
+  createdAt: number;
   expiresAt: number;
   successor?: Signal;
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
 };
+// Keep these aligned with firebase/functions/coop-signaling.cjs.
+const PREPARE_WINDOW_MS = 36_000;
+const ROTATION_WINDOW_MS = 25_000;
+const FAILED_GENERATION_MS = 15_000;
 type BrowserPlayer = {
   platform: "web" | "steam";
   externalId: string;
@@ -638,6 +643,7 @@ export function crossplayFixture() {
         hostBinding: host.binding,
         guestId: guest.id,
         guestBinding: guest.binding,
+        createdAt: now,
         expiresAt: now + 120_000,
       });
       const eligible = (pair: Signal, guest: RoomMember) =>
@@ -691,8 +697,16 @@ export function crossplayFixture() {
       if (operation === "signal/prepare") {
         if (staged || !pair.offer || !pair.answer)
           throw new CrossplayError(409, "obsolete-connection");
+        if (pair.expiresAt - now > PREPARE_WINDOW_MS)
+          throw new CrossplayError(429, "turn-rotation-limit");
         current.successor ??= freshPair(guest);
       } else if (operation === "signal/reset") {
+        const deadline =
+          pair.offer && pair.answer
+            ? pair.createdAt + ROTATION_WINDOW_MS
+            : pair.createdAt + FAILED_GENERATION_MS;
+        if (now < deadline)
+          throw new CrossplayError(429, "turn-rotation-limit");
         if (staged) current.successor = freshPair(guest);
         else delete signals[pair.guestId];
       } else {
@@ -726,7 +740,7 @@ export function crossplayFixture() {
     );
   };
 
-  const reservedCodes = new Map<string, number>();
+  const reservedCodes = new Map<string, { id: string; expiresAt: number }>();
   const service = createCrossplay({
     origins: [fakeOrigin],
     quotaKey: "playwright-crossplay-fixture-only",
@@ -766,15 +780,22 @@ export function crossplayFixture() {
       reserveRoom: async () => true,
       reserveInviteCode: async (
         digest: string,
-        _id: string,
+        id: string,
         expiresAt: number,
       ) => {
-        if ((reservedCodes.get(digest) ?? 0) > Date.now()) return false;
-        reservedCodes.set(digest, expiresAt);
+        const reserved = reservedCodes.get(digest);
+        if (reserved && reserved.expiresAt > Date.now()) return false;
+        reservedCodes.set(digest, { id, expiresAt });
         return true;
       },
       getRoom: async (id: string) => currentRoom(id),
-      findInvite: async (digest: string) => {
+      findInvite: async (digest: string, shortCode?: boolean) => {
+        if (shortCode) {
+          const reserved = reservedCodes.get(digest);
+          return reserved && reserved.expiresAt > Date.now()
+            ? currentRoom(reserved.id)
+            : null;
+        }
         const room = [...rooms.values()].find(
           ({ invite }) =>
             invite?.codeHash === digest || invite?.linkHash === digest,

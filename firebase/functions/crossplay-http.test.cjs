@@ -9,6 +9,7 @@ const DEVICE = "d".repeat(43);
 function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
   let now = 10_000;
   let stopped = false;
+  let inviteFailures = 0;
   const documents = new Map();
   const inviteCodes = new Map();
   const accounts = new Map();
@@ -67,6 +68,10 @@ function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
       },
       reserveRoom: async () => true,
       reserveInviteCode: async (digest, id, expiresAt) => {
+        if (inviteFailures > 0) {
+          inviteFailures--;
+          return false;
+        }
         if (collisions > 0) {
           collisions--;
           return false;
@@ -205,6 +210,9 @@ function setup({ steamEnabled = true, collisions = 0, campaignRules } = {}) {
     create,
     join,
     login,
+    failInvites(count) {
+      inviteFailures = count;
+    },
   };
 }
 
@@ -354,6 +362,28 @@ test("the host renews an expired lobby invite while the old link and code stop w
   assert.equal(joined.lobby.inviteToken, undefined);
 });
 
+test("an invite roll failure still commits the host lease", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  let token = host;
+  for (let index = 1; index <= 224; index++) {
+    ctx.advance(4000);
+    if (index % 60 === 0) token = await ctx.login("host", { token });
+    assert.equal(
+      (await ctx.call("room/state", { roomId }, { token })).status,
+      200,
+    );
+  }
+  ctx.failInvites(8);
+  ctx.advance(4000);
+  const state = await ctx.call("room/state", { roomId }, { token });
+  assert.equal(state.status, 200);
+  assert.equal(state.body.authority.leaseRemainingMs, 12_000);
+  assert.equal(state.body.lobby.inviteCode, undefined);
+});
+
 test("same-device renewal preserves a seat, and a fenced device cannot renew back into play", async () => {
   const ctx = setup();
   let host = await ctx.login("host");
@@ -443,6 +473,50 @@ test("only an original player can upgrade an expired saved campaign to the deplo
     (await resume(host)).body.authority.epoch,
     upgraded.body.authority.epoch,
   );
+});
+
+test("a published checkpoint stays resumable after an intermediate build acquires it", async () => {
+  const intermediate = `coop-2-${"b".repeat(64)}`;
+  const current = `coop-2-${"c".repeat(64)}`;
+  const rules = { current: intermediate, published: { [RULES]: 27 } };
+  const ctx = setup({ campaignRules: rules });
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  const { lobby } = await ctx.joinPlayer(room, guest);
+  const roomId = lobby.lobbyId;
+  const ids = lobby.members.map(({ id }) => id);
+  assert.equal(
+    (
+      await ctx.call(
+        "room/lock",
+        { roomId, ids, requiredIds: ids },
+        { token: host },
+      )
+    ).status,
+    200,
+  );
+  const published = await ctx.call("save/publish", { roomId }, { token: host });
+  assert.equal(published.status, 200);
+  ctx.advance(12_001);
+  const stepped = await ctx.call(
+    "room/reconnect",
+    { roomId, rules: intermediate },
+    { token: guest },
+  );
+  assert.equal(stepped.status, 200);
+  assert.equal(stepped.body.authority.head.rules, RULES);
+  assert.equal(stepped.body.authority.head.gameSchema, 27);
+  rules.current = current;
+  ctx.advance(12_001);
+  const upgraded = await ctx.call(
+    "room/reconnect",
+    { roomId, rules: current },
+    { token: guest },
+  );
+  assert.equal(upgraded.status, 200);
+  assert.deepEqual(upgraded.body.authority.head, published.body);
+  assert.notEqual(upgraded.body.authority.epoch, stepped.body.authority.epoch);
 });
 
 test("expired host loses publication rights and a single original seat acquires the pinned checkpoint", async () => {

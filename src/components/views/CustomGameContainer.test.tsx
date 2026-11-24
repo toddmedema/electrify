@@ -10,10 +10,16 @@ import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
 import { launchCustomScenario } from "../../reducers/Game";
 import type { AppStateType, ScenarioType } from "../../Types";
+import { registerCoopControls } from "../../multiplayer/Registry";
 import CustomGameContainer, {
   mapDispatchToProps,
   mapStateToProps,
 } from "./CustomGameContainer";
+
+const mockApp: {
+  ui: { coop?: { role: "host" | "guest" } };
+  game: { difficulty: string };
+} = { ui: {}, game: { difficulty: "Manager" } };
 
 jest.mock("./CustomGame", () => ({
   __esModule: true,
@@ -26,7 +32,7 @@ jest.mock("./StartGame", () => ({
 }));
 jest.mock("../../reducers/Game", () => ({ launchCustomScenario: jest.fn() }));
 jest.mock("../../Store", () => ({
-  store: { getState: () => ({ ui: {}, game: { difficulty: "Manager" } }) },
+  store: { getState: () => mockApp },
 }));
 
 const setup: ScenarioType = {
@@ -56,6 +62,8 @@ const state = (customScenario?: ScenarioType) =>
 beforeEach(() => {
   localStorage.clear();
   achievementJournal.refresh();
+  delete mockApp.ui.coop;
+  registerCoopControls(undefined);
 });
 
 test("a running mod never seeds or leaks into the custom game setup", () => {
@@ -98,4 +106,40 @@ it("updates the connected picker immediately when synced wins unlock another lev
     );
   });
   expect(screen.getByText("Employee/Employee")).toBeInTheDocument();
+});
+
+test("online host back returns to the lobby and guest back leaves", () => {
+  const back = jest.fn();
+  const returnToLobby = jest.fn();
+  registerCoopControls({
+    start: jest.fn(),
+    ready: jest.fn(),
+    back,
+    returnToLobby,
+    copyCode: jest.fn(),
+    openSaves: jest.fn(),
+  });
+  mockApp.ui.coop = { role: "host" };
+  mapDispatchToProps(jest.fn()).onBack();
+  expect(returnToLobby).toHaveBeenCalledTimes(1);
+  expect(back).not.toHaveBeenCalled();
+
+  mockApp.ui.coop = { role: "guest" };
+  mapDispatchToProps(jest.fn()).onBack();
+  expect(back).toHaveBeenCalledTimes(1);
+  expect(returnToLobby).toHaveBeenCalledTimes(1);
+});
+
+test("a local host back uses the co-op control that returns to the join stage", () => {
+  const back = jest.fn();
+  registerCoopControls({
+    start: jest.fn(),
+    ready: jest.fn(),
+    back,
+    copyCode: jest.fn(),
+    openSaves: jest.fn(),
+  });
+  mockApp.ui.coop = { role: "host" };
+  mapDispatchToProps(jest.fn()).onBack();
+  expect(back).toHaveBeenCalledTimes(1);
 });

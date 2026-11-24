@@ -187,6 +187,7 @@ type Side = "host" | "guest";
 type TestGeneration = {
   generation: string;
   expiresAt: number;
+  createdAt: number;
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
 };
@@ -196,6 +197,8 @@ function duplex() {
   const priorPeer = globalThis.RTCPeerConnection;
   const sockets = new Map<string, Partial<Record<Side, Connection>>>();
   const other = (side: Side) => (side === "host" ? "guest" : "host");
+  let holdDrained = false;
+  const heldDrains: (() => void)[] = [];
   class Connection extends PeerFixture {
     localInstalled = false;
     remoteInstalled = false;
@@ -213,10 +216,15 @@ function duplex() {
       this.localDescription = side === "host" ? offer : answer;
       this.channel.send.mockImplementation((frame: Uint8Array<ArrayBuffer>) => {
         const target = pair[other(side)];
-        void Promise.resolve().then(() => {
+        const deliver = () => {
           if (target?.channel.readyState === "open")
             target.channel.onmessage?.({ data: frame.buffer });
-        });
+        };
+        if (holdDrained && frame.byteLength === 1 && frame[0] === 13) {
+          heldDrains.push(deliver);
+          return;
+        }
+        void Promise.resolve().then(deliver);
       });
       this.close.mockImplementation(() => {
         this.connectionState = "closed";
@@ -259,6 +267,7 @@ function duplex() {
   let created = 0;
   const makeGeneration = () => ({
     generation: "generation-" + ++created,
+    createdAt: performance.now(),
     expiresAt: performance.now() + 120_000,
   });
   let current: TestGeneration = makeGeneration();
@@ -329,6 +338,9 @@ function duplex() {
             if (description?.type === "offer") pair.offer = description;
             if (description?.type === "answer") pair.answer = description;
           } else if (operation === "signal/reset") {
+            const minimumAge = pair.offer && pair.answer ? 25_000 : 15_000;
+            if (performance.now() < pair.createdAt + minimumAge)
+              throw new Error("turn-rotation-limit");
             if (pair === staged) staged = makeGeneration();
             else {
               current = makeGeneration();
@@ -370,6 +382,14 @@ function duplex() {
     guestDownload,
     sockets,
     generations: () => created,
+    staged: () => staged?.generation,
+    holdDrained: (hold: boolean) => {
+      holdDrained = hold;
+      if (!hold) {
+        const pending = heldDrains.splice(0);
+        pending.forEach((deliver) => deliver());
+      }
+    },
     rejectSuccessor: () => {
       rejectStagedCredential = true;
     },
@@ -502,23 +522,69 @@ test("a failed successor preserves the current stream and a genuine loss reconne
     await f.advance(82_000);
     f.rejectSuccessor();
     await f.advance(96_000);
+    const staged = f.staged();
+    expect(staged).toBe("generation-2");
     await f.guest.send(command(1));
     await f.host.send(records(1));
     await settle();
+    expect(f.staged()).toBe(staged);
+    expect(f.generations()).toBe(2);
     expect(f.host.status.mock.calls).toEqual([[["guest"]]]);
     expect(f.guest.status.mock.calls).toEqual([[["host"]]]);
-    expect(f.generations()).toBe(3);
+    expect(f.host.message.mock.calls.map(([, message]) => message)).toEqual([
+      command(1),
+    ]);
 
-    f.sockets.get("generation-3")!.host!.close();
-    expect(f.host.status).toHaveBeenLastCalledWith([]);
-    await f.advance(112_000);
+    await f.advance(120_000);
+    expect(f.generations()).toBeGreaterThan(2);
+    expect(f.staged()).not.toBe(staged);
     await f.guest.send(command(2));
+    await settle();
+    expect(f.host.message.mock.calls.map(([, message]) => message)).toEqual([
+      command(1),
+      command(2),
+    ]);
+
+    f.sockets.get(f.staged()!)!.host!.close();
+    expect(f.host.status).toHaveBeenLastCalledWith([]);
+    await f.advance(140_000);
+    await f.guest.send(command(3));
     await settle();
     expect(f.host.status).toHaveBeenLastCalledWith(["guest"]);
     expect(f.host.message.mock.calls.map(([, message]) => message)).toEqual([
       command(1),
       command(2),
+      command(3),
     ]);
+  } finally {
+    f.close();
+  }
+});
+
+test("a predecessor loss after the local drain keeps the successor until the remote drain arrives", async () => {
+  const f = duplex();
+  try {
+    f.holdDrained(true);
+    await f.advance(90_000);
+    let sent = false;
+    const queued = f.host.send(records(1)).then(() => {
+      sent = true;
+    });
+    await settle();
+    expect(sent).toBe(false);
+    const successor = f.sockets.get("generation-2")!.host!;
+    f.sockets.get("generation-1")!.host!.close();
+    await settle();
+    expect(successor.close).not.toHaveBeenCalled();
+    expect(sent).toBe(false);
+    expect(f.host.status).toHaveBeenLastCalledWith(["guest"]);
+    f.holdDrained(false);
+    await queued;
+    await settle();
+    expect(f.guest.message.mock.calls.map(([, message]) => message)).toEqual([
+      records(1),
+    ]);
+    expect(f.host.status).toHaveBeenLastCalledWith(["guest"]);
   } finally {
     f.close();
   }

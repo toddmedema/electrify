@@ -67,6 +67,7 @@ function fixture() {
   };
   let revocationStatus = 204;
   const requests = [];
+  const revoked = [];
   const signaling = createTurnSignaling({
     db,
     keyId: "key",
@@ -74,9 +75,13 @@ function fixture() {
     loadRoom: async () => room,
     clock: () => now,
     fetchImpl: async (url) => {
-      const operation = url.split("/").at(-1);
+      const parts = String(url).split("/");
+      const operation = parts.at(-1);
       requests.push(operation);
-      if (operation === "revoke") return { status: revocationStatus };
+      if (operation === "revoke") {
+        revoked.push(decodeURIComponent(parts.at(-2)));
+        return { status: revocationStatus };
+      }
       assert.equal(operation, "generate-ice-servers");
       return {
         status: 201,
@@ -117,6 +122,7 @@ function fixture() {
     read,
     room,
     requests,
+    revoked,
     reap: signaling.reap,
     values,
     advance: (ms) => {
@@ -193,12 +199,12 @@ test("preparing a successor preserves both grants until the old generation expir
   const { guest, generation, address } = await negotiated(f);
   const stillEarly = f.handle("signal/prepare", f.context, address);
   await assert.rejects(stillEarly, { code: "turn-rotation-limit" });
-  await f.issue("guest-a");
+  const predecessor = await f.issue("guest-a");
   f.advance(85_000);
   await f.handle("signal/prepare", f.context, address);
   const next = f.room.signals["guest-a"].successor.generation;
   await f.handle("signal/prepare", guest, { to: "host", generation });
-  await f.issue("guest-a", f.context, next);
+  const successor = await f.issue("guest-a", f.context, next);
   const { pairs } = await f.read(guest);
   assert.equal(pairs[0].generation, generation);
   assert.equal(pairs[0].successor.generation, next);
@@ -221,17 +227,22 @@ test("preparing a successor preserves both grants until the old generation expir
     "generate-ice-servers",
     "revoke",
   ]);
+  assert.deepEqual(f.revoked, [predecessor.iceServers[0].username]);
+  assert.notEqual(
+    predecessor.iceServers[0].username,
+    successor.iceServers[0].username,
+  );
   assert.ok(activeSignalPair(f.room, "guest-a", "host", next, 121_000));
 });
 
 test("a failed staged generation can be reset without disrupting its predecessor", async () => {
   const f = fixture();
   const { generation, address } = await negotiated(f);
-  await f.issue("guest-a");
+  const predecessor = await f.issue("guest-a");
   f.advance(85_000);
   await f.handle("signal/prepare", f.context, address);
   const staged = f.room.signals["guest-a"].successor.generation;
-  await f.issue("guest-a", f.context, staged);
+  const successor = await f.issue("guest-a", f.context, staged);
   f.advance(15_000);
   await f.handle("signal/reset", f.context, { ...address, generation: staged });
   const { pairs } = await f.read();
@@ -243,6 +254,11 @@ test("a failed staged generation can be reset without disrupting its predecessor
     "generate-ice-servers",
     "revoke",
   ]);
+  assert.deepEqual(f.revoked, [successor.iceServers[0].username]);
+  assert.notEqual(
+    predecessor.iceServers[0].username,
+    successor.iceServers[0].username,
+  );
   f.room.members[1].binding = "different-device";
   for (const id of [generation, staged, first.successor.generation]) {
     await assert.rejects(f.issue("guest-a", f.context, id), {

@@ -184,7 +184,7 @@ class V2Campaign {
             )
               message = {
                 ...message,
-                spec: { scenarioId: legacyScenario, difficulty: "EASY" },
+                spec: { scenarioId: legacyScenario, difficulty: "Employee" },
               };
             if (Array.isArray(options)) super.postMessage(message, options);
             else super.postMessage(message, options);

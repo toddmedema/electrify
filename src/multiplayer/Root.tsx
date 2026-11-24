@@ -367,6 +367,11 @@ export default function MultiplayerRoot() {
           .setReady(ready && browse ? selectionKey(browse) : "")
           .catch(() => undefined);
       },
+      returnToLobby: () => {
+        choosing.current = false;
+        setOpen(true);
+        syncCoop();
+      },
       back: () => {
         const { lobby } = session.getSnapshot();
         const host = lobby.hostId === lobby.selfId;

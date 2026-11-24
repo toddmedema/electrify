@@ -122,6 +122,15 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
     };
   }
 
+  function inviteExpired(room, now) {
+    return (
+      !room.invite ||
+      room.invite.expiresAt <= now ||
+      (room.invite.version.startsWith(INVITE_VERSION_PREFIX) &&
+        !revealInvite(room.invite))
+    );
+  }
+
   async function rollInvite(id, now) {
     const expiresAt = now + INVITE_MS;
     for (let attempt = 0; attempt < 8; attempt++) {
@@ -350,32 +359,46 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
         loaded.now - self.seenAt >= HEARTBEAT_MS &&
         loaded.room.leaseUntil > loaded.now
       ) {
-        await edit(
-          id,
-          actor,
-          renew ? "host" : "active",
-          async (room, seat, now) => {
-            if (now - seat.seenAt < HEARTBEAT_MS) return {};
-            if (renew) {
-              await reserve(id, now);
-              room.leaseUntil = now + LEASE_MS;
-              if (!room.locked) {
-                room.expiresAt = now + LOBBY_MS;
-                if (
-                  !room.invite ||
-                  room.invite.expiresAt <= now ||
-                  (room.invite.version.startsWith(INVITE_VERSION_PREFIX) &&
-                    !revealInvite(room.invite))
-                )
-                  room.invite = await rollInvite(id, now);
-              }
-            }
-            room.members.find(({ id }) => id === seat.id).seenAt = now;
-            return { room };
-          },
-        ).catch((error) => {
+        let replaceInvite = false;
+        try {
+          replaceInvite =
+            (await edit(
+              id,
+              actor,
+              renew ? "host" : "active",
+              async (room, seat, now) => {
+                if (now - seat.seenAt < HEARTBEAT_MS) return {};
+                let roll = false;
+                if (renew) {
+                  await reserve(id, now);
+                  room.leaseUntil = now + LEASE_MS;
+                  if (!room.locked) {
+                    room.expiresAt = now + LOBBY_MS;
+                    roll = inviteExpired(room, now);
+                  }
+                }
+                room.members.find(({ id }) => id === seat.id).seenAt = now;
+                return { room, value: roll };
+              },
+            )) === true;
+        } catch (error) {
           if (error.code !== "authority_changed") throw error;
-        });
+        }
+        if (replaceInvite) {
+          // The lease is already committed. A failed code reservation must not
+          // roll that write back or fail the host's presence update.
+          await edit(id, actor, "host", async (room, _seat, now) => {
+            if (room.locked || !inviteExpired(room, now)) return {};
+            room.invite = await rollInvite(id, now);
+            return { room };
+          }).catch((error) => {
+            if (
+              error.code !== "authority_changed" &&
+              error.code !== "unavailable"
+            )
+              throw error;
+          });
+        }
       }
     }
     return response(id, actor);
@@ -388,14 +411,17 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
       const upgrade = body.rules !== room.rules;
       if (upgrade) {
         const published = campaignRules?.published;
+        const checkpoint = room.head;
+        // Compatibility follows the published checkpoint. room.rules may name
+        // an intermediate build that acquired the room without publishing.
         requireValue(
           body.rules === campaignRules?.current &&
             room.leaseUntil <= now &&
             room.locked &&
-            room.head?.rules === room.rules &&
+            checkpoint &&
             published &&
-            Object.hasOwn(published, room.rules) &&
-            published[room.rules] === room.head.gameSchema,
+            Object.hasOwn(published, checkpoint.rules) &&
+            published[checkpoint.rules] === checkpoint.gameSchema,
           409,
           "incompatible",
         );
