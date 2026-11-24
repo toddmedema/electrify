@@ -434,13 +434,17 @@ export default function MultiplayerRoot() {
   const host =
     !!state.lobby.selfId && state.lobby.hostId === state.lobby.selfId;
   const canLeaveInterruption = session.canLeaveInterruption();
-  const checkpointOnly = !!state.checkpointRecovery;
   const stoppedReplica = session.hasStoppedReplica();
   const connectionError = isConnectionLoss(state.error, state.lobby.error);
   const guestConnectionLost =
     canLeaveInterruption && connectionError && (hasView || (!!coop && !open));
+  const endReason = state.checkpointRecovery
+    ? "checkpoint"
+    : hasView && guestConnectionLost && !lobbyId
+      ? "roomUnavailable"
+      : undefined;
   const interrupted =
-    checkpointOnly ||
+    !!endReason ||
     !!state.synchronizing ||
     (hasView && state.waitingForHost && canLeaveInterruption) ||
     guestConnectionLost;
@@ -542,7 +546,7 @@ export default function MultiplayerRoot() {
       )}
       <HostConnectionWarning
         open={interrupted && !appDialogOpen}
-        checkpointOnly={checkpointOnly}
+        endReason={endReason}
         rollback={
           !!state.checkpointRecovery &&
           (state.view?.revision ?? 0) >

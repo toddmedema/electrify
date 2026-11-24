@@ -10,7 +10,7 @@ import {
 
 export default function HostConnectionWarning({
   open,
-  checkpointOnly,
+  endReason,
   rollback,
   waiting,
   synchronizing,
@@ -19,7 +19,7 @@ export default function HostConnectionWarning({
   onReturnToMenu,
 }: {
   open: boolean;
-  checkpointOnly: boolean;
+  endReason?: "checkpoint" | "roomUnavailable";
   rollback: boolean;
   waiting: boolean;
   synchronizing?: boolean;
@@ -31,16 +31,17 @@ export default function HostConnectionWarning({
   const [action, setAction] = useState<"reconnect" | "leave">();
   const activeAction = useRef<typeof action>();
   const [actionError, setActionError] = useState<string>();
+  const menuOnly = !!endReason;
   // When the current session ends during a retry, the Reconnect button disappears.
   useEffect(() => {
     if (
       open &&
-      checkpointOnly &&
+      menuOnly &&
       (document.activeElement === document.body ||
         document.activeElement === title.current?.closest('[role="dialog"]'))
     )
       title.current?.focus();
-  }, [open, checkpointOnly]);
+  }, [open, menuOnly]);
   useEffect(() => {
     if (!open && actionError) setActionError(undefined);
   }, [open, actionError]);
@@ -49,13 +50,15 @@ export default function HostConnectionWarning({
   const status =
     action === "leave"
       ? "Returning to the main menu…"
-      : checkpointOnly
+      : menuOnly
         ? actionError
         : action === "reconnect"
           ? "Reconnecting…"
           : actionError ||
             error ||
-            (syncing ? "Synchronizing with the host…" : undefined);
+            (syncing
+              ? "Synchronizing with the host…"
+              : "Waiting for the host.");
 
   function act(next: NonNullable<typeof action>, run: () => Promise<void>) {
     if (activeAction.current || (next === "reconnect" && syncing)) return;
@@ -82,7 +85,11 @@ export default function HostConnectionWarning({
       fullWidth
       maxWidth="xs"
       aria-labelledby="multiplayer-interruption-title"
-      aria-describedby="multiplayer-interruption-description"
+      aria-describedby={
+        menuOnly
+          ? "multiplayer-interruption-description"
+          : "multiplayer-interruption-status multiplayer-interruption-description"
+      }
       onClose={() => {}}
       slotProps={{
         transition: {
@@ -102,23 +109,28 @@ export default function HostConnectionWarning({
         ref={title}
         tabIndex={-1}
       >
-        {checkpointOnly
-          ? "Multiplayer session ended"
-          : "Multiplayer connection"}
+        {menuOnly ? "Multiplayer session ended" : "Multiplayer connection"}
       </DialogTitle>
       <DialogContent>
+        <Typography
+          id="multiplayer-interruption-status"
+          role="status"
+          sx={status ? { mb: 1.5 } : undefined}
+        >
+          {status}
+        </Typography>
         <Typography id="multiplayer-interruption-description">
-          {checkpointOnly
+          {endReason === "checkpoint"
             ? "Open Play with friends → Multiplayer saves to continue from the last confirmed save."
-            : syncing
-              ? "The game will continue once it has the latest state from the host."
-              : error || actionError
-                ? "The connection to the host was interrupted. Reconnect to continue this session."
-                : "Waiting for the host. Reconnect to continue this session."}
-          {checkpointOnly &&
+            : endReason === "roomUnavailable"
+              ? "The multiplayer room is no longer available. Check Play with friends → Multiplayer saves in the main menu."
+              : syncing
+                ? "The game will continue once it has the latest state from the host."
+                : "Reconnect to continue this session."}
+          {endReason === "checkpoint" &&
             rollback &&
             " Changes since that save will be lost."}
-          {!checkpointOnly && onReturnToMenu && (
+          {!menuOnly && onReturnToMenu && (
             <>
               {" Leaving now won't create a new save. Progress may be lost."}
               {
@@ -126,9 +138,6 @@ export default function HostConnectionWarning({
               }
             </>
           )}
-        </Typography>
-        <Typography role="status" sx={status ? { mt: 1.5 } : undefined}>
-          {status}
         </Typography>
       </DialogContent>
       <DialogActions
@@ -145,14 +154,14 @@ export default function HostConnectionWarning({
       >
         {onReturnToMenu && (
           <Button
-            variant={checkpointOnly ? "contained" : "text"}
+            variant={menuOnly ? "contained" : "text"}
             aria-disabled={!!action}
             onClick={() => act("leave", onReturnToMenu)}
           >
             Return to main menu
           </Button>
         )}
-        {!checkpointOnly && (
+        {!menuOnly && (
           <Button
             variant="contained"
             aria-disabled={!!action || syncing}

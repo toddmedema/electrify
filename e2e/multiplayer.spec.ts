@@ -594,7 +594,7 @@ test(
       exact: true,
     });
     await expect(warning).toHaveAccessibleDescription(
-      /(?:waiting for the host|connection to the host was interrupted).*won't create a new save.*Play with friends → Multiplayer saves/i,
+      /(?:waiting for the host|connection .* was interrupted).*Reconnect to continue this session.*won't create a new save.*Play with friends → Multiplayer saves/i,
     );
     await expect(warning.getByRole("heading")).toBeFocused();
     await expect(

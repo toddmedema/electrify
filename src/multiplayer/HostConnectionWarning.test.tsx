@@ -11,7 +11,6 @@ function warning() {
   ) => (
     <HostConnectionWarning
       open
-      checkpointOnly={false}
       rollback={false}
       waiting
       onReconnect={onReconnect}
@@ -99,7 +98,7 @@ test("a checkpoint-only interruption offers only the main menu route", async () 
   const user = userEvent.setup();
   const view = warning();
   await user.click(screen.getByRole("button", { name: "Reconnect" }));
-  view.update({ checkpointOnly: true, rollback: true });
+  view.update({ endReason: "checkpoint", rollback: true });
   const dialog = screen.getByRole("dialog", {
     name: "Multiplayer session ended",
   });
