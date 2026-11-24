@@ -14,7 +14,12 @@ const sdp = [
 ].join("\r\n");
 
 test("the exchanged SDP keeps the relay and strips local network details", () => {
-  const offer = relayDescription({ type: "offer", sdp });
+  const candidate = sdp.split("\r\n").at(-1)!;
+  const offer = relayDescription({
+    type: "offer",
+    sdp: [sdp, candidate, candidate.toUpperCase()].join("\r\n"),
+  });
+  expect(offer.sdp?.match(/a=candidate:/gi)).toHaveLength(1);
   expect(offer.sdp).toContain(
     "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
   );

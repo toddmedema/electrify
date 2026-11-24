@@ -493,7 +493,7 @@ export class TurnPeers {
           this.retire(peer);
           return;
         }
-        peer.proofAt = performance.now();
+        peer.proofAt = peer.candidateCheck;
         if (!peer.localVerified) {
           channel.send(new Uint8Array([CONFIRMED]));
           peer.localVerified = true;
@@ -565,7 +565,7 @@ export class TurnPeers {
     void this.options
       .readTransfer(peer.address, message.reference, peer.abort.signal)
       .then((payload) => {
-        if (!this.ready(peer)) return;
+        if (!this.ready(peer)) return this.retire(peer);
         if (!validTurnTransfer(payload, message.type, peer.address.epoch)) {
           this.retire(peer);
           return;

@@ -8,16 +8,7 @@
 
   const token = match[1];
   const web = document.getElementById("web");
-  web.addEventListener("click", () => {
-    try {
-      sessionStorage.setItem(
-        "electrify-crossplay-invite",
-        JSON.stringify({ token, expiresAt: Date.now() + 10 * 60_000 }),
-      );
-    } catch {
-      // Players can copy the invite when browser storage is unavailable.
-    }
-  });
+  web.href = "/#invite=" + token;
   const appId = document.querySelector(
     'meta[name="electrify-steam-app"]',
   ).content;

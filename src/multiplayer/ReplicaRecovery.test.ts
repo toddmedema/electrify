@@ -27,7 +27,11 @@ beforeAll(() => loadSimData("SF"));
 const settle = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 };
-function fixture(hash: DigestFunction = digest, count = 2) {
+function fixture(
+  hash: DigestFunction = digest,
+  count = 2,
+  waitForDispatch = false,
+) {
   let now = 0;
   const host = new ReplicatedWorld(
     createWorld(COOP_TEST_SPEC, coopSeats(count), "match", "epoch"),
@@ -45,6 +49,7 @@ function fixture(hash: DigestFunction = digest, count = 2) {
   const recovery = new ReplicaRecovery(host, "0", {
     now: () => now,
     digest: hash,
+    waitForDispatch,
     flush,
     send: (to, baseline) => events.push({ kind: "baseline", to, baseline }),
     changed: () => {},
@@ -85,6 +90,20 @@ function fixture(hash: DigestFunction = digest, count = 2) {
     baselines: () => events.filter((event) => event.kind === "baseline"),
   };
 }
+
+test("an online baseline dispatch failure leaves time for the transfer service to recover", () => {
+  const f = fixture(digest, 2, true);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.recovery.dispatched("1", f.baselines()[0].baseline.index, false);
+  f.time(1000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  f.time(2000);
+  expect(f.recovery.baseline("1")).toBe(true);
+  f.recovery.dispatched("1", f.baselines()[1].baseline.index, true);
+  f.time(26000);
+  expect(f.recovery.baseline("1")).toBe(false);
+  expect(f.baselines()).toHaveLength(2);
+});
 
 test("a deliberately altered replica recovers at a hash boundary and a pending purchase applies exactly once", async () => {
   const f = fixture();

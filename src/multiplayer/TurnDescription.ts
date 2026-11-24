@@ -16,8 +16,8 @@ export function relayDescription(
   }
   const lines = description.sdp.trimEnd().split(/\r?\n/);
   const endpoints = new Set<string>();
-  const cleanCandidates = new Map<string, string>();
-  for (const line of lines) {
+  const cleanCandidates = new Map<number, string>();
+  for (const [index, line] of lines.entries()) {
     const fields = candidate.exec(line);
     if (!fields) continue;
     const [, foundation, priority, address, port] = fields;
@@ -25,7 +25,7 @@ export function relayDescription(
     if (endpoints.has(endpoint)) continue;
     endpoints.add(endpoint);
     cleanCandidates.set(
-      line,
+      index,
       `a=candidate:${foundation} 1 udp ${priority} ${address} ${port} typ relay`,
     );
   }
@@ -39,10 +39,10 @@ export function relayDescription(
     .find((line) => line.startsWith("c=IN IP4 "))
     ?.split(" ")[2];
   const preserveDefault = endpoints.has(`${address}:${Number(port)}`);
-  const safe = lines.flatMap((line) => {
-    if (line.startsWith("a=candidate:")) return cleanCandidates.get(line) ?? [];
+  const safe = lines.flatMap((line, index) => {
+    if (/^a=candidate:/i.test(line)) return cleanCandidates.get(index) ?? [];
     if (
-      /^a=(?:ice-options|remote-candidates|ice-pacing|msid-semantic):/.test(
+      /^a=(?:ice-options|remote-candidates|ice-pacing|msid-semantic):/i.test(
         line,
       ) ||
       ["a=ice-lite", "a=extmap-allow-mixed", "a=sendrecv"].includes(line)

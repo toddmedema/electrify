@@ -179,6 +179,7 @@ export class MultiplayerSession {
   private connected = new Set<string>();
   private timer?: ReturnType<typeof setInterval>;
   private lifecycle = 0;
+  private lastHost?: { room: string; epoch: string };
   private startGeneration = 0;
   private campaignGeneration = 0;
   private startupCleanup: Promise<unknown> = Promise.resolve();
@@ -318,9 +319,10 @@ export class MultiplayerSession {
       }
       if (
         this.services.authority &&
-        this.state.lobby.authorityEpoch &&
+        this.lastHost &&
         event.state.authorityEpoch &&
-        this.state.lobby.authorityEpoch !== event.state.authorityEpoch
+        (this.lastHost.room !== event.state.lobbyId ||
+          this.lastHost.epoch !== event.state.authorityEpoch)
       ) {
         const error = new Error(
           "Host changed. Actions from the previous session were discarded.",
@@ -348,6 +350,12 @@ export class MultiplayerSession {
           waitingForHost: true,
         };
       }
+      if (!event.state.lobbyId) this.lastHost = undefined;
+      else if (event.state.authorityEpoch)
+        this.lastHost = {
+          room: event.state.lobbyId,
+          epoch: event.state.authorityEpoch,
+        };
       this.update({ lobby: event.state });
       if (this.worker) this.relayAuthority();
       if (this.isHost()) {
@@ -1175,9 +1183,7 @@ export class MultiplayerSession {
   canRecover() {
     const { campaignLocked, recoveryAvailable, members, requiredPlayers } =
       this.state.lobby;
-    const required = requiredPlayers
-      ? members.filter((member) => requiredPlayers.includes(member.id))
-      : members;
+    const required = requiredPlayers ?? members.map(({ id }) => id);
     return (
       !!campaignLocked &&
       !!recoveryAvailable &&
@@ -1185,7 +1191,7 @@ export class MultiplayerSession {
       !this.state.busy &&
       this.authorityIsCurrent() &&
       required.every(
-        ({ id }) =>
+        (id) =>
           id === this.state.lobby.selfId ||
           this.state.lobby.connected.includes(id),
       )
@@ -1471,15 +1477,22 @@ export class MultiplayerSession {
           initialCheckpoint = false;
           this.saving = this.saving
             .catch(() => {})
-            .then(() =>
-              current()
-                ? this.services.checkpoints.write(
-                    data.world,
-                    checkpointSource,
-                    !!data.requestId,
-                  )
-                : undefined,
-            );
+            .then(async () => {
+              const authorized = () =>
+                current() && this.authorityIsCurrent(data.world.epoch);
+              if (authorized()) {
+                await this.services.checkpoints.write(
+                  data.world,
+                  checkpointSource,
+                  !!data.requestId,
+                );
+                if (!data.requestId || authorized()) return;
+              }
+              if (data.requestId)
+                throw new Error(
+                  "Host authority changed before the save finished.",
+                );
+            });
           void this.saving.then(
             () => {
               if (!current() || !first) return;
@@ -1503,7 +1516,6 @@ export class MultiplayerSession {
           );
           if (data.requestId) {
             const request = this.saveRequests.get(data.requestId);
-            this.saveRequests.delete(data.requestId);
             void this.saving.then(
               () => request?.resolve(),
               (error) => request?.reject(error),
@@ -1638,7 +1650,9 @@ export class MultiplayerSession {
           this.saveRequests.set(requestId, { resolve, reject });
           timer = setTimeout(
             () => reject(new Error("The host could not finish the save")),
-            this.onlineCampaigns ? ONLINE_SAVE_TIMEOUT_MS : SAVE_TIMEOUT_MS,
+            this.onlineCampaigns
+              ? ONLINE_SAVE_TIMEOUT_MS + HOST_SILENCE_MS
+              : SAVE_TIMEOUT_MS,
           );
           void this.request({
             kind: "send",
@@ -1824,8 +1838,7 @@ export class MultiplayerSession {
       if (
         browse.mod &&
         scenario &&
-        this.outboundScenario.get(id) !== selection &&
-        lobby.members.find((member) => member.id === id)?.ready !== selection
+        this.outboundScenario.get(id) !== selection
       ) {
         this.outboundScenario.set(id, selection);
         void this.request({
@@ -1966,10 +1979,9 @@ export class MultiplayerSession {
     if (!this.isHost()) return;
     this.closing = true;
     try {
-      // Keep the finished match's final state as the multiplayer save; a failed write isn't fatal.
-      if (this.worker) await this.save(true).catch(() => undefined);
+      if (this.worker) await this.save(true);
+      await this.request({ kind: "unlock" });
       this.endLocalMatch();
-      await this.request({ kind: "unlock" }).catch(() => undefined);
     } finally {
       this.closing = false;
     }

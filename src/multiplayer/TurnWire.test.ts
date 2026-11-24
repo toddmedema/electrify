@@ -86,7 +86,7 @@ test("rejects obsolete, reordered, deep and role-invalid gameplay", () => {
   })[0];
   expect(() =>
     new TurnFrameReader().read(deep.buffer, 0, generation, epoch, false),
-  ).toThrow("too deep");
+  ).toThrow("structural limits");
 
   const badFragment = heartbeat.slice();
   badFragment[1] = 1;

@@ -115,6 +115,9 @@ export function onlineCheckpoints(
   scope: () => { roomId?: string; seatId?: string },
   saved: (timestamp: number) => void,
 ): CheckpointStore {
+  let localWrite:
+    | (Pick<World, "matchId" | "revision" | "epoch"> & { seatId: string })
+    | undefined;
   let published:
     { roomId: string; epoch: string; revision: number; at: number } | undefined;
   const list = async (sync: boolean): Promise<SharedSaveLibrary> => {
@@ -143,20 +146,33 @@ export function onlineCheckpoints(
       const target = id ?? roomId;
       if (!target)
         throw new Error("There is no multiplayer campaign to export.");
-      const local =
-        !id && seatId
-          ? await browserCheckpoints(seatId)
-              .read()
-              .catch(() => null)
-          : null;
-      const world =
-        local ??
-        (await decodeSnapshot(
+      let world: unknown;
+      let filename = "electrify-multiplayer-campaign.json";
+      try {
+        world = await decodeSnapshot(
           await api.request<EncodedSnapshot>("save/download", {
             roomId: target,
           }),
-        ));
-      downloadJson("electrify-multiplayer-campaign.json", {
+        );
+      } catch (error) {
+        const local =
+          !id && seatId
+            ? await browserCheckpoints(seatId)
+                .read()
+                .catch(() => null)
+            : null;
+        if (!local || scope().roomId !== roomId || scope().seatId !== seatId)
+          throw error;
+        if (
+          !window.confirm(
+            "The confirmed online save could not be downloaded. Download this device’s checkpoint instead? It may be older.",
+          )
+        )
+          return;
+        world = local;
+        filename = "electrify-multiplayer-device-checkpoint.json";
+      }
+      downloadJson(filename, {
         format: "electrify-multiplayer",
         world: JSON.parse(encodeWire(world)),
       });
@@ -171,20 +187,24 @@ export function onlineCheckpoints(
         throw new Error("Multiplayer room is no longer active.");
       try {
         const cache = browserCheckpoints(seatId);
-        const local = source && (await cache.read(world.matchId));
         const superseded =
           source &&
-          local &&
-          local.epoch === source.epoch &&
-          local.revision >= source.revision
-            ? {
-                matchId: local.matchId,
-                epoch: local.epoch,
-                revision: local.revision,
-              }
+          localWrite?.seatId === seatId &&
+          localWrite.matchId === source.matchId &&
+          localWrite.epoch === source.epoch &&
+          localWrite.revision >= source.revision
+            ? localWrite
             : source;
         await cache.write(world, superseded);
-        saved(Date.now());
+        localWrite = {
+          seatId,
+          matchId: world.matchId,
+          epoch: world.epoch,
+          revision: world.revision,
+        };
+        const current = scope();
+        if (current.roomId === roomId && current.seatId === seatId)
+          saved(Date.now());
       } catch {
         // Durable saves still work with an unavailable or full local store.
       }

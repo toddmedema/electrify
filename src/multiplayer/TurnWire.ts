@@ -82,8 +82,16 @@ function command(value: unknown, epoch: string) {
         typeof data.value === "number" &&
         Number.isFinite(data.value)
       );
-    case "action":
-      return exact(data, ["kind", "name", "payload"]) && text(data.name, 160);
+    case "action": {
+      if (!exact(data, ["kind", "name", "payload"]) || !text(data.name, 160))
+        return false;
+      // A recorded command also carries its seat, receipt, record and packet headers.
+      const json = encodeWire(value);
+      return (
+        new TextEncoder().encode(json).byteLength <= 56 * 1024 &&
+        fitsJsonShape(json, 40, 8000)
+      );
+    }
     default:
       return false;
   }
@@ -242,7 +250,11 @@ export function turnFrames(packet: Packet): Uint8Array<ArrayBuffer>[] {
 }
 
 /** Bound reviver recursion and visited object values before parsing untrusted JSON. */
-function guardedJson(source: string) {
+export function fitsJsonShape(
+  source: string,
+  maxDepth: number,
+  maxItems: number,
+) {
   let depth = 0;
   let elements = 0;
   let quoted = false;
@@ -254,18 +266,17 @@ function guardedJson(source: string) {
       quoted = !quoted;
     } else if (!quoted) {
       if (character === "{" || character === "[") {
-        if (++depth > 48) throw new Error("Multiplayer message is too deep");
+        if (++depth > maxDepth) return false;
         elements += 1;
       } else if (character === "}" || character === "]") {
         depth -= 1;
       } else if (character === ",") {
         elements += 1;
       }
-      if (elements > 8192)
-        throw new Error("Multiplayer message has too many items");
+      if (elements > maxItems) return false;
     }
   }
-  return decodeWire(source);
+  return true;
 }
 
 /** An ordered channel permits one bounded assembly, with no cross-generation carryover. */
@@ -335,7 +346,10 @@ export class TurnFrameReader {
     );
     this.buffer = undefined;
     this.index = 0;
-    const packet = guardedJson(this.decoder.decode(assembled));
+    const source = this.decoder.decode(assembled);
+    if (!fitsJsonShape(source, 48, 8192))
+      throw new Error("Multiplayer message exceeds structural limits");
+    const packet = decodeWire(source);
     if (
       !object(packet) ||
       !exact(packet, ["epoch", "generation", "message"]) ||

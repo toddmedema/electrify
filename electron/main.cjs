@@ -98,7 +98,6 @@ const primaryInstance = app.requestSingleInstanceLock();
 const steam = new SteamService();
 let crossplay;
 let confirmedInvite;
-let lastSteamInvite;
 let stopSteamInvites;
 let modStore;
 let workshop;
@@ -416,8 +415,11 @@ function configureSteamCrossplay() {
         ),
     });
     stopSteamInvites = observeSteamInvites(api, steam.dispatcher, (token) => {
-      if (lastSteamInvite === token) return;
-      lastSteamInvite = token;
+      if (
+        confirmedInvite?.token === token &&
+        confirmedInvite.expiresAt > Date.now()
+      )
+        return;
       confirmedInvite = { token, expiresAt: Date.now() + 10 * 60_000 };
       if (window && !window.isDestroyed())
         window.webContents.send("desktop:crossplay-invite-available");

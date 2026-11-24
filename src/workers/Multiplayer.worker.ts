@@ -16,6 +16,8 @@ import {
 import { ReplicatedWorld } from "../multiplayer/Replication";
 import type { ReplicaRecord } from "../multiplayer/Replication";
 import { ReplicaRecovery } from "../multiplayer/ReplicaRecovery";
+import { fitsJsonShape } from "../multiplayer/TurnWire";
+import { encodeWire } from "../multiplayer/WireJson";
 import { ViewPublication } from "../multiplayer/ViewPublication";
 import {
   CHECKPOINT_INTERVAL_MS,
@@ -100,20 +102,6 @@ async function data(spec: MatchSpec) {
     waitForLoad((done) => initWeather(location, done)),
   ]);
 }
-/** Exact numeric-tag overhead matters to the native 64 KiB records limit. World packing never
- * applies to ordinary command records, whose envelopes are separately size-limited natively. */
-function recordJson(value: unknown) {
-  return JSON.stringify(value, function (_key, item) {
-    if (
-      typeof item === "number" &&
-      (Object.is(item, -0) || !Number.isFinite(item))
-    )
-      return { $electrifyNumber: Object.is(item, -0) ? "-0" : String(item) };
-    if (item === undefined && Array.isArray(this))
-      return { $electrifyNumber: "undefined" };
-    return item;
-  });
-}
 function flushRecords() {
   clearTimeout(recordTimer);
   recordTimer = undefined;
@@ -132,20 +120,25 @@ function flushRecords() {
     from,
     records: items,
   });
-  const bytes = (items: ReplicaRecord[]) =>
-    new TextEncoder().encode(recordJson(message(items))).byteLength;
+  const fits = (items: ReplicaRecord[]) => {
+    const json = encodeWire(message(items));
+    return (
+      new TextEncoder().encode(json).byteLength <= maxRecordBytes &&
+      (!online || fitsJsonShape(json, 47, 8188))
+    );
+  };
   // Leave room for the generation and epoch in the TURN packet envelope.
   const maxRecordBytes = online ? 60 * 1024 : 64 * 1024;
   for (const record of batch.records) {
     if (
       records.length &&
-      (records.length === 256 || bytes([...records, record]) > maxRecordBytes)
+      (records.length === 256 || !fits([...records, record]))
     ) {
       post(message(records));
       from += records.length;
       records = [];
     }
-    if (!records.length && bytes([record]) > maxRecordBytes)
+    if (!records.length && !fits([record]))
       throw new Error("A multiplayer record exceeds the network limit");
     records.push(record);
   }
@@ -338,7 +331,7 @@ async function startMatch(
     });
     recoveryTimer = setInterval(() => {
       try {
-        recovery!.pulse();
+        if (replicationOpen) recovery!.pulse();
       } catch (error) {
         fault(error);
       }
@@ -424,7 +417,7 @@ function handle(request: WorkerRequest, running: World) {
     if (requestedMembership) requestedMembership = request.connected;
     recovery?.connected(request.connected);
   } else if (request.kind === "progress") {
-    recovery?.progress(request);
+    if (replicationOpen) recovery?.progress(request);
   } else if (request.kind === "resync") {
     if (request.matchId === running.matchId && request.epoch === running.epoch)
       sendBaseline(request.sender);

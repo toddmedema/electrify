@@ -30,6 +30,13 @@ test("accepts only official links, opaque invite secrets and paste codes", () =>
   expect(crossplayInviteLink("url=//example.test/")).toBeUndefined();
 });
 
+test("captures the invitation from a new tab with empty storage", () => {
+  window.history.replaceState(null, "", "/#invite=" + token);
+  expect(captureCrossplayInvite()).toBe(token);
+  expect(window.location.hash).toBe("");
+  expect(captureCrossplayInvite()).toBe(token);
+});
+
 test("keeps an invite through sign-in and expires or clears the handoff", () => {
   sessionStorage.setItem(
     key,

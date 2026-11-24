@@ -141,7 +141,7 @@ export class ReplicaRecovery {
     const baseline = this.peers.get(to)?.baseline;
     if (!this.options.waitForDispatch || !baseline || baseline.index !== index)
       return;
-    baseline.retryAt = this.now() + (delivered ? 25_000 : 0);
+    baseline.retryAt = this.now() + (delivered ? 25_000 : 2_000);
   }
   progress(report: Progress) {
     if (this.terminal) return;

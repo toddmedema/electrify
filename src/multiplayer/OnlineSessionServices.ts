@@ -133,9 +133,15 @@ export function onlineSessionServices(
     timer = setTimeout(() => {
       if (actions) return schedule();
       const before = version;
+      const sequence = lastRequest + 1;
       void roomRequest("state", { roomId })
         .catch((error: unknown) => {
-          if (before !== version || !(error instanceof CrossplayApiError))
+          if (
+            before !== version ||
+            sequence < applied ||
+            sequence < latestAction ||
+            !(error instanceof CrossplayApiError)
+          )
             return;
           if (
             error.code === "invalid_invite" ||
@@ -284,7 +290,7 @@ export function onlineSessionServices(
   function suspend() {
     if (hidden) return;
     hidden = true;
-    version++;
+    if (roomId) version++;
     clearTimeout(timer);
     expire();
     if (roomId && presence)
@@ -382,7 +388,17 @@ export function onlineSessionServices(
           if (!roomId || !presence || lobby.hostId !== lobby.selfId)
             throw new CrossplayApiError("authority_changed");
           const campaign = roomId;
+          const restartVersion = version;
+          const action = ++lastRequest;
+          latestAction = action;
           await api.request("room/leave", { roomId: campaign });
+          if (
+            !active ||
+            restartVersion !== version ||
+            latestAction !== action ||
+            roomId !== campaign
+          )
+            return lobby as Reply;
           return (await roomRequest(
             "reconnect",
             {

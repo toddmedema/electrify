@@ -528,9 +528,7 @@ export default function MultiplayerRoot() {
         </Suspense>
       )}
       <HostConnectionWarning
-        waiting={
-          hasView && state.waitingForHost && !state.lobby.recoveryAvailable
-        }
+        waiting={hasView && state.waitingForHost && !recoverHere}
         synchronizing={state.synchronizing}
         onReconnect={reconnect}
         onDisconnect={disconnect}
@@ -618,21 +616,21 @@ export default function MultiplayerRoot() {
           hostName={coop?.hostName ?? "The host"}
           selfId={state.lobby.selfId}
           onWatch={() => setWatching(endingKey)}
+          online={session.onlineCampaigns}
           onBackToLobby={() => {
-            choosing.current = true;
-            void session
-              .leave({ skipSave: false })
-              .then(() => setOpen(true))
-              .catch((error) => {
-                store.dispatch(
-                  dialogOpen({
-                    open: true,
-                    title: "Multiplayer save",
-                    message: error.message,
-                    closeText: "OK",
-                  }),
-                );
-              });
+            const transition = session.onlineCampaigns
+              ? session.leave({ skipSave: false }).then(() => setOpen(true))
+              : session.backToLobby().then(startChoosing);
+            void transition.catch((error) => {
+              store.dispatch(
+                dialogOpen({
+                  open: true,
+                  title: "Multiplayer save",
+                  message: error.message,
+                  closeText: "OK",
+                }),
+              );
+            });
           }}
           onLeave={() => leaveLobby(true)}
         />

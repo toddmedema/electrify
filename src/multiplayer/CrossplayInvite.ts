@@ -16,8 +16,26 @@ export function parseCrossplayInvite(input: string): string | undefined {
   return LINK_TOKEN.test(fromLink) ? fromLink : undefined;
 }
 
-/** The static first-party page strips the fragment before handing off to the app. */
+/** Capture a browser handoff in this tab, including links opened in a new tab. */
 export function captureCrossplayInvite(): string | undefined {
+  if (window.location.pathname === "/" && !window.location.search) {
+    const match = /^#invite=([A-Za-z0-9_-]{22})$/.exec(window.location.hash);
+    if (match) {
+      try {
+        sessionStorage.setItem(
+          KEY,
+          JSON.stringify({
+            token: match[1],
+            expiresAt: Date.now() + 10 * 60_000,
+          }),
+        );
+        window.history.replaceState(window.history.state, "", "/");
+      } catch {
+        // Keep the fragment available for the lobby when session storage is disabled.
+      }
+      return match[1];
+    }
+  }
   try {
     const stored = sessionStorage.getItem(KEY);
     if (!stored) return undefined;

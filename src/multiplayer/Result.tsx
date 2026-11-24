@@ -37,6 +37,7 @@ export default function CoopResult({
   host,
   hostName,
   selfId,
+  online = false,
   onWatch,
   onBackToLobby,
   onLeave,
@@ -45,6 +46,7 @@ export default function CoopResult({
   ending?: CompanyOutcomeType;
   /** Every company has finished. */
   complete: boolean;
+  online?: boolean;
   host: boolean;
   hostName: string;
   /** Marks this player's own company in the table. */
@@ -153,7 +155,7 @@ export default function CoopResult({
             <KeepModCopy scenario={scenario} />
           </Box>
         )}
-        {complete && !host && (
+        {complete && !host && !online && (
           <Typography role="status" sx={{ mt: 2 }}>
             Waiting for {hostName} to choose the next game.
           </Typography>
@@ -171,7 +173,7 @@ export default function CoopResult({
         )}
         {complete && host && (
           <Button variant="contained" onClick={onBackToLobby}>
-            Back to lobby
+            {online ? "Save and leave campaign" : "Back to lobby"}
           </Button>
         )}
       </DialogActions>

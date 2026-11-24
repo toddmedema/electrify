@@ -33,6 +33,7 @@ export default function SavesDialog({
     session.getSnapshot,
   );
   const [failure, setFailure] = useState<string>();
+  const [withdrawalFailure, setWithdrawalFailure] = useState<string>();
   const [search, setSearch] = useState("");
   const [menu, setMenu] = useState<{
     anchor: HTMLElement;
@@ -245,7 +246,7 @@ export default function SavesDialog({
           sx={{ color: "error.main" }}
           onClick={() => {
             if (menu) setDeleting({ id: menu.id, name: menu.name });
-            setFailure(undefined);
+            setWithdrawalFailure(undefined);
             setMenu(undefined);
           }}
         >
@@ -281,9 +282,9 @@ export default function SavesDialog({
               ? `You will lose access to “${deleting?.name}”. The original roster may be unable to resume without you.`
               : `“${deleting?.name}” will be permanently deleted.`}
           </Typography>
-          {failure && (
+          {withdrawalFailure && (
             <Alert severity="error" sx={{ mt: 2 }}>
-              {failure}
+              {withdrawalFailure}
             </Alert>
           )}
         </DialogContent>
@@ -302,11 +303,16 @@ export default function SavesDialog({
             disabled={loadingSaves}
             onClick={() => {
               if (deleting)
-                void run(async () => {
-                  await session.deleteSharedSave(deleting.id);
-                  deleted.current = true;
-                  setDeleting(undefined);
-                });
+                void session.deleteSharedSave(deleting.id).then(
+                  () => {
+                    deleted.current = true;
+                    setDeleting(undefined);
+                  },
+                  (error) =>
+                    setWithdrawalFailure(
+                      error instanceof Error ? error.message : "Try again.",
+                    ),
+                );
             }}
           >
             {loadingSaves

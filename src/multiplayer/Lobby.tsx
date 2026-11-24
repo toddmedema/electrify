@@ -62,6 +62,28 @@ export default function Lobby({
   const [code, setCode] = useState(initialInviteCode ?? "");
   const [failure, setFailure] = useState<string>();
   const [entryAttempt, setEntryAttempt] = useState<"host" | "join">();
+  const entryVersion = useRef(0);
+  const [authorizing, setAuthorizing] = useState(false);
+  useEffect(
+    () => () => {
+      entryVersion.current++;
+    },
+    [],
+  );
+  async function authorized(action: () => Promise<void> | void) {
+    const attempt = ++entryVersion.current;
+    setAuthorizing(true);
+    try {
+      await onAuthorize?.();
+      if (attempt === entryVersion.current) await action();
+    } finally {
+      if (attempt === entryVersion.current) setAuthorizing(false);
+    }
+  }
+  function dismissEntry() {
+    entryVersion.current++;
+    onClose();
+  }
   const title = useRef<HTMLHeadingElement>(null);
   const mode =
     !lobby.lobbyId || entryOperation === "join"
@@ -92,7 +114,8 @@ export default function Lobby({
     : /^[0-9]{6}$/.test(code)
       ? code
       : undefined;
-  const canJoin = canAuthenticate && lobby.available && !busy && invite;
+  const canJoin =
+    canAuthenticate && lobby.available && !busy && !authorizing && invite;
   const joinFailed = entryAttempt === "join" && !!failure;
   return (
     <Dialog
@@ -104,7 +127,7 @@ export default function Lobby({
         busy
           ? undefined
           : mode === "entry"
-            ? onClose
+            ? dismissEntry
             : mode === "campaign" && host
               ? onChooseNew
               : undefined
@@ -135,7 +158,7 @@ export default function Lobby({
             edge="start"
             color="primary"
             disabled={busy}
-            onClick={onClose}
+            onClick={dismissEntry}
           >
             <ChevronLeftIcon />
           </IconButton>
@@ -182,13 +205,18 @@ export default function Lobby({
               <Button
                 variant="contained"
                 size="large"
-                disabled={!canAuthenticate || !lobby.available || busy}
+                disabled={
+                  !canAuthenticate || !lobby.available || busy || authorizing
+                }
                 onClick={() =>
-                  run(async () => {
-                    await onAuthorize?.();
-                    await session.create();
-                    onHosted?.();
-                  }, "host")
+                  run(
+                    () =>
+                      authorized(async () => {
+                        await session.create();
+                        onHosted?.();
+                      }),
+                    "host",
+                  )
                 }
               >
                 Host a game
@@ -199,11 +227,14 @@ export default function Lobby({
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (canJoin)
-                    run(async () => {
-                      await onAuthorize?.();
-                      await session.join(invite);
-                      onJoined?.();
-                    }, "join");
+                    run(
+                      () =>
+                        authorized(async () => {
+                          await session.join(invite);
+                          onJoined?.();
+                        }),
+                      "join",
+                    );
                 }}
               >
                 <TextField
@@ -213,7 +244,7 @@ export default function Lobby({
                       : "6-digit invite code"
                   }
                   value={code}
-                  disabled={busy}
+                  disabled={busy || authorizing}
                   error={joinFailed}
                   onChange={(event) => {
                     if (joinFailed) setFailure(undefined);
@@ -241,13 +272,8 @@ export default function Lobby({
               </form>
               {onOpenSaves && (
                 <Button
-                  disabled={!canAuthenticate || busy}
-                  onClick={() =>
-                    run(async () => {
-                      await onAuthorize?.();
-                      onOpenSaves();
-                    }, "join")
-                  }
+                  disabled={!canAuthenticate || busy || authorizing}
+                  onClick={() => run(() => authorized(onOpenSaves), "join")}
                 >
                   Multiplayer saves
                 </Button>
@@ -437,7 +463,11 @@ export default function Lobby({
       </DialogContent>
       {mode === "entry" && onLocalPlay && (
         <DialogActions>
-          <Button size="large" disabled={busy} onClick={onLocalPlay}>
+          <Button
+            size="large"
+            disabled={busy || authorizing}
+            onClick={onLocalPlay}
+          >
             Local Co-op
           </Button>
         </DialogActions>

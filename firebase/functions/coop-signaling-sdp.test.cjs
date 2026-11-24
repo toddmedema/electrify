@@ -77,7 +77,13 @@ test("rejects malformed, private and reserved relay candidate addresses", () => 
     "224.0.0.1",
     "255.255.255.255",
   ]) {
-    const offer = { type: "offer", sdp: sdp.replaceAll("8.8.8.8", address) };
+    const offer = {
+      type: "offer",
+      sdp: sdp.replace(
+        "a=mid:0",
+        `a=candidate:2 1 udp 12345 ${address} 12213 typ relay\r\na=mid:0`,
+      ),
+    };
     assert.equal(validateDescription(offer, "offer"), null, address);
   }
 });
