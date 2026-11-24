@@ -447,7 +447,6 @@ test("production workflow rejects unusable cross-play configuration before Fireb
     env: {
       STEAM_APP_ID: "123456",
       COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
-      COOP_TURN_RELAY_CIDRS: "141.101.64.0/18",
     },
   });
   const { jobs } = parse(
@@ -460,15 +459,15 @@ test("production workflow rejects unusable cross-play configuration before Fireb
   );
   for (const [variable, value] of [
     ["STEAM_APP_ID", "2147483648"],
-    ["COOP_TURN_RELAY_CIDRS", "141.101.64.0/18,192.168.1.0/24"],
-    ["COOP_TURN_RELAY_CIDRS", "999.101.64.0/18"],
+    ["COOP_CHECKPOINT_BUCKET", "invalid/bucket"],
+    ["COOP_CHECKPOINT_BUCKET", ""],
   ]) {
     const result = fixture.runShell(
       `export ${variable}="${value}"\n${firebase}`,
     );
     assert.equal(result.status, 1, variable);
     assert.match(result.stderr, new RegExp(variable));
-    assert.ok(!result.stderr.includes(value));
+    if (value) assert.ok(!result.stderr.includes(value));
     assert.equal(
       fixture.calls.filter(({ args }) => args[0] === "firebase").length,
       0,
@@ -476,13 +475,12 @@ test("production workflow rejects unusable cross-play configuration before Fireb
   }
 });
 
-test("production workflow deploys the Firebase web service without a Steam App ID", (t) => {
+test("production workflow deploys the Firebase web service without a Steam App ID or relay CIDRs", (t) => {
   const fixture = fakeDeployment(t, distribution(), undefined, "", {
     args: ["--preflight"],
     env: {
       STEAM_APP_ID: "",
       COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
-      COOP_TURN_RELAY_CIDRS: "141.101.64.0/18",
     },
   });
   const { jobs } = parse(
@@ -491,7 +489,9 @@ test("production workflow deploys the Firebase web service without a Steam App I
   const deploy = jobs.deploy.steps.find(({ run }) =>
     run?.includes("firebase-tools@15 deploy"),
   );
-  const result = fixture.runShell(resolveDeploymentScripts(deploy.run));
+  const result = fixture.runShell(
+    "unset COOP_TURN_RELAY_CIDRS\n" + resolveDeploymentScripts(deploy.run),
+  );
   assert.equal(result.status, 0, result.stderr);
   assert.equal(
     fixture.calls.filter(({ args }) => args[0] === "firebase").length,
@@ -506,7 +506,6 @@ test("production workflow checks hosting readiness before Firebase or AWS mutati
     env: {
       STEAM_APP_ID: "123456",
       COOP_CHECKPOINT_BUCKET: "test-electrify-checkpoints",
-      COOP_TURN_RELAY_CIDRS: "141.101.64.0/18",
     },
   });
   const { jobs } = parse(

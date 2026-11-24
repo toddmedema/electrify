@@ -1,9 +1,6 @@
 const { createHash, randomUUID } = require("node:crypto");
 const { CrossplayError } = require("./crossplay-errors.cjs");
-const {
-  createRelayPolicy,
-  validateDescription,
-} = require("./coop-signaling-sdp.cjs");
+const { validateDescription } = require("./coop-signaling-sdp.cjs");
 
 const TURN_API = "https://rtc.live.cloudflare.com/v1/turn/keys";
 const UDP = "turn:turn.cloudflare.com:3478";
@@ -99,26 +96,23 @@ function credentialId(roomId, generation, seatId) {
 
 function createTurnSignaling({
   db,
-  relayCidrs,
   keyId,
   keyToken,
   loadRoom,
   fetchImpl = fetch,
   clock = Date.now,
 }) {
-  const relay = createRelayPolicy(relayCidrs);
+  const configured =
+    typeof keyId === "string" &&
+    IDENTIFIER.test(keyId) &&
+    typeof keyToken === "string" &&
+    CREDENTIAL.test(keyToken);
   const grants = db.collection("coopTurnGrants");
   const operation = db.doc("coopOperations/turn");
   const runtime = db.doc("coopSettings/runtime");
 
   async function provider(path, status, body) {
-    if (
-      typeof keyId !== "string" ||
-      !IDENTIFIER.test(keyId) ||
-      typeof keyToken !== "string" ||
-      !keyToken
-    )
-      throw new CrossplayError(503, "turn-unavailable");
+    if (!configured) throw new CrossplayError(503, "turn-unavailable");
     const response = await fetchImpl(
       `${TURN_API}/${keyId}/credentials/${path}`,
       {
@@ -163,7 +157,7 @@ function createTurnSignaling({
   }
 
   async function issue(context, pair, to) {
-    if (!relay) throw new CrossplayError(503, "turn-unavailable");
+    if (!configured) throw new CrossplayError(503, "turn-unavailable");
     const { roomId, seatId } = context;
     const ref = grants.doc(credentialId(roomId, pair.generation, seatId));
     const now = clock();
@@ -316,7 +310,7 @@ function createTurnSignaling({
         if (name !== "signal/describe")
           throw new CrossplayError(404, "unknown-operation");
         const type = seatId === pair.hostId ? "offer" : "answer";
-        const description = validateDescription(body.description, type, relay);
+        const description = validateDescription(body.description, type);
         if (!description || (type === "answer" && !pair.offer))
           throw new CrossplayError(400, "invalid-signaling");
         if (pair[type]) {
@@ -395,7 +389,7 @@ function createTurnSignaling({
     if (failures) throw new Error("TURN grant cleanup needs retry");
   }
 
-  return { handle, revokeRoom, reap, configured: !!relay };
+  return { handle, revokeRoom, reap, configured };
 }
 
 module.exports = { activeSignalPair, createTurnSignaling };

@@ -28,9 +28,7 @@ function registerCrossplay(adminApp) {
     const db = getFirestore(adminApp);
     const auth = getAuth(adminApp);
     const checkpointBucket = process.env.COOP_CHECKPOINT_BUCKET;
-    const relayCidrs = process.env.COOP_TURN_RELAY_CIDRS;
-    if (!checkpointBucket || !relayCidrs)
-      throw new CrossplayError(503, "unavailable");
+    if (!checkpointBucket) throw new CrossplayError(503, "unavailable");
 
     const writerToken = createWriter({ auth, apiKey: secrets.writer.value() });
     const store = createStore({ db, projectId, writerToken });
@@ -38,7 +36,6 @@ function registerCrossplay(adminApp) {
     const { createTurnSignaling } = require("./coop-signaling.cjs");
     const signaling = createTurnSignaling({
       db,
-      relayCidrs,
       keyId: secrets.turnId.value(),
       keyToken: secrets.turnToken.value(),
       loadRoom: (id) => service.loadRoom(id),

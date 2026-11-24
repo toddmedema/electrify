@@ -1,11 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {
-  createRelayPolicy,
-  validateDescription,
-} = require("./coop-signaling-sdp.cjs");
+const { validateDescription } = require("./coop-signaling-sdp.cjs");
 
-const approved = createRelayPolicy("8.8.8.0/24");
 const fingerprint = Array(32).fill("C2").join(":");
 const sdp = [
   "v=0",
@@ -26,20 +22,23 @@ const sdp = [
   "",
 ].join("\r\n");
 
-test("accepts a single data-only exchange with approved relay endpoints", () => {
+test("accepts data-only offers and answers with public IPv4 relays without configured ranges", () => {
   const offer = { type: "offer", sdp };
-  const answer = { type: "answer", sdp: sdp.replace("actpass", "active") };
-  assert.deepEqual(validateDescription(offer, "offer", approved), offer);
-  assert.deepEqual(validateDescription(answer, "answer", approved), answer);
-  assert.equal(validateDescription(offer, "answer", approved), null);
-  assert.equal(validateDescription(answer, "offer", approved), null);
+  const answer = {
+    type: "answer",
+    sdp: sdp.replaceAll("8.8.8.8", "1.1.1.1").replace("actpass", "active"),
+  };
+  assert.deepEqual(validateDescription(offer, "offer"), offer);
+  assert.deepEqual(validateDescription(answer, "answer"), answer);
+  assert.equal(validateDescription(offer, "answer"), null);
+  assert.equal(validateDescription(answer, "offer"), null);
 });
 
-test("rejects fake relays, direct candidates, leaked addresses and duplicate DTLS identity", () => {
+test("rejects direct candidates, leaked addresses and duplicate DTLS identity", () => {
   const invalid = [
-    sdp.replaceAll("8.8.8.8", "8.8.4.4"),
-    sdp.replaceAll("8.8.8.8", "192.168.0.11"),
     sdp.replace("typ relay", "typ host"),
+    sdp.replace("typ relay", "typ srflx"),
+    sdp.replace("c=IN IP4 8.8.8.8", "c=IN IP4 192.168.0.11"),
     sdp.replace("typ relay", "typ relay raddr 192.168.0.11 rport 6133"),
     sdp.replace("12212 typ relay", "61222 typ relay"),
     sdp.replace("a=mid:0", "a=mid:1"),
@@ -54,12 +53,31 @@ test("rejects fake relays, direct candidates, leaked addresses and duplicate DTL
   ];
   for (const value of invalid) {
     assert.equal(
-      validateDescription({ type: "offer", sdp: value }, "offer", approved),
+      validateDescription({ type: "offer", sdp: value }, "offer"),
       null,
     );
   }
-  assert.equal(
-    validateDescription({ type: "offer", sdp }, "offer", createRelayPolicy("")),
-    null,
-  );
+});
+
+test("rejects malformed, private and reserved relay candidate addresses", () => {
+  for (const address of [
+    "999.8.8.8",
+    "8.008.8.8",
+    "::ffff:8.8.8.8",
+    "relay.example.com",
+    "0.0.0.0",
+    "10.0.0.1",
+    "100.64.0.1",
+    "127.0.0.1",
+    "169.254.169.254",
+    "172.16.0.1",
+    "192.168.0.11",
+    "192.0.2.1",
+    "198.18.0.1",
+    "224.0.0.1",
+    "255.255.255.255",
+  ]) {
+    const offer = { type: "offer", sdp: sdp.replaceAll("8.8.8.8", address) };
+    assert.equal(validateDescription(offer, "offer"), null, address);
+  }
 });

@@ -35,6 +35,10 @@ const password = /^a=ice-pwd:[\da-z+/]{22,256}$/i;
 const direct = new Set(["v=0", "s=-", "t=0 0", "a=sctp-port:5000"]);
 const optional = new Set(["a=msid-semantic: WMS", "a=end-of-candidates"]);
 
+function isPublicRelayAddress(address) {
+  return isIP(address) === 4 && !nonPublic.check(address);
+}
+
 function createRelayPolicy(config) {
   if (typeof config !== "string" || !config.trim()) return null;
   const ips = new BlockList();
@@ -42,21 +46,18 @@ function createRelayPolicy(config) {
     const [address, mask, extra] = range.split("/");
     if (
       extra !== undefined ||
-      isIP(address) !== 4 ||
-      nonPublic.check(address) ||
+      !isPublicRelayAddress(address) ||
       !/^(?:1[6-9]|2\d|3[0-2])$/.test(mask)
     ) {
       return null;
     }
     ips.addSubnet(address, Number(mask));
   }
-  return (address) =>
-    isIP(address) === 4 && !nonPublic.check(address) && ips.check(address);
+  return (address) => isPublicRelayAddress(address) && ips.check(address);
 }
 
-function validateDescription(value, type, isRelay) {
+function validateDescription(value, type) {
   if (
-    !isRelay ||
     value?.type !== type ||
     Object.keys(value).length !== 2 ||
     typeof value.sdp !== "string" ||
@@ -79,7 +80,7 @@ function validateDescription(value, type, isRelay) {
       if (
         endpoints.size >= 16 ||
         endpoints.has(key) ||
-        !isRelay(address) ||
+        !isPublicRelayAddress(address) ||
         Number(priority) > 0xffffffff ||
         Number(port) < 1 ||
         Number(port) > 65535
@@ -148,4 +149,8 @@ function validateDescription(value, type, isRelay) {
   return { type, sdp: value.sdp };
 }
 
-module.exports = { createRelayPolicy, validateDescription };
+module.exports = {
+  createRelayPolicy,
+  isPublicRelayAddress,
+  validateDescription,
+};

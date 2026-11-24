@@ -58,26 +58,31 @@ the host's approval. The deployment checks co-op health before publishing the
 website. The operator can stop the service with `coopSettings/runtime.stopped`
 in Firestore.
 
+Signaling accepts data-only descriptions with public IPv4 relay candidates.
+It rejects direct candidates and private or reserved addresses. The web rollout
+accepts that a player can supply a public destination and cause TURN to send
+connectivity checks there.
+
 After deployment, use two signed-in browsers to verify host approval, play,
 Save & Quit, and recovery under a different host. Verify the selected TURN
 relay path on a normal connection and over TLS with UDP blocked.
 
 ## Release access
 
-Provision these resources through the provider consoles before a production
-rollout. Keep tokens and keys in the named secret stores. Share the project ID,
-App ID, endpoint, bucket name, provider policy and pass/fail evidence in the PR.
+Provision the web deployment resources through the provider consoles and keep
+tokens and keys in the named secret stores. Share the project ID, endpoint, bucket
+name, and test results in the PR. Include the Steam App ID and Steamworks setup
+when qualifying the combined web and Steam release.
 
-- **GitHub repository maintainer.** Set Actions variables
-  `COOP_CHECKPOINT_BUCKET` and `COOP_TURN_RELAY_CIDRS` on the repository or
-  its `production` environment. Add `STEAM_APP_ID` when Steam is ready. Use the public IPv4 networks Cloudflare
-  confirms for **relay allocations**. The preflight validates the same CIDR
-  syntax as the application. It runs before Firebase changes. The existing
+- **GitHub repository maintainer.** Set `COOP_CHECKPOINT_BUCKET` as an Actions
+  variable on the repository or its `production` environment. Add `STEAM_APP_ID`
+  when Steam is ready. The production preflight validates these settings before
+  Firebase changes. The existing
   `FIREBASE_SERVICE_ACCOUNT` deploy identity needs permission to deploy
   Firestore rules and indexes, the two co-op functions and their scheduler,
   and to act as the runtime service account. The workflow deploys Firebase
   and checks its health before publishing the AWS web bundle.
-- **Steamworks administrator and build operator.** Confirm the production App
+- **Steamworks administrator and build operator for the combined release.** Confirm the production App
   ID and enable **Use launch command line**. Have a Steamworks administrator
   create a publisher Web API key for the group containing Electrify and put it
   in Secret Manager as `STEAM_PUBLISHER_KEY`. Use the dedicated build account
@@ -106,9 +111,9 @@ App ID, endpoint, bucket name, provider policy and pass/fail evidence in the PR.
 - **Cloudflare Realtime account owner or delegated operator.** Provision a
   dedicated test TURN key and a separate production key. Store the production
   key ID and token in Secret Manager as `CLOUDFLARE_TURN_KEY_ID` and
-  `CLOUDFLARE_TURN_KEY_API_TOKEN`. Provide the provider-confirmed allocation
-  CIDRs, applicable destination rules, enforceable account-level or key-level
-  limits and access to usage measurements. If approval relies on shutdown,
+  `CLOUDFLARE_TURN_KEY_API_TOKEN`. For broader rollout, document applicable
+  destination rules, enforceable account-level or key-level limits, and access
+  to usage measurements. If approval relies on shutdown,
   obtain the cutoff and billing behavior for already allocated relays and
   demonstrate a maximum time and outbound byte count after the stop. The
   service admits two live rooms and limits issuance to 120 tracked grants with
@@ -119,14 +124,14 @@ App ID, endpoint, bucket name, provider policy and pass/fail evidence in the PR.
   · [Allocation expiry and billing](https://developers.cloudflare.com/realtime/turn/faq/#what-will-happen-if-turn-credentials-expire-while-the-turn-allocation-is-in-use)
 
 For a separate staging deployment, provide the HTTPS origin, Firebase project
-and web app configuration, Steam App ID and test depot, checkpoint bucket, and
-provider allocation CIDRs. The checked-in browser and Steam build target the
+and web app configuration, Steam App ID and test depot, and checkpoint bucket.
+The checked-in browser and Steam build target the
 production function, Firebase project, and Steam ticket audience. A separate
 deployment needs the matching endpoint, auth audience, runtime service account,
 and invite settings wired into its build before end-to-end testing. Protect that
 deployment and its Steam build for the approved test group.
 
-## Live acceptance
+## Combined web and Steam live acceptance
 
 Arrange four devices with distinct co-op identities and access to the same test
 build. Use Google test accounts on iPhone Safari, Android Chrome, and desktop
@@ -161,10 +166,8 @@ Record the commit and compatibility ID, OS/browser/Steam versions, host order,
 transports, measured limits and pass/fail for each case. The repository's
 [TURN probe](multiplayer-network.md#turn-qualification-for-cross-play) can measure
 synthetic browser relay paths and traffic after revocation using a dedicated
-test key. Supply the provider-confirmed `COOP_TURN_RELAY_CIDRS` to check
-each observed candidate against the production policy. Preserve the report's
-`allocationCidrsChecked` result with the measured traffic. Run the four-device
-matrix against the deployed stack for release acceptance.
+test key. Run the four-device matrix against the deployed stack for combined web
+and Steam release acceptance.
 
 Relay cost estimates and application bounds are distinct. At the historical
 5 MiB live-payload measurement and a rate of $0.05 per GB, the payload alone

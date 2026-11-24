@@ -1,7 +1,8 @@
-const { BlockList, isIP } = require("node:net");
+const { isIP } = require("node:net");
 const { setTimeout: delay } = require("node:timers/promises");
 const {
   createRelayPolicy,
+  isPublicRelayAddress,
 } = require("../../firebase/functions/coop-signaling-sdp.cjs");
 const {
   installTurnProbe,
@@ -17,26 +18,6 @@ const ENGINES = ["chromium", "firefox", "webkit"];
 const ROOM_URL = "http://localhost/turn-probe";
 const CONTROL_BYTES = 8192;
 const BURST = 8;
-
-// Reject locally scoped and special-use IPv4 addresses in observations. Provider allocation
-// provenance is a separate requirement and cannot be inferred from this public-address check.
-const nonPublic = new BlockList();
-for (const [address, bits] of [
-  ["0.0.0.0", 8],
-  ["10.0.0.0", 8],
-  ["100.64.0.0", 10],
-  ["127.0.0.0", 8],
-  ["169.254.0.0", 16],
-  ["172.16.0.0", 12],
-  ["192.0.0.0", 24],
-  ["192.0.2.0", 24],
-  ["192.168.0.0", 16],
-  ["198.18.0.0", 15],
-  ["198.51.100.0", 24],
-  ["203.0.113.0", 24],
-  ["224.0.0.0", 3],
-])
-  nonPublic.addSubnet(address, bits);
 
 class ProbeError extends Error {}
 
@@ -149,8 +130,7 @@ function inspectDescription(description, type, allocationPolicy) {
       protocol?.toLowerCase() !== "udp" ||
       typ !== "typ" ||
       candidateType !== "relay" ||
-      isIP(address) !== 4 ||
-      nonPublic.check(address) ||
+      !isPublicRelayAddress(address) ||
       !/^\d{1,5}$/.test(port) ||
       Number(port) < 1 ||
       Number(port) > 65535
