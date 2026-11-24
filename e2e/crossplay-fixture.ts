@@ -640,11 +640,7 @@ export function crossplayFixture() {
         guestBinding: guest.binding,
         expiresAt: now + 120_000,
       });
-      const eligible = (
-        pair: Signal | undefined,
-        guest: RoomMember,
-      ): pair is Signal =>
-        !!pair &&
+      const eligible = (pair: Signal, guest: RoomMember) =>
         pair.epoch === room.epoch &&
         pair.hostId === host.id &&
         pair.hostBinding === host.binding &&
@@ -660,12 +656,13 @@ export function crossplayFixture() {
         let changed = false;
         const pairs = guests.map((guest) => {
           let pair = signals[guest.id];
-          if (!eligible(pair, guest)) {
+          if (!pair || !eligible(pair, guest)) {
             changed = true;
             const successor = pair?.successor;
-            pair = signals[guest.id] = eligible(successor, guest)
-              ? successor
-              : freshPair(guest);
+            pair = signals[guest.id] =
+              successor && eligible(successor, guest)
+                ? successor
+                : freshPair(guest);
           }
           return {
             peerId: seatId === host.id ? guest.id : host.id,
@@ -684,6 +681,7 @@ export function crossplayFixture() {
       if (
         !guest ||
         !current ||
+        !pair ||
         !eligible(pair, guest) ||
         pair.generation !== body.generation
       )
