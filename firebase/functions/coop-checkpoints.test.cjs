@@ -145,7 +145,17 @@ test("publishes immutable checkpoints and repeats an exact authorized save", asy
 
 test("reserves bounded recovery uploads when ordinary checkpoint attempts run out", async (t) => {
   t.mock.timers.enable({ apis: ["Date"] });
-  const { context, world, state, guest } = fixture();
+  const { context: roomContext, world, state } = fixture();
+  const counts = new Map();
+  const context = () => ({
+    ...roomContext(),
+    async limit(scope, max) {
+      const key = scope + Math.floor(Date.now() / 60_000);
+      const count = (counts.get(key) ?? 0) + 1;
+      assert.ok(count <= max, "same-account quota exhausted");
+      counts.set(key, count);
+    },
+  });
   const ordinary = encoded(world);
   for (let attempt = 0; attempt < 6; attempt++)
     await handle("save/publish", context(), ordinary);
@@ -153,7 +163,6 @@ test("reserves bounded recovery uploads when ordinary checkpoint attempts run ou
     code: "checkpoint-rate-limit",
   });
 
-  state.hostId = guest;
   state.epoch = randomUUID();
   state.restoreHead = state.head;
   const recovery = {
@@ -287,7 +296,12 @@ test("an explicit pause can publish at the most recent confirmed revision", asyn
     explicit: false,
   });
   const previous = state.head.id;
-  const paused = { ...world, reason: "Host saved and stopped the match" };
+  const { schema, ...fields } = world;
+  const paused = {
+    ...fields,
+    schema,
+    reason: "Host saved and stopped the match",
+  };
   await handle("save/publish", context(), encoded(paused));
   assert.equal(state.head.revision, world.revision);
   assert.notEqual(state.head.id, previous);
@@ -314,12 +328,20 @@ test("requires the same restore generation after reading from storage", async ()
 test("reaps abandoned objects by generation while preserving every pinned checkpoint", async () => {
   const { bucket, context, objects, roomId, world, state } = fixture();
   await handle("save/publish", context(), encoded(world));
-  const pinned = `checkpoints/${roomId}/${state.head.id}`;
+  const pinned = [`checkpoints/${roomId}/${state.head.id}`];
+  for (const role of ["previousHead", "explicitHead", "restoreHead"]) {
+    const id = randomUUID();
+    const generation = String(pinned.length + 1);
+    state[role] = { id, generation };
+    const key = `checkpoints/${roomId}/${id}`;
+    objects.set(key, { generation });
+    pinned.push(key);
+  }
   const obsolete = `checkpoints/${roomId}/${randomUUID()}`;
   const abandoned = `staging/${roomId}/${randomUUID()}`;
   const now = Date.now();
   for (const [key, age] of [
-    [pinned, 1_000_000],
+    ...pinned.map((key) => [key, 1_000_000]),
     [obsolete, 1_000_000],
     [abandoned, 200_000],
   ]) {
@@ -336,7 +358,7 @@ test("reaps abandoned objects by generation while preserving every pinned checkp
     },
     now,
   );
-  assert.deepEqual([...objects.keys()], [pinned]);
+  assert.deepEqual([...objects.keys()], pinned);
 });
 
 test("preserves the original roster and removes retired guests from required attendance", async () => {

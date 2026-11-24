@@ -21,6 +21,15 @@ WebRTC DTLS encrypts gameplay traffic in transit.
 
 ## Service contract
 
+The managed Functions runtime buffers request bodies before the handler applies its
+128 KiB JSON and bulk-transfer limits. The published second-generation HTTP limit is
+32 MB uncompressed. Per-client IP quotas also depend on ingress: the current
+socket-address bucket can combine callers behind a Google proxy. The public function
+has no verified forwarding-hop contract for selecting a caller address. Enforcing
+smaller limits before buffering and isolating IP buckets requires a trusted ingress
+that all public routes traverse. [Functions limits](https://docs.cloud.google.com/functions/quotas)
+· [Request headers](https://docs.cloud.google.com/functions/docs/reference/headers)
+
 The browser posts authenticated JSON to the fixed `coopV2` HTTPS function. Steam
 requests go through Electron main. Steam tickets and temporary service tokens
 stay in main. The renderer receives validated responses and temporary TURN

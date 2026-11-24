@@ -12,10 +12,12 @@ const loadProduction = compileFunction(
 );
 
 async function productionHealth({
+  quotaKey = "test-quota-key-of-at-least-24-characters",
   keyId = "fixture-id",
   keyToken = "fixture-token",
 } = {}) {
   const turnSecrets = {
+    COOP_RATE_LIMIT_KEY: quotaKey,
     CLOUDFLARE_TURN_KEY_ID: keyId,
     CLOUDFLARE_TURN_KEY_API_TOKEN: keyToken,
   };
@@ -85,6 +87,7 @@ test("production co-op is ready with TURN credentials and no relay CIDRs or Stea
 
 test("production co-op fails readiness with missing or malformed TURN credentials", async () => {
   for (const credentials of [
+    { quotaKey: "too-short" },
     { keyId: "" },
     { keyId: "invalid/id" },
     { keyToken: "" },

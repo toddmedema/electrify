@@ -43,6 +43,7 @@ function createCrossplay({
   audit = () => undefined,
   clock = Date.now,
 }) {
+  requireValue(quotaKey?.length >= 24, 503, "unavailable");
   const identity = createIdentity({ store, verifyGoogle, verifySteam, clock });
   const rooms = createRooms({ store, extensions, onRoomChanged });
 
@@ -51,7 +52,6 @@ function createCrossplay({
     // X-Forwarded-For values. An ingress may group its requests into one bucket.
     const address = request.socket?.remoteAddress;
     const ip = isIP(address) ? address : "unknown";
-    requireValue(quotaKey?.length >= 24, 503, "unavailable");
     return createHmac("sha256", quotaKey).update(ip).digest("hex");
   }
 
@@ -162,7 +162,7 @@ function createCrossplay({
           if (operation === "room/join")
             await limit("join-ip", hashedIp(request), 80);
           result = await rooms.handle(operation, actor, requestBody, limit);
-          if (bulk) {
+          if (bulk && operation !== "save/publish") {
             requireValue(
               !response.destroyed && !(await isStopped()),
               503,

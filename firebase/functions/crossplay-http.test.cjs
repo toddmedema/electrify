@@ -49,7 +49,7 @@ function setup({ steamEnabled = true } = {}) {
         const retain =
           previous?.deviceHash === next.deviceHash &&
           !previous.revoked &&
-          previous.expiresAt > now;
+          (previous.expiresAt > now || next.priorTokenHash !== undefined);
         if (
           next.priorTokenHash !== undefined &&
           (!retain || next.priorTokenHash !== previous.tokenHash)
@@ -323,6 +323,15 @@ test("same-device renewal preserves a seat, and a fenced device cannot renew bac
   host = await ctx.login("host", { token: host });
   const active = await ctx.call("room/state", { roomId }, { token: host });
   assert.equal(active.body.authority.binding, bind);
+
+  ctx.advance(5 * 60_000 + 1);
+  host = await ctx.login("host", { token: host });
+  const renewed = await ctx.call(
+    "room/reconnect",
+    { roomId, rules: RULES },
+    { token: host },
+  );
+  assert.equal(renewed.body.authority.binding, bind);
 
   const replacement = await ctx.login("host", { device: "r".repeat(43) });
   const stale = await ctx.call(

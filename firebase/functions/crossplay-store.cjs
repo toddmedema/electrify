@@ -141,7 +141,7 @@ function createStore({ db, projectId, writerToken, fetchImpl = fetch }) {
         const retain =
           previous?.deviceHash === issue.deviceHash &&
           !previous.revoked &&
-          previous.expiresAt > now;
+          (previous.expiresAt > now || issue.priorTokenHash !== undefined);
         if (
           issue.priorTokenHash !== undefined &&
           (!retain || previous.tokenHash !== issue.priorTokenHash)
@@ -190,7 +190,7 @@ function createStore({ db, projectId, writerToken, fetchImpl = fetch }) {
         );
         if (!(id in next) && Object.keys(next).length >= MAX_LIVE_ROOMS)
           return false;
-        next[id] = expiresAt;
+        next[id] = Math.max(next[id] ?? 0, expiresAt);
         tx.set(ref, { rooms: next });
         return true;
       });

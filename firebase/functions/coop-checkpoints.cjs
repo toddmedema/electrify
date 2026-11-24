@@ -198,14 +198,10 @@ async function download(bucket, key, generation, digest, size) {
 
 async function publish(context, body) {
   requireHost(context);
-  await context.limit?.(
-    "coop-checkpoint-upload",
-    CHECKPOINT_UPLOADS_PER_MINUTE,
-  );
   if (typeof body.explicit !== "boolean") refuse("invalid-checkpoint");
   const bucket = bucketFor(context);
   const expected = context.room.head?.id ?? null;
-  await context.updateRoom((room) => {
+  const recovery = await context.updateRoom((room) => {
     if (!room.locked) refuse("roster-not-locked", 409);
     const now = Date.now();
     const current = room.checkpointQuota;
@@ -213,23 +209,27 @@ async function publish(context, body) {
       current?.until > now
         ? { ...current, count: current.count + 1 }
         : { until: now + TRANSFER_MS, count: 1 };
-    if (quota.count > CHECKPOINT_UPLOADS_PER_MINUTE) {
-      // A new host must commit its restored epoch before the room can play.
-      // Keep the reserve in the same room window across host changes.
-      const recovering =
-        !body.explicit &&
-        room.head &&
-        room.head.epoch !== room.epoch &&
-        room.restoreHead?.id === room.head.id;
-      if (
-        !recovering ||
-        quota.count >
-          CHECKPOINT_UPLOADS_PER_MINUTE + EXTRA_RECOVERY_UPLOADS_PER_MINUTE
-      )
-        refuse("checkpoint-rate-limit", 429);
-    }
-    return { room: { ...room, checkpointQuota: quota } };
+    // A new host must commit its restored epoch before the room can play.
+    // Keep the reserve in the same room window across host changes.
+    const recovering =
+      !body.explicit &&
+      room.head &&
+      room.head.epoch !== room.epoch &&
+      room.restoreHead?.id === room.head.id;
+    if (
+      quota.count >
+      CHECKPOINT_UPLOADS_PER_MINUTE +
+        (recovering ? EXTRA_RECOVERY_UPLOADS_PER_MINUTE : 0)
+    )
+      refuse("checkpoint-rate-limit", 429);
+    return { room: { ...room, checkpointQuota: quota }, value: recovering };
   }, "host");
+  await context.limit?.(
+    recovery ? "coop-checkpoint-recovery" : "coop-checkpoint-upload",
+    recovery
+      ? EXTRA_RECOVERY_UPLOADS_PER_MINUTE
+      : CHECKPOINT_UPLOADS_PER_MINUTE,
+  );
   const result = compressedBody(body);
   const now = Date.now();
   const previous = context.room.head;

@@ -327,9 +327,19 @@ service cloud.firestore {
         return request.resource.data.room.epoch == resource.data.room.epoch
           && request.resource.data.room.hostId == resource.data.room.hostId;
       }
+      function requiredSeatsActive() {
+        let data = request.resource.data;
+        let ids = data.room.requiredIds;
+        return ids.size() >= 1 && ids.size() <= 4
+          && activeSeat(data, ids[0])
+          && (ids.size() < 2 || activeSeat(data, ids[1]))
+          && (ids.size() < 3 || activeSeat(data, ids[2]))
+          && (ids.size() < 4 || activeSeat(data, ids[3]));
+      }
       function liveMutation() {
         return liveHost()
           && afterLeaseSameOwner()
+          && (resource.data.room.locked || !request.resource.data.room.locked || requiredSeatsActive())
           && activeActor(resource.data)
           && (guard().peerId == '' || activeSeat(resource.data, guard().peerId))
           && (guard().get('approvedId', '') == '' || activeSeat(request.resource.data, guard().approvedId))

@@ -4,6 +4,14 @@ const { CrossplayError, requireValue } = require("./crossplay-errors.cjs");
 const SESSION_MS = 5 * 60_000;
 const STEAM_TICKET_IDENTITY = "electrify-coop-prod-v2";
 const DEVICE = /^[A-Za-z0-9_-]{43}$/;
+const INVALID_GOOGLE_PROOF = new Set([
+  "auth/argument-error",
+  "auth/invalid-id-token",
+  "auth/id-token-expired",
+  "auth/id-token-revoked",
+  "auth/user-disabled",
+  "auth/user-not-found",
+]);
 const BEARER = /^Bearer ([a-f0-9]{64}\.[A-Za-z0-9_-]{43})$/;
 
 function hash(value) {
@@ -87,7 +95,8 @@ function createIdentity({ store, verifyGoogle, verifySteam, clock }) {
         let decoded;
         try {
           decoded = await verifyGoogle(input.token);
-        } catch {
+        } catch (error) {
+          if (!INVALID_GOOGLE_PROOF.has(error?.code)) throw error;
           throw new CrossplayError(401, "unauthenticated");
         }
         requireValue(

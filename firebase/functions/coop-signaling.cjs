@@ -6,6 +6,8 @@ const TURN_API = "https://rtc.live.cloudflare.com/v1/turn/keys";
 const UDP = "turn:turn.cloudflare.com:3478";
 const TLS = "turns:turn.cloudflare.com:443";
 const MAX_GRANTS = 120;
+// Two four-seat rooms have six host/guest pairs sharing the global budget.
+const MAX_PAIR_GRANTS = 20;
 const GENERATION_MS = 120_000;
 const ALLOCATION_DRAIN_MS = 600_000;
 const ROTATION_WINDOW_MS = 25_000;
@@ -175,6 +177,18 @@ function createTurnSignaling({
       const count = control.data()?.count ?? 0;
       if (!Number.isSafeInteger(count) || count < 0 || count >= MAX_GRANTS)
         throw new CrossplayError(429, "turn-capacity");
+      const roomGrants = await transaction.get(
+        grants.where("roomId", "==", roomId),
+      );
+      const pairCount = roomGrants.docs.filter((snapshot) => {
+        const grant = snapshot.data();
+        return (
+          (grant.seatId === seatId && grant.to === to) ||
+          (grant.seatId === to && grant.to === seatId)
+        );
+      }).length;
+      if (pairCount >= MAX_PAIR_GRANTS)
+        throw new CrossplayError(429, "turn-capacity");
       transaction.set(operation, { count: count + 1 }, { merge: true });
       transaction.create(ref, {
         roomId,
@@ -231,7 +245,11 @@ function createTurnSignaling({
       );
       if ((await runtime.get()).data()?.stopped === true) throw aborted();
     } catch (error) {
-      await revoke(await ref.get()).catch(() => undefined);
+      if (
+        error instanceof CrossplayError &&
+        error.code === "obsolete-connection"
+      )
+        await revoke(await ref.get()).catch(() => undefined);
       throw error;
     }
     return {
@@ -243,32 +261,27 @@ function createTurnSignaling({
   async function handle(name, context, body) {
     const { roomId, seatId } = context;
     if (name === "signal/read") {
-      const { pairs, obsolete, at } = await context.updateRoom(
-        (room, now, projected) => {
-          const pairs = presentPairs(projected, seatId, now);
-          const old = room.signals ?? {};
-          const next = Object.fromEntries(
-            Object.entries(old).filter(([, pair]) =>
-              livePair(projected, pair, now),
-            ),
-          );
-          Object.assign(next, pairs);
-          const obsolete = Object.values(old).filter(
-            (pair) => next[pair.guestId]?.generation !== pair.generation,
-          );
-          const changed =
-            obsolete.length ||
-            Object.keys(next).some((id) => next[id] !== old[id]);
-          return {
-            ...(changed ? { room: { ...room, signals: next } } : {}),
-            value: { pairs, obsolete, at: now },
-          };
-        },
-      );
-      if (obsolete.length)
-        await Promise.allSettled(
-          obsolete.map((pair) => revokeGeneration(roomId, pair)),
+      const { pairs, at } = await context.updateRoom((room, now, projected) => {
+        const pairs = presentPairs(projected, seatId, now);
+        const old = room.signals ?? {};
+        const next = Object.fromEntries(
+          Object.entries(old).filter(([, pair]) =>
+            livePair(projected, pair, now),
+          ),
         );
+        Object.assign(next, pairs);
+        const obsolete = Object.values(old).filter(
+          (pair) => next[pair.guestId]?.generation !== pair.generation,
+        );
+        const changed =
+          obsolete.length ||
+          Object.keys(next).some((id) => next[id] !== old[id]);
+        return {
+          ...(changed ? { room: { ...room, signals: next } } : {}),
+          value: { pairs, at: now },
+        };
+      });
+      // The scheduled reaper revokes obsolete generations independently of confirmations.
       return { pairs: formatPairs(pairs, seatId, at) };
     }
 
@@ -348,25 +361,27 @@ function createTurnSignaling({
         snapshots.docs.slice(index, index + 8).map(async (snapshot) => {
           const grant = snapshot.data();
           const now = clock();
-          if (!stop && !rooms.has(grant.roomId))
-            rooms.set(grant.roomId, loadRoom(grant.roomId));
-          const room = stop ? undefined : await rooms.get(grant.roomId);
-          if (
-            (stop ||
-              !room ||
-              !activeSignalPair(
-                room,
-                grant.seatId,
-                grant.to,
-                grant.generation,
-                now,
-              )) &&
-            grant.ice &&
-            !grant.revoked
-          ) {
-            await revoke(snapshot);
+          if (grant.removeAfter > now) {
+            if (!stop && !rooms.has(grant.roomId))
+              rooms.set(grant.roomId, loadRoom(grant.roomId));
+            const room = stop ? undefined : await rooms.get(grant.roomId);
+            if (
+              (stop ||
+                !room ||
+                !activeSignalPair(
+                  room,
+                  grant.seatId,
+                  grant.to,
+                  grant.generation,
+                  now,
+                )) &&
+              grant.ice &&
+              !grant.revoked
+            ) {
+              await revoke(snapshot);
+            }
+            return;
           }
-          if (grant.removeAfter > now) return;
           await db.runTransaction(async (transaction) => {
             const [latest, count] = await transaction.getAll(
               snapshot.ref,

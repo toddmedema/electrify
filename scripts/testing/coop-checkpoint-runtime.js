@@ -10,6 +10,17 @@ const {
 } = require("../../src/multiplayer/World");
 const { SAVE_SCHEMA_VERSION } = require("../../src/SaveSchema");
 
+// Sort only object keys. Arrays and the wire codec's exceptional values retain their meaning.
+function ordered(value) {
+  if (Array.isArray(value)) return value.map(ordered);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, ordered(value[key])]),
+  );
+}
+
 function validateCheckpoint(json) {
   const input = decodeWire(json);
   if (input?.rules !== RULES || input?.gameSchema !== SAVE_SCHEMA_VERSION)
@@ -27,7 +38,7 @@ function validateCheckpoint(json) {
   for (const key of ["ready", "readyRequired", "paused", "reason", "speed"])
     delete stable[key];
   const stateDigest = createHash("sha256")
-    .update(encodeWire(stable))
+    .update(encodeWire(ordered(stable)))
     .digest("hex");
   return {
     matchId,

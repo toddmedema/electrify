@@ -538,6 +538,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
         withOnlyRoom();
         const secret = await edit(id, actor, "host", (room, _self, now) => {
           requireValue(!room.head, 409, "roster_locked");
+          room.members = room.members.filter((member) => !member.withdrawn);
           room.locked = false;
           room.requiredIds = [];
           room.expiresAt = now + LOBBY_MS;
@@ -617,7 +618,10 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
             )
               return {};
             forgetPair(room, member.id);
-            if (!room.locked && leave && room.hostId !== member.id) {
+            if (
+              !room.locked &&
+              (withdraw || (leave && room.hostId !== member.id))
+            ) {
               room.members = room.members.filter(({ id }) => id !== member.id);
             } else {
               member.active = false;
@@ -626,7 +630,7 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
             }
             if (room.hostId === member.id && operation !== "room/suspend") {
               room.leaseUntil = now;
-              if (!room.locked && leave) room.expiresAt = now;
+              if (!room.locked) room.expiresAt = now;
             }
             return { room };
           },

@@ -165,6 +165,27 @@ test("host renewal and publication fail at the authoritative write after the ori
   );
 });
 
+test("locking requires active bindings for every required seat at commit", async () => {
+  const data = room();
+  data.room.locked = false;
+  const locked = {
+    ...data,
+    room: { ...data.room, locked: true, requiredIds: [HOST, GUEST] },
+  };
+  await seed(data);
+  await assertSucceeds(setDoc(doc(writer(), "coopRooms", ID), locked));
+  await seed(data);
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), "coopAccounts", "guest-account"), {
+      binding: "another-device",
+      tokenHash: "another-token",
+      revoked: false,
+      expiresAt: at(30_000),
+    });
+  });
+  await assertFails(setDoc(doc(writer(), "coopRooms", ID), locked));
+});
+
 test("replaced room peers and a runtime emergency stop fence service mutations", async () => {
   const active = room();
   await seed(active);
