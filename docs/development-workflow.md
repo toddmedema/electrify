@@ -155,6 +155,49 @@ same save, run `node scripts/ci/benchmark-world-advance.js <native-world.json>
 <month>`. The benchmark reserves the local validation slot, alternates three rounds
 of nine requests per mode, and requires identical output checkpoint hashes.
 
+## Review PR evidence with the OpenAI API
+
+`npm run review:api` compares captures or seeded balance reports from two revisions. Set
+`OPENAI_API_KEY` in your shell or secret manager to a project API key from the API organization
+that should be billed. For a ChatGPT Pro grant, use a project in the organization that received it.
+[API keys](https://developers.openai.com/api/docs/guides/api-keys) ·
+[ChatGPT Pro API credits](https://developers.openai.com/api/docs/guides/chatgpt-api-credits)
+
+Run the same capture on the base and candidate worktrees with the same viewport, theme, and
+game state. This example captures the Valley tile builder at 360 px.
+
+```sh
+ELECTRIFY_E2E_ALL_SPECS=1 REVIEW_SCREENSHOT_DIR="$PWD/.tmp/api-review/screens" \
+  npm run test:e2e -- e2e/acquisitions.spec.ts --project=mobile-360px \
+  --grep 'tile builder keeps project decisions together in light'
+```
+
+Pass the resulting PNGs in baseline/candidate order. You can add more pairs to the same call.
+Replace the example filenames with your capture paths.
+
+```sh
+npm run --silent review:api -- visual baseline-360.png candidate-360.png \
+  --intent 'Make the project total easier to scan' > .tmp/api-review/visual-review.md
+```
+
+For balance, export a completed report from each worktree using the same cases and seeds.
+
+```sh
+mkdir -p .tmp/api-review
+ELECTRIFY_EXPANSION_BALANCE_REPORT="$PWD/.tmp/api-review/valley.json" \
+  ELECTRIFY_EXPANSION_BALANCE_REVISION="$(git rev-parse HEAD)" \
+  npm run test:sim -- --runTestsByPath src/testing/UtilityExpansionBalance.sim.test.tsx
+
+npm run --silent review:api -- balance baseline-valley.json candidate-valley.json \
+  --intent 'Price acquisitions using the current seller fleet valuation' > .tmp/api-review/balance-review.md
+```
+
+The balance command pairs cases by case ID, difficulty, and seed. It rejects incomplete reports,
+duplicates, and different case sets. Add `--dry-run` to validate inputs locally without a key.
+Otherwise each invocation sends one billable Responses API request. The default is GPT‑6.2 Sol.
+Use `--model` to select another compatible model. Markdown goes to stdout and token counts go to
+stderr. Review findings are advisory. Confirm them against browser assertions or a seeded replay.
+
 ## Resume verified validation
 
 After fixing a failed check, run `npm run check:ci -- --resume`. This still accounts

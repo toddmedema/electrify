@@ -78,6 +78,7 @@
     "check:prepush": "node scripts/site/check-changed.js",
     "task": "node scripts/dev/task.js",
     "shot": "node scripts/dev/shot.js",
+    "review:api": "node scripts/dev/api-review.js",
     "ci:failures": "node scripts/ci/failures.js",
     "ci:history": "node scripts/ci/failures.js --history",
     "check:assets": "node scripts/check-assets.js",
