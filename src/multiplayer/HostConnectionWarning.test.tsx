@@ -1,192 +1,114 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Provider } from "react-redux";
-import { useLayoutEffect } from "react";
-import { store } from "../Store";
-import { dialogClose, dialogOpen } from "../reducers/UI";
-import HostConnectionWarning, {
-  HOST_WAITING_MESSAGE,
-  HOST_SYNCHRONIZING_MESSAGE,
-} from "./HostConnectionWarning";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { backInput, inputScope } from "../desktop/InputNavigation";
+import HostConnectionWarning from "./HostConnectionWarning";
 
-beforeEach(() => store.dispatch(dialogClose()));
-afterEach(() => store.dispatch(dialogClose()));
-
-test("recovery preserves a notification committed after the warning rendered", () => {
-  function NewNotification({ open }: { open: boolean }) {
-    useLayoutEffect(() => {
-      if (open)
-        store.dispatch(
-          dialogOpen({
-            open: true,
-            title: "Construction",
-            message: "Not enough cash",
-          }),
-        );
-    }, [open]);
-    return null;
-  }
-  const ui = (waiting: boolean) => (
-    <Provider store={store}>
-      <HostConnectionWarning
-        waiting={waiting}
-        onReconnect={jest.fn()}
-        onDisconnect={jest.fn()}
-      />
-      <NewNotification open={!waiting} />
-    </Provider>
+function warning() {
+  const onReconnect = jest.fn().mockResolvedValue(undefined);
+  const onReturnToMenu = jest.fn().mockResolvedValue(undefined);
+  const ui = (
+    props: Partial<React.ComponentProps<typeof HostConnectionWarning>> = {},
+  ) => (
+    <HostConnectionWarning
+      open
+      checkpointOnly={false}
+      rollback={false}
+      waiting
+      onReconnect={onReconnect}
+      onReturnToMenu={onReturnToMenu}
+      {...props}
+    />
   );
-  const view = render(ui(true));
-  view.rerender(ui(false));
-  expect(store.getState().ui.dialog).toMatchObject({
-    open: true,
-    title: "Construction",
-  });
-});
-
-test("recovery closes its notice even when it is committed after the recovery render", () => {
-  let notice = store.getState().ui.dialog;
-  function QueuedNotice({ open }: { open: boolean }) {
-    useLayoutEffect(() => {
-      if (open) store.dispatch(dialogOpen(notice));
-    }, [open]);
-    return null;
-  }
-  const ui = (synchronizing: boolean) => (
-    <Provider store={store}>
-      <HostConnectionWarning
-        waiting={false}
-        synchronizing={synchronizing}
-        onReconnect={jest.fn()}
-        onDisconnect={jest.fn()}
-      />
-      <QueuedNotice open={!synchronizing} />
-    </Provider>
-  );
-  const view = render(ui(true));
-  notice = store.getState().ui.dialog;
-  act(() => {
-    store.dispatch(dialogClose());
-  });
-  view.rerender(ui(false));
-  expect(store.getState().ui.dialog.open).toBe(false);
-});
-
-test("replica synchronization uses the existing notice and releases it when the replica is live", () => {
-  const ui = (synchronizing: boolean) => (
-    <Provider store={store}>
-      <HostConnectionWarning
-        waiting={false}
-        synchronizing={synchronizing}
-        onReconnect={jest.fn()}
-        onDisconnect={jest.fn()}
-      />
-    </Provider>
-  );
-  const view = render(ui(true));
-  expect(store.getState().ui.dialog).toMatchObject({
-    open: true,
-    message: HOST_SYNCHRONIZING_MESSAGE,
-  });
-  view.rerender(ui(false));
-  expect(store.getState().ui.dialog.open).toBe(false);
-});
-
-function warning(waiting = true) {
-  const onReconnect = jest.fn();
-  const onDisconnect = jest.fn();
-  const ui = (active: boolean) => (
-    <Provider store={store}>
-      <HostConnectionWarning
-        waiting={active}
-        onReconnect={onReconnect}
-        onDisconnect={onDisconnect}
-      />
-    </Provider>
-  );
-  const view = render(ui(waiting));
+  const view = render(ui());
   return {
-    ...view,
-    waiting: (active: boolean) => view.rerender(ui(active)),
+    update: (props: Parameters<typeof ui>[0]) => view.rerender(ui(props)),
     onReconnect,
-    onDisconnect,
+    onReturnToMenu,
   };
 }
 
-test("a fresh host view releases the temporary warning and its blocking dialog", () => {
+test("a blocked player must choose an action to reconnect or leave", async () => {
+  const user = userEvent.setup();
   const view = warning();
-  expect(store.getState().ui.dialog).toMatchObject({
-    open: true,
-    message: HOST_WAITING_MESSAGE,
-  });
-  view.waiting(false);
-  expect(store.getState().ui.dialog.open).toBe(false);
+  const dialog = screen.getByRole("dialog");
+  const title = screen.getByRole("heading");
+  await waitFor(() => expect(title).toHaveFocus());
+  await user.keyboard("{Escape}");
+  expect(dialog).toBeVisible();
+  expect(screen.queryByRole("button", { name: "OK" })).not.toBeInTheDocument();
+  expect(view.onReturnToMenu).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole("button", { name: "Return to main menu" }));
+  expect(view.onReturnToMenu).toHaveBeenCalledTimes(1);
   expect(view.onReconnect).not.toHaveBeenCalled();
 });
 
-test("the warning offers Disconnect beside Reconnect, for a host that is not coming back", () => {
-  const view = warning();
-  const { secondaryLabel, secondaryAction } = store.getState().ui.dialog;
-  expect(secondaryLabel).toBe("Disconnect");
-  expect(store.getState().ui.dialog.actionLabel).toBe("Reconnect");
-  secondaryAction!({} as React.MouseEvent<HTMLElement>);
-  expect(view.onDisconnect).toHaveBeenCalledTimes(1);
-  expect(view.onReconnect).not.toHaveBeenCalled();
+test("controller Back stays within the interruption dialog", async () => {
+  const rects = jest
+    .spyOn(HTMLElement.prototype, "getClientRects")
+    .mockReturnValue([{}] as unknown as DOMRectList);
+  try {
+    const { onReturnToMenu, onReconnect } = warning();
+    const dialog = screen.getByRole("dialog");
+    await waitFor(() => expect(screen.getByRole("heading")).toHaveFocus());
+    expect(inputScope()).toBe(dialog);
+    act(() => {
+      backInput();
+    });
+    expect(dialog).toBeVisible();
+    expect(onReturnToMenu).not.toHaveBeenCalled();
+    expect(onReconnect).not.toHaveBeenCalled();
+  } finally {
+    rects.mockRestore();
+  }
 });
 
-test("the player can dismiss one episode without the warning immediately reopening", () => {
+test("retry keeps focus and the same dialog until synchronization completes", async () => {
+  const user = userEvent.setup();
   const view = warning();
-  act(() => {
-    store.dispatch(dialogClose());
-  });
-  view.waiting(true);
-  expect(store.getState().ui.dialog.open).toBe(false);
-  view.waiting(false);
-  view.waiting(true);
-  expect(store.getState().ui.dialog.open).toBe(true);
-  render(
-    <button onClick={store.getState().ui.dialog.action}>Reconnect</button>,
-  );
-  fireEvent.click(screen.getByRole("button", { name: "Reconnect" }));
-  expect(view.onReconnect).toHaveBeenCalledTimes(1);
-  expect(store.getState().ui.dialog.open).toBe(false);
-});
-
-test("a host warning waits for an existing game dialog and recovery leaves that dialog open", () => {
-  store.dispatch(
-    dialogOpen({
-      open: true,
-      title: "Construction",
-      message: "Not enough cash",
+  let finishRetry!: () => void;
+  view.onReconnect.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finishRetry = resolve;
     }),
   );
-  const view = warning();
-  expect(store.getState().ui.dialog.title).toBe("Construction");
-  view.waiting(false);
-  expect(store.getState().ui.dialog).toMatchObject({
-    open: true,
-    title: "Construction",
-  });
-  view.waiting(true);
-  act(() => {
-    store.dispatch(dialogClose());
-  });
-  expect(store.getState().ui.dialog.message).toBe(HOST_WAITING_MESSAGE);
+  const dialog = screen.getByRole("dialog");
+  const reconnect = screen.getByRole("button", { name: "Reconnect" });
+  const description = dialog.getAttribute("aria-describedby");
+
+  await user.click(reconnect);
+  expect(reconnect).toHaveFocus();
+  expect(reconnect).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("status")).toHaveTextContent("Reconnecting");
+  await user.keyboard("{Enter}");
+  expect(view.onReconnect).toHaveBeenCalledTimes(1);
+
+  view.update({ waiting: false, synchronizing: true });
+  await act(async () => finishRetry());
+  expect(screen.getByRole("dialog")).toBe(dialog);
+  expect(screen.getByRole("status")).toHaveTextContent("Synchronizing");
+  expect(reconnect).toHaveFocus();
+  expect(reconnect).toHaveAttribute("aria-disabled", "true");
+  expect(dialog).toHaveAttribute("aria-describedby", description);
+
+  view.update({ open: false });
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
 });
 
-test.each([
-  "Not enough cash",
-  "Disk full",
-  "Connection lost. Reconnect to continue.",
-  HOST_WAITING_MESSAGE,
-])("a healthy connection preserves a newer actionable error: %s", (message) => {
+test("a checkpoint-only interruption offers only the main menu route", async () => {
+  const user = userEvent.setup();
   const view = warning();
-  act(() => {
-    store.dispatch(dialogOpen({ open: true, title: "Multiplayer", message }));
+  await user.click(screen.getByRole("button", { name: "Reconnect" }));
+  view.update({ checkpointOnly: true, rollback: true });
+  const dialog = screen.getByRole("dialog", {
+    name: "Multiplayer session ended",
   });
-  view.waiting(false);
-  expect(store.getState().ui.dialog).toMatchObject({
-    open: true,
-    title: "Multiplayer",
-    message,
-  });
+  expect(dialog).toHaveAccessibleDescription(
+    /Play with friends → Multiplayer saves.*Changes since that save will be lost/,
+  );
+  expect(screen.getByRole("heading")).toHaveFocus();
+  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(
+    screen.getByRole("button", { name: "Return to main menu" }),
+  ).toBeVisible();
 });

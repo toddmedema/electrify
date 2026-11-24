@@ -26,7 +26,7 @@ import {
   snackbarOpen,
 } from "../reducers/UI";
 import { registerShutdownCheckpoint } from "../desktop/Shutdown";
-import { HOST_LEFT, MultiplayerSession, offersDisconnect } from "./Session";
+import { HOST_LEFT, isConnectionLoss, MultiplayerSession } from "./Session";
 import {
   registerCoopControls,
   registerLobbyOpener,
@@ -96,6 +96,7 @@ export default function MultiplayerRoot() {
   const lobbyId = state.lobby.lobbyId;
   const pendingCampaignId = state.pendingCampaign?.id;
   const coop = useAppSelector((app) => app.ui.coop);
+  const appDialogOpen = useAppSelector((app) => app.ui.dialog.open);
   const reconnect = useCallback(() => {
     void session.reconnect();
   }, [session]);
@@ -165,17 +166,22 @@ export default function MultiplayerRoot() {
       choosing.current = false;
       setOpen(false);
       setSavesOpen(false);
-      void session.leave({ skipSave }).catch(() => undefined);
+      return session.leave({ skipSave }).catch(() => undefined);
     },
     [session],
   );
 
-  /** A connection notice's way out: leave now, keeping the last multiplayer save, because a lost
-   * connection may mean there is nobody to save with. */
-  const disconnect = useCallback(() => {
-    store.dispatch(dialogClose());
-    leaveLobby(true);
-  }, [leaveLobby]);
+  const returnFromInterruption = async () => {
+    if (!session.canLeaveInterruption()) return;
+    await leaveLobby(true);
+    requestAnimationFrame(() => {
+      const { card, ui } = store.getState();
+      if (card.name === "MAIN_MENU" && !ui.dialog.open)
+        document
+          .querySelector<HTMLElement>("#menuCard [data-multiplayer-entry]")
+          ?.focus({ preventScroll: true });
+    });
+  };
 
   /** The host shows the scenario screens to the lobby, which friends can join meanwhile. */
   const startChoosing = useCallback(() => {
@@ -425,6 +431,20 @@ export default function MultiplayerRoot() {
       return session.save(true, reason === "suspend");
     });
   }, [session, hasView, state.lobby.hostId, state.lobby.selfId]);
+  const host =
+    !!state.lobby.selfId && state.lobby.hostId === state.lobby.selfId;
+  const canLeaveInterruption = session.canLeaveInterruption();
+  const checkpointOnly = !!state.checkpointRecovery;
+  const stoppedReplica = session.hasStoppedReplica();
+  const connectionError = isConnectionLoss(state.error, state.lobby.error);
+  const guestConnectionLost =
+    canLeaveInterruption && connectionError && (hasView || (!!coop && !open));
+  const interrupted =
+    checkpointOnly ||
+    !!state.synchronizing ||
+    (hasView && state.waitingForHost && canLeaveInterruption) ||
+    guestConnectionLost;
+
   useEffect(() => {
     const error = state.error || state.lobby.error;
     if (error === HOST_LEFT && !open) {
@@ -439,29 +459,25 @@ export default function MultiplayerRoot() {
       session.dismissError();
       return;
     }
-    if (!error || !(hasView || (coop && !open))) return;
+    if (
+      !error ||
+      !(hasView || (coop && !open)) ||
+      (interrupted && (connectionError || state.synchronizing))
+    )
+      return;
     store.dispatch(
       dialogOpen({
         open: true,
         title: "Multiplayer",
         message: error,
         closeText: "OK",
-        actionLabel: "Reconnect",
-        action: () => {
-          store.dispatch(dialogClose());
-          void session.reconnect();
-        },
-        // Only a guest's lost connection leaves nothing to wait for. Other errors, such as a
-        // failed save, and the host, which can still save, never get a way out that skips the
-        // checkpoint.
-        ...(offersDisconnect({
-          error: state.error,
-          lobbyError: state.lobby.error,
-          hostId: state.lobby.hostId,
-          selfId: state.lobby.selfId,
-        }) && {
-          secondaryLabel: "Disconnect",
-          secondaryAction: disconnect,
+        ...((connectionError || stoppedReplica) && {
+          closeText: "Close",
+          actionLabel: "Reconnect",
+          action: () => {
+            store.dispatch(dialogClose());
+            reconnect();
+          },
         }),
       }),
     );
@@ -470,12 +486,14 @@ export default function MultiplayerRoot() {
     session,
     state.error,
     state.lobby.error,
-    state.lobby.hostId,
-    state.lobby.selfId,
+    state.synchronizing,
     hasView,
     coop,
     open,
-    disconnect,
+    interrupted,
+    connectionError,
+    stoppedReplica,
+    reconnect,
   ]);
 
   // Another company retiring is news while the rest of the lobby plays on.
@@ -506,14 +524,9 @@ export default function MultiplayerRoot() {
     state.view.grids.every((g) => g.retired);
   const endingKey = ending ? `${state.view?.matchId}:${ending.month}` : "";
   const showResult =
-    hasView && (complete || (!!ending && watching !== endingKey));
-  const host =
-    !!state.lobby.selfId && state.lobby.hostId === state.lobby.selfId;
-  const recoverHere =
     hasView &&
-    host &&
-    state.lobby.recoveryAvailable &&
-    session.hasOnlineAuthority();
+    !interrupted &&
+    (complete || (!!ending && watching !== endingKey));
 
   return (
     <>
@@ -528,12 +541,22 @@ export default function MultiplayerRoot() {
         </Suspense>
       )}
       <HostConnectionWarning
-        waiting={hasView && state.waitingForHost && !recoverHere}
+        open={interrupted && !appDialogOpen}
+        checkpointOnly={checkpointOnly}
+        rollback={
+          !!state.checkpointRecovery &&
+          (state.view?.revision ?? 0) >
+            state.checkpointRecovery.confirmedRevision
+        }
+        waiting={state.waitingForHost}
         synchronizing={state.synchronizing}
-        onReconnect={reconnect}
-        onDisconnect={disconnect}
+        error={state.error || state.lobby.error}
+        onReconnect={() => session.reconnect()}
+        onReturnToMenu={
+          canLeaveInterruption ? returnFromInterruption : undefined
+        }
       />
-      {open && !savesOpen && !state.view ? (
+      {open && !savesOpen && !state.view && !interrupted ? (
         <Lobby
           session={session}
           initialInviteCode={entryInviteCode}
@@ -577,36 +600,6 @@ export default function MultiplayerRoot() {
             if (session.getSnapshot().lobby.campaignLocked) setOpen(true);
           }}
         />
-      )}
-      {recoverHere && (
-        <dialog
-          open
-          aria-label="Recover multiplayer campaign"
-          className="coopRecovery"
-        >
-          <p>
-            Resume from the last confirmed online save when the original players
-            reconnect.
-          </p>
-          {state.lobby.sharedAt && (
-            <p>
-              Confirmed save {new Date(state.lobby.sharedAt).toLocaleString()}.
-            </p>
-          )}
-          {state.view &&
-            state.lobby.confirmedRevision !== undefined &&
-            state.view.revision > state.lobby.confirmedRevision && (
-              <p>Progress after that checkpoint will be rolled back.</p>
-            )}
-          <button
-            disabled={!session.canRecover()}
-            onClick={() => {
-              void session.recover().catch(() => undefined);
-            }}
-          >
-            Resume campaign
-          </button>
-        </dialog>
       )}
       {showResult && (
         <CoopResult

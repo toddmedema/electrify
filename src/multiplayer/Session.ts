@@ -87,27 +87,11 @@ function validPendingCampaign(value: unknown): value is PendingCampaign {
 export const HOST_LEFT = "The host closed the lobby.";
 
 /** A guest's match lost its host mid-game; the connection notice shows this message. */
-export const CONNECTION_LOST =
-  "Connection lost. Reconnect to continue, or resume the multiplayer save in a new lobby.";
+export const CONNECTION_LOST = "Connection to the host was interrupted.";
 /** Whether a shown error means the link to the host is gone, as opposed to a failed save or a
  * refused command. Native lobby errors come only from its connection failures. */
 export const isConnectionLoss = (error?: string, lobbyError?: string) =>
   error === CONNECTION_LOST || (!error && !!lobbyError);
-/** Whether the notice for this error should offer Disconnect. A guest whose host link is gone
- * has nothing to wait for and nothing to save with. A host's simulation keeps running through a
- * lobby error and can still save, so it never gets an exit that skips its checkpoint. */
-export const offersDisconnect = ({
-  error,
-  lobbyError,
-  hostId,
-  selfId,
-}: {
-  error?: string;
-  lobbyError?: string;
-  hostId?: string;
-  selfId?: string;
-}) => !!hostId && hostId !== selfId && isConnectionLoss(error, lobbyError);
-
 export interface SessionState {
   lobby: LobbyState;
   view?: RoomView;
@@ -115,6 +99,8 @@ export interface SessionState {
   busy: boolean;
   entryOperation?: "create" | "join";
   waitingForHost: boolean;
+  /** A confirmed new epoch replaced the retained view and its worker. */
+  checkpointRecovery?: { confirmedRevision: number };
   /** A replica is receiving data or recovering; commands wait for a live local world. */
   synchronizing?: boolean;
   error?: string;
@@ -138,6 +124,7 @@ export class MultiplayerSession {
   private libraryRequest = 0;
   private listeners = new Set<() => void>();
   private worker?: Worker;
+  private hostedView = false;
   private replica?: Worker;
   private replicaOpening?: Promise<Worker | undefined>;
   private replicaGeneration = 0;
@@ -356,7 +343,22 @@ export class MultiplayerSession {
           room: event.state.lobbyId,
           epoch: event.state.authorityEpoch,
         };
-      this.update({ lobby: event.state });
+      const { authorityEpoch, confirmedRevision, recoveryAvailable } =
+        event.state;
+      const view = this.state.view;
+      // A missing grant can be transient. Remember a confirmed replacement of
+      // the displayed epoch so a subsequent outage cannot strand the player.
+      const checkpointRecovery =
+        view &&
+        !this.worker &&
+        !!authorityEpoch &&
+        authorityEpoch !== view.epoch &&
+        recoveryAvailable &&
+        confirmedRevision !== undefined &&
+        this.services.authority?.()?.epoch === authorityEpoch
+          ? { confirmedRevision }
+          : this.state.checkpointRecovery;
+      this.update({ lobby: event.state, checkpointRecovery });
       if (this.worker) this.relayAuthority();
       if (this.isHost()) {
         // A friend who just joined lands on the page the host is showing, straight away.
@@ -635,8 +637,10 @@ export class MultiplayerSession {
     if (newReceipt && view.receipt?.error && !this.pending)
       this.sequence = view.lastSequence;
     else this.sequence = Math.max(this.sequence, view.lastSequence);
+    this.hostedView = !!this.worker;
     this.update({
       view,
+      checkpointRecovery: undefined,
       ...(this.replicaLive || this.replicaStopped
         ? { synchronizing: false }
         : {}),
@@ -649,7 +653,9 @@ export class MultiplayerSession {
         (newReceipt &&
         (view.receipt?.error || acknowledged?.kind !== "activity")
           ? view.receipt?.error
-          : this.state.error),
+          : this.state.error === CONNECTION_LOST
+            ? undefined
+            : this.state.error),
     });
     this.flushActivity();
     this.flushQueued();
@@ -1140,6 +1146,11 @@ export class MultiplayerSession {
     }
   }
   async reconnect(roomId?: string) {
+    if (!roomId && this.state.view && !this.worker) {
+      // A successful service request precedes the first usable message from the host.
+      this.lastHostMessage = -Infinity;
+      this.update({ waitingForHost: true });
+    }
     try {
       const lobby = await this.request({
         kind: "reconnect",
@@ -1148,9 +1159,7 @@ export class MultiplayerSession {
       this.update({ error: undefined });
       this.event({ kind: "state", state: lobby });
     } catch (error) {
-      // A failed reconnect means the host link is gone. Surface it as a lobby connection
-      // error (the channel reserved for connection failures) so the notice offers Disconnect
-      // instead of leaving a player waiting on a dead link with no way out.
+      // Keep a failed retry in the connection notice so the player can try again.
       this.update({
         error: undefined,
         lobby: {
@@ -1179,6 +1188,18 @@ export class MultiplayerSession {
   }
   hasOnlineAuthority() {
     return !!this.services.authority?.();
+  }
+  canLeaveInterruption() {
+    const { lobby, view, checkpointRecovery } = this.state;
+    return (
+      !!checkpointRecovery ||
+      (!this.worker &&
+        !this.isHost() &&
+        (view ? !this.hostedView : !!lobby.selfId && !!lobby.hostId))
+    );
+  }
+  hasStoppedReplica() {
+    return !!this.replicaStopped;
   }
   canRecover() {
     const { campaignLocked, recoveryAvailable, members, requiredPlayers } =
@@ -1760,6 +1781,8 @@ export class MultiplayerSession {
           connected: [],
         },
         view: undefined,
+        checkpointRecovery: undefined,
+        error: undefined,
         pending: false,
         busy: false,
         waitingForHost: false,
@@ -2008,6 +2031,7 @@ export class MultiplayerSession {
     this.receiptSequence = 0;
     this.update({
       view: undefined,
+      checkpointRecovery: undefined,
       pending: false,
       busy: false,
       waitingForHost: false,

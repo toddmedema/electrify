@@ -58,6 +58,8 @@ function renderRoot(
     },
     initialize,
     onlineCampaigns: true,
+    canLeaveInterruption: () => false,
+    hasStoppedReplica: () => false,
     dispose: () => {},
     setActivity: () => {},
     join: jest.fn().mockResolvedValue(undefined),

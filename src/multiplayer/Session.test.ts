@@ -19,7 +19,6 @@ import {
   HOST_LEFT,
   MultiplayerSession,
   isConnectionLoss,
-  offersDisconnect,
 } from "./Session";
 import type { DesktopBridge } from "../Desktop";
 import type {
@@ -845,25 +844,58 @@ test("only a lost connection counts as one, so other errors never offer a way ou
   expect(isConnectionLoss()).toBe(false);
   f.session.dispose();
 });
-test("only a guest's lost connection offers Disconnect, never a host that can still save", () => {
-  const guestSide = { hostId: host, selfId: guest };
-  expect(offersDisconnect({ error: CONNECTION_LOST, ...guestSide })).toBe(true);
-  expect(offersDisconnect({ lobbyError: "The host left.", ...guestSide })).toBe(
-    true,
-  );
-  expect(offersDisconnect({ error: "Not enough cash", ...guestSide })).toBe(
-    false,
-  );
-  // A native lobby error can reach a host whose simulation keeps running.
-  const hostSide = { hostId: host, selfId: host };
-  expect(
-    offersDisconnect({
-      lobbyError: "Steam connection interrupted.",
-      ...hostSide,
-    }),
-  ).toBe(false);
-  expect(offersDisconnect({ error: CONNECTION_LOST, ...hostSide })).toBe(false);
-  expect(offersDisconnect({ error: CONNECTION_LOST })).toBe(false);
+test("a host can leave the interruption only after a confirmed epoch replaces its hosted view", async () => {
+  let authorityEpoch: string | undefined = "epoch";
+  const f = fixture(true, false, {
+    authority: () =>
+      authorityEpoch
+        ? {
+            epoch: authorityEpoch,
+            monotonicDeadline: Infinity,
+            wallDeadline: Infinity,
+          }
+        : undefined,
+  });
+  await f.session.initialize();
+  const lobby = { ...f.session.getSnapshot().lobby, authorityEpoch };
+  f.event({ kind: "state", state: lobby });
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  expect(f.session.getSnapshot().view?.epoch).toBe("epoch");
+  const checkpoint = {
+    ...lobby,
+    recoveryAvailable: true,
+    confirmedRevision: 0,
+  };
+
+  authorityEpoch = undefined;
+  f.event({ kind: "state", state: checkpoint });
+  expect(f.session.canLeaveInterruption()).toBe(false);
+  expect(f.worker.terminate).not.toHaveBeenCalled();
+
+  authorityEpoch = "replacement";
+  f.event({
+    kind: "state",
+    state: { ...checkpoint, authorityEpoch, confirmedRevision: undefined },
+  });
+  expect(f.worker.terminate).toHaveBeenCalled();
+  expect(f.session.canLeaveInterruption()).toBe(false);
+
+  f.event({ kind: "state", state: { ...checkpoint, authorityEpoch } });
+  expect(f.session.getSnapshot().checkpointRecovery).toEqual({
+    confirmedRevision: 0,
+  });
+  expect(f.session.canLeaveInterruption()).toBe(true);
+
+  authorityEpoch = undefined;
+  f.event({
+    kind: "state",
+    state: { ...checkpoint, authorityEpoch, recoveryAvailable: false },
+  });
+  expect(f.session.canLeaveInterruption()).toBe(true);
+  await f.session.leave({ skipSave: true });
+  expect(f.session.getSnapshot().checkpointRecovery).toBeUndefined();
+  expect(f.session.canLeaveInterruption()).toBe(false);
+  f.session.dispose();
 });
 test("players read the transport's message, never Electron's invoke wrapper", async () => {
   const f = fixture();
@@ -986,16 +1018,8 @@ test.each([false, true])(
     const snapshot = f.session.getSnapshot();
     expect(snapshot.error).toBeUndefined();
     expect(snapshot.lobby.error).toBe("Steam could not connect to the host");
-    // A failed reconnect is a connection loss, so a guest (not the host) gets a Disconnect offer.
     expect(isConnectionLoss(snapshot.error, snapshot.lobby.error)).toBe(true);
-    expect(
-      offersDisconnect({
-        error: snapshot.error,
-        lobbyError: snapshot.lobby.error,
-        hostId: snapshot.lobby.hostId,
-        selfId: snapshot.lobby.selfId,
-      }),
-    ).toBe(true);
+    expect(f.session.canLeaveInterruption()).toBe(true);
     f.session.dispose();
   },
 );
@@ -1160,7 +1184,7 @@ test("worker view credit follows synchronous host consumption and cannot outlive
 });
 
 test.each(["command", "disconnect"])(
-  "host liveness never overwrites or dismisses a real %s error",
+  "host silence preserves a %s error and recovery clears only connection loss",
   async (source) => {
     const f = fixture();
     await f.session.initialize();
@@ -1182,7 +1206,9 @@ test.each(["command", "disconnect"])(
     expect(f.session.getSnapshot().error).toBe(error);
     await deliver(f, { revision: 2 });
     expect(f.session.getSnapshot().waitingForHost).toBe(false);
-    expect(f.session.getSnapshot().error).toBe(error);
+    expect(f.session.getSnapshot().error).toBe(
+      source === "disconnect" ? undefined : error,
+    );
     f.session.dispose();
   },
 );

@@ -222,6 +222,7 @@ const MainMenu = (props: Props): React.JSX.Element => {
           {props.onPlayWithFriends && (
             <Button
               data-main-action
+              data-multiplayer-entry
               size="large"
               color="primary"
               onClick={props.onPlayWithFriends}

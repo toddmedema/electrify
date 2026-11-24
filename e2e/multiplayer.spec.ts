@@ -583,23 +583,51 @@ test(
     for (const page of campaign.players) await selectSpeed(page, "slow speed");
     await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
     const original = await captureState(guest);
+    const gameControl = clock(guest).getByRole("button", {
+      name: "slow speed",
+    });
+    await gameControl.focus();
     const operationCount = campaign.fixture.operations.length;
     campaign.fixture.loseAuthority(guest);
     const warning = guest.getByRole("dialog", {
-      name: "Multiplayer",
+      name: "Multiplayer connection",
       exact: true,
     });
-    await expect(warning).toContainText(/connection|reconnect/i);
+    await expect(warning).toHaveAccessibleDescription(
+      /(?:waiting for the host|connection to the host was interrupted).*won't create a new save.*Play with friends → Multiplayer saves/i,
+    );
+    await expect(warning.getByRole("heading")).toBeFocused();
     await expect(
-      warning.getByRole("button", { name: "Disconnect", exact: true }),
+      warning.getByRole("button", { name: "Return to main menu", exact: true }),
     ).toBeVisible();
+    await guest.keyboard.press("Escape");
+    await expect(warning).toBeVisible();
+    const reconnect = warning.getByRole("button", {
+      name: "Reconnect",
+      exact: true,
+    });
+    await campaign.fixture.disconnect(guest);
+    await reconnect.click();
+    await expect
+      .poll(() =>
+        campaign.fixture.operations
+          .slice(operationCount)
+          .some(
+            ({ page, operation, status }) =>
+              page === guest &&
+              operation === "room/reconnect" &&
+              status === 503,
+          ),
+      )
+      .toBe(true);
+    await expect(warning).toBeVisible();
+    await expect(reconnect).toBeEnabled();
     const viewSequence = () =>
       guest.evaluate(() => (window as MultiplayerWindow).viewSequence ?? 0);
     const beforeReconnect = await viewSequence();
+    campaign.fixture.reconnect(guest);
     campaign.fixture.restoreAuthority(guest);
-    await warning
-      .getByRole("button", { name: "Reconnect", exact: true })
-      .click();
+    await reconnect.click();
     await expect
       .poll(() =>
         campaign.fixture.operations
@@ -611,6 +639,7 @@ test(
       )
       .toBe(true);
     await expect(warning).toBeHidden();
+    await expect(gameControl).toBeFocused();
     await expect.poll(viewSequence).toBeGreaterThan(beforeReconnect);
     expect(await captureState(guest)).toMatchObject({
       epoch: original.epoch,
@@ -621,6 +650,134 @@ test(
       await selectSpeed(page, "normal speed");
     for (const page of campaign.players)
       await expect(clock(page)).toHaveAttribute("data-active-speed", "NORMAL");
+    expect(campaign.errors).toEqual([]);
+  },
+);
+
+test(
+  "V2 routes an expired multiplayer session through the confirmed save",
+  { tag: "@mobile" },
+  async ({ browser }, info) => {
+    const compact = !!info.project.use.isMobile;
+    const campaign = await startCustom(browser, 2, compact);
+    const [host, guest] = campaign.players;
+    if (compact) await guest.setViewportSize({ width: 360, height: 640 });
+    const original = await Promise.all(campaign.players.map(captureState));
+    const confirmed = await campaign.fixture.checkpoint();
+    expect(confirmed?.matchId).toBe(original[1].matchId);
+    for (const page of campaign.players) await selectSpeed(page, "slow speed");
+    await expect
+      .poll(async () => (await projection(guest))?.revision ?? 0)
+      .toBeGreaterThan(confirmed!.revision);
+    campaign.fixture.loseAuthority(guest);
+    const interrupted = guest.getByRole("dialog", {
+      name: "Multiplayer connection",
+      exact: true,
+    });
+    await expect(interrupted).toBeVisible();
+    await reviewScreenshot(interrupted, {
+      path: info.outputPath("multiplayer-reconnect.png"),
+      animations: "disabled",
+    });
+
+    campaign.fixture.expireHost();
+    campaign.fixture.restoreAuthority(guest);
+    await interrupted
+      .getByRole("button", { name: "Reconnect", exact: true })
+      .click();
+
+    const ended = guest.getByRole("dialog", {
+      name: "Multiplayer session ended",
+      exact: true,
+    });
+    expect(campaign.fixture.hostSeat(guest)).toBe(
+      campaign.fixture.seatId(guest),
+    );
+    await expect(ended).toHaveAccessibleDescription(
+      /Play with friends → Multiplayer saves.*Changes since that save will be lost/,
+    );
+    await expect(guest.getByRole("dialog")).toHaveCount(1);
+    await expect(ended.getByRole("button")).toHaveCount(1);
+    const returnToMenu = ended.getByRole("button", {
+      name: "Return to main menu",
+      exact: true,
+    });
+    expect((await returnToMenu.boundingBox())?.height).toBeGreaterThanOrEqual(
+      compact ? 44 : 40,
+    );
+    const bounds = await ended.boundingBox();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(compact ? 360 : 1280);
+    await reviewScreenshot(ended, {
+      path: info.outputPath("multiplayer-session-ended.png"),
+      animations: "disabled",
+    });
+    await guest.keyboard.press("Escape");
+    await expect(ended).toBeVisible();
+
+    const renewedOutageStart = campaign.fixture.operations.length;
+    campaign.fixture.loseAuthority(guest);
+    await expect
+      .poll(
+        () =>
+          campaign.fixture.operations
+            .slice(renewedOutageStart)
+            .filter(
+              ({ page, operation, status }) =>
+                page === guest && operation === "room/state" && status === 503,
+            ).length,
+      )
+      .toBeGreaterThanOrEqual(3);
+    await expect(ended).toBeVisible();
+
+    const exitStart = campaign.fixture.operations.length;
+    await returnToMenu.click();
+    await expect(entry(guest)).toBeFocused();
+    expect(
+      campaign.fixture.operations
+        .slice(exitStart)
+        .filter(
+          ({ page, operation }) =>
+            page === guest && operation === "save/publish",
+        ),
+    ).toHaveLength(0);
+    expect(await campaign.fixture.checkpoint()).toEqual(confirmed);
+    campaign.fixture.restoreAuthority(guest);
+
+    const saves = await openCampaignSaves(guest);
+    await saves.getByRole("button", { name: "Load save", exact: true }).click();
+    await expect(
+      lobby(guest).getByRole("button", {
+        name: "Resume campaign",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    const hostEnded = host.getByRole("dialog", {
+      name: "Multiplayer session ended",
+      exact: true,
+    });
+    await hostEnded
+      .getByRole("button", { name: "Return to main menu", exact: true })
+      .click();
+    const hostSaves = await openCampaignSaves(host);
+    await hostSaves
+      .getByRole("button", { name: "Load save", exact: true })
+      .click();
+    const resume = lobby(guest).getByRole("button", {
+      name: "Resume campaign",
+      exact: true,
+    });
+    await expect(resume).toBeEnabled();
+    await resume.click();
+    for (const [index, page] of campaign.players.entries()) {
+      await expect(grid(page)).toBeVisible();
+      expect(await captureState(page)).toMatchObject({
+        matchId: confirmed!.matchId,
+        seat: original[index].seat,
+      });
+      expect((await captureState(page)).epoch).not.toBe(original[index].epoch);
+    }
     expect(campaign.errors).toEqual([]);
   },
 );
