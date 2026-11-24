@@ -74,10 +74,10 @@ function initialDialogAction(dialog: HTMLElement): HTMLElement | null {
   const buttons = Array.from(
     dialog.querySelectorAll<HTMLButtonElement>("button"),
   ).filter((button) => !button.closest("[aria-hidden='true']"));
-  const actionable = buttons.filter((button) => !isChromeControl(button));
-  const pool = actionable.length ? actionable : buttons;
-  const enabled = pool.filter((button) => !isUnfocusable(button));
-  const candidates = enabled.length ? enabled : pool;
+  const enabled = buttons.filter((button) => !isUnfocusable(button));
+  const pool = enabled.length ? enabled : buttons;
+  const actionable = pool.filter((button) => !isChromeControl(button));
+  const candidates = actionable.length ? actionable : pool;
   return (
     candidates.find((button) =>
       button.classList.contains("MuiButton-contained"),

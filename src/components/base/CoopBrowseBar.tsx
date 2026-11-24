@@ -204,7 +204,12 @@ export default function CoopBrowseBar({
               <RosterPlayer
                 key={player.id}
                 player={player}
-                canKick={host && !coop.starting && !player.host}
+                canKick={
+                  host &&
+                  !coop.starting &&
+                  !player.host &&
+                  !!coopControls()?.kick
+                }
               />
             ))}
           </ul>

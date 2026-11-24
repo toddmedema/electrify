@@ -117,6 +117,22 @@ test("the host sees how many guests are ready and waits for the rest", () => {
   expect(onStart).not.toHaveBeenCalled();
 });
 
+test("a host without a kick action does not offer Kick", () => {
+  registerCoopControls({ ...controls, kick: undefined });
+  render(
+    <CoopBrowseBar
+      coop={coop({
+        role: "host",
+        players: coop().players.map((player) => ({
+          ...player,
+          connected: true,
+        })),
+      })}
+    />,
+  );
+  expect(screen.queryByRole("button", { name: /^Kick / })).toBeNull();
+});
+
 test("the host kicks a guest from the name chip after it offers Kick?", () => {
   const host = coop({
     role: "host",

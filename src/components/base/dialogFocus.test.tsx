@@ -6,6 +6,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
 } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import { createAppTheme } from "../../Theme";
@@ -59,6 +60,26 @@ test("navigation during the open animation keeps its target", () => {
     jest.advanceTimersByTime(1000);
   });
   expect(cancel).toHaveFocus();
+});
+
+test("an enabled back control wins when every other action is disabled", () => {
+  show(
+    <Dialog open aria-labelledby="lobby-title">
+      <DialogTitle id="lobby-title">
+        <IconButton aria-label="Back">Back</IconButton>
+        Play with friends
+      </DialogTitle>
+      <DialogActions>
+        <Button disabled variant="contained">
+          Host a game
+        </Button>
+      </DialogActions>
+    </Dialog>,
+  );
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
+  expect(screen.getByRole("button", { name: "Back" })).toHaveFocus();
 });
 
 test("an explicit autofocus action wins over the first contained button", () => {

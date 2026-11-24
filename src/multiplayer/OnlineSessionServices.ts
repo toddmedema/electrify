@@ -49,6 +49,7 @@ export function onlineSessionServices(
   let authority: AuthorityWindow | undefined;
   let presence: string | undefined;
   let connected: string[] = [];
+  let roster = new Set<string>();
   let refreshedInvite:
     | {
         code: string;
@@ -107,7 +108,12 @@ export function onlineSessionServices(
 
   const peers = new TurnPeers(api, {
     message: (sender, payload) => {
-      if (!liveAuthority() || !connected.includes(sender)) return;
+      if (
+        !liveAuthority() ||
+        !connected.includes(sender) ||
+        (roster.size > 0 && !roster.has(sender))
+      )
+        return;
       for (const listener of listeners)
         listener({ kind: "message", sender, payload });
     },
@@ -127,6 +133,12 @@ export function onlineSessionServices(
     readTransfer: (peer, reference, signal) =>
       readTransfer(api, peer, reference, signal),
   });
+
+  function retainMembers(members: LobbyState["members"]) {
+    if (!members.length) return;
+    roster = new Set(members.map((member) => member.id));
+    for (const id of [...connected]) if (!roster.has(id)) peers.forget(id);
+  }
 
   function expire(error?: string) {
     clearTimeout(expiry);
@@ -207,6 +219,7 @@ export function onlineSessionServices(
       return lobby;
     applied = sequence;
     roomId = result.lobby.lobbyId;
+    retainMembers(result.lobby.members);
     const grant = result.authority;
     presence = grant?.presence;
     if (

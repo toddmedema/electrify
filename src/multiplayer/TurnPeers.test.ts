@@ -466,6 +466,21 @@ function records(from: number): WireMessage {
   };
 }
 
+test("forgetting a peer closes its link without waiting for the next signal poll", async () => {
+  const f = duplex();
+  try {
+    await f.advance(4_000);
+    await f.guest.send(command(1));
+    f.host.peers.forget("guest");
+    expect(f.host.status).toHaveBeenLastCalledWith([]);
+    await expect(f.host.peers.send("guest", command(2))).rejects.toThrow(
+      /unavailable/,
+    );
+  } finally {
+    f.close();
+  }
+});
+
 test("three TURN renewals keep both seats connected and deliver commands and records", async () => {
   const f = duplex();
   try {

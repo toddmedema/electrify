@@ -323,6 +323,15 @@ export class TurnPeers {
     this.publish();
   }
 
+  /** Membership already ended. Do not wait for the next signal poll to drop the channel. */
+  forget(peerId: string): void {
+    const link = this.links.get(peerId);
+    if (!link) return;
+    this.closeLink(link);
+    this.links.delete(peerId);
+    this.publish();
+  }
+
   close(): void {
     this.authority = undefined;
     this.poll?.abort();
