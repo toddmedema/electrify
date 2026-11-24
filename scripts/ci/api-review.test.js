@@ -197,6 +197,61 @@ test("reports API errors without retrying or printing the server's error message
   assert.deepEqual(api.output, []);
 });
 
+test("the CLI reports usage even when the review is incomplete", (t) => {
+  const file = fixtures(t);
+  const screenshot = file("capture.png", PNG);
+  const preload = file(
+    "mock-api.cjs",
+    "globalThis.fetch = async () => Response.json(JSON.parse(process.env.MOCK_REVIEW_RESULT));",
+  );
+  const run = (result) =>
+    spawnSync(
+      process.execPath,
+      ["--require", preload, SCRIPT, "visual", screenshot, screenshot],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          OPENAI_API_KEY: "test-project-key",
+          MOCK_REVIEW_RESULT: JSON.stringify(result),
+        },
+      },
+    );
+  const response = {
+    status: "completed",
+    model: "mock-review-model",
+    output: [
+      { type: "message", content: [{ type: "output_text", text: "# Review" }] },
+    ],
+    usage: { input_tokens: 30, output_tokens: 10 },
+  };
+
+  const completed = run(response);
+  assert.equal(completed.status, 0, completed.stderr);
+  assert.equal(completed.stdout, "# Review\n");
+  assert.match(
+    completed.stderr,
+    /mock-review-model: 30 input tokens, 10 output tokens/,
+  );
+
+  const incomplete = run({
+    ...response,
+    status: "incomplete",
+    incomplete_details: { reason: "max_output_tokens" },
+    usage: { input_tokens: 30, output_tokens: 2_500 },
+  });
+  assert.equal(incomplete.status, 1);
+  assert.equal(incomplete.stdout, "");
+  assert.match(
+    incomplete.stderr,
+    /OpenAI did not complete the review response/,
+  );
+  assert.match(
+    incomplete.stderr,
+    /mock-review-model: 30 input tokens, 2500 output tokens/,
+  );
+});
+
 test("the CLI dry run works without an API key and rejects an unsupported screenshot", (t) => {
   const file = fixtures(t);
   const screenshot = file("capture.png", PNG);

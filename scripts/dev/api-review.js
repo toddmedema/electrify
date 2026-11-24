@@ -175,6 +175,10 @@ async function requestReview(body, apiKey) {
       `OpenAI returned HTTP ${response.status}${detail ? ` (${code})` : ""}.`,
     );
   }
+  if (result?.usage)
+    console.error(
+      `${result.model ?? body.model}: ${result.usage.input_tokens} input tokens, ${result.usage.output_tokens} output tokens.`,
+    );
   if (result?.status !== "completed")
     throw new Error("OpenAI did not complete the review response.");
   const review = (result.output ?? [])
@@ -185,7 +189,7 @@ async function requestReview(body, apiKey) {
     .join("\n")
     .trim();
   if (!review) throw new Error("OpenAI returned no review text.");
-  return { review, model: result.model ?? body.model, usage: result.usage };
+  return review;
 }
 
 async function main(args, stdout = process.stdout) {
@@ -245,7 +249,7 @@ async function main(args, stdout = process.stdout) {
     throw new Error(
       "Set OPENAI_API_KEY to a key from your linked API project.",
     );
-  const result = await requestReview(
+  const review = await requestReview(
     {
       model,
       store: false,
@@ -255,11 +259,7 @@ async function main(args, stdout = process.stdout) {
     },
     apiKey,
   );
-  stdout.write(`${result.review}\n`);
-  if (result.usage)
-    console.error(
-      `${result.model}: ${result.usage.input_tokens} input tokens, ${result.usage.output_tokens} output tokens.`,
-    );
+  stdout.write(`${review}\n`);
 }
 
 if (require.main === module)
