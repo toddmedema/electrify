@@ -51,12 +51,12 @@ verify the selected candidate pair as relay–relay. TURN permits UDP and TLS ov
 port 443. HTTPS handles large replication baselines, scenario snapshots and
 checkpoints. Checkpoints are pinned to an immutable Cloud Storage generation
 and checked against the room epoch, roster, compatibility ID and head.
-Checkpoint uploads are capped at six attempts per account per minute. A room
-has six ordinary attempts and two reserved attempts for publishing a recovered
-checkpoint after host handoff, all within the same 60-second window. Attempts
-that reach payload validation consume the budget even if validation fails. A
-handoff keeps the current window. A host who exhausts the account limit must
-wait for the next quota window before retrying recovery.
+Each account has six ordinary checkpoint upload attempts per minute and a
+separate allowance of two attempts to publish a recovered epoch. A returning
+host can use recovery after exhausting ordinary uploads. Each room has six
+attempts per 60-second window plus two reserved for recovery. Host handoffs
+share that room budget for the rest of its window. Attempts that reach payload
+validation consume the budget even if validation fails.
 
 ## Web-only production rollout
 
@@ -125,8 +125,9 @@ when qualifying the combined web and Steam release.
   to usage measurements. If approval relies on shutdown,
   obtain the cutoff and billing behavior for already allocated relays and
   demonstrate a maximum time and outbound byte count after the stop. The
-  service admits two live rooms and limits issuance to 120 tracked grants with
-  a ten-minute drain period. One grant can authorize multiple allocations, so
+  service admits two live rooms and tracks up to 120 grants, with at most
+  60 per room and 20 per host/guest pair. Reservations remain counted for a
+  ten-minute drain after credential expiry. One grant can authorize multiple allocations, so
   use provider enforcement or a measured cutoff to establish the aggregate
   exposure. [Credential operations](https://developers.cloudflare.com/realtime/turn/generate-credentials/)
   · [Per-allocation limits](https://developers.cloudflare.com/realtime/turn/#limits)

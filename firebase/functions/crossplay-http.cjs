@@ -39,13 +39,12 @@ function createCrossplay({
   extensions,
   isStopped = async () => false,
   healthy = async () => true,
-  onRoomChanged,
   audit = () => undefined,
   clock = Date.now,
 }) {
   requireValue(quotaKey?.length >= 24, 503, "unavailable");
   const identity = createIdentity({ store, verifyGoogle, verifySteam, clock });
-  const rooms = createRooms({ store, extensions, onRoomChanged });
+  const rooms = createRooms({ store, extensions });
 
   function hashedIp(request) {
     // The direct network address cannot be selected using attacker-supplied
@@ -155,7 +154,6 @@ function createCrossplay({
         if (operation === "auth/revoke") {
           keys(requestBody);
           await store.revoke(actor.account, actor.tokenHash);
-          await onRoomChanged?.();
           result = {};
         } else {
           await limit("account", actor.account, 240);

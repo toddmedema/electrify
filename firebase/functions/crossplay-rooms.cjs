@@ -78,7 +78,7 @@ function invalidInvite(condition) {
   requireValue(condition, 404, "invalid_invite");
 }
 
-function createRooms({ store, extensions = {}, onRoomChanged }) {
+function createRooms({ store, extensions = {} }) {
   async function loadRoom(id) {
     const result = await store.getRoom(id);
     if (!result.room || result.room.expiresAt <= result.now) return null;
@@ -220,7 +220,8 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
         binding: actor.binding,
         presence: self.presence,
         hostBinding: host?.binding,
-        leaseRemainingMs: isLive(room, now) ? room.leaseUntil - now : 0,
+        leaseRemainingMs:
+          self.active && isLive(room, now) ? room.leaseUntil - now : 0,
         head: room.head,
         requiredIds: room.requiredIds,
         locked: room.locked,
@@ -565,7 +566,6 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
           }
           return { room };
         });
-        await onRoomChanged?.();
         break;
       }
       case "room/suspend":
@@ -635,7 +635,6 @@ function createRooms({ store, extensions = {}, onRoomChanged }) {
             return { room };
           },
         );
-        await onRoomChanged?.();
         return {};
       }
       default:

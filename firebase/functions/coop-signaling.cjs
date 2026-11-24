@@ -6,8 +6,9 @@ const TURN_API = "https://rtc.live.cloudflare.com/v1/turn/keys";
 const UDP = "turn:turn.cloudflare.com:3478";
 const TLS = "turns:turn.cloudflare.com:443";
 const MAX_GRANTS = 120;
-// Two four-seat rooms have six host/guest pairs sharing the global budget.
-const MAX_PAIR_GRANTS = 20;
+// Split capacity between two live rooms, then between three host/guest pairs.
+const MAX_ROOM_GRANTS = MAX_GRANTS / 2;
+const MAX_PAIR_GRANTS = MAX_ROOM_GRANTS / 3;
 const GENERATION_MS = 120_000;
 const ALLOCATION_DRAIN_MS = 600_000;
 const ROTATION_WINDOW_MS = 25_000;
@@ -150,14 +151,6 @@ function createTurnSignaling({
     await Promise.allSettled(snapshots.map(revoke));
   }
 
-  async function revokeRoom(roomId) {
-    const snapshots = await grants
-      .where("roomId", "==", roomId)
-      .limit(MAX_GRANTS)
-      .get();
-    await Promise.allSettled(snapshots.docs.map(revoke));
-  }
-
   async function issue(context, pair, to) {
     if (!configured) throw new CrossplayError(503, "turn-unavailable");
     const { roomId, seatId } = context;
@@ -180,6 +173,9 @@ function createTurnSignaling({
       const roomGrants = await transaction.get(
         grants.where("roomId", "==", roomId),
       );
+      // Old seats retain their drain reservations even after the room admits new players.
+      if (roomGrants.docs.length >= MAX_ROOM_GRANTS)
+        throw new CrossplayError(429, "turn-capacity");
       const pairCount = roomGrants.docs.filter((snapshot) => {
         const grant = snapshot.data();
         return (
@@ -404,7 +400,7 @@ function createTurnSignaling({
     if (failures) throw new Error("TURN grant cleanup needs retry");
   }
 
-  return { handle, revokeRoom, reap, configured };
+  return { handle, reap, configured };
 }
 
 module.exports = { activeSignalPair, createTurnSignaling };

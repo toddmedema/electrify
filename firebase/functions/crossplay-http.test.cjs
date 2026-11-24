@@ -471,6 +471,27 @@ test("a guest can cancel pending approval and reclaim their approved seat on ano
   assert.equal(reclaimed.body.lobby.selfId, approved.lobby.selfId);
 });
 
+test("an expired guest presence cannot borrow the live host lease", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  const roomId = room.lobby.lobbyId;
+  await ctx.approve(room, host, guest);
+  ctx.advance(7000);
+  const hostState = await ctx.call("room/state", { roomId }, { token: host });
+  assert.ok(hostState.body.authority.leaseRemainingMs > 6000);
+  ctx.advance(6000);
+  const guestState = await ctx.call("room/state", { roomId }, { token: guest });
+  assert.equal(guestState.body.authority.leaseRemainingMs, 0);
+  const returned = await ctx.call(
+    "room/reconnect",
+    { roomId, rules: RULES },
+    { token: guest },
+  );
+  assert.ok(returned.body.authority.leaseRemainingMs > 0);
+});
+
 test("a late suspend cannot invalidate a newer foreground binding", async () => {
   const ctx = setup();
   const host = await ctx.login("host");

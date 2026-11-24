@@ -78,8 +78,6 @@ function registerCrossplay(adminApp) {
         save: transfer,
         transfer,
       },
-      onRoomChanged: () =>
-        signaling.reap().catch(() => logger.warn("Co-op revocation retry")),
       audit: (event) => logger.info("Co-op control request", event),
     });
     const cleanup = db.doc("coopOperations/checkpointReaper");
