@@ -9193,20 +9193,20 @@ option {
 }
 
 // ============================================================================
-// DANGER: THE HOME-SCREEN CTAs AND THE LOGO SMOKE ARE THE LOGO BLUE. LEAVE THEM.
+// DANGER: EVERY HOME-SCREEN BUTTON AND THE LOGO SMOKE ARE THE LOGO BLUE. LEAVE THEM.
 //
 // Never re-declare --interactive-blue here (this block used to, and it turned every
-// CTA and the smoke a different blue from the logo). Never give a CTA a "more
-// legible" blue. --home-link below is ONLY for the quiet secondary text links
-// (Settings, Quit, Mods, Turn on sound, the explore row); CTAs opt back out of it
-// in the .mainActions / .couchSettingsPromptActions rules that follow.
+// CTA and the smoke a different blue from the logo). Never give a button a "more
+// legible" blue. --home-link below is ONLY for the small explore-link row at the
+// bottom; every button group (.mainActions, .resourceActions, .discoveryActions and
+// the couch prompt's actions) opts back out of it in the rules that follow.
 // src/CtaColor.test.ts and e2e/main-menu.spec.ts enforce all of this.
 // ============================================================================
 #menuCard,
 .couchSettingsPrompt {
   --home-link: #0868be;
 }
-#menuCard .mainActions,
+#menuCard :is(.mainActions, .resourceActions, .discoveryActions),
 .couchSettingsPromptActions {
   --home-link: var(--interactive-blue);
 }
@@ -9235,7 +9235,9 @@ html[data-theme="dark"] #menuCard,
 html[data-theme="dark"] .couchSettingsPrompt {
   --home-link: #8bc8f8;
 }
-html[data-theme="dark"] #menuCard .mainActions,
+html[data-theme="dark"]
+  #menuCard
+  :is(.mainActions, .resourceActions, .discoveryActions),
 html[data-theme="dark"] .couchSettingsPromptActions {
   --home-link: var(--interactive-blue);
 }

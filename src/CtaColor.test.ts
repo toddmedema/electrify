@@ -89,15 +89,16 @@ describe("the CTA blue is the logo blue", () => {
     );
   });
 
-  it("is what every home-screen CTA reads, with no quieter or deeper blue", () => {
+  it("is what every home-screen button reads, with no quieter or deeper blue", () => {
     const styles = withoutComments(read("src/app.scss"));
-    // --home-link is the legible blue for the quiet secondary links only. The CTA groups
-    // must opt back out of it, in both palettes.
+    // --home-link is the legible blue for the small explore-link row only. Every button
+    // group (CTAs, Settings/Quit/Mods, Turn on sound, the couch prompt) must opt back out
+    // of it, in both palettes.
     expect(styles).toMatch(
-      /#menuCard \.mainActions,\s*\.couchSettingsPromptActions\s*\{\s*--home-link:\s*var\(--interactive-blue\);\s*\}/,
+      /#menuCard :is\(\.mainActions, \.resourceActions, \.discoveryActions\),\s*\.couchSettingsPromptActions\s*\{\s*--home-link:\s*var\(--interactive-blue\);\s*\}/,
     );
     expect(styles).toMatch(
-      /html\[data-theme="dark"\] #menuCard \.mainActions,\s*html\[data-theme="dark"\] \.couchSettingsPromptActions\s*\{\s*--home-link:\s*var\(--interactive-blue\);\s*\}/,
+      /html\[data-theme="dark"\]\s*#menuCard\s*:is\(\.mainActions, \.resourceActions, \.discoveryActions\),\s*html\[data-theme="dark"\] \.couchSettingsPromptActions\s*\{\s*--home-link:\s*var\(--interactive-blue\);\s*\}/,
     );
     expect(styles).toMatch(
       /#menuCard \.MuiButton-text\.MuiButton-colorPrimary:not\(\.Mui-disabled\),[^{]*\{\s*color:\s*var\(--home-link\);/,

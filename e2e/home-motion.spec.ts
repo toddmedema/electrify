@@ -71,17 +71,17 @@ for (const theme of ["light", "dark"] as const) {
     expect(authRequests).toEqual([]);
     // The CTAs are the logo blue and stay that blue (see src/CtaColor.test.ts): never darken
     // or lighten them to chase a score. Light's logo blue is 3.7:1 on white by decision.
-    const ctas = page.locator("#menuCard .mainActions .MuiButton-root");
-    expect(await ctas.count()).toBeGreaterThanOrEqual(2);
+    const ctas = page.locator(
+      "#menuCard :is(.mainActions, .resourceActions, .discoveryActions) .MuiButton-root",
+    );
+    expect(await ctas.count()).toBeGreaterThanOrEqual(3);
     for (const cta of await ctas.all()) {
       expect(await foregroundContrast(cta)).toBeGreaterThanOrEqual(
         theme === "light" ? 3.5 : 4.5,
       );
     }
-    const quiet = page.locator(
-      "#menuCard :is(.resourceActions, .discoveryActions) .MuiButton-text.MuiButton-colorPrimary, .homeExplore a",
-    );
-    expect(await quiet.count()).toBeGreaterThanOrEqual(8);
+    const quiet = page.locator("#menuCard .homeExplore a");
+    expect(await quiet.count()).toBeGreaterThanOrEqual(7);
     for (const control of await quiet.all()) {
       expect(await foregroundContrast(control)).toBeGreaterThanOrEqual(4.5);
     }
