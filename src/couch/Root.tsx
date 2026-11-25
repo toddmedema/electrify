@@ -70,6 +70,13 @@ const defaultSeats: Seat[] = [
   { id: "local-p2", name: "P2 Utility" },
 ];
 
+/** Dialogs where Confirm joins, readies or claims a company. The shell also
+ * delivers that press to the focused element, so focus stays on the dialog
+ * instead of the theme's first action (Back or Save & Quit for everyone). */
+const confirmClaimsController = {
+  transition: { onEntered: () => undefined },
+};
+
 /** Let the TV paint between company views, with a deadline for hidden windows. */
 function afterSeatPaint(callback: () => void) {
   let pending = true;
@@ -1287,6 +1294,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         fullWidth
         maxWidth="sm"
         aria-labelledby="couch-title"
+        slotProps={confirmClaimsController}
       >
         <DialogTitle id="couch-title">Local Co-op · Two players</DialogTitle>
         <DialogContent>
@@ -1484,7 +1492,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           </Button>
         </DialogActions>
       </CouchDialog>
-      <Dialog open={!!summary?.complete && !exitOwner} fullWidth maxWidth="sm">
+      <Dialog
+        open={!!summary?.complete && !exitOwner}
+        fullWidth
+        maxWidth="sm"
+        slotProps={confirmClaimsController}
+      >
         <DialogTitle>Match complete</DialogTitle>
         <DialogContent>
           {!seats.some((seat) =>
@@ -1632,6 +1645,7 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
         }
         fullWidth
         maxWidth="sm"
+        slotProps={confirmClaimsController}
       >
         <DialogTitle>TV session paused</DialogTitle>
         <DialogContent>

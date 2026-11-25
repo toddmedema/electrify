@@ -1693,6 +1693,9 @@ describe("the intertie upgrade control", () => {
       screen.getByLabelText(`Inspect ${line.name}`, { exact: false }),
     );
     const upgrade = screen.getByLabelText(`Review upgrade of ${line.name}`);
+    expect(
+      screen.getByRole("group", { name: "Facility actions" }),
+    ).toContainElement(upgrade);
     expect(screen.queryByText(/CO2e to build/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Extra import room/)).not.toBeInTheDocument();
     await user.click(upgrade);

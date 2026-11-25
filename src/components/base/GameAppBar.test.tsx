@@ -636,6 +636,25 @@ describe("GameAppBar", () => {
     expect(library).toHaveFocus();
   });
 
+  it("leaves campaign reconnect and save status out of the multiplayer menu", () => {
+    const game = createGame({ scenarioId: 101 });
+    renderAppBar({
+      game: {
+        ...game,
+        inGame: true,
+        multiplayer: { seat: "1" },
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "menu" }));
+    expect(
+      screen.queryByRole("menuitem", { name: "Reconnect to campaign" }),
+    ).toBeNull();
+    expect(screen.queryByText(/Device save/)).toBeNull();
+    expect(screen.queryByText(/Confirmed online save/)).toBeNull();
+    expect(screen.queryByText(/required players return/)).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Save & Quit" })).toBeVisible();
+  });
+
   it.each([false, true])(
     "keeps the solo save library outside a multiplayer game (%s)",
     (multiplayer) => {

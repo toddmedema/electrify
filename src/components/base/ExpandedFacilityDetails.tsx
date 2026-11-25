@@ -24,6 +24,7 @@ import { facilityOperatingStatus } from "./FacilityMapStatus";
 import { useMoney } from "./CurrencyContext";
 import ConfirmDialog from "./ConfirmDialog";
 import FacilityDetails from "./FacilityDetails";
+import GasConversion from "./GasConversion";
 import FacilityCapacityUpgrade, {
   type FacilityCapacityUpgradeActions,
 } from "./FacilityCapacityUpgrade";
@@ -250,6 +251,13 @@ export default function ExpandedFacilityDetails({
         onCancelExpansion={actions.onCancelExpansion}
         fallbackFocusRef={operationSection}
       >
+        {!permanentlyShutdown && (
+          <GasConversion
+            facility={facility}
+            game={game}
+            onRetrofit={actions.onRetrofit}
+          />
+        )}
         <MemoizedFacilityActions
           facility={facility}
           upgrading={!!installing && isUpgradingAt(facility, game.date.minute)}

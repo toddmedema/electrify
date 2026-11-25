@@ -160,8 +160,9 @@ test("the unified lobby accepts a pasted link and a code", async () => {
   const { join } = renderWithSteamInvites();
   const user = userEvent.setup();
   act(showMultiplayerLobby);
-  const title = screen.getByRole("heading", { name: "Play with friends" });
-  await waitFor(() => expect(title).toHaveFocus());
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Host a game" })).toHaveFocus(),
+  );
   const code = screen.getByRole("textbox", { name: "Invite code" });
   await user.type(
     code,

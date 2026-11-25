@@ -22,13 +22,21 @@ for (const theme of ["light", "dark"]) {
       has: page.locator(".facilityName", { hasText: /^Natural Gas Peaker$/ }),
     });
     await row.locator(".facilityDisclosure").click();
-    const conversion = row.getByRole("region", {
-      name: "Combined-cycle conversion",
-      exact: true,
-    });
-    const action = conversion.getByRole("button", {
+    const actions = row.locator(".facilityActions");
+    await expect(row.getByText("Combined-cycle conversion")).toHaveCount(0);
+    await expect(row.getByText(/output afterward/)).toHaveCount(0);
+    const action = actions.getByRole("button", {
       name: /^Convert \([^)]+\)$/,
     });
+    const labels = await actions.getByRole("button").allInnerTexts();
+    const upgradeIndex = labels.findIndex((label) =>
+      label.startsWith("Upgrade capacity"),
+    );
+    const convertIndex = labels.findIndex((label) =>
+      label.startsWith("Convert"),
+    );
+    expect(upgradeIndex).toBeGreaterThanOrEqual(0);
+    expect(convertIndex).toBeGreaterThan(upgradeIndex);
     await action.click();
     const dialog = page.getByRole("dialog");
     await expectDialogToFit(dialog);

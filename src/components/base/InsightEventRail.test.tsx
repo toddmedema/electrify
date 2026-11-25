@@ -1,5 +1,5 @@
 import * as React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import InsightEventRail from "./InsightEventRail";
 
@@ -90,12 +90,14 @@ it("focuses event details and restores the trigger on Escape and Zoom", async ()
   const trigger = screen.getByRole("button", { name: /January 2026/ });
   trigger.focus();
   await user.keyboard("{Enter}");
-  expect(screen.getByRole("dialog")).toHaveFocus();
+  const zoomButton = () =>
+    screen.getByRole("button", { name: "Zoom to event" });
+  await waitFor(() => expect(zoomButton()).toHaveFocus());
+  expect(screen.getByRole("dialog")).not.toHaveAttribute("tabindex");
   await user.keyboard("{Escape}");
   expect(trigger).toHaveFocus();
   await user.keyboard("{Enter}");
-  await user.tab();
-  expect(screen.getByRole("button", { name: "Zoom to event" })).toHaveFocus();
+  await waitFor(() => expect(zoomButton()).toHaveFocus());
   await user.keyboard("{Enter}");
   expect(zoom).toHaveBeenCalledTimes(1);
   expect(trigger).toHaveFocus();

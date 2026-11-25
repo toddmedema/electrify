@@ -5,6 +5,7 @@
 
 import { blue, green, grey, red, amber } from "@mui/material/colors";
 import { createTheme, Theme } from "@mui/material/styles";
+import { focusInitialDialogAction } from "./components/base/dialogFocus";
 import {
   DemandTypeNameType,
   FuelNameType,
@@ -621,6 +622,17 @@ export function createAppTheme(mode: ThemeModeType): Theme {
         },
       },
       MuiDialog: {
+        defaultProps: {
+          // Dialogs that pass their own transition.onEntered replace this and must
+          // call focusInitialDialogAction themselves.
+          slotProps: {
+            transition: {
+              onEntered: (node: HTMLElement) => {
+                focusInitialDialogAction(node);
+              },
+            },
+          },
+        },
         styleOverrides: {
           paper: {
             // --radius-lg in app.scss: dialogs and sheets share the grouped-list corner

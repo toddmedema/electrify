@@ -82,12 +82,14 @@ async function showLobby() {
   return { session, bridge };
 }
 
-test("the lobby heading receives initial focus and focus on a new lobby mode", async () => {
+test("the lobby focuses Host a game, then the next mode's action", async () => {
   const { session } = await showLobby();
   const title = screen.getByRole("heading", { name: "Play with friends" });
+  expect(title).not.toHaveAttribute("tabindex");
   expect(screen.getByRole("dialog")).toHaveFocus();
   await act(async () => jest.advanceTimersByTime(1000));
-  expect(title).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Host a game" })).toHaveFocus();
+  expect(title).not.toHaveFocus();
   await act(async () =>
     screen.getByRole("textbox", { name: "6-digit invite code" }).focus(),
   );
@@ -95,7 +97,7 @@ test("the lobby heading receives initial focus and focus on a new lobby mode", a
   expect(
     screen.queryByRole("textbox", { name: "6-digit invite code" }),
   ).toBeNull();
-  expect(title).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Leave lobby" })).toHaveFocus();
 });
 
 test("joining a Steam invitation shows join progress without submitting the code form", async () => {
@@ -199,12 +201,13 @@ async function showSaves() {
   });
 }
 
-test("multiplayer saves focus the heading when the opening animation ends without navigation", async () => {
+test("multiplayer saves focus Load save when the opening animation ends without navigation", async () => {
   await showSaves();
+  const title = screen.getByRole("heading", { name: "Multiplayer saves" });
+  expect(title).not.toHaveAttribute("tabindex");
   await act(async () => jest.advanceTimersByTime(1000));
-  expect(
-    screen.getByRole("heading", { name: "Multiplayer saves" }),
-  ).toHaveFocus();
+  expect(screen.getAllByRole("button", { name: "Load save" })[0]).toHaveFocus();
+  expect(title).not.toHaveFocus();
 });
 
 test.each(["Search saves", "Back"])(

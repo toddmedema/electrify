@@ -11,7 +11,6 @@ import {
 
 const AUTHORITY_MS = 4_000;
 const STATS_MS = 1_000;
-const PROOF_STALE_MS = 10_000;
 const RENEGOTIATE_REMAINING_MS = 20_000;
 const SIGNAL_POLL_MS = 1_000;
 const SIGNAL_IDLE_MS = 2_000;
@@ -126,6 +125,8 @@ interface Peer {
   confirmedUntil: number;
   candidateCheck: number;
   proofAt: number;
+  /** Consecutive relay-proof failures. A live channel survives one slow or empty stats read. */
+  proofMisses: number;
   checking: boolean;
   localVerified: boolean;
   remoteVerified: boolean;
@@ -246,7 +247,7 @@ export class TurnPeers {
       this.usable(peer) &&
       peer.localVerified &&
       peer.remoteVerified &&
-      performance.now() - peer.proofAt <= 2 * STATS_MS &&
+      peer.proofMisses < 3 &&
       peer.pc?.connectionState === "connected" &&
       peer.channel?.readyState === "open"
     );
@@ -322,6 +323,20 @@ export class TurnPeers {
     this.publish();
   }
 
+  /** Membership already ended. Do not wait for the next signal poll to drop the channel. */
+  forget(peerId: string): void {
+    const link = this.links.get(peerId);
+    if (!link) return;
+    this.closeLink(link);
+    this.links.delete(peerId);
+    this.publish();
+  }
+
+  /** Every peer with a link, including one still negotiating and not yet published. */
+  retained(): string[] {
+    return [...this.links.keys()];
+  }
+
   close(): void {
     this.authority = undefined;
     this.poll?.abort();
@@ -344,9 +359,18 @@ export class TurnPeers {
       for (const leg of [link.current, link.successor]) {
         const peer = leg?.peer;
         if (!peer) continue;
+        // A stalled signal poll used to expire confirmedUntil and drop a channel
+        // that was still carrying the match. Refresh that grace while it is open.
+        if (
+          this.current() &&
+          now < peer.expiresAt &&
+          peer.pc?.connectionState === "connected" &&
+          peer.channel?.readyState === "open" &&
+          now + STATS_MS >= peer.confirmedUntil
+        )
+          peer.confirmedUntil = now + AUTHORITY_MS;
         if (
           !this.usable(peer) ||
-          (peer.localVerified && now - peer.proofAt > PROOF_STALE_MS) ||
           (now - peer.createdAt > NEGOTIATION_MS && !this.ready(peer))
         ) {
           this.retire(peer);
@@ -560,6 +584,7 @@ export class TurnPeers {
       confirmedUntil: startedAt + AUTHORITY_MS,
       candidateCheck: -Infinity,
       proofAt: -Infinity,
+      proofMisses: 0,
       checking: false,
       localVerified: false,
       remoteVerified: false,
@@ -681,9 +706,13 @@ export class TurnPeers {
       .then((valid) => {
         if (!this.usable(peer)) return;
         if (!valid) {
-          this.retire(peer);
+          // One empty or non-relay stats sample is common while the page is busy.
+          // Three in a row means the selected pair is no longer the agreed relay.
+          peer.proofMisses += 1;
+          if (peer.proofMisses >= 3) this.retire(peer);
           return;
         }
+        peer.proofMisses = 0;
         peer.proofAt = performance.now();
         if (!peer.localVerified) {
           channel.send(new Uint8Array([CONFIRMED]));
@@ -692,7 +721,11 @@ export class TurnPeers {
         this.advanceHandoff(peer.link);
         this.publish();
       })
-      .catch(() => this.retire(peer))
+      .catch(() => {
+        if (!this.usable(peer)) return;
+        peer.proofMisses += 1;
+        if (peer.proofMisses >= 3) this.retire(peer);
+      })
       .finally(() => {
         peer.checking = false;
       });

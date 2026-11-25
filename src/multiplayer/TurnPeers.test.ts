@@ -72,6 +72,9 @@ class PeerFixture {
       ((event: { data: ArrayBuffer }) => void) | undefined,
   };
   close = jest.fn();
+  holdStats = false;
+  statsValid = true;
+  private statsWaiters: Array<(stats: Map<string, object>) => void> = [];
   createDataChannel = jest.fn(() => this.channel);
   createOffer = async () => offer;
   setLocalDescription = async (): Promise<void> => undefined;
@@ -79,7 +82,17 @@ class PeerFixture {
     this.connectionState = "connected";
     this.channel.readyState = "open";
   };
-  getStats = async () => relayStats(true);
+  getStats = () => {
+    if (!this.holdStats)
+      return Promise.resolve(this.statsValid ? relayStats(true) : new Map());
+    return new Promise<Map<string, object>>((resolve) => {
+      this.statsWaiters.push(resolve);
+    });
+  };
+  releaseStats() {
+    const waiting = this.statsWaiters.splice(0);
+    for (const resolve of waiting) resolve(relayStats(true));
+  }
 }
 
 async function settle() {
@@ -172,10 +185,20 @@ test("a live verified relay stops delivering gameplay when the independent autho
     fixture.channel.onmessage?.({ data: frame.buffer });
     expect(message).toHaveBeenCalledTimes(3);
     expect(status).toHaveBeenLastCalledWith(["guest"]);
+    // A stalled relay-stats read must not unpublish a channel that is still open.
+    fixture.holdStats = true;
+    jest.advanceTimersByTime(5_000);
+    await settle();
+    fixture.channel.onmessage?.({ data: frame.buffer });
+    expect(message).toHaveBeenCalledTimes(4);
+    expect(status).toHaveBeenLastCalledWith(["guest"]);
+    fixture.holdStats = false;
+    fixture.releaseStats();
+    await settle();
     jest.advanceTimersByTime(8_000);
     await settle();
     fixture.channel.onmessage?.({ data: frame.buffer });
-    expect(message).toHaveBeenCalledTimes(3);
+    expect(message).toHaveBeenCalledTimes(4);
     expect(status).toHaveBeenLastCalledWith([]);
     expect(fixture.close).toHaveBeenCalledTimes(1);
     await expect(peers.send("guest", { kind: "heartbeat" })).rejects.toThrow(
@@ -442,6 +465,21 @@ function records(from: number): WireMessage {
     records: [{ t: "verify" }],
   };
 }
+
+test("forgetting a peer closes its link without waiting for the next signal poll", async () => {
+  const f = duplex();
+  try {
+    await f.advance(4_000);
+    await f.guest.send(command(1));
+    f.host.peers.forget("guest");
+    expect(f.host.status).toHaveBeenLastCalledWith([]);
+    await expect(f.host.peers.send("guest", command(2))).rejects.toThrow(
+      /unavailable/,
+    );
+  } finally {
+    f.close();
+  }
+});
 
 test("three TURN renewals keep both seats connected and deliver commands and records", async () => {
   const f = duplex();

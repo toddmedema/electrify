@@ -1,7 +1,6 @@
 import { currencyForLocation } from "../../helpers/Currency";
 import { useMoney } from "./CurrencyContext";
 import * as React from "react";
-import { Typography } from "@mui/material";
 import {
   FacilityOperatingType,
   GameType,
@@ -35,22 +34,9 @@ export default function GasConversion(props: {
   const costChange = (before: number, after: number, unit: string) =>
     `${formatMoneyConcise(before * escalation)} → ${formatMoneyConcise(after)}/${unit}`;
   return (
-    <section
-      className="facilityDetailSection"
-      aria-label="Combined-cycle conversion"
-    >
-      <Typography component="h3" className="facilityDetailHeading">
-        Combined-cycle conversion
-      </Typography>
-      <Typography variant="body2">Use less gas for the same power.</Typography>
-      <Typography
-        variant="body2"
-        color="textSecondary"
-        className="facilityDetailDescription"
-      >
-        Six months offline. Slower starts and 45% minimum output afterward.
-      </Typography>
+    <>
       <FacilityUpgradeAction
+        className="facilityRetrofitInline"
         label="Convert"
         cost={quote.cost}
         shortfall={shortfall}
@@ -136,6 +122,6 @@ export default function GasConversion(props: {
           />
         </ConfirmDialog>
       )}
-    </section>
+    </>
   );
 }

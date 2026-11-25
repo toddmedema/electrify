@@ -84,16 +84,9 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   return {
     onBack: () => {
       const role = coopRole();
-      const controls = coopControls();
-      if (role === "guest") {
-        controls?.back();
-        return;
-      }
-      if (role === "host") {
-        // Local co-op returns to the join stage. An online host keeps the room
-        // and reopens the lobby instead of confirming a departure.
-        if (controls?.returnToLobby) controls.returnToLobby();
-        else controls?.back();
+      // Online play confirms leaving the lobby. Local co-op returns to join.
+      if (role) {
+        coopControls()?.back();
         return;
       }
       if (customEventFromSearch(window.location.search) !== undefined) {
