@@ -8,6 +8,7 @@ import {
 import { randomUUID } from "node:crypto";
 import type { ReactNode } from "react";
 import { Provider } from "react-redux";
+import { ThemeProvider } from "@mui/material/styles";
 import type { AudioNode } from "../audio/AudioNode";
 import { MUSIC_INTRO_FILE, ThemeManager } from "../audio/ThemeManager";
 import { MUSIC_DEFINITIONS } from "../Constants";
@@ -24,6 +25,7 @@ import type {
 } from "../multiplayer/WorkerProtocol";
 import { createWorld, roomView } from "../multiplayer/World";
 import { store } from "../Store";
+import { createAppTheme } from "../Theme";
 import { COOP_TEST_SPEC } from "../testing/MultiplayerFixtures";
 import { loadSimData } from "../testing/SimData";
 import { couchPlatformActive, couchPlatformMatch } from "./Platform";
@@ -101,6 +103,26 @@ async function mount(audio?: ReactNode) {
   });
   return view;
 }
+
+it("keeps focus off Back while players press Confirm to join", async () => {
+  // The shell also delivers Confirm to the focused element, so the theme's
+  // first-action focus would turn a join press into Back.
+  render(
+    <ThemeProvider theme={createAppTheme("dark")}>
+      <Provider store={store}>
+        <CouchRoot onClose={() => {}} />
+      </Provider>
+    </ThemeProvider>,
+  );
+  await act(async () => {
+    await setupReply;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  });
+  expect(
+    screen.getByRole("dialog", { name: "Local Co-op · Two players" }),
+  ).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Back" })).not.toHaveFocus();
+});
 
 it("accepts binding acknowledgments against the newest device frame before React commits", async () => {
   await mount();

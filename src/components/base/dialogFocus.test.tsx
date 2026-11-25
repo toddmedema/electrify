@@ -97,3 +97,21 @@ test("an explicit autofocus action wins over the first contained button", () => 
   });
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
 });
+
+test("focusing the first action after the open animation keeps a scrolled dialog in place", () => {
+  show(
+    <Dialog open aria-label="Settings">
+      <DialogContent>
+        <Button>System</Button>
+        <Button>Credits and licenses</Button>
+      </DialogContent>
+    </Dialog>,
+  );
+  const first = screen.getByRole("button", { name: "System" });
+  const focus = jest.spyOn(first, "focus");
+  act(() => {
+    jest.advanceTimersByTime(1000);
+  });
+  expect(first).toHaveFocus();
+  expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+});

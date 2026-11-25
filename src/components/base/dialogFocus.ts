@@ -96,5 +96,7 @@ export function focusInitialDialogAction(
   const active = document.activeElement;
   if (!options?.force && !shouldReplaceInitialFocus(dialog, active)) return;
   const target = initialDialogAction(dialog);
-  if (target && target !== active) target.focus();
+  // This runs after the open animation, so the player may already have scrolled
+  // a long dialog such as Settings. Moving focus must not scroll it back.
+  if (target && target !== active) target.focus({ preventScroll: true });
 }
