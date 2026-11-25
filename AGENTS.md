@@ -223,11 +223,13 @@ untracked. Agents without a verified hook should format the files they changed b
 - Preserve the palette's semantic roles. Electric blue means interaction, red means a shortage or
   harmful state, amber means warning, and green means favorable change. Use the cool neutral
   surfaces for structure instead of introducing decorative colors.
-- **Never change the CTA color.** The call-to-action blue, the logo blue and the home-screen smoke
-  are one color: `--interactive-blue`, `#0084f8` in light and `#629be1` in dark. Do not re-declare
-  it, add a "more legible" CTA blue, or nudge it for a contrast score; fix the label instead.
-  `src/CtaColor.test.ts` and the home CTA test in `e2e/main-menu.spec.ts` fail on any change, and
-  only an explicit instruction in the task itself may move them.
+- **Never change the CTA color.** Every CTA, button and link, the home-screen smoke and the logo
+  are one blue per theme: `--interactive-blue`, `#0084f8` in light and `#629be1` in dark (`--brand`
+  on the static pages in `public/legal.css`). Do not re-declare it, add a deeper, lighter or
+  per-screen blue for buttons or links, or nudge it for a contrast score; fix the label instead.
+  Only hover and pressed states may shade it. `src/CtaColor.test.ts` and the home CTA test in
+  `e2e/main-menu.spec.ts` fail on any change, and only an explicit instruction in the task itself
+  may move them.
 - Design light and dark modes as separate contrast systems rather than mechanically inverting
   colors. Use the shared theme and CSS tokens, and verify text, controls, charts, and SVGs in both
   palettes.

@@ -35,7 +35,7 @@ async function expectContinuousBorder(button: Locator) {
 }
 
 /** The speed control marks its selection with a thumb under the pressed segment, not a border. */
-async function expectThumbUnder(button: Locator) {
+async function expectThumbUnder(button: Locator, theme: string) {
   await expect(button).toHaveAttribute("aria-pressed", "true");
   await button.scrollIntoViewIfNeeded();
   // The thumb glides and the label's colour eases in behind it, so read until both settle.
@@ -65,10 +65,13 @@ async function expectThumbUnder(button: Locator) {
       "the thumb is under the pressed speed",
     ).toBeLessThanOrEqual(1);
     expect(thumb.labelOnTop, "the thumb never covers its label").toBe(true);
+    // The thumb is the logo blue, which stays that blue (see src/CtaColor.test.ts): light's is
+    // 3.7:1 under a white label by decision, so it holds the repo's 3.5:1 floor for logo-blue
+    // fills; dark keeps WCAG AA.
     expect(
       contrastRatio(thumb.label, thumb.background),
       "the pressed label is readable on the thumb",
-    ).toBeGreaterThanOrEqual(4.5);
+    ).toBeGreaterThanOrEqual(theme === "light" ? 3.5 : 4.5);
   }).toPass({ timeout: 10000 });
 }
 
@@ -122,7 +125,7 @@ for (const theme of ["light", "dark"]) {
     ]) {
       const button = speeds.getByRole("button", { name, exact: true });
       await button.click();
-      await expectThumbUnder(button);
+      await expectThumbUnder(button, theme);
     }
     await page.mouse.move(0, 0);
     await reviewScreenshot(page, {

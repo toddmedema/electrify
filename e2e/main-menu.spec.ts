@@ -471,7 +471,7 @@ test("footer icons have equal optical gaps beside Share", async ({ page }) => {
 });
 
 // ============================================================================
-// DANGER: CHANGING THE CTA COLOR IS NOT ALLOWED. The home-screen buttons and the logo smoke are
+// DANGER: CHANGING THE CTA COLOR IS NOT ALLOWED. The home-screen buttons, links and the logo smoke are
 // the logo's blue (public/images/logo-home*.svg), in both themes. If this fails you changed
 // it: put it back. Do not edit these constants, loosen the assertions, or re-declare
 // --interactive-blue to chase a contrast score. src/CtaColor.test.ts guards the source.
@@ -510,10 +510,13 @@ for (const theme of ["light", "dark"] as const) {
     await expect(smoke).toHaveCount(2);
     for (const puff of await smoke.all())
       await expect(puff).toHaveCSS("fill", LOGO_BLUE[theme]);
-    // Settings (and Quit, Mods, Turn on sound) are logo blue too, not a quieter blue.
+    // Settings (and Quit, Mods, Turn on sound) and the explore links are logo blue too,
+    // not a quieter or deeper blue.
     await expect(
       page.getByRole("button", { name: "Settings", exact: true }),
     ).toHaveCSS("color", LOGO_BLUE[theme]);
+    for (const link of await page.locator("#menuCard .homeExplore a").all())
+      await expect(link).toHaveCSS("color", LOGO_BLUE[theme]);
     // The CTAs that are not filled read in the same blue, and take the fill when selected.
     const friends = page.getByRole("button", { name: "Play with friends" });
     await expect(friends).toBeVisible();

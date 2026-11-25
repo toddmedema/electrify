@@ -207,7 +207,7 @@
 
 .scenario-decision-number {
   padding-top: 2px;
-  color: var(--brand-strong);
+  color: var(--brand);
   font-size: 0.875rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
@@ -226,7 +226,7 @@
   padding: 40px;
   border-radius: 12px;
   background: var(--surface-soft);
-  border-left: 4px solid var(--brand-strong);
+  border-left: 4px solid var(--brand);
 }
 
 .scenario-invitation h2 {
@@ -283,7 +283,7 @@
 
 .scenario-entry__link:hover h3,
 .scenario-entry__link:focus-visible h3 {
-  color: var(--brand-strong);
+  color: var(--brand);
   text-decoration: underline;
   text-underline-offset: 0.16em;
 }
@@ -319,7 +319,7 @@
   display: inline-flex;
   gap: 8px;
   margin-top: 16px;
-  color: var(--brand-strong);
+  color: var(--brand);
   font-size: 0.8125rem;
   font-weight: 700;
 }
@@ -423,7 +423,7 @@
 }
 
 .scenario-theme-nav a:hover {
-  border-color: var(--brand-strong);
+  border-color: var(--brand);
   background: var(--brand-wash);
 }
 

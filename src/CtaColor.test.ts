@@ -89,19 +89,63 @@ describe("the CTA blue is the logo blue", () => {
     );
   });
 
-  it("is what every home-screen button reads, with no quieter or deeper blue", () => {
+  it("is what every home-screen button and link reads, with no quieter or deeper blue", () => {
     const styles = withoutComments(read("src/app.scss"));
-    // --home-link is the legible blue for the small explore-link row only. Every button
-    // group (CTAs, Settings/Quit/Mods, Turn on sound, the couch prompt) must opt back out
-    // of it, in both palettes.
     expect(styles).toMatch(
-      /#menuCard :is\(\.mainActions, \.resourceActions, \.discoveryActions\),\s*\.couchSettingsPromptActions\s*\{\s*--home-link:\s*var\(--interactive-blue\);\s*\}/,
+      /\.homeExplore a\s*\{[^}]*color:\s*var\(--interactive-blue\);/,
     );
     expect(styles).toMatch(
-      /html\[data-theme="dark"\]\s*#menuCard\s*:is\(\.mainActions, \.resourceActions, \.discoveryActions\),\s*html\[data-theme="dark"\] \.couchSettingsPromptActions\s*\{\s*--home-link:\s*var\(--interactive-blue\);\s*\}/,
+      /#menuCard\s+\.homeExplore\s+a:focus\s*\{[^}]*outline:\s*2px solid var\(--interactive-blue\);/,
     );
+  });
+
+  it("is the link and button blue on the static site pages, in both palettes", () => {
+    const styles = withoutComments(read("public/legal.css"));
+    expect(
+      Array.from(styles.matchAll(/--brand:\s*(#[0-9a-f]{6})/gi), (match) =>
+        match[1].toLowerCase(),
+      ),
+    ).toEqual([CTA_BLUE.light, CTA_BLUE.dark]);
+    expect(styles).toMatch(/(^|\n)a\s*\{\s*color:\s*var\(--brand\);/);
     expect(styles).toMatch(
-      /#menuCard \.MuiButton-text\.MuiButton-colorPrimary:not\(\.Mui-disabled\),[^{]*\{\s*color:\s*var\(--home-link\);/,
+      /\.button--primary\s*\{\s*border-color:\s*var\(--brand\);\s*background:\s*var\(--brand\);/,
     );
+    const shell = read("public/index.html");
+    expect(shell).toMatch(/\.app-loading a\s*\{[^}]*color:\s*#0084f8;/);
+    expect(shell).toMatch(
+      /data-theme="dark"\]\s*\.app-loading a\s*\{\s*color:\s*#629be1;/,
+    );
+  });
+
+  it("has no second blue for buttons or links anywhere: the old shades and tokens stay gone", () => {
+    // Each of these was once a "more legible" CTA or link blue. Chart series colors in
+    // Theme.tsx are data colors, not interface blues, and are not scanned.
+    const forbidden = [
+      "#0868be",
+      "#8bc8f8",
+      "#0066cc",
+      "#8db6ee",
+      "#006bc7",
+      "#64b5f6",
+      "--home-link",
+      "--interactive-strong",
+      "--brand-strong",
+      "--brand-deep",
+    ];
+    const publicStyles = readdirSync(join(root, "public")).filter((name) =>
+      name.endsWith(".css"),
+    );
+    const files = [
+      ...stylesheets("src"),
+      ...publicStyles.map((name) => `public/${name}`),
+      "public/index.html",
+    ];
+    const found = files.flatMap((path) => {
+      const source = withoutComments(read(path)).toLowerCase();
+      return forbidden
+        .filter((blue) => source.includes(blue))
+        .map((blue) => `${path}: ${blue}`);
+    });
+    expect(found).toEqual([]);
   });
 });

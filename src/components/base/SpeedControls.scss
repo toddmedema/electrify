@@ -62,7 +62,7 @@
       border-radius: var(--radius-pill);
       background: transparent;
       background-clip: content-box;
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
       font-size: var(--font-size-caption);
       font-variant-numeric: tabular-nums;
       font-weight: 500;
@@ -98,7 +98,7 @@
 
       &.Mui-selected:not([data-thumb="true"]) {
         background-color: transparent;
-        color: var(--interactive-strong);
+        color: var(--interactive-blue);
         font-weight: 600;
       }
     }
@@ -148,7 +148,7 @@
       position: absolute;
       inset: var(--speed-inset);
       box-sizing: border-box;
-      border: 2px solid var(--couch-player-color, var(--interactive-strong));
+      border: 2px solid var(--couch-player-color, var(--interactive-blue));
       border-radius: var(--radius-pill);
       pointer-events: none;
     }
