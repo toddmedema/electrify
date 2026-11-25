@@ -137,7 +137,8 @@ export function onlineSessionServices(
   function retainMembers(members: LobbyState["members"]) {
     if (!members.length) return;
     roster = new Set(members.map((member) => member.id));
-    for (const id of [...connected]) if (!roster.has(id)) peers.forget(id);
+    // A link can open before the peer is published as connected; close it too.
+    for (const id of peers.retained()) if (!roster.has(id)) peers.forget(id);
   }
 
   function expire(error?: string) {
@@ -219,7 +220,9 @@ export function onlineSessionServices(
       return lobby;
     applied = sequence;
     roomId = result.lobby.lobbyId;
-    retainMembers(result.lobby.members);
+    const fresh = performance.now() - monotonic < MAX_AUTHORITY_MS;
+    // A late reply can predate a guest who has since joined and connected.
+    if (fresh) retainMembers(result.lobby.members);
     const grant = result.authority;
     presence = grant?.presence;
     if (
@@ -240,7 +243,6 @@ export function onlineSessionServices(
     ) {
       refreshedInvite = undefined;
     }
-    const fresh = performance.now() - monotonic < MAX_AUTHORITY_MS;
     const lobbyView = {
       ...result.lobby,
       savedAt:
@@ -392,7 +394,8 @@ export function onlineSessionServices(
         type Reply = SessionReply<Request>;
         if (input.kind === "state") return lobby as Reply;
         if (input.kind === "send") {
-          if (!liveAuthority()) throw new PeerDisconnectedError();
+          if (!liveAuthority() || (roster.size > 0 && !roster.has(input.to)))
+            throw new PeerDisconnectedError();
           await peers.send(input.to, input.payload);
           return undefined as Reply;
         }

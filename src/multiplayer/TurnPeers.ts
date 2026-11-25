@@ -332,6 +332,11 @@ export class TurnPeers {
     this.publish();
   }
 
+  /** Every peer with a link, including one still negotiating and not yet published. */
+  retained(): string[] {
+    return [...this.links.keys()];
+  }
+
   close(): void {
     this.authority = undefined;
     this.poll?.abort();
