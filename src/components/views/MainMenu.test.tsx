@@ -303,6 +303,54 @@ describe("MainMenu", () => {
     ).toBe(discord);
   });
 
+  it.each<[string, Partial<Props>]>([
+    ["with a saved game", { hasSavedGame: true, hasSavedGames: true }],
+    ["without a saved game", {}],
+  ])(
+    "gives exactly one action the primary style %s, never Play with friends too",
+    (_name, overrides) => {
+      renderMainMenu(
+        <MainMenu {...props({ onPlayWithFriends: jest.fn(), ...overrides })} />,
+      );
+      const primary = screen
+        .getAllByRole("button")
+        .filter((button) => button.hasAttribute("data-main-action"));
+      expect(primary).toHaveLength(1);
+      expect(primary[0]).toHaveTextContent(
+        overrides.hasSavedGame ? "Continue" : "Play",
+      );
+      expect(
+        screen.getByRole("button", { name: "Play with friends" }),
+      ).not.toHaveAttribute("data-main-action");
+    },
+  );
+
+  it("leaves About to the text link instead of a duplicate footer icon", () => {
+    renderMainMenu(<MainMenu {...props()} />);
+    expect(
+      within(screen.getByRole("contentinfo")).queryByRole("link", {
+        name: "About Electrify",
+      }),
+    ).toBeNull();
+    expect(
+      within(
+        screen.getByRole("navigation", { name: "Explore Electrify" }),
+      ).getByRole("link", { name: "About" }),
+    ).toHaveAttribute("href", "/about.html");
+  });
+
+  it("fetches the Saved games screen as soon as Saves is on offer", () => {
+    const onSavedGamesVisible = jest.fn();
+    const { rerender } = renderMainMenu(
+      <MainMenu {...props({ onSavedGamesVisible })} />,
+    );
+    expect(onSavedGamesVisible).not.toHaveBeenCalled();
+    rerender(
+      <MainMenu {...props({ hasSavedGames: true, onSavedGamesVisible })} />,
+    );
+    expect(onSavedGamesVisible).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the feedback dialog from the footer button", () => {
     const onFeedback = jest.fn();
     renderMainMenu(

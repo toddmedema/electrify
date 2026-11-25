@@ -69,11 +69,20 @@ for (const theme of ["light", "dark"] as const) {
         .evaluate((element: HTMLImageElement) => element.naturalWidth),
     ).toBeGreaterThan(0);
     expect(authRequests).toEqual([]);
-    const controls = page.locator(
-      "#menuCard .MuiButton-text.MuiButton-colorPrimary, .homeExplore a",
+    // The CTAs are the logo blue and stay that blue (see src/CtaColor.test.ts): never darken
+    // or lighten them to chase a score. Light's logo blue is 3.7:1 on white by decision.
+    const ctas = page.locator("#menuCard .mainActions .MuiButton-root");
+    expect(await ctas.count()).toBeGreaterThanOrEqual(2);
+    for (const cta of await ctas.all()) {
+      expect(await foregroundContrast(cta)).toBeGreaterThanOrEqual(
+        theme === "light" ? 3.5 : 4.5,
+      );
+    }
+    const quiet = page.locator(
+      "#menuCard :is(.resourceActions, .discoveryActions) .MuiButton-text.MuiButton-colorPrimary, .homeExplore a",
     );
-    expect(await controls.count()).toBeGreaterThanOrEqual(10);
-    for (const control of await controls.all()) {
+    expect(await quiet.count()).toBeGreaterThanOrEqual(8);
+    for (const control of await quiet.all()) {
       expect(await foregroundContrast(control)).toBeGreaterThanOrEqual(4.5);
     }
     await explore.getByRole("link", { name: "For teachers" }).click();

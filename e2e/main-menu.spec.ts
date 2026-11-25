@@ -448,7 +448,7 @@ test("footer icons have equal optical gaps beside Share", async ({ page }) => {
   await expect(page.locator("#appStartup")).toHaveCount(0);
   const edges = await page
     .locator(
-      '.mainMenuFooter :is([aria-label="Send feedback"],[aria-label="About Electrify"],[aria-label="Share Electrify"]) svg',
+      '.mainMenuFooter :is([aria-label="Join the Electrify Discord"],[aria-label="Send feedback"],[aria-label="Share Electrify"]) svg',
     )
     .evaluateAll((icons) =>
       icons.map((icon) => {
@@ -468,6 +468,80 @@ test("footer icons have equal optical gaps beside Share", async ({ page }) => {
     edges[1].left - edges[0].right,
     1,
   );
+});
+
+// ============================================================================
+// DANGER: CHANGING THE CTA COLOR IS NOT ALLOWED. The home-screen CTAs and the logo smoke are
+// the logo's blue (public/images/logo-home*.svg), in both themes. If this fails you changed
+// it: put it back. Do not edit these constants, loosen the assertions, or re-declare
+// --interactive-blue to chase a contrast score. src/CtaColor.test.ts guards the source.
+// ============================================================================
+const LOGO_BLUE = {
+  light: "rgb(0, 132, 248)", // #0084f8
+  dark: "rgb(98, 155, 225)", // #629be1
+} as const;
+
+for (const theme of ["light", "dark"] as const) {
+  test(`home CTAs and logo smoke are the logo blue, with one primary action, in ${theme}`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.addInitScript(
+      (value) => localStorage.setItem("theme", value),
+      theme,
+    );
+    await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
+    const play = page.getByRole("button", { name: "Play", exact: true });
+    await expect(play).toBeVisible();
+    // Selection follows focus; with focus outside the menu the default action carries the fill.
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    const filled = page.locator(
+      "#menuCard .mainActions .MuiButton-root:not([data-main-action])",
+    );
+    for (const button of await filled.all())
+      await expect(button).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(page.locator("#menuCard [data-main-action]")).toHaveCount(1);
+    await expect(page.locator("#menuCard [data-main-action]")).toHaveCSS(
+      "background-color",
+      LOGO_BLUE[theme],
+    );
+    const smoke = page.locator("#menuCard .homeSmokePuff");
+    await expect(smoke).toHaveCount(2);
+    for (const puff of await smoke.all())
+      await expect(puff).toHaveCSS("fill", LOGO_BLUE[theme]);
+    // The CTAs that are not filled read in the same blue, and take the fill when selected.
+    const friends = page.getByRole("button", { name: "Play with friends" });
+    await expect(friends).toBeVisible();
+    await expect(friends).toHaveCSS("color", LOGO_BLUE[theme]);
+    // Touch has no moving selection: the one default action keeps the fill.
+    if (!test.info().project.use.hasTouch) {
+      await friends.focus();
+      await expect(friends).toHaveCSS("background-color", LOGO_BLUE[theme]);
+      await expect(play).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    }
+  });
+}
+
+test("a returning player sees Continue as the only primary action, not Play with friends too", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/?scenario=103");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
+  await page.goto("/");
+  await expect(page.locator("#appStartup")).toHaveCount(0);
+  const resume = page.getByRole("button", { name: "Continue", exact: true });
+  await expect(resume).toBeVisible();
+  await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  await expect(page.locator("#menuCard [data-main-action]")).toHaveCount(1);
+  await expect(resume).toHaveCSS("background-color", LOGO_BLUE.light);
+  for (const name of ["Play", "Saves", "Play with friends"])
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCSS(
+      "background-color",
+      "rgba(0, 0, 0, 0)",
+    );
 });
 
 test("a failed load can be retried", async ({ page }) => {
@@ -880,7 +954,7 @@ for (const theme of ["light", "dark"]) {
     const actions = page.locator("#menuCard button, #menuCard a[href]");
     const count = await actions.count();
     const footerActions = footer.locator("button,a[href]");
-    await expect(footerActions).toHaveCount(7);
+    await expect(footerActions).toHaveCount(6);
     for (const action of await footerActions.all()) {
       const bounds = (await action.boundingBox())!;
       expect(bounds.width).toBeGreaterThanOrEqual(44);
@@ -1012,7 +1086,7 @@ for (const theme of ["light", "dark"]) {
     );
     const footer = page.locator(".mainMenuFooter");
     const actions = footer.locator("button,a[href]");
-    await expect(actions).toHaveCount(7);
+    await expect(actions).toHaveCount(6);
     const styles: Record<string, string>[] = [];
     for (const action of await actions.all()) {
       const name = (await action.getAttribute("aria-label"))!;

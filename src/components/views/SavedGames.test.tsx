@@ -131,6 +131,15 @@ it("preserves player-authored titles and completed outcomes", () => {
   expect(screen.getByText("Completed")).toBeInTheDocument();
 });
 
+it("shows no loading message while the library is still being read", () => {
+  renderLibrary({ loading: true, entries: [] });
+  expect(screen.getByRole("heading", { name: "Saved games" })).toBeVisible();
+  expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  // Nothing is claimed about an empty library until it has actually been read.
+  expect(screen.queryByText("No saved games yet")).not.toBeInTheDocument();
+});
+
 it("shows an empty library without search", () => {
   renderLibrary({ entries: [] });
   expect(
