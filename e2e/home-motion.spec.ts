@@ -82,6 +82,14 @@ for (const theme of ["light", "dark"] as const) {
         theme === "light" ? 3.5 : 4.5,
       );
     }
+    // Keyboard and controller focus fills a link with the same logo blue as every button's
+    // focus, so it is held to the same floor. It is not given a deeper blue of its own.
+    const about = explore.getByRole("link", { name: "About", exact: true });
+    await about.focus();
+    await expect(about).toBeFocused();
+    expect(await foregroundContrast(about)).toBeGreaterThanOrEqual(
+      theme === "light" ? 3.5 : 4.5,
+    );
     await explore.getByRole("link", { name: "For teachers" }).click();
     await expect(page).toHaveURL(/classroom\.html$/);
   });

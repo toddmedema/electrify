@@ -341,12 +341,21 @@ describe("MainMenu", () => {
 
   it("fetches the Saved games screen as soon as Saves is on offer", () => {
     const onSavedGamesVisible = jest.fn();
-    const { rerender } = renderMainMenu(
+    const { rerender, store } = renderMainMenu(
       <MainMenu {...props({ onSavedGamesVisible })} />,
     );
     expect(onSavedGamesVisible).not.toHaveBeenCalled();
+    // Rerender under the same Provider so this is an update, not a remount.
     rerender(
-      <MainMenu {...props({ hasSavedGames: true, onSavedGamesVisible })} />,
+      <Provider store={store}>
+        <MainMenu {...props({ hasSavedGames: true, onSavedGamesVisible })} />
+      </Provider>,
+    );
+    expect(onSavedGamesVisible).toHaveBeenCalledTimes(1);
+    rerender(
+      <Provider store={store}>
+        <MainMenu {...props({ hasSavedGames: true, onSavedGamesVisible })} />
+      </Provider>,
     );
     expect(onSavedGamesVisible).toHaveBeenCalledTimes(1);
   });

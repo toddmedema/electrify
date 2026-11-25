@@ -41,7 +41,7 @@ import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
 import { isDesktopApp } from "../../Desktop";
 import { restoreMenuFocus } from "../base/useMenuKeys";
-import { useLeaveSavedGames } from "./SavedGamesShell";
+import { takeShellFocus, useLeaveSavedGames } from "./SavedGamesShell";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -53,6 +53,14 @@ const STATUS_LABELS: Record<SaveStatus, string> = {
 export default function SavedGames(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const onBack = useLeaveSavedGames();
+  const page = React.useRef<HTMLDivElement>(null);
+  // Replacing the page shell must not drop focus the player had already put on Back.
+  React.useLayoutEffect(() => {
+    if (takeShellFocus())
+      page.current
+        ?.querySelector<HTMLElement>('button[aria-label="Back"]')
+        ?.focus({ preventScroll: true });
+  }, []);
   const saves = useAppSelector((state) => state.saves);
   const inGame = useAppSelector((state) => state.game.inGame);
   const [search, setSearch] = React.useState("");
@@ -209,6 +217,7 @@ export default function SavedGames(): React.JSX.Element {
   );
   return (
     <ScreenPage
+      ref={page}
       id="gameCard"
       title="Saved games"
       onBack={onBack}
