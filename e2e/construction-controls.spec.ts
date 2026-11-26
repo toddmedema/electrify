@@ -297,10 +297,10 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("dialog")
         .getByRole("button", { name: "Take loan" })
         .click();
-      if (testInfo.project.use.hasTouch)
-        await page
-          .getByRole("button", { name: "Dismiss notification" })
-          .click();
+      if (testInfo.project.use.hasTouch) {
+        await page.mouse.move(0, 0);
+        await expect(page.locator(".snackbarContent")).toBeHidden();
+      }
     };
     await build();
     const line = pane.locator(".transmissionLine").first();
