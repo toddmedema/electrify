@@ -306,6 +306,40 @@ async function confirmDelete() {
   await act(async () => undefined);
 }
 
+it("holds a deleted card through confirmation, then hides it and focuses the next save", async () => {
+  jest.useFakeTimers();
+  const next = entry({ id: "workshop", name: "Workshop" });
+  const { testStore } = renderLibrary({ entries: [entry(), next] });
+  const card = screen.getByRole("article", { name: "Wind experiment" });
+  const nextAction = screen.getByRole("button", {
+    name: "Actions for Workshop",
+  });
+  (deleteSavedGame as jest.Mock).mockImplementationOnce(async () => {
+    testStore.dispatch(libraryLoaded([next]));
+  });
+  await confirmDelete();
+
+  await act(async () => {
+    jest.advanceTimersByTime(100);
+  });
+  expect(card).toBeInTheDocument();
+  await act(async () => {
+    jest.advanceTimersByTime(200);
+  });
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(nextAction).toHaveFocus();
+  expect(
+    screen.queryByRole("article", { name: "Wind experiment" }),
+  ).not.toBeInTheDocument();
+  expect(card).toBeInTheDocument();
+  await act(async () => {
+    jest.advanceTimersByTime(250);
+  });
+
+  expect(card).not.toBeInTheDocument();
+});
+
 it("releases a hung deletion at six seconds, reports it and permits a fresh retry", async () => {
   jest.useFakeTimers();
   let finish!: () => void;

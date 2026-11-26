@@ -15,6 +15,7 @@ import {
   Stack,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
 import { TransitionGroup } from "react-transition-group";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -45,6 +46,9 @@ import ShareSaveDialog from "../base/ShareSaveDialog";
 import { isDesktopApp } from "../../Desktop";
 import { restoreMenuFocus } from "../base/useMenuKeys";
 
+const SEARCH_COLLAPSE_ID = "saved-game-search";
+const collapseId = (id: string) => `saved-game-removal-${id}`;
+
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
   completed: "Completed",
@@ -61,7 +65,7 @@ export default function SavedGames(): React.JSX.Element {
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [menu, setMenu] = React.useState<{
-    anchor: HTMLElement;
+    anchor: HTMLButtonElement;
     save: SaveMetadata;
   }>();
   const [rename, setRename] = React.useState<{ id: string; name: string }>();
@@ -69,8 +73,12 @@ export default function SavedGames(): React.JSX.Element {
     id: string;
     name: string;
     pending?: boolean;
+    closing?: boolean;
   }>();
-  const [removing, setRemoving] = React.useState<string>();
+  const [removal, setRemoval] = React.useState<{
+    id: string;
+    phase: "deleting" | "closing" | "collapsing";
+  }>();
   const [deleted, setDeleted] = React.useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -81,8 +89,11 @@ export default function SavedGames(): React.JSX.Element {
   const [unavailable, setUnavailable] = React.useState<Record<string, string>>(
     {},
   );
+  const page = React.useRef<HTMLDivElement>(null);
+  const deleteTrigger = React.useRef<HTMLButtonElement>();
   const deleteCancel = React.useRef<HTMLButtonElement>(null);
   const deleteAttempt = React.useRef<AbortController>();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   React.useEffect(
     () => () => {
       deleteAttempt.current?.abort();
@@ -112,8 +123,42 @@ export default function SavedGames(): React.JSX.Element {
       setBusy(false);
     }
   };
+  const closeDeleteDialog = () => {
+    setDeleting((request) => request && { ...request, closing: true });
+  };
+  const deleteDialogExited = () => {
+    setDeleting(undefined);
+    const trigger = deleteTrigger.current;
+    deleteTrigger.current = undefined;
+    if (removal?.phase !== "closing") {
+      trigger?.focus({ preventScroll: true });
+      return;
+    }
+
+    const actions = Array.from(
+      page.current?.querySelectorAll<HTMLButtonElement>(
+        ".saveEntry button[aria-haspopup='menu']",
+      ) ?? [],
+    ).filter((button) => !button.closest("[inert]"));
+    const index = trigger ? actions.indexOf(trigger) : -1;
+    const next = actions[index + 1] ?? actions[index - 1];
+    (
+      next ??
+      page.current?.querySelector<HTMLButtonElement>(
+        "button[aria-label='Back']",
+      )
+    )?.focus({ preventScroll: true });
+    setRemoval({ ...removal, phase: "collapsing" });
+  };
+  const removalFinished = (id: string) => {
+    setRemoval((current) =>
+      current?.id === id && current.phase === "collapsing"
+        ? undefined
+        : current,
+    );
+  };
   const deleteGame = async () => {
-    if (!deleting || busy || deleteAttempt.current) return;
+    if (!deleting || deleting.closing || busy || deleteAttempt.current) return;
     const controller = new AbortController();
     deleteAttempt.current = controller;
     const started = performance.now();
@@ -121,7 +166,7 @@ export default function SavedGames(): React.JSX.Element {
     let timer: ReturnType<typeof setTimeout> | undefined;
     setBusy(true);
     setError("");
-    setRemoving(deleting.id);
+    setRemoval({ id: deleting.id, phase: "deleting" });
     try {
       // Race the UI deadline as well as aborting storage: an unavailable browser API
       // must never keep this dialog modal, even if it ignores cancellation.
@@ -142,13 +187,14 @@ export default function SavedGames(): React.JSX.Element {
       ]);
       if (deleteAttempt.current === controller) {
         setDeleted((ids) => new Set(ids).add(deleting.id));
-        setDeleting(undefined);
+        setRemoval({ id: deleting.id, phase: "closing" });
+        closeDeleteDialog();
       }
     } catch (failure) {
       // Unmount cancels this view's work without reporting a failure or changing a
       // newer view. Promise.race also consumes any late storage rejection.
       if (controller.signal.aborted && !timedOut) return;
-      setRemoving(undefined);
+      setRemoval(undefined);
       reportSaveDeleteFailure(failure, {
         timedOut,
         elapsedMs: Math.round(performance.now() - started),
@@ -159,7 +205,7 @@ export default function SavedGames(): React.JSX.Element {
         cloudState: saves.cloudState,
       });
       if (timedOut) {
-        setDeleting(undefined);
+        closeDeleteDialog();
         dispatch(
           snackbarOpen("Delete may have failed. Please try again later."),
         );
@@ -211,21 +257,34 @@ export default function SavedGames(): React.JSX.Element {
     dispatch(navigate("FACILITIES"));
     focusGameMenu();
   };
+  const activeId = saves.activeId;
   const pending =
-    saves.activeId &&
-    inGame &&
-    !saves.entries.some((entry) => entry.id === saves.activeId);
+    activeId && inGame && !saves.entries.some((entry) => entry.id === activeId);
   const entries = sortSaves(saves.entries.filter(({ id }) => !deleted.has(id)));
   const showSearch = entries.length > 3;
-  const query = showSearch ? search.trim().toLocaleLowerCase() : "";
+  const waitingForDialog = !!removal && removal.phase !== "collapsing";
+  const query =
+    showSearch || waitingForDialog ? search.trim().toLocaleLowerCase() : "";
   const filtered = entries.filter((entry) =>
     `${entry.name} ${entry.scenarioName}`.toLocaleLowerCase().includes(query),
   );
-  const removalChild = (child: React.ReactElement<{ animate?: boolean }>) =>
-    React.cloneElement(child, { animate: child.key === removing });
+  const removalChild = (
+    child: React.ReactElement<React.ComponentProps<typeof RemovalCollapse>>,
+  ) => {
+    // TransitionGroup escapes React keys. Use the row ID to find its retained child.
+    const animate =
+      !!removal &&
+      (child.props.id === collapseId(removal.id) ||
+        child.props.id === SEARCH_COLLAPSE_ID);
+    return React.cloneElement(child, {
+      animate,
+      in: animate && waitingForDialog ? true : child.props.in,
+    });
+  };
   const collapseSpacing = { "&&": { marginTop: 0 } };
   return (
     <ScreenPage
+      ref={page}
       id="gameCard"
       title="Saved games"
       onBack={onBack}
@@ -243,16 +302,26 @@ export default function SavedGames(): React.JSX.Element {
           }}
         >
           <CloudSaveStatus />
-          {showSearch && (
-            <TextField
-              fullWidth
-              size="small"
-              className="saveSearch"
-              label="Search saves"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          )}
+          <TransitionGroup component={null} childFactory={removalChild}>
+            {showSearch && (
+              <RemovalCollapse
+                key="search"
+                id={SEARCH_COLLAPSE_ID}
+                sx={collapseSpacing}
+              >
+                <Box sx={{ pt: 2 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    className="saveSearch"
+                    label="Search saves"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </Box>
+              </RemovalCollapse>
+            )}
+          </TransitionGroup>
           {error && !deleting && (
             <Alert severity="error" role="alert" onClose={() => setError("")}>
               {error}
@@ -295,8 +364,13 @@ export default function SavedGames(): React.JSX.Element {
             </Alert>
           )}
           <TransitionGroup component={null} childFactory={removalChild}>
-            {pending && saves.activeId && !deleted.has(saves.activeId) && (
-              <RemovalCollapse key={saves.activeId} sx={collapseSpacing}>
+            {pending && activeId && !deleted.has(activeId) && (
+              <RemovalCollapse
+                key={activeId}
+                id={collapseId(activeId)}
+                onExited={() => removalFinished(activeId)}
+                sx={collapseSpacing}
+              >
                 <Box sx={{ pt: 2 }}>
                   <Paper
                     variant="outlined"
@@ -345,10 +419,11 @@ export default function SavedGames(): React.JSX.Element {
                         </Button>
                         <Button
                           color="primary"
-                          onClick={() => {
+                          onClick={(event) => {
                             setError("");
+                            deleteTrigger.current = event.currentTarget;
                             setDeleting({
-                              id: saves.activeId!,
+                              id: activeId,
                               name: saves.pendingName || "Current game",
                               pending: true,
                             });
@@ -389,7 +464,12 @@ export default function SavedGames(): React.JSX.Element {
               const title = save.name;
               const subtitle = `${save.date.month} ${save.date.year} · ${difficultyLabel(save.difficulty)} · ${save.locationName}`;
               return (
-                <RemovalCollapse key={save.id} sx={collapseSpacing}>
+                <RemovalCollapse
+                  key={save.id}
+                  id={collapseId(save.id)}
+                  onExited={() => removalFinished(save.id)}
+                  sx={collapseSpacing}
+                >
                   <Box sx={{ pt: 2 }}>
                     <Paper
                       variant="outlined"
@@ -503,24 +583,28 @@ export default function SavedGames(): React.JSX.Element {
               );
             })}
           </TransitionGroup>
-          {!saves.loading && !entries.length && !pending && !saves.error && (
-            <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
-              <Typography component="h2" variant="h6">
-                No saved games yet
-              </Typography>
-              <Typography color="text.secondary" sx={{ my: 1 }}>
-                Games save automatically when you start playing. Sign in to
-                restore cloud backups from another device.
-              </Typography>
-              <Button
-                variant="contained"
-                onClick={() => dispatch(navigate("NEW_GAME"))}
-              >
-                New game
-              </Button>
-            </Paper>
-          )}
-          {entries.length > 0 && !filtered.length && (
+          {!removal &&
+            !saves.loading &&
+            !entries.length &&
+            !pending &&
+            !saves.error && (
+              <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+                <Typography component="h2" variant="h6">
+                  No saved games yet
+                </Typography>
+                <Typography color="text.secondary" sx={{ my: 1 }}>
+                  Games save automatically when you start playing. Sign in to
+                  restore cloud backups from another device.
+                </Typography>
+                <Button
+                  variant="contained"
+                  onClick={() => dispatch(navigate("NEW_GAME"))}
+                >
+                  New game
+                </Button>
+              </Paper>
+            )}
+          {!removal && entries.length > 0 && !filtered.length && (
             <Typography role="status">No saves match “{search}”.</Typography>
           )}
         </Stack>
@@ -574,8 +658,10 @@ export default function SavedGames(): React.JSX.Element {
           )}
         <MenuItem
           onClick={() => {
+            if (!menu) return;
             setError("");
-            setDeleting(menu?.save);
+            deleteTrigger.current = menu.anchor;
+            setDeleting(menu.save);
             setMenu(undefined);
           }}
         >
@@ -585,14 +671,19 @@ export default function SavedGames(): React.JSX.Element {
       <RenameSaveDialog save={rename} onClose={() => setRename(undefined)} />
       <ShareSaveDialog id={sharing} onClose={() => setSharing(undefined)} />
       <Dialog
-        open={!!deleting}
-        onClose={busy ? undefined : () => setDeleting(undefined)}
+        open={!!deleting && !deleting.closing}
+        onClose={busy ? undefined : closeDeleteDialog}
+        disableRestoreFocus
+        transitionDuration={reduceMotion ? 0 : undefined}
         fullWidth
         maxWidth="xs"
         aria-labelledby="delete-save-title"
         aria-describedby="delete-save-message"
         slotProps={{
-          transition: { onEntered: () => deleteCancel.current?.focus() },
+          transition: {
+            onEntered: () => deleteCancel.current?.focus(),
+            onExited: deleteDialogExited,
+          },
         }}
       >
         <DialogTitle id="delete-save-title">
@@ -618,17 +709,17 @@ export default function SavedGames(): React.JSX.Element {
             autoFocus
             ref={deleteCancel}
             disabled={busy}
-            onClick={() => setDeleting(undefined)}
+            onClick={closeDeleteDialog}
           >
             Cancel
           </Button>
           <Button
             color="error"
             variant="contained"
-            disabled={busy}
+            disabled={busy || deleting?.closing}
             onClick={() => void deleteGame()}
           >
-            {busy
+            {busy || removal?.phase === "closing"
               ? "Deleting…"
               : deleting?.pending
                 ? "Discard and leave"

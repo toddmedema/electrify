@@ -3,7 +3,7 @@ import { Collapse, useMediaQuery } from "@mui/material";
 
 type Props = Pick<
   React.ComponentProps<typeof Collapse>,
-  "children" | "in" | "onExited" | "sx"
+  "children" | "id" | "in" | "onExited" | "sx"
 > & {
   /** Pass false for filtering or other changes that are not explicit removals. */
   animate?: boolean;
@@ -13,6 +13,7 @@ type Props = Pick<
 export default function RemovalCollapse({
   animate = true,
   children,
+  id,
   in: present,
   onExited,
   sx,
@@ -25,8 +26,10 @@ export default function RemovalCollapse({
   return (
     <Collapse
       ref={ref}
+      id={id}
       in={present}
-      timeout={{ enter: 0, exit: animate && !reduceMotion ? 200 : 0 }}
+      exit={animate && !reduceMotion}
+      timeout={{ enter: 0, exit: 200 }}
       aria-hidden={present === false || undefined}
       onExited={onExited}
       sx={sx}
