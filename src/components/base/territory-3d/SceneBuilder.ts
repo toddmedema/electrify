@@ -66,6 +66,11 @@ interface TileScene {
   structure?: MapInstance;
   hail?: MapInstance;
 }
+interface WireEndpoint {
+  position: Vec3;
+  model?: MapModel;
+  gridJunction?: MapInstance;
+}
 
 function waterRange(part: ModelPart) {
   return part.material === "watershed-water"
@@ -309,8 +314,7 @@ export class SceneBuilder {
       this.cells.clear();
       this.wireKey = undefined;
     }
-    const models = new Map<string, MapModel>();
-    const positions = new Map<string, Vec3>();
+    const endpoints = new Map<string, WireEndpoint>();
     if (wires !== this.wires) {
       this.wires = wires;
       this.overheadWireTiles.clear();
@@ -417,7 +421,8 @@ export class SceneBuilder {
         cell.terrain = { ...cell.terrain, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
-      positions.set(tileKey, position);
+      const endpoint: WireEndpoint = { position };
+      endpoints.set(tileKey, endpoint);
       instances.push(cell.terrain);
       if (!model) continue;
       const stage = size ? facilityConstructionStage(view.facility) : undefined;
@@ -464,12 +469,11 @@ export class SceneBuilder {
           : undefined;
       // Commissioning and the completed plant share the same fitted terminals.
       if (stage === undefined || displayedModel.terminals.length)
-        models.set(tileKey, model);
+        endpoint.model = model;
       else if (this.overheadWireTiles.has(tileKey)) {
         cell.gridJunction ??= gridJunction(cell.terrain, tileKey);
         instances.push(cell.gridJunction);
-        positions.set(tileKey, cell.gridJunction.position);
-        models.set(tileKey, cell.gridJunction.model);
+        endpoint.gridJunction = cell.gridJunction;
       }
       const waterLevel = tile.city
         ? undefined
@@ -495,11 +499,18 @@ export class SceneBuilder {
     }
     for (const id of this.cells.keys())
       if (!byId.has(id)) this.cells.delete(id);
+    const wireEndpoint = (id: string, kind: HexWire["kind"]) => {
+      const endpoint = endpoints.get(id);
+      return kind === "overhead"
+        ? (endpoint?.gridJunction ?? endpoint)
+        : endpoint;
+    };
     const key = wires
-      .map(
-        (wire) =>
-          `${wire.id}:${wire.kind}:${models.get(wire.from)?.key}:${models.get(wire.to)?.key}:${positions.get(wire.from)?.[1]}:${positions.get(wire.to)?.[1]}:${byId.get(wire.from)?.visibilityDistance}:${byId.get(wire.to)?.visibilityDistance}`,
-      )
+      .map(({ id, kind, from, to }) => {
+        const a = wireEndpoint(from, kind);
+        const b = wireEndpoint(to, kind);
+        return `${id}:${kind}:${a?.model?.key}:${b?.model?.key}:${a?.position[1]}:${b?.position[1]}:${byId.get(from)?.visibilityDistance}:${byId.get(to)?.visibilityDistance}`;
+      })
       .join("|");
     if (key !== this.wireKey) {
       this.wireKey = key;
@@ -511,11 +522,11 @@ export class SceneBuilder {
       ];
       const connections: MapWireConnection[][] = [[], [], [], []];
       for (const wire of wires) {
-        const from = positions.get(wire.from),
-          to = positions.get(wire.to);
+        const from = wireEndpoint(wire.from, wire.kind),
+          to = wireEndpoint(wire.to, wire.kind);
         if (!from || !to) continue;
-        const a = terminal(models.get(wire.from), from, to),
-          b = terminal(models.get(wire.to), to, from);
+        const a = terminal(from.model, from.position, to.position),
+          b = terminal(to.model, to.position, from.position);
         const fog = Math.max(
           byId.get(wire.from)!.visibilityDistance,
           byId.get(wire.to)!.visibilityDistance,

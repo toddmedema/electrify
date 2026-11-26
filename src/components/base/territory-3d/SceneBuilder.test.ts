@@ -495,8 +495,17 @@ test("keeps the existing grid connected while a new plant fits its own switchgea
     },
   };
   const neighbor = view(1);
-  const tiles = [target.tile, neighbor.tile];
-  const wires = hexWires(tiles, () => true);
+  const lake: TerritoryTileView = {
+    ...view(-1),
+    tile: { ...view(-1).tile, id: "green-uplands:site-3", terrain: "lake" },
+  };
+  const tiles = [target.tile, neighbor.tile, lake.tile];
+  const wires = hexWires(
+    tiles,
+    () => true,
+    undefined,
+    ({ terrain }) => terrain === "lake",
+  );
   const builder = new SceneBuilder({
     terrain: getTerrainModel,
     structure: getStructureModel,
@@ -513,6 +522,7 @@ test("keeps the existing grid connected while a new plant fits its own switchgea
           facility: { ...peer.facility!, yearsToBuildLeft, yearsToBuild },
         },
         neighbor,
+        lake,
       ],
       tiles,
       links,
@@ -535,7 +545,9 @@ test("keeps the existing grid connected while a new plant fits its own switchgea
   );
   expect(installing.junction).toBe(legacy.junction);
   expect(installing.wire).toBe(legacy.wire);
-  const existingLink = installing.wire.model.connections![0];
+  const existingLink = installing.wire.model.connections!.find(
+    ({ kind }) => kind === "overhead",
+  )!;
   const { model: junction, position } = installing.junction!;
   expect(
     junction.terminals.map(([x, y, z]) => [
@@ -544,14 +556,24 @@ test("keeps the existing grid connected while a new plant fits its own switchgea
       z + position[2],
     ]),
   ).toContainEqual(existingLink.start);
+  expect(installing.wire.model.connections!).toContainEqual(
+    expect.objectContaining({
+      kind: "submerged",
+      from: target.tile.id,
+      to: lake.tile.id,
+      start: [0, 0.006, 0],
+    }),
+  );
 
   const commissioning = build(0.24, 1);
   expect(commissioning.junction).toBeUndefined();
-  const installedLink = commissioning.wire.model.connections![0];
-  expect(installedLink.from).toBe(target.tile.id);
-  expect(commissioning.plant.model.terminals).toContainEqual(
-    installedLink.start,
-  );
+  expect(commissioning.wire.model.connections).toHaveLength(2);
+  for (const installedLink of commissioning.wire.model.connections!) {
+    expect(installedLink.from).toBe(target.tile.id);
+    expect(commissioning.plant.model.terminals).toContainEqual(
+      installedLink.start,
+    );
+  }
   expect(commissioning.plant).toMatchObject({
     active: false,
     producing: false,
@@ -561,7 +583,7 @@ test("keeps the existing grid connected while a new plant fits its own switchgea
   const buried = build(
     0.5,
     1,
-    wires.map((wire) => ({ ...wire, kind: "submerged" })),
+    wires.filter(({ kind }) => kind === "submerged"),
   );
   expect(buried.junction).toBeUndefined();
   expect(buried.wire.model.connections![0]).toMatchObject({
