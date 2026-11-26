@@ -753,7 +753,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         title: MANUAL_SECTION.CUSTOMERS,
         entry: (
           <p>
-            Recorded and projected total customer counts. Growth raises future
+            Recorded and projected total customer counts. Growth raises future{" "}
             <EntryLink to={MANUAL_ENTRY.CUSTOMER_DEMAND}>
               electricity needs
             </EntryLink>
