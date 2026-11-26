@@ -468,6 +468,48 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
+test("customers chart help links to customer demand and pricing", async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("audioEnabled", "false");
+    localStorage.setItem("insightsLayers", JSON.stringify(["customers"]));
+  });
+  await page.goto("/?scenario=106");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const insights = page.getByRole("region", { name: "Insights", exact: true });
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  const customersHelp = insights.getByRole("button", {
+    name: "What is Customers?",
+    exact: true,
+  });
+  const manual = page.getByRole("dialog", { name: "Manual help" });
+
+  await customersHelp.click();
+  await manual.getByRole("link", { name: "Pricing", exact: true }).click();
+  await expect(
+    manual.getByRole("heading", { name: "Pricing", exact: true }),
+  ).toBeVisible();
+  await reviewScreenshot(manual, {
+    path: info.outputPath("pricing.png"),
+    animations: "disabled",
+  });
+  await manual.getByRole("button", { name: "close", exact: true }).click();
+
+  await customersHelp.click();
+  await manual.getByRole("link", { name: "electricity needs" }).click();
+  await expect(
+    manual.getByRole("heading", { name: "Customer demand", exact: true }),
+  ).toBeVisible();
+  await reviewScreenshot(manual, {
+    path: info.outputPath("customer-demand.png"),
+    animations: "disabled",
+  });
+});
+
 test("manual search keeps chart subsections inside the insights page", async ({
   page,
 }) => {
