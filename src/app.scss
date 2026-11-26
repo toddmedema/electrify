@@ -3539,6 +3539,8 @@ $pane_header_height: 48px;
     }
 
     .MuiAccordionSummary-root {
+      // Match the collapsed row in both states so opening an entry moves only its content.
+      min-height: 3rem;
       padding: 0 $space-4;
 
       // While a long entry scrolls, its title pins below the group header (32px =
@@ -3564,14 +3566,12 @@ $pane_header_height: 48px;
       }
     }
 
-    // A divider under the title while expanded: it gives the pinned bar a bottom edge, and
-    // collapsed entries keep their single card border instead of doubling it
-    &.Mui-expanded .MuiAccordionSummary-root {
-      border-bottom: 1px solid var(--border-subtle);
+    .MuiAccordionSummary-content {
+      margin-block: 0.75rem;
     }
 
     .MuiAccordionDetails-root {
-      padding: 0 $space-4 $space-4;
+      padding: $space-4;
     }
 
     // A citation list, not prose: each line is one assumption and the link that backs it
@@ -5734,11 +5734,6 @@ $homeSmokeCycle: 5.6s;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-}
-// The first paragraph's margin used to be the gap under an open entry's title divider, so
-// entries that open on a table or legend started flush against it. The gap lives here now.
-#manual .manual-entry .MuiAccordionDetails-root {
-  padding-top: $space-4;
 }
 @media (pointer: coarse) {
   .manual-link-text {
