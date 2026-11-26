@@ -18,6 +18,8 @@ import {
   subscribeInterfaceScale,
 } from "../../InterfaceScale";
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
 import RemovableDraggable, {
   RemovableDragList,
 } from "../base/RemovableDraggable";
@@ -871,6 +873,14 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     React.cloneElement(child, {
       animate: this.removedFacilityIds.has(child.props.facility.id),
     });
+  private removingLastIntertie = false;
+
+  private cancelFleetIntertie = (id: number) => {
+    const lines = this.props.game.transmission?.lines;
+    this.removingLastIntertie = lines?.length === 1 && lines[0].id === id;
+    this.props.onTransmissionCancel?.(id);
+  };
+
   private selectionFocus: HTMLButtonElement | null = null;
   private previewFocus: HTMLButtonElement | null = null;
   private menuFocus: HTMLButtonElement | null = null;
@@ -1541,28 +1551,51 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     Choose Build to add a generator or storage.
                   </Typography>
                 )}
-                {!territoryNetwork &&
-                  intertiesAvailable &&
-                  !!game.transmission?.lines.length && (
-                    <section
-                      aria-label="Intertie management"
-                      ref={this.intertiesAnchor}
-                      tabIndex={-1}
-                    >
-                      <TransmissionPanel
-                        game={game}
-                        onBuild={onTransmissionBuild}
-                        onUpgrade={onTransmissionUpgrade}
-                        onAcquire={this.props.onUtilityAcquire}
-                        onCancel={this.props.onTransmissionCancel}
-                        onPause={this.props.onTransmissionPause}
-                        onBuyingRule={onBuyingRule}
-                        onSellingRule={onSellingRule}
-                        onBeforeDragStart={this.onBeforeDragStart}
-                        onDragEnd={this.onDragEnd}
-                      />
-                    </section>
-                  )}
+                <TransitionGroup
+                  component={null}
+                  childFactory={(
+                    child: React.ReactElement<
+                      React.ComponentProps<typeof RemovalCollapse>
+                    >,
+                  ) =>
+                    React.cloneElement(child, {
+                      animate: this.removingLastIntertie,
+                    })
+                  }
+                >
+                  {!territoryNetwork &&
+                    intertiesAvailable &&
+                    !!game.transmission?.lines.length && (
+                      <RemovalCollapse
+                        key="interties"
+                        onExited={() => {
+                          this.removingLastIntertie = false;
+                        }}
+                      >
+                        <section
+                          aria-label="Intertie management"
+                          ref={this.intertiesAnchor}
+                          tabIndex={-1}
+                        >
+                          <TransmissionPanel
+                            game={game}
+                            onBuild={onTransmissionBuild}
+                            onUpgrade={onTransmissionUpgrade}
+                            onAcquire={this.props.onUtilityAcquire}
+                            onCancel={
+                              this.props.onTransmissionCancel &&
+                              this.cancelFleetIntertie
+                            }
+                            onPause={this.props.onTransmissionPause}
+                            onBuyingRule={onBuyingRule}
+                            onSellingRule={onSellingRule}
+                            onBeforeDragStart={this.onBeforeDragStart}
+                            onDragEnd={this.onDragEnd}
+                          />
+                        </section>
+                      </RemovalCollapse>
+                    )}
+                </TransitionGroup>
               </List>
             </div>
           )}

@@ -358,11 +358,10 @@ for (const theme of ["light", "dark"] as const) {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await cancel.click();
     const closedDuringExit = line.evaluate(async (element) => {
-      const row = element.closest(".MuiCollapse-root");
       const deadline = performance.now() + 3000;
-      while (row?.isConnected && performance.now() < deadline) {
+      while (element.isConnected && performance.now() < deadline) {
         await new Promise(requestAnimationFrame);
-        if (row.hasAttribute("inert")) {
+        if (element.closest(".MuiCollapse-root[inert]")) {
           return !Array.from(document.querySelectorAll('[role="dialog"]')).some(
             (dialog) => dialog.textContent?.includes("Cancel construction of"),
           );
