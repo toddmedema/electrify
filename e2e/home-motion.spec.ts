@@ -32,6 +32,7 @@ for (const theme of ["light", "dark"] as const) {
         authRequests.push(request.url());
     });
     await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Play", exact: true }),
     ).toBeVisible();
@@ -82,11 +83,16 @@ for (const theme of ["light", "dark"] as const) {
         theme === "light" ? 3.5 : 4.5,
       );
     }
-    // Keyboard and controller focus fills a link with the same logo blue as every button's
-    // focus, so it is held to the same floor. It is not given a deeper blue of its own.
+    // Tab from the preceding link so coarse-pointer projects use keyboard focus styling.
+    await explore
+      .getByRole("link", { name: "Compare simulators" })
+      .press("Tab");
     const about = explore.getByRole("link", { name: "About", exact: true });
-    await about.focus();
     await expect(about).toBeFocused();
+    await expect(about).toHaveCSS(
+      "background-color",
+      theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)",
+    );
     expect(await foregroundContrast(about)).toBeGreaterThanOrEqual(
       theme === "light" ? 3.5 : 4.5,
     );

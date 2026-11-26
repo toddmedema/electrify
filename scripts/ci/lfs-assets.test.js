@@ -12,11 +12,15 @@ const cue = "public/audio/menu/confirm.wav";
 const soundtrack = "public/audio/menu/quiet-current.wav";
 const image = "public/images/manual-cost.webp";
 const icon = `public/images/${achievements[0].icon}.svg`;
+const lightLogo = "public/images/logo-home.svg";
+const darkLogo = "public/images/logo-home-dark.svg";
 const assets = {
   [cue]: "Short PCM cue",
   [soundtrack]: "Soundtrack bytes",
   [image]: "Compressed manual figure",
   [icon]: "Achievement SVG",
+  [lightLogo]: "Light home wordmark SVG",
+  [darkLogo]: "Dark home wordmark SVG",
   "public/images/logo.svg": "Unrelated SVG",
   "public/.well-known/image.png": "A public asset in a dot-directory",
   "docs/manual-images/manual-cost.png": "Original manual figure",
@@ -105,6 +109,8 @@ test("CPU downloads only fixtures whose test suites need the bytes", (t) => {
     cue,
     image,
     icon,
+    lightLogo,
+    darkLogo,
     "docs/manual-images/manual-cost.png",
     "steamworks/achievement-artwork/uploads/ACHIEVED.png",
   ];
