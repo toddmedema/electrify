@@ -2322,9 +2322,14 @@ $pane_header_height: 48px;
 }
 
 .generatorComparisonChoices {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  container-type: inline-size;
+}
+
+.generatorComparisonChoice {
+  box-sizing: border-box;
+  width: calc((100cqw - 24px) / 3);
+  margin-inline-end: 8px;
 }
 
 .generatorComparisonRemove.MuiIconButton-root {
@@ -2341,7 +2346,7 @@ $pane_header_height: 48px;
     overflow-x: auto;
   }
   .generatorComparisonChoice {
-    flex: 0 0 200px;
+    width: 200px;
   }
   .generatorComparisonChoice .MuiTypography-caption:last-child {
     display: none;
@@ -6257,7 +6262,7 @@ $homeSmokeCycle: 5.6s;
 .screenCatalog > .cardList,
 .screenCatalog > .constructionHeader,
 .screenCatalog > .MuiToolbar-root,
-.screenCatalog > .generatorComparison {
+.screenCatalog > .generatorComparisonSlot {
   width: 100%;
   max-width: 1040px;
   margin-left: auto;
@@ -8276,22 +8281,23 @@ img[src$="/transmission.svg"] {
     flex: 1 1 auto;
     display: flex;
     flex-wrap: wrap;
-    gap: $space-1 $space-2;
+    row-gap: $space-1;
     margin: 0;
     padding: 0;
     list-style: none;
 
-    li {
+    .coopBrowsePlayer {
       display: inline-flex;
       align-items: center;
       gap: $space-1;
       padding: $space-1 $space-2;
+      margin-inline-end: $space-2;
       border: 1px solid var(--border-tile);
       border-radius: var(--radius-sm);
       font-size: var(--font-size-caption);
     }
 
-    li:has(.coopBrowseKickTarget) {
+    .coopBrowsePlayer:has(.coopBrowseKickTarget) {
       padding: 0;
     }
   }

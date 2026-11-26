@@ -1,3 +1,5 @@
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
 import { currencyForLocation, CurrencyType } from "../../helpers/Currency";
 import { currencyFormatters } from "../../helpers/Format";
 import { activeScenario, currentTick } from "../../helpers/GameSelectors";
@@ -1032,10 +1034,13 @@ export default class Insights extends React.Component<Props, State> {
     });
   }
 
+  private removedLayer?: InsightLayerId;
+
   private toggleLayer(id: InsightLayerId) {
     const required = requiredTutorialLayers(this.props.game.scenarioId);
     if (this.state.layers.includes(id)) {
       if (!required.includes(id)) {
+        this.removedLayer = id;
         this.setLayers(this.state.layers.filter((layer) => layer !== id));
       }
     } else {
@@ -2601,9 +2606,29 @@ export default class Insights extends React.Component<Props, State> {
             <ChartAnnotationsContext.Provider value={annotations}>
               <ChartAxisAlignment>
                 <div className="insightsTracks">
-                  {visible.map((id, index) =>
-                    this.renderTrack(id, index, visible, viewportProjection),
-                  )}
+                  <TransitionGroup
+                    component={null}
+                    childFactory={(
+                      child: React.ReactElement<
+                        React.ComponentProps<typeof RemovalCollapse>
+                      >,
+                    ) =>
+                      React.cloneElement(child, {
+                        animate: child.props.id === this.removedLayer,
+                      })
+                    }
+                  >
+                    {visible.map((id, index) => (
+                      <RemovalCollapse id={id} key={id}>
+                        {this.renderTrack(
+                          id,
+                          index,
+                          visible,
+                          viewportProjection,
+                        )}
+                      </RemovalCollapse>
+                    ))}
+                  </TransitionGroup>
                   {!visible.length && (
                     <Typography className="insightsEmpty" color="textSecondary">
                       Choose Layers to add charts.

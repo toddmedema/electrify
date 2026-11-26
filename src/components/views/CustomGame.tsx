@@ -26,6 +26,8 @@ import AddIcon from "@mui/icons-material/Add";
 import CasinoIcon from "@mui/icons-material/Casino";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutlined";
 import ScreenPage from "../base/ScreenPage";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
 import DeleteIcon from "@mui/icons-material/Delete";
 import InfoIcon from "@mui/icons-material/Info";
 import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
@@ -263,6 +265,19 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const [feeDialogOpen, setFeeDialogOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
   const [addSize, setAddSize] = React.useState(GENERATOR_SIZES_W[2]);
+  const facilityKeys = React.useRef(
+    new WeakMap<ScenarioFacilityType, number>(),
+  );
+  const nextFacilityKey = React.useRef(0);
+  const removedKey = React.useRef<string>();
+  const facilityKey = (facility: ScenarioFacilityType) => {
+    let key = facilityKeys.current.get(facility);
+    if (key === undefined) {
+      key = nextFacilityKey.current++;
+      facilityKeys.current.set(facility, key);
+    }
+    return `starting-facility-${key}`;
+  };
   const previewSeed = React.useRef(scenario.seed ?? newSeed());
   const guest = props.coop?.role === "guest";
   const { onScenarioChange } = props;
@@ -494,7 +509,19 @@ export default function CustomGame(props: Props): React.JSX.Element {
     change({ facilities: [...scenario.facilities, facility] });
   };
 
-  const removeFacility = (index: number) => {
+  const removeFacility = (index: number, trigger: HTMLButtonElement) => {
+    if (guest) return;
+    removedKey.current = facilityKey(scenario.facilities[index]);
+    const row = trigger.closest(".startingFacility");
+    const neighbor =
+      (row?.nextElementSibling?.classList.contains("startingFacility") &&
+        row.nextElementSibling) ||
+      (row?.previousElementSibling?.classList.contains("startingFacility") &&
+        row.previousElementSibling);
+    const next = neighbor
+      ? neighbor.querySelector<HTMLButtonElement>("button")
+      : document.getElementById("addFacilityName");
+    next?.focus();
     change({
       facilities: scenario.facilities.filter(
         (_f: Partial<FacilityShoppingType>, i: number) => i !== index,
@@ -936,37 +963,54 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 </div>
               </section>
 
-              {scenario.facilities.map(
-                (f: Partial<FacilityShoppingType>, i: number) => {
+              <TransitionGroup
+                component={null}
+                childFactory={(
+                  child: React.ReactElement<
+                    React.ComponentProps<typeof RemovalCollapse>
+                  >,
+                ) =>
+                  React.cloneElement(child, {
+                    animate: child.props.id === removedKey.current,
+                  })
+                }
+              >
+                {scenario.facilities.map((f, i) => {
+                  const key = facilityKey(f);
                   return (
-                    <Card
-                      className="build-list-item"
-                      key={`${facilityName(f)}${i}`}
+                    <RemovalCollapse
+                      key={key}
+                      id={key}
+                      className="startingFacility"
                     >
-                      <CardHeader
-                        avatar={
-                          <Avatar
-                            alt=""
-                            src={`/images/${facilityName(f).toLowerCase()}.svg`}
-                          />
-                        }
-                        title={facilityName(f)}
-                        subheader={facilitySize(f)}
-                        action={
-                          <IconButton
-                            onClick={() => removeFacility(i)}
-                            aria-label={`Remove ${facilityName(f)}`}
-                            color="primary"
-                            size="large"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        }
-                      />
-                    </Card>
+                      <Card className="build-list-item">
+                        <CardHeader
+                          avatar={
+                            <Avatar
+                              alt=""
+                              src={`/images/${facilityName(f).toLowerCase()}.svg`}
+                            />
+                          }
+                          title={facilityName(f)}
+                          subheader={facilitySize(f)}
+                          action={
+                            <IconButton
+                              onClick={(event) =>
+                                removeFacility(i, event.currentTarget)
+                              }
+                              aria-label={`Remove ${facilityName(f)}`}
+                              color="primary"
+                              size="large"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          }
+                        />
+                      </Card>
+                    </RemovalCollapse>
                   );
-                },
-              )}
+                })}
+              </TransitionGroup>
 
               <div className="customFacilityPicker">
                 <Select

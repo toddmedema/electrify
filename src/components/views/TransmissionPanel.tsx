@@ -16,18 +16,16 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
+import RemovableDraggable, {
+  RemovableDragList,
+} from "../base/RemovableDraggable";
 import {
   initialIntertieBuildTier,
   largestAffordableBuildSize,
 } from "../../helpers/BuildSizing";
 import useBuildRowReveal from "../base/useBuildRowReveal";
 import { useToolState } from "../base/GameToolMemory";
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  DropResult,
-} from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, DropResult } from "@hello-pangea/dnd";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
@@ -930,12 +928,7 @@ export default function TransmissionPanel({
           >
             <Droppable droppableId="interties">
               {(droppable) => (
-                <div
-                  ref={droppable.innerRef}
-                  {...droppable.droppableProps}
-                  role="list"
-                  aria-label="Interties"
-                >
+                <RemovableDragList provided={droppable} label="Interties">
                   {tradingLines.map((line, index) => {
                     const inherited = inheritedUtilityForCorridor(
                       line.corridorId,
@@ -1063,12 +1056,12 @@ export default function TransmissionPanel({
                       </span>
                     );
                     return (
-                      <Draggable
+                      <RemovableDraggable
+                        animate={building}
                         key={line.id}
                         draggableId={`t${line.id}`}
                         index={index}
                         isDragDisabled={reorderDisabled}
-                        disableInteractiveElementBlocking
                       >
                         {(provided, snapshot) => (
                           <div
@@ -1078,7 +1071,7 @@ export default function TransmissionPanel({
                             data-corridor-id={line.corridorId}
                             style={{
                               userSelect: "none",
-                              ...provided.draggableProps.style,
+                              ...provided.draggableProps?.style,
                             }}
                             className={`transmissionLine${selectedLine === line.id ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
                           >
@@ -1189,8 +1182,8 @@ export default function TransmissionPanel({
                                     confirmLabel="Cancel construction"
                                     onCancel={() => setCancelLine(null)}
                                     onConfirm={() => {
-                                      onCancel?.(line.id);
                                       setCancelLine(null);
+                                      onCancel?.(line.id);
                                     }}
                                   >
                                     <Typography>
@@ -1507,11 +1500,10 @@ export default function TransmissionPanel({
                             )}
                           </div>
                         )}
-                      </Draggable>
+                      </RemovableDraggable>
                     );
                   })}
-                  {droppable.placeholder}
-                </div>
+                </RemovableDragList>
               )}
             </Droppable>
           </DragDropContext>

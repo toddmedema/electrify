@@ -1,5 +1,7 @@
 import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
 import { Button, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
 import DesktopBuildRail from "../base/DesktopBuildRail";
@@ -214,6 +216,11 @@ function TileNetwork(props: Props) {
   // Let the purchase dialog finish before moving focus to the updated inspector.
   const inspectorOwner = review ? tile?.territoryId : view?.ownerKey;
   const operatingFacility = view?.operatingFacility;
+  const soldMapFacility = React.useRef<string>();
+  const sellMapFacility = (id: number) => {
+    soldMapFacility.current = String(id);
+    props.facilityActions.onSell(id);
+  };
   const facilityStatus = view?.facility
     ? facilityMapStatus(view, game.date.minute)
     : undefined;
@@ -504,7 +511,7 @@ function TileNetwork(props: Props) {
             ? views.find(({ tile }) => territoryMapTileKey(tile) === menu.key)
             : undefined
         }
-        actions={props.facilityActions}
+        actions={{ ...props.facilityActions, onSell: sellMapFacility }}
         busy={projectPending}
         canAcquire={!!props.onAcquire}
         projectSite={!!menu && !!projectSites?.has(menu.key)}
@@ -656,15 +663,7 @@ function TileNetwork(props: Props) {
                     <strong>{formatWatts(demandW)}</strong>
                   </div>
                 </div>
-              ) : operatingFacility ? (
-                <ExpandedFacilityDetails
-                  showStatus
-                  facility={operatingFacility}
-                  game={game}
-                  expandRequest={expandRequest}
-                  {...props.facilityActions}
-                />
-              ) : view.facility ? (
+              ) : !operatingFacility && view.facility ? (
                 <div className="tileCityMetrics">
                   <div>
                     <span>{view.facility.name}</span>
@@ -677,6 +676,34 @@ function TileNetwork(props: Props) {
                   )}
                 </div>
               ) : null}
+              <TransitionGroup
+                component={null}
+                childFactory={(
+                  child: React.ReactElement<
+                    React.ComponentProps<typeof RemovalCollapse>
+                  >,
+                ) =>
+                  React.cloneElement(child, {
+                    animate: child.props.id === soldMapFacility.current,
+                  })
+                }
+              >
+                {operatingFacility && (
+                  <RemovalCollapse
+                    key={operatingFacility.id}
+                    id={String(operatingFacility.id)}
+                  >
+                    <ExpandedFacilityDetails
+                      showStatus
+                      facility={operatingFacility}
+                      game={game}
+                      expandRequest={expandRequest}
+                      {...props.facilityActions}
+                      onSell={sellMapFacility}
+                    />
+                  </RemovalCollapse>
+                )}
+              </TransitionGroup>
               {!view.owned && !tile.city && (
                 <TileTerrainModifiers terrain={tile.terrain} />
               )}

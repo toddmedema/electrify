@@ -1,3 +1,5 @@
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
 import { getTerritoryDefinition } from "../../data/Territories";
 import TerritoryBuildDestination, {
   useTerritoryBuildDestination,
@@ -1034,6 +1036,7 @@ export function GeneratorBuildItem(
 function GeneratorComparison(props: {
   forecastPending?: boolean;
   generators: GeneratorShoppingType[];
+  comparedNames: string[];
   outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
   onRemove: (name: string) => void;
@@ -1052,58 +1055,79 @@ function GeneratorComparison(props: {
           Clear
         </Button>
       </div>
-      <div className="generatorComparisonChoices">
+      <TransitionGroup
+        component="div"
+        className="generatorComparisonChoices"
+        childFactory={(
+          child: React.ReactElement<
+            React.ComponentProps<typeof RemovalCollapse>
+          >,
+        ) =>
+          React.cloneElement(child, {
+            animate: !props.comparedNames.some(
+              (name) =>
+                `comparison-${encodeURIComponent(name)}` === child.props.id,
+            ),
+          })
+        }
+      >
         {props.generators.map((generator) => (
-          <div className="generatorComparisonChoice" key={generator.name}>
-            <img
-              src={`/images/${generator.name.toLowerCase()}.svg`}
-              alt=""
-              aria-hidden
-            />
-            <Typography variant="body2" sx={{ fontWeight: 800 }}>
-              {generator.name}
-            </Typography>
-            <IconButton
-              className="generatorComparisonRemove"
-              size="small"
-              aria-label={`Remove ${generator.name} from comparison`}
-              onClick={() => props.onRemove(generator.name)}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-            {/* A separator stays with the figure before it, so a narrow chip never starts a
+          <RemovalCollapse
+            key={generator.name}
+            id={`comparison-${encodeURIComponent(generator.name)}`}
+            orientation="horizontal"
+          >
+            <div className="generatorComparisonChoice">
+              <img
+                src={`/images/${generator.name.toLowerCase()}.svg`}
+                alt=""
+                aria-hidden
+              />
+              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                {generator.name}
+              </Typography>
+              <IconButton
+                className="generatorComparisonRemove"
+                size="small"
+                aria-label={`Remove ${generator.name} from comparison`}
+                onClick={() => props.onRemove(generator.name)}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+              {/* A separator stays with the figure before it, so a narrow chip never starts a
               line with "·" */}
-            <Typography variant="caption">
-              <span className="nowrap">
-                {formatPurchasePrice(generator.buildCost)} ·
-              </span>{" "}
-              <span className="nowrap">
-                {formatBuildMonths(generator.yearsToBuild)}
-              </span>
-            </Typography>
-            <Typography variant="caption" color="textSecondary">
-              {props.forecastPending &&
-              !props.outputShapes.get(generator.name) ? (
-                "Calculating output and energy costs…"
-              ) : (
-                <>
-                  {formatWatts(
-                    generator.peakW *
-                      typicalCapacityFactor(
-                        generator,
-                        props.outputShapes.get(generator.name),
-                      ),
-                  )}{" "}
-                  typical{"\u00a0·"}{" "}
-                  <span className="nowrap">
-                    {formatForecastMoney(generator.lcWh * 1000000)}/MWh
-                  </span>
-                </>
-              )}
-            </Typography>
-          </div>
+              <Typography variant="caption">
+                <span className="nowrap">
+                  {formatPurchasePrice(generator.buildCost)} ·
+                </span>{" "}
+                <span className="nowrap">
+                  {formatBuildMonths(generator.yearsToBuild)}
+                </span>
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                {props.forecastPending &&
+                !props.outputShapes.get(generator.name) ? (
+                  "Calculating output and energy costs…"
+                ) : (
+                  <>
+                    {formatWatts(
+                      generator.peakW *
+                        typicalCapacityFactor(
+                          generator,
+                          props.outputShapes.get(generator.name),
+                        ),
+                    )}{" "}
+                    typical{"\u00a0·"}{" "}
+                    <span className="nowrap">
+                      {formatForecastMoney(generator.lcWh * 1000000)}/MWh
+                    </span>
+                  </>
+                )}
+              </Typography>
+            </div>
+          </RemovalCollapse>
         ))}
-      </div>
+      </TransitionGroup>
     </section>
   );
 }
@@ -1426,14 +1450,37 @@ function BuildGenerators(props: Props): React.JSX.Element {
     });
   };
 
-  const comparison = (
-    <GeneratorComparison
-      generators={comparedGenerators}
-      outputShapes={outputShapes}
-      forecastPending={!forecast}
-      onClear={() => setComparedNames([])}
-      onRemove={toggleCompare}
-    />
+  const focusComparisonOption = (name: string) => {
+    Array.from(listRef.current?.querySelectorAll("button") ?? [])
+      .find((button) => button.getAttribute("aria-label") === `Compare ${name}`)
+      ?.focus({ preventScroll: true });
+  };
+  const animateComparison = (
+    child: React.ReactElement<React.ComponentProps<typeof RemovalCollapse>>,
+  ) => React.cloneElement(child, { animate: comparedNames.length === 0 });
+  const comparison = comparedGenerators.length > 0 && (
+    <RemovalCollapse
+      key="comparison"
+      component={comparisonInList ? "li" : "div"}
+      className={
+        comparisonInList ? "buildComparisonItem" : "generatorComparisonSlot"
+      }
+    >
+      <GeneratorComparison
+        generators={comparedGenerators}
+        comparedNames={comparedNames}
+        outputShapes={outputShapes}
+        forecastPending={!forecast}
+        onClear={() => {
+          focusComparisonOption(comparedGenerators[0].name);
+          setComparedNames([]);
+        }}
+        onRemove={(name) => {
+          focusComparisonOption(name);
+          toggleCompare(name);
+        }}
+      />
+    </RemovalCollapse>
   );
 
   if (!now) return <span />;
@@ -1483,15 +1530,21 @@ function BuildGenerators(props: Props): React.JSX.Element {
           Calculating output and energy costs…
         </Typography>
       )}
-      {!comparisonInList && comparison}
+      {!comparisonInList && (
+        <TransitionGroup component={null} childFactory={animateComparison}>
+          {comparison}
+        </TransitionGroup>
+      )}
       <List
         ref={listRef}
         dense
         className="scrollable cardList"
         aria-label="Generator options"
       >
-        {comparisonInList && comparedGenerators.length > 0 && (
-          <li className="buildComparisonItem">{comparison}</li>
+        {comparisonInList && (
+          <TransitionGroup component={null} childFactory={animateComparison}>
+            {comparison}
+          </TransitionGroup>
         )}
         {generators.map((g: GeneratorShoppingType) => {
           const advantages = [

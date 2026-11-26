@@ -18,6 +18,9 @@ import {
   subscribeInterfaceScale,
 } from "../../InterfaceScale";
 import * as React from "react";
+import RemovableDraggable, {
+  RemovableDragList,
+} from "../base/RemovableDraggable";
 import {
   Avatar,
   Button,
@@ -37,7 +40,6 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
-  Draggable,
   DraggingStyle,
   Droppable,
   DropResult,
@@ -105,6 +107,9 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
 interface FacilityListItemProps extends FacilityCapacityUpgradeActions {
+  animate?: boolean;
+  in?: boolean;
+  onExited?: React.ComponentProps<typeof RemovableDraggable>["onExited"];
   arriving: boolean;
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
@@ -504,12 +509,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   );
 
   return (
-    <Draggable
-      key={"f" + facility.id}
+    <RemovableDraggable
+      animate={props.animate}
+      in={props.in}
+      onExited={props.onExited}
       draggableId={"f" + facility.id}
       index={props.spotInList}
       isDragDisabled={reorderDisabled}
-      disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
         <div
@@ -518,9 +524,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           role="listitem"
           className={`facilityRow${selected ? " selected" : ""}${props.bulkSelected ? " bulkSelected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           onContextMenu={(event) => props.onContextMenu(facility.id, event)}
+          data-facility-id={facility.id}
           data-fuel={fuel}
           data-facility={facility.name}
-          style={getDraggableStyle(provided.draggableProps.style)}
+          style={getDraggableStyle(provided.draggableProps?.style)}
         >
           <div
             className={`facilityRowHeader${arriving ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
@@ -672,7 +679,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           )}
         </div>
       )}
-    </Draggable>
+    </RemovableDraggable>
   );
 }
 
@@ -851,6 +858,19 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     modifierHeld: false,
   };
   private draggedIds: number[] = [];
+  private removedFacilityIds = new Set<number>();
+
+  private sellFacility = (id: number) => {
+    this.removedFacilityIds.add(id);
+    this.props.onSell(id);
+  };
+
+  private animateRemovedFacility = (
+    child: React.ReactElement<FacilityListItemProps>,
+  ) =>
+    React.cloneElement(child, {
+      animate: this.removedFacilityIds.has(child.props.facility.id),
+    });
   private selectionFocus: HTMLButtonElement | null = null;
   private previewFocus: HTMLButtonElement | null = null;
   private menuFocus: HTMLButtonElement | null = null;
@@ -1296,7 +1316,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   public render() {
     const {
       game,
-      onSell,
       onTogglePause,
       onPause,
       onTransmissionBuild,
@@ -1346,7 +1365,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onBuyingRule={onBuyingRule}
                   onSellingRule={onSellingRule}
                   facilityActions={{
-                    onSell,
+                    onSell: this.sellFacility,
                     onPause,
                     onTogglePause,
                     onRetrofit: this.props.onRetrofit,
@@ -1450,11 +1469,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 >
                   <Droppable droppableId="droppable">
                     {(provided) => (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        role="list"
-                        aria-label="Plants and storage"
+                      <RemovableDragList
+                        provided={provided}
+                        label="Plants and storage"
+                        childFactory={this.animateRemovedFacility}
                       >
                         {game.facilities.map(
                           (g: FacilityOperatingType, i: number) => (
@@ -1464,7 +1482,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                               facility={g}
                               game={game}
                               key={g.id}
-                              onSell={onSell}
+                              onSell={this.sellFacility}
+                              onExited={() => {
+                                this.removedFacilityIds.delete(g.id);
+                              }}
                               onTogglePause={onTogglePause}
                               onPause={onPause}
                               onRetrofit={this.props.onRetrofit}
@@ -1507,8 +1528,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                             />
                           ),
                         )}
-                        {provided.placeholder}
-                      </div>
+                      </RemovableDragList>
                     )}
                   </Droppable>
                 </DragDropContext>
@@ -1551,7 +1571,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
             target={this.state.menu}
             onClose={this.closeMenu}
             onMenuExited={this.restoreSelectionFocus}
-            onSell={onSell}
+            onSell={this.sellFacility}
             onPause={onPause}
             onTogglePause={onTogglePause}
             onRetrofit={this.props.onRetrofit}
