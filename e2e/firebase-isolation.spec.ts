@@ -5,6 +5,22 @@ const firestore = "https://firestore.googleapis.com/";
 const authProbe =
   "https://identitytoolkit.googleapis.com/firebase-isolation-probe";
 
+// If an isolation rule regresses, this spec must fail without dialing that host.
+test.use({
+  launchOptions: async ({ launchOptions }, use) => {
+    const prefix = "--host-resolver-rules=";
+    const args = launchOptions.args ?? [];
+    const existing = args.find((arg) => arg.startsWith(prefix));
+    await use({
+      ...launchOptions,
+      args: [
+        ...args.filter((arg) => !arg.startsWith(prefix)),
+        `${existing ? existing + "," : prefix}MAP * 127.0.0.1`,
+      ],
+    });
+  },
+});
+
 test("a game starts with the local unavailable leaderboard fixture", async ({
   page,
 }) => {
@@ -49,6 +65,15 @@ test("the Firebase guard rejects an unmocked request and reports the endpoint", 
   } finally {
     await context.close();
   }
+});
+
+test("the shared fixture flags an unmocked Firebase request at teardown", async ({
+  page,
+}) => {
+  await expect(page.goto(authProbe)).rejects.toThrow(
+    "net::ERR_BLOCKED_BY_CLIENT",
+  );
+  test.fail(true, "The Firebase guard must fail fixture teardown");
 });
 
 test("Chromium blocks a Firebase request continued past the Playwright guard", async ({

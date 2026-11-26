@@ -8,6 +8,7 @@ const { firebaseResolverRules } = require("./firebase-hosts");
 function browserLaunchOptions(platform = process.platform) {
   // Browser routing can be bypassed by a service worker or an explicit continue().
   // Force local resolution so a system proxy cannot resolve a blocked host remotely.
+  // Node-side clients such as Playwright's route.fetch have their own transport.
   const args = [
     "--no-proxy-server",
     `--host-resolver-rules=${firebaseResolverRules}`,
