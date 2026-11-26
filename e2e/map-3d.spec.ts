@@ -9,6 +9,7 @@ import {
   openMapProjectCatalogue,
   returnToTerritoryMap,
   setMapProjectCapacity,
+  showMapFacilityStatus,
 } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 import { getBuildFacilityQuote } from "../src/data/Facilities";
@@ -242,7 +243,9 @@ test("resizing keeps the painted terrain and map labels centered at the same zoo
 }) => {
   const original = page.viewportSize()!;
   await page.clock.install();
-  const { map } = await startPausedMap(page);
+  const { map, canvas } = await startPausedMap(page);
+  await showMapFacilityStatus(map);
+  await readyDiagnostics(canvas);
   const viewport = map.locator(".territoryMapViewport");
   const scale = (await viewport.getAttribute("data-camera-scale"))!;
   await pauseBrowserClock(page);
@@ -322,15 +325,16 @@ for (const theme of ["light", "dark"] as const) {
     const { map, canvas } = await startPausedMap(page, theme);
     await readyDiagnostics(canvas);
     const viewport = map.locator(".territoryMapViewport");
-    const bounds = (await viewport.boundingBox())!;
+    const capital = viewport.locator('[data-map-target="champlain:city"]');
+    const hitArea = capital.locator(".territoryTileHitArea");
     const cameraX = (await readTerritoryMapCamera(viewport)).x;
-    const x = Math.round(bounds.x + bounds.width / 2);
-    const y = Math.round(bounds.y + bounds.height / 2);
-    await page.mouse.move(x, y);
-    const hovered = viewport.locator(
-      '[data-model-hovered="true"] .territoryTileHitArea',
-    );
-    await expect(hovered).toHaveCSS("background-image", /radial-gradient/);
+    await hitArea.hover();
+    await expect(capital).toHaveAttribute("data-model-hovered", "true");
+    await expect(hitArea).toHaveCSS("background-image", /radial-gradient/);
+    await expect(map.getByRole("tooltip")).toContainText("Burlington");
+    const bounds = (await hitArea.boundingBox())!;
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height / 2;
     await page.mouse.down({ button: "middle" });
     await page.mouse.move(x + 40, y + 20, { steps: 4 });
     await page.mouse.up({ button: "middle" });
@@ -690,11 +694,15 @@ test("keyboard selection draws a centered 3D mountain outline and Escape clears 
   ).toBeFocused();
 });
 
-test("clicking real mountain relief above its ground selects the mountain tile", async ({
+test("clicking projected mountain relief follows the hex under the pointer", async ({
   page,
 }) => {
-  const { map } = await startPausedMap(page);
-  const { mountain, tile } = await nearestUnownedMountain(map);
+  const { map, canvas } = await startPausedMap(page);
+  const tile = getTerritoryTile("frontier:0:-5")!;
+  const mountain = map.locator(`[data-map-target="${tile.id}"]`);
+  const groundId = "frontier:1:-6";
+  const ground = map.locator(`[data-map-target="${groundId}"]`);
+  await expect(mountain).toHaveAttribute("data-owned", "false");
   // Reveal the same tile on compact viewports before testing pointer picking.
   await mountain.focus();
   await mountain.press("Escape");
@@ -724,6 +732,10 @@ test("clicking real mountain relief above its ground selects the mountain tile",
     0,
     "run",
   );
+  const diagnostics = await readyDiagnostics(canvas, true);
+  const rendered = diagnostics.scene?.find(({ id }) => id === terrain.id);
+  expect(rendered?.modelKey).toBe(terrain.model.key);
+  expect(rendered?.max[1]).toBeGreaterThan(0);
   const mesh = terrain.model.parts[1].mesh.positions;
   let peak = [0, -Infinity, 0];
   for (let i = 0; i < mesh.length; i += 9) {
@@ -743,20 +755,28 @@ test("clicking real mountain relief above its ground selects the mountain tile",
   );
   const bounds = (await viewport.boundingBox())!;
   const click = { x: bounds.x + point.x, y: bounds.y + point.y };
-  const ground = await page.evaluate(
+  // This peak projects into the hit area of its neighbor in the next row.
+  const groundAtPeak = await page.evaluate(
     ({ x, y }) =>
-      document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-map-target]")
-        ?.dataset.mapTarget,
+      document
+        .elementFromPoint(x, y)
+        ?.closest(".territoryTileHitArea")
+        ?.closest<HTMLElement>("[data-map-target]")?.dataset.mapTarget,
     click,
   );
-  // With a finite board, a foreground peak can also project above the map edge.
   expect(point.x).toBeGreaterThan(0);
   expect(point.x).toBeLessThan(width);
   expect(point.y).toBeGreaterThan(0);
   expect(point.y).toBeLessThan(height);
-  expect(ground).not.toBe(tile.id);
+  expect(groundAtPeak).toBe(groundId);
   await page.mouse.click(click.x, click.y);
+  await expect(ground).toHaveAttribute("aria-pressed", "true");
+  await expect(mountain).toHaveAttribute("aria-pressed", "false");
+  const surface = page.locator(".tileWorkspaceSurface");
+  await closeTileSurface(surface);
+  await mountain.locator(".territoryTileHitArea").click();
   await expect(mountain).toHaveAttribute("aria-pressed", "true");
+  await expect(surface).toBeVisible();
 });
 
 for (const theme of ["light", "dark"] as const) {

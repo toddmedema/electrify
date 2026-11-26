@@ -42,6 +42,7 @@ import {
   returnToTerritoryMap,
   selectTerritoryMapTile,
   setMapProjectCapacity,
+  showMapFacilityStatus,
   waitForTileConnection,
 } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
@@ -741,6 +742,7 @@ for (const theme of ["light", "dark"] as const) {
       await touch.detach();
     }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    await showMapFacilityStatus(network);
 
     const states = [
       [getTerritoryTile(hydro.tileId, built)!, "producing", "Generating"],
