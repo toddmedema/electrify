@@ -29,16 +29,17 @@ async function waitForSave(page: Page) {
   await expect.poll(async () => Boolean(await readSavedGame(page))).toBe(true);
 }
 
-async function expectWideHeaderRow(page: Page, mission: string, alert: string) {
+async function expectWideHeaderRow(page: Page, alert: string, risk?: string) {
   const toolbar = page.locator("#topbar");
+  const term = toolbar.getByRole("button", { name: /months? left$/ });
   const row = [
     toolbar.locator(".gameStatusValue").first(),
     toolbar.getByLabel(/^Monthly profit forecast/),
     toolbar.locator("[data-game-minute]"),
     toolbar.getByText(/^NOW /),
     toolbar.getByText(/^FUTURE /),
-    toolbar.getByText(mission, { exact: true }),
-    toolbar.getByRole("button", { name: /months? left$/ }),
+    ...(risk ? [toolbar.getByText(risk, { exact: true })] : []),
+    term,
     toolbar.getByRole("button", { name: alert, exact: true }),
     toolbar.getByRole("group", { name: "game speed" }),
   ];
@@ -50,6 +51,7 @@ async function expectWideHeaderRow(page: Page, mission: string, alert: string) {
       await expect(item).toBeInViewport({ ratio: 1 });
       boxes.push((await item.boundingBox())!);
     }
+    await expectGoalBelowTime(term, "Acquire utilities (0/3)");
     const middle = boxes[0].y + boxes[0].height / 2;
     for (const [index, box] of boxes.entries()) {
       expect(box.y).toBeLessThan(middle);
@@ -60,6 +62,32 @@ async function expectWideHeaderRow(page: Page, mission: string, alert: string) {
       }
     }
   }
+}
+
+async function expectGoalBelowTime(
+  term: ReturnType<Page["locator"]>,
+  goal: string | RegExp,
+) {
+  const time = (await term.locator(":scope > span").first().boundingBox())!;
+  const goalLine = term.getByText(goal);
+  await expect(goalLine).toBeInViewport({ ratio: 1 });
+  expect((await goalLine.boundingBox())!.y).toBeGreaterThanOrEqual(
+    time.y + time.height,
+  );
+}
+
+async function expectCompactStatusRow(page: Page) {
+  const grid = (await page
+    .getByRole("button", { name: /^Current grid status:/ })
+    .boundingBox())!;
+  const term = (await page
+    .getByRole("button", { name: /months left$/ })
+    .boundingBox())!;
+  expect(grid.height).toBeGreaterThanOrEqual(44);
+  expect(term.height).toBeGreaterThanOrEqual(44);
+  expect(grid.x + grid.width).toBeLessThan(term.x);
+  expect(grid.y + grid.height).toBeGreaterThan(term.y + term.height / 2);
+  expect(term.y + term.height).toBeGreaterThan(grid.y + grid.height / 2);
 }
 
 async function range(page: Page) {
@@ -127,12 +155,12 @@ for (const theme of ["light", "dark"]) {
       });
       await expect(events).toHaveText("");
       await expect(events.locator(".MuiBadge-dot")).toBeVisible();
-      await expectWideHeaderRow(
-        page,
-        "Acquire utilities (0/3)",
-        "Unread events",
-      );
+      await expectWideHeaderRow(page, "Unread events");
       await page.setViewportSize({ width: 1120, height: 900 });
+    } else {
+      const term = page.getByRole("button", { name: /months left$/ });
+      await expectGoalBelowTime(term, "Acquire utilities (0/3)");
+      await expectCompactStatusRow(page);
     }
     expect(
       await page.evaluate(
@@ -166,38 +194,61 @@ for (const theme of ["light", "dark"]) {
       page.locator('.insights:visible [data-layer="supplyDemand"]'),
     ).toBeVisible();
 
-    if (info.project.name === "desktop-chromium") {
-      await editSavedGame(page, (save) => {
-        const game = save.game;
-        const minute = game.date.minute;
-        const later = game.timeline.find((tick) => tick.minute > minute);
-        if (!later)
-          throw new Error("Expected a future tick in the grid sample");
-        later.supplyW = later.demandW * 0.9;
-        game.worldEvents.active.push({
-          key: "header-storm-damage",
-          definitionId: "header-storm-damage",
-          title: "Storm damage",
-          message: "Storm damage disrupts the regional grid.",
-          importance: "CRITICAL",
-          startsMinute: minute,
-          endsMinute: minute + 1440,
-          attributes: {},
-          effects: {},
-        });
+    await editSavedGame(page, (save) => {
+      const game = save.game;
+      const minute = game.date.minute;
+      const later = game.timeline.find((tick) => tick.minute > minute);
+      if (!later) throw new Error("Expected a future tick in the grid sample");
+      later.supplyW = later.demandW * 0.9;
+      game.worldEvents.active.push({
+        key: "header-storm-damage",
+        definitionId: "header-storm-damage",
+        title: "Storm damage",
+        message: "Storm damage disrupts the regional grid.",
+        importance: "CRITICAL",
+        startsMinute: minute,
+        endsMinute: minute + 1440,
+        attributes: {},
+        effects: {},
       });
-      await page.reload();
-      await page.getByRole("button", { name: "Continue", exact: true }).click();
-      await expect(grid.getByText(/^FUTURE Short at/)).toBeVisible();
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(grid.getByText(/^FUTURE Short at/)).toBeVisible();
+    if (info.project.name === "desktop-chromium") {
       await expectWideHeaderRow(
         page,
-        "Active: Storm damage",
         "Ongoing emergency, unread events",
+        "Active: Storm damage",
       );
       await reviewScreenshot(page.locator("#appbar:visible"), {
         path: info.outputPath(`emergency-header-${theme}.png`),
         animations: "disabled",
       });
+    } else {
+      const currentGrid = grid.getByRole("button", {
+        name: /^Current grid status:/,
+      });
+      const storm = page.getByRole("button", { name: /^Active: Storm damage/ });
+      const term = page.getByRole("button", { name: /months left$/ });
+      await expect(storm.getByText("Active: Storm damage")).toBeInViewport({
+        ratio: 1,
+      });
+      await expectGoalBelowTime(term, "Acquire utilities (0/3)");
+      const gridBounds = (await currentGrid.boundingBox())!;
+      const stormBounds = (await storm.boundingBox())!;
+      const termBounds = (await term.boundingBox())!;
+      expect(gridBounds.y + gridBounds.height).toBeLessThanOrEqual(
+        stormBounds.y,
+      );
+      expect(stormBounds.x + stormBounds.width).toBeLessThanOrEqual(
+        termBounds.x,
+      );
+      await currentGrid.focus();
+      await page.keyboard.press("Tab");
+      await expect(storm).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(term).toBeFocused();
     }
   });
 
@@ -226,23 +277,19 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".missionSummary:visible")).toContainText(
       "144 months left",
     );
-    // The announced fee takes the goal's place, keeping the tracker to one line.
+    // The announced fee remains actionable alongside the term and authored goal.
     await expect(page.locator(".missionSummaryCopy:visible")).toContainText(
       info.project.name.startsWith("mobile") ? "Next:" : "Upcoming:",
     );
-    const copy = await page.locator(".missionSummary:visible").boundingBox();
-    expect(copy!.height).toBeLessThanOrEqual(56);
-    const reorder = page.locator(".facilityActions:visible");
-    if (info.project.name.startsWith("mobile")) {
-      await expect(reorder).toHaveCount(0);
-    } else {
-      await expect(reorder).toHaveCount(0);
+    const months = page.getByRole("button", { name: "144 months left" });
+    await expectGoalBelowTime(months, /Keep ≥80% of customer baseline/);
+    await expect(page.locator(".facilityActions:visible")).toHaveCount(0);
+    if (info.project.name === "desktop-chromium") {
       const grid = await page.locator(".gridHealth:visible").boundingBox();
       const mission = await page
         .locator(".missionSummary:visible")
         .boundingBox();
-      // One line, whether in its own row or folded into the top bar on wide windows, where the
-      // grid readout is a shorter tinted box centred beside the mission.
+      // The grid and mission controls stay centered in the same desktop row.
       expect(
         Math.abs(
           grid!.y + grid!.height / 2 - (mission!.y + mission!.height / 2),
@@ -250,7 +297,6 @@ for (const theme of ["light", "dark"]) {
       ).toBeLessThanOrEqual(1);
     }
     await settle(page);
-    const months = page.getByRole("button", { name: "144 months left" });
     await months.click();
     const dialog = page.getByRole("region", { name: "Scenario", exact: true });
     await expect(dialog).toContainText(
@@ -277,19 +323,8 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "pause", exact: true }).click();
     await expect(page.locator(".missionRiskButton:visible")).toHaveCount(0);
     if (info.project.name.startsWith("mobile")) {
-      const heights = await page.evaluate(() =>
-        ["#topbar", ".gridHealth", ".missionSummary"].map(
-          (selector) =>
-            document.querySelector(selector)!.getBoundingClientRect().height,
-        ),
-      );
-      // Keep both status rows compact. Chromium can round the grid button's
-      // font and border to a fractional CSS pixel.
-      const [topbar, grid, mission] = heights;
-      expect(topbar).toBe(56);
-      expect(mission).toBe(44);
-      expect(grid).toBeGreaterThanOrEqual(mission);
-      expect(grid - mission).toBeLessThanOrEqual(1);
+      await expectCompactStatusRow(page);
+      await expectGoalBelowTime(months, /Keep ≥80% of customer baseline/);
     }
     await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     for (const speed of ["normal speed", "fast speed", "pause"]) {

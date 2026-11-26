@@ -1599,6 +1599,7 @@ export interface GameType {
         fuel?: FuelNameType;
         peakW: number;
         peakWh?: number;
+        yearsToBuild?: number;
         yearsToBuildLeft: number;
       };
     }[];
@@ -1622,6 +1623,7 @@ export interface GameType {
           fuel?: FuelNameType;
           peakW: number;
           peakWh?: number;
+          yearsToBuild?: number;
           yearsToBuildLeft: number;
         }
       >

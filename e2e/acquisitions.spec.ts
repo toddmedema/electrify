@@ -461,15 +461,7 @@ for (const theme of ["light", "dark"] as const) {
       });
       await expect
         .poll(() =>
-          network.evaluate(
-            (element) =>
-              element
-                .querySelector(".territoryMapViewport")!
-                .getBoundingClientRect().width +
-              (element
-                .querySelector(".desktopBuildRail")
-                ?.getBoundingClientRect().width ?? 0),
-          ),
+          viewport.evaluate((element) => element.getBoundingClientRect().width),
         )
         .toBe(width);
       const camera = await readTerritoryMapCamera(viewport);
@@ -742,6 +734,17 @@ for (const theme of ["light", "dark"] as const) {
     }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
 
+    // Restore a deterministic midpoint so the map can show a partially drawn ring.
+    await editSavedGame(page, ({ game }) => {
+      const building = game.facilities.find(
+        (facility) => facility.id === plant.id,
+      )!;
+      building.yearsToBuildLeft = building.yearsToBuild / 2;
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await returnToTerritoryMap(page);
+
     const states = [
       [getTerritoryTile(hydro.tileId, built)!, "producing", "Generating"],
       [getTerritoryTile(oil.tileId, built)!, "idle", "Idle"],
@@ -780,8 +783,14 @@ for (const theme of ["light", "dark"] as const) {
         `${kind} is represented by solid 3D geometry`,
       ).toBeDefined();
       expect(geometry!.active).toBe(kind === "producing");
-      if (kind === "construction")
+      if (kind === "construction") {
         expect(geometry!.modelKey).toMatch(/:construction$/);
+        await expect(target).toHaveAccessibleDescription(/50% complete/);
+        await expect(badge.locator('circle[pathLength="1"]')).toHaveAttribute(
+          "stroke-dasharray",
+          "0.5 1",
+        );
+      }
       await expect(
         badge.locator(":scope > .facilityMapStatusArtwork"),
       ).toHaveAttribute("aria-hidden", "true");
@@ -879,19 +888,12 @@ for (const theme of ["light", "dark"] as const) {
         .getBoundingClientRect();
       return {
         map: { width: map.width, height: map.height },
-        railWidth:
-          element.querySelector(".desktopBuildRail")?.getBoundingClientRect()
-            .width ?? 0,
         workspace: { width: workspace.width, height: workspace.height },
         overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     expect(
-      Math.abs(
-        dimensions.map.width +
-          dimensions.railWidth -
-          dimensions.workspace.width,
-      ),
+      Math.abs(dimensions.map.width - dimensions.workspace.width),
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(dimensions.map.height - dimensions.workspace.height),

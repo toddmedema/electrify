@@ -94,7 +94,16 @@ for (const theme of ["light", "dark"] as const) {
     if (desktop) {
       // Every available technology is discoverable before opening Build.
       await expect(rail).toBeVisible();
+      await expect(rail).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const mapViewport = network.locator(".territoryMapViewport");
+      expect((await mapViewport.boundingBox())!.x).toBeLessThanOrEqual(
+        (await rail.boundingBox())!.x,
+      );
       const icons = rail.getByRole("button", { name: /^Choose sites for / });
+      await expect(icons.first()).not.toHaveCSS(
+        "background-color",
+        "rgba(0, 0, 0, 0)",
+      );
       const artwork = await icons.evaluateAll((buttons) =>
         buttons.map((button) => ({
           name: button
@@ -447,11 +456,13 @@ for (const theme of ["light", "dark"] as const) {
         top: rail.top,
         bottom: rail.bottom,
         mapLeft: map.left,
+        mapRight: map.right,
         overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     expect(geometry.left).toBeGreaterThanOrEqual(0);
-    expect(geometry.right).toBeLessThanOrEqual(geometry.mapLeft + 1);
+    expect(geometry.left).toBeGreaterThanOrEqual(geometry.mapLeft);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.mapRight);
     expect(geometry.top).toBeGreaterThanOrEqual(0);
     expect(geometry.bottom).toBeLessThanOrEqual(560);
     expect(geometry.overflow).toBeLessThanOrEqual(1);

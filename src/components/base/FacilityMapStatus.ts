@@ -1,7 +1,12 @@
 import { FacilityOperatingType, isStorage } from "../../Types";
 import { facilityPermanentlyShutdown } from "../../helpers/Financials";
-import { isUpgradingAt, retrofitOutputMultiplier } from "../../helpers/Hazards";
+import {
+  isUpgradingAt,
+  retrofitOutputMultiplier,
+  upgradeProgress,
+} from "../../helpers/Hazards";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
+import { constructionFraction } from "./ConstructionProgress";
 
 export type FacilityMapStatusKind =
   "construction" | "paused" | "producing" | "idle" | "charging" | "unknown";
@@ -9,6 +14,7 @@ export type FacilityMapStatusKind =
 export interface FacilityMapStatus {
   kind: FacilityMapStatusKind;
   label: string;
+  progress?: number;
 }
 
 /** Share measured operating state between the map and the facility inspector. */
@@ -44,13 +50,30 @@ export function facilityMapStatus(
   includeConstruction = true,
 ): FacilityMapStatus | undefined {
   if (view.tile.city || !view.facility) return undefined;
-  if (view.operatingFacility) {
-    const status = facilityOperatingStatus(view.operatingFacility, minute);
-    return includeConstruction && view.operatingFacility.expansionInProgress
-      ? { kind: "construction", label: status.label }
+  const facility = view.operatingFacility;
+  if (facility) {
+    const status = facilityOperatingStatus(facility, minute);
+    if (facility.yearsToBuildLeft > 0)
+      return { ...status, progress: constructionFraction(facility) };
+    if (status.kind === "construction" && facility.upgradeInProgress)
+      return {
+        ...status,
+        progress: upgradeProgress(facility.upgradeInProgress, minute),
+      };
+    const expansion = facility.expansionInProgress;
+    return includeConstruction && expansion
+      ? {
+          kind: "construction",
+          label: status.label,
+          progress: constructionFraction(expansion),
+        }
       : status;
   }
   if (view.facility.yearsToBuildLeft > 0)
-    return { kind: "construction", label: "Under construction" };
+    return {
+      kind: "construction",
+      label: "Under construction",
+      progress: constructionFraction(view.facility),
+    };
   return { kind: "unknown", label: "Operating status unavailable" };
 }

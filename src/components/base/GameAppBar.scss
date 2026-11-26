@@ -78,6 +78,10 @@ html[data-couch-seat] #appbar #topbar {
 // Keep every readout and all five co-op speed choices legible at 360 px.
 // When they cannot share a row, move the clock below instead of clipping profit.
 @media (max-width: 599px) {
+  #appbar {
+    container: phone-appbar / inline-size;
+  }
+
   #topbar .MuiToolbar-root:has(> .gameStatus):has(.multiplayerSpeedToggles) {
     flex-wrap: wrap !important;
     row-gap: 4px;
@@ -299,6 +303,46 @@ html[data-couch-seat] #appbar #topbar {
   #appbar .gameStatusBar .missionSummary {
     flex: 1 0 auto;
     padding-left: 16px;
+  }
+
+  // A separate event or mission warning keeps its own row and tap target.
+  @container phone-appbar (min-width: 22rem) {
+    #appbar .gameStatusBar:has(.missionSummary):not(:has(.missionRiskButton)) {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      gap: 8px;
+      padding-inline: max(16px, env(safe-area-inset-left))
+        max(16px, env(safe-area-inset-right));
+
+      .gridHealth,
+      .missionSummary {
+        padding-inline: 0;
+      }
+
+      .missionSummaryMonths.MuiButton-root,
+      .gridStatusButton {
+        padding-inline: 4px;
+      }
+
+      .gridHealth {
+        width: auto;
+        margin-inline: -4px 0;
+        border-radius: var(--radius-sm);
+      }
+
+      .missionSummaryMonths.MuiButton-root {
+        margin-inline-end: -4px;
+      }
+
+      .missionSummaryHeadline {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        text-align: right;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+    }
   }
 }
 @media (pointer: coarse) {
