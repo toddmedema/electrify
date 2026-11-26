@@ -18,6 +18,11 @@ import {
   subscribeInterfaceScale,
 } from "../../InterfaceScale";
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
+import RemovableDraggable, {
+  RemovableDragList,
+} from "../base/RemovableDraggable";
 import {
   Avatar,
   Button,
@@ -37,7 +42,6 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import { ChevronDownGlyph } from "../base/Glyphs";
 import {
   DragDropContext,
-  Draggable,
   DraggingStyle,
   Droppable,
   DropResult,
@@ -108,6 +112,9 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { GAME_TO_REAL_YEARS, TICKS_PER_HOUR } from "../../Constants";
 
 interface FacilityListItemProps extends FacilityCapacityUpgradeActions {
+  animate?: boolean;
+  in?: boolean;
+  onExited?: React.ComponentProps<typeof RemovableDraggable>["onExited"];
   arriving: boolean;
   onArrivalShown?: (id: number) => void;
   facility: FacilityOperatingType;
@@ -500,12 +507,13 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   );
 
   return (
-    <Draggable
-      key={"f" + facility.id}
+    <RemovableDraggable
+      animate={props.animate}
+      in={props.in}
+      onExited={props.onExited}
       draggableId={"f" + facility.id}
       index={props.spotInList}
       isDragDisabled={reorderDisabled}
-      disableInteractiveElementBlocking
     >
       {(provided, snapshot) => (
         <div
@@ -514,9 +522,10 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           role="listitem"
           className={`facilityRow${selected ? " selected" : ""}${props.bulkSelected ? " bulkSelected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
           onContextMenu={(event) => props.onContextMenu(facility.id, event)}
+          data-facility-id={facility.id}
           data-fuel={fuel}
           data-facility={facility.name}
-          style={getDraggableStyle(provided.draggableProps.style)}
+          style={getDraggableStyle(provided.draggableProps?.style)}
         >
           <div
             className={`facilityRowHeader${arriving ? " facilityArrival" : ""}${ready ? " facilityReady" : ""}`}
@@ -668,7 +677,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
           )}
         </div>
       )}
-    </Draggable>
+    </RemovableDraggable>
   );
 }
 
@@ -847,6 +856,27 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     modifierHeld: false,
   };
   private draggedIds: number[] = [];
+  private removedFacilityIds = new Set<number>();
+
+  private sellFacility = (id: number) => {
+    this.removedFacilityIds.add(id);
+    this.props.onSell(id);
+  };
+
+  private animateRemovedFacility = (
+    child: React.ReactElement<FacilityListItemProps>,
+  ) =>
+    React.cloneElement(child, {
+      animate: this.removedFacilityIds.has(child.props.facility.id),
+    });
+  private removingLastIntertie = false;
+
+  private cancelFleetIntertie = (id: number) => {
+    const lines = this.props.game.transmission?.lines;
+    this.removingLastIntertie = lines?.length === 1 && lines[0].id === id;
+    this.props.onTransmissionCancel?.(id);
+  };
+
   private selectionFocus: HTMLButtonElement | null = null;
   private previewFocus: HTMLButtonElement | null = null;
   private menuFocus: HTMLButtonElement | null = null;
@@ -1292,7 +1322,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   public render() {
     const {
       game,
-      onSell,
       onTogglePause,
       onPause,
       onTransmissionBuild,
@@ -1342,7 +1371,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   onBuyingRule={onBuyingRule}
                   onSellingRule={onSellingRule}
                   facilityActions={{
-                    onSell,
+                    onSell: this.sellFacility,
                     onPause,
                     onTogglePause,
                     onRetrofit: this.props.onRetrofit,
@@ -1446,11 +1475,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 >
                   <Droppable droppableId="droppable">
                     {(provided) => (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        role="list"
-                        aria-label="Plants and storage"
+                      <RemovableDragList
+                        provided={provided}
+                        label="Plants and storage"
+                        childFactory={this.animateRemovedFacility}
                       >
                         {game.facilities.map(
                           (g: FacilityOperatingType, i: number) => (
@@ -1460,7 +1488,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                               facility={g}
                               game={game}
                               key={g.id}
-                              onSell={onSell}
+                              onSell={this.sellFacility}
+                              onExited={() => {
+                                this.removedFacilityIds.delete(g.id);
+                              }}
                               onTogglePause={onTogglePause}
                               onPause={onPause}
                               onRetrofit={this.props.onRetrofit}
@@ -1503,8 +1534,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                             />
                           ),
                         )}
-                        {provided.placeholder}
-                      </div>
+                      </RemovableDragList>
                     )}
                   </Droppable>
                 </DragDropContext>
@@ -1517,28 +1547,51 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                     Choose Build to add a generator or storage.
                   </Typography>
                 )}
-                {!territoryNetwork &&
-                  intertiesAvailable &&
-                  !!game.transmission?.lines.length && (
-                    <section
-                      aria-label="Intertie management"
-                      ref={this.intertiesAnchor}
-                      tabIndex={-1}
-                    >
-                      <TransmissionPanel
-                        game={game}
-                        onBuild={onTransmissionBuild}
-                        onUpgrade={onTransmissionUpgrade}
-                        onAcquire={this.props.onUtilityAcquire}
-                        onCancel={this.props.onTransmissionCancel}
-                        onPause={this.props.onTransmissionPause}
-                        onBuyingRule={onBuyingRule}
-                        onSellingRule={onSellingRule}
-                        onBeforeDragStart={this.onBeforeDragStart}
-                        onDragEnd={this.onDragEnd}
-                      />
-                    </section>
-                  )}
+                <TransitionGroup
+                  component={null}
+                  childFactory={(
+                    child: React.ReactElement<
+                      React.ComponentProps<typeof RemovalCollapse>
+                    >,
+                  ) =>
+                    React.cloneElement(child, {
+                      animate: this.removingLastIntertie,
+                    })
+                  }
+                >
+                  {!territoryNetwork &&
+                    intertiesAvailable &&
+                    !!game.transmission?.lines.length && (
+                      <RemovalCollapse
+                        key="interties"
+                        onExited={() => {
+                          this.removingLastIntertie = false;
+                        }}
+                      >
+                        <section
+                          aria-label="Intertie management"
+                          ref={this.intertiesAnchor}
+                          tabIndex={-1}
+                        >
+                          <TransmissionPanel
+                            game={game}
+                            onBuild={onTransmissionBuild}
+                            onUpgrade={onTransmissionUpgrade}
+                            onAcquire={this.props.onUtilityAcquire}
+                            onCancel={
+                              this.props.onTransmissionCancel &&
+                              this.cancelFleetIntertie
+                            }
+                            onPause={this.props.onTransmissionPause}
+                            onBuyingRule={onBuyingRule}
+                            onSellingRule={onSellingRule}
+                            onBeforeDragStart={this.onBeforeDragStart}
+                            onDragEnd={this.onDragEnd}
+                          />
+                        </section>
+                      </RemovalCollapse>
+                    )}
+                </TransitionGroup>
               </List>
             </div>
           )}
@@ -1547,7 +1600,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
             target={this.state.menu}
             onClose={this.closeMenu}
             onMenuExited={this.restoreSelectionFocus}
-            onSell={onSell}
+            onSell={this.sellFacility}
             onPause={onPause}
             onTogglePause={onTogglePause}
             onRetrofit={this.props.onRetrofit}

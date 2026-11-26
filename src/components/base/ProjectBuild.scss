@@ -9,20 +9,10 @@
   min-height: 0;
   padding: 0 16px 12px;
 }
-.projectCandidateHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  p {
-    flex: 1;
-    margin: 4px 0;
-    font-size: 13px;
-    color: var(--font-color-secondary);
-  }
-  button {
-    flex-shrink: 0;
-    min-height: 44px;
-  }
+.projectLocation {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--font-color-secondary);
 }
 .projectFacts {
   display: grid;
@@ -61,18 +51,6 @@
   [role="status"] {
     flex-basis: 100%;
     font-size: 13px;
-  }
-}
-.projectSiteLegend {
-  display: grid;
-  gap: 8px;
-  font-size: 13px;
-  span {
-    border-left: 3px solid var(--interactive-blue);
-    padding-left: 8px;
-  }
-  span + span {
-    border-left-style: dashed;
   }
 }
 .tileWorkspaceProject .tileWorkspaceBody {

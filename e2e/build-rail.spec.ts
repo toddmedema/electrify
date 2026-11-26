@@ -76,6 +76,93 @@ test("wheeling over Power or Energy steps its size in both axes", async ({
   });
 });
 
+test("dragging a facility selects a compatible site and waits for confirmation", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium", "Uses the desktop rail");
+  const network = await startMap(page, "dark");
+  const before = (await readSavedGame(page))!;
+  const wind = network.getByRole("button", {
+    name: "Choose sites for Wind",
+    exact: true,
+  });
+  const project = network.getByRole("dialog", { name: /^Wind ·/ });
+  const city = network.locator(
+    '[data-map-target="champlain:city"] .territoryTileHitArea',
+  );
+  const site = network.locator('[data-map-target="champlain:site-13"]');
+
+  await expect(wind).toHaveAttribute("draggable", "true");
+  await wind.dragTo(city);
+  await expect(wind).toHaveAttribute("aria-pressed", "false");
+  await expect(project).toHaveCount(0);
+
+  await wind.dragTo(site.locator(".territoryTileHitArea"));
+  await expect(wind).toHaveAttribute("aria-pressed", "true");
+  await expect(site).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    project.getByRole("button", { name: "Cash", exact: true }),
+  ).toBeVisible();
+  await expect(
+    project.getByRole("button", { name: "Loan", exact: true }),
+  ).toBeVisible();
+  await reviewScreenshot(page, {
+    path: info.outputPath("dragged-project-review.png"),
+    scale: "css",
+  });
+  const after = (await readSavedGame(page))!;
+  expect(after.facilities).toEqual(before.facilities);
+  expect(after.territoryNetwork!.tilePurchases).toEqual(
+    before.territoryNetwork!.tilePurchases,
+  );
+  expect(currentTick(after)!.cash).toBe(currentTick(before)!.cash);
+
+  await project.getByRole("button", { name: "Cash", exact: true }).click();
+  await expect(project).toHaveCount(0);
+  await site.press("Enter");
+  const inspector = page.locator(".tileWorkspaceInspector");
+  const details = inspector.locator(".facilityDetails");
+  await expect(details).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await inspector
+    .getByRole("button", { name: /^Cancel construction of/ })
+    .click();
+  // Arm the observer before confirming. A busy renderer can skip every frame
+  // between the start and the end of the short collapse.
+  const measuredExit = await details.evaluateHandle((element) => {
+    const row = element.closest<HTMLElement>(".MuiCollapse-root")!;
+    const state = { inert: false, from: 0, to: -1 };
+    const observer = new MutationObserver(() => {
+      if (!row.inert || row.style.height !== "0px") return;
+      const height = row
+        .getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "height",
+        );
+      if (!(height?.effect instanceof KeyframeEffect)) return;
+      const [first, last] = height.effect.getKeyframes();
+      state.inert = row.inert;
+      state.from = parseFloat(String(first.height));
+      state.to = parseFloat(String(last.height));
+      observer.disconnect();
+    });
+    observer.observe(row, { attributeFilter: ["inert", "style"] });
+    return state;
+  });
+  await page
+    .getByRole("dialog", { name: /^Cancel construction of/ })
+    .getByRole("button", { name: "Cancel construction", exact: true })
+    .click();
+  await expect(details).toHaveCount(0);
+  const { inert, from, to } = await measuredExit.jsonValue();
+  expect(inert).toBe(true);
+  expect(from).toBeGreaterThan(0);
+  expect(to).toBe(0);
+  await measuredExit.dispose();
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`build catalogue preserves previews, sizing and responsive entry points · ${theme}`, async ({
     page,
@@ -130,6 +217,21 @@ for (const theme of ["light", "dark"] as const) {
       expect(artwork.length).toBeGreaterThan(5);
       for (const { name, source } of artwork)
         expect(source).toBe(`/images/${name.toLowerCase()}.svg`);
+      for (const [category, label] of [
+        ["Generators", "Power"],
+        ["Storage", "Energy"],
+      ]) {
+        const heading = rail.getByRole("heading", {
+          name: category,
+          exact: true,
+        });
+        const sizing = rail.getByRole("button", {
+          name: new RegExp(`^${label}:`),
+        });
+        expect((await heading.boundingBox())!.y).toBeLessThan(
+          (await sizing.boundingBox())!.y,
+        );
+      }
       const energy = rail.getByRole("button", { name: /^Energy:/ });
       await energy.hover();
       const energySizing = rail.getByRole("region", { name: "Energy sizing" });
@@ -181,8 +283,8 @@ for (const theme of ["light", "dark"] as const) {
         "Direct emissions",
       ]);
       await expect(
-        preview.getByText("Compared with typical buildable generators"),
-      ).toBeVisible();
+        preview.getByText(/Compared with typical buildable generators/),
+      ).toHaveCount(0);
       const advanced = preview.getByRole("button", { name: "Advanced" });
       await expect(advanced).toHaveAttribute("aria-expanded", "false");
       const advancedGenerator = preview.getByRole("table", {
@@ -325,9 +427,19 @@ for (const theme of ["light", "dark"] as const) {
       surface.getByRole("heading", { name: "Wind · 30MW", exact: true }),
     ).toBeVisible();
     await expect(surface.getByText("Choose a highlighted site.")).toBeVisible();
-    if (!desktop) await expect(build).toHaveAttribute("aria-expanded", "true");
+    if (!desktop) {
+      await expect(build).toHaveAttribute("aria-expanded", "true");
+      await reviewScreenshot(page, {
+        path: info.outputPath("pick-project-site.png"),
+        scale: "css",
+      });
+    }
+    await expect(
+      surface.getByRole("button", { name: "Change project", exact: true }),
+    ).toHaveCount(0);
+    await expect(surface.getByText(/total project .*cost/)).toHaveCount(0);
     await surface
-      .getByRole("button", { name: "Change project", exact: true })
+      .getByRole("button", { name: "Close project", exact: true })
       .click();
 
     if (desktop) {
@@ -346,6 +458,7 @@ for (const theme of ["light", "dark"] as const) {
         }),
       ).toBeVisible();
     } else {
+      await openMapProjectCatalogue(page);
       await expect(
         surface.getByRole("heading", { name: "Build", exact: true }),
       ).toBeVisible();

@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  cloneElement,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../components/base/RemovalCollapse";
 import {
   Alert,
   Box,
@@ -47,6 +55,9 @@ export default function SavesDialog({
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const deleteReturn = useRef<HTMLElement>();
   const deleted = useRef(false);
+  const exiting = useRef<string>();
+  type Campaign = NonNullable<typeof library>["slots"][number];
+  const [retained, setRetained] = useState<{ save: Campaign; index: number }>();
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
     return action().catch((error) =>
@@ -63,9 +74,12 @@ export default function SavesDialog({
       await session.prepareResume(id, name);
       onClose();
     });
-  const showSearch = (library?.slots.length || 0) > 3;
+  const displayedSlots = library?.slots.slice() ?? [];
+  if (retained && !displayedSlots.some(({ id }) => id === retained.save.id))
+    displayedSlots.splice(retained.index, 0, retained.save);
+  const showSearch = displayedSlots.length > 3;
   const query = showSearch ? search.trim().toLocaleLowerCase() : "";
-  const saves = library?.slots.filter((slot) =>
+  const saves = displayedSlots.filter((slot) =>
     `${slot.name} ${slot.players.join(" ")}`
       .toLocaleLowerCase()
       .includes(query),
@@ -132,81 +146,101 @@ export default function SavesDialog({
                 <Typography>Loading multiplayer saves…</Typography>
               </Stack>
             )}
-            {!loading && library && !library.slots.length && (
+            {!loading && library && !displayedSlots.length && (
               <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
                 <Typography component="h2" variant="h6">
                   No multiplayer saves yet
                 </Typography>
               </Paper>
             )}
-            {!!library?.slots.length && !saves?.length && (
+            {!!displayedSlots.length && !saves.length && (
               <Typography role="status">No saves match “{search}”.</Typography>
             )}
-            {saves?.map((save) => {
-              const savedAt = new Date(save.updatedAt);
-              const timestamp = savedAt.toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              });
-              return (
-                <Paper
-                  key={save.id}
-                  variant="outlined"
-                  component="article"
-                  className="saveEntry"
-                  aria-label={save.name}
-                >
-                  <Box className="coopCampaignHeading">
-                    <Typography component="h2" variant="h6">
-                      {save.name}
-                    </Typography>
-                    <IconButton
-                      aria-label={`Actions for ${save.name}`}
-                      aria-haspopup="menu"
-                      aria-expanded={menu?.id === save.id || undefined}
-                      disabled={busy || loadingSaves}
-                      onClick={(event) => {
-                        deleteReturn.current = event.currentTarget;
-                        deleted.current = false;
-                        setMenu({
-                          anchor: event.currentTarget,
-                          id: save.id,
-                          name: save.name,
-                        });
-                      }}
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {save.players.join(", ")}
-                  </Typography>
-                  <Typography
-                    component="div"
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 0.5 }}
+            <TransitionGroup
+              component={null}
+              childFactory={(
+                child: React.ReactElement<
+                  React.ComponentProps<typeof RemovalCollapse>
+                >,
+              ) =>
+                cloneElement(child, {
+                  animate: child.props.id === exiting.current,
+                })
+              }
+            >
+              {saves.map((save) => {
+                const savedAt = new Date(save.updatedAt);
+                const timestamp = savedAt.toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                });
+                return (
+                  <RemovalCollapse
+                    key={save.id}
+                    id={save.id}
+                    sx={{ "&&": { marginTop: 0 } }}
                   >
-                    <time
-                      dateTime={savedAt.toISOString()}
-                      title={timestamp}
-                      aria-label={`Saved ${timestamp}`}
-                    >
-                      Saved {timestamp}
-                    </time>
-                  </Typography>
-                  <Box className="coopCampaignResume">
-                    <Button
-                      variant="contained"
-                      disabled={busy || loadingSaves}
-                      onClick={() => void resume(save.id, save.name)}
-                    >
-                      Load save
-                    </Button>
-                  </Box>
-                </Paper>
-              );
-            })}
+                    <Box sx={{ pt: 2 }}>
+                      <Paper
+                        variant="outlined"
+                        component="article"
+                        className="saveEntry"
+                        aria-label={save.name}
+                      >
+                        <Box className="coopCampaignHeading">
+                          <Typography component="h2" variant="h6">
+                            {save.name}
+                          </Typography>
+                          <IconButton
+                            aria-label={`Actions for ${save.name}`}
+                            aria-haspopup="menu"
+                            aria-expanded={menu?.id === save.id || undefined}
+                            disabled={busy || loadingSaves}
+                            onClick={(event) => {
+                              deleteReturn.current = event.currentTarget;
+                              deleted.current = false;
+                              setMenu({
+                                anchor: event.currentTarget,
+                                id: save.id,
+                                name: save.name,
+                              });
+                            }}
+                          >
+                            <MoreVertIcon />
+                          </IconButton>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary">
+                          {save.players.join(", ")}
+                        </Typography>
+                        <Typography
+                          component="div"
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          <time
+                            dateTime={savedAt.toISOString()}
+                            title={timestamp}
+                            aria-label={`Saved ${timestamp}`}
+                          >
+                            Saved {timestamp}
+                          </time>
+                        </Typography>
+                        <Box className="coopCampaignResume">
+                          <Button
+                            variant="contained"
+                            disabled={busy || loadingSaves}
+                            onClick={() => void resume(save.id, save.name)}
+                          >
+                            Load save
+                          </Button>
+                        </Box>
+                      </Paper>
+                    </Box>
+                  </RemovalCollapse>
+                );
+              })}
+            </TransitionGroup>
             {busy && (
               <CircularProgress size={20} aria-label="Loading multiplayer" />
             )}
@@ -256,15 +290,18 @@ export default function SavesDialog({
           transition: {
             onEntered: () => cancelDelete.current?.focus(),
             onExited: () => {
+              setRetained(undefined);
               if (!deleted.current) {
                 deleteReturn.current?.focus();
                 return;
               }
-              focusInitialDialogAction(
-                document
-                  .getElementById("multiplayer-saves-title")
-                  ?.closest<HTMLElement>('[role="dialog"]') ?? null,
-                { force: true },
+              requestAnimationFrame(() =>
+                focusInitialDialogAction(
+                  document
+                    .getElementById("multiplayer-saves-title")
+                    ?.closest<HTMLElement>('[role="dialog"]') ?? null,
+                  { force: true },
+                ),
               );
             },
           },
@@ -304,15 +341,23 @@ export default function SavesDialog({
             color="error"
             disabled={loadingSaves}
             onClick={() => {
-              if (deleting)
-                void session.deleteSharedSave(deleting.id).then(
-                  () => {
-                    deleted.current = true;
-                    setDeleting(undefined);
-                  },
-                  (error) =>
-                    setWithdrawalFailure(crossplayFailure(error, "Try again.")),
-                );
+              if (!deleting) return;
+              const index = displayedSlots.findIndex(
+                (save) => save.id === deleting.id,
+              );
+              if (index >= 0)
+                setRetained({ save: displayedSlots[index], index });
+              void session.deleteSharedSave(deleting.id).then(
+                () => {
+                  deleted.current = true;
+                  exiting.current = deleting.id;
+                  setDeleting(undefined);
+                },
+                (error) => {
+                  setRetained(undefined);
+                  setWithdrawalFailure(crossplayFailure(error, "Try again."));
+                },
+              );
             }}
           >
             {loadingSaves

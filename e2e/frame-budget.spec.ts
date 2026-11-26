@@ -236,7 +236,10 @@ for (const journey of journeys) {
       name: desktop ? "ultra speed" : "fast speed",
       exact: true,
     });
-    await expect(speed).toHaveText(desktop ? "24×" : "12×");
+    await expect(speed).toHaveAttribute(
+      "title",
+      desktop ? "ultra speed (24×)" : "fast speed (12×)",
+    );
     await page.evaluate(() => {
       window.__frameProbe!.measuring = true;
     });

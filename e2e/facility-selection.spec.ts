@@ -381,3 +381,46 @@ for (const theme of ["light", "dark"]) {
     }
   });
 }
+
+test("selling an open facility collapses its row before removing it", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const pane = page.locator(".facilities:visible");
+  await openPane(
+    pane,
+    page.getByRole("button", { name: "Facilities", exact: true }),
+  );
+  const row = pane.locator(".facilityRow").first();
+  const id = (await row.getAttribute("data-facility-id"))!;
+  const sold = pane.locator(`.facilityRow[data-facility-id="${id}"]`);
+  await sold.locator(".facilityDisclosure").click();
+  await sold.getByRole("button", { name: /^Sell / }).click();
+  const confirm = page.getByRole("dialog", { name: /Sell .* facility/ });
+  const started = await sold.evaluate(
+    (element) => element.getBoundingClientRect().height,
+  );
+  // Sample frames in the page so a fast exit can't finish between Playwright commands.
+  const measurements = page.evaluate(
+    async ({ id, started }) => {
+      const selector = `.facilityRow[data-facility-id="${id}"]`;
+      const deadline = performance.now() + 4000;
+      let interimHeight = false;
+      while (performance.now() < deadline) {
+        await new Promise(requestAnimationFrame);
+        const row = document.querySelector(selector);
+        if (!row) return { interimHeight, removed: true };
+        const collapsed = row.closest<HTMLElement>(".MuiCollapse-root");
+        if (!collapsed?.hasAttribute("inert")) continue;
+        const { height } = collapsed.getBoundingClientRect();
+        interimHeight ||= height > 1 && height < started - 1;
+      }
+      return { interimHeight, removed: false };
+    },
+    { id, started },
+  );
+  await confirm.getByRole("button", { name: "Sell", exact: true }).click();
+  expect(await measurements).toEqual({ interimHeight: true, removed: true });
+});

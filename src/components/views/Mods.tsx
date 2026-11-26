@@ -1,6 +1,8 @@
 import { useUnlockedDifficulty } from "../../achievements/useAchievements";
 import { playableDifficulty } from "../../achievements/DifficultyUnlocks";
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../base/RemovalCollapse";
 import {
   Alert,
   Box,
@@ -133,6 +135,9 @@ function ModsLibrary(): React.JSX.Element {
   const libraryRef = React.useRef(library);
   libraryRef.current = library;
   const [removing, setRemoving] = React.useState<InstalledMod>();
+  const [removed, setRemoved] = React.useState<InstalledMod>();
+  const exitingMod = React.useRef<string>();
+  const removalFocus = React.useRef<string>();
   const [publishing, setPublishing] = React.useState<InstalledMod>();
   const [playing, setPlaying] = React.useState<InstalledMod>();
   const [authoring, setAuthoring] = React.useState<InstalledMod>();
@@ -145,6 +150,16 @@ function ModsLibrary(): React.JSX.Element {
   const removeCancel = React.useRef<HTMLButtonElement>(null);
   const publishCancel = React.useRef<HTMLButtonElement>(null);
   const entries = library.entries;
+  // The library updates as soon as the service succeeds. Keep the card painted
+  // beneath its confirmation dialog until that dialog's backdrop fades.
+  const retainedMod = removed ?? removing;
+  const retainedIndex = React.useRef(0);
+  const displayedEntries = entries.slice();
+  if (
+    retainedMod &&
+    !displayedEntries.some(({ key }) => key === retainedMod.key)
+  )
+    displayedEntries.splice(retainedIndex.current, 0, retainedMod);
   const [peakPreparation, setPeakPreparation] = React.useState<
     Record<string, PeakPreparation>
   >({});
@@ -466,15 +481,18 @@ function ModsLibrary(): React.JSX.Element {
         report(result);
         return;
       }
+      if (!result.entries.some(({ key }) => key === removing.key)) {
+        exitingMod.current = removing.key;
+        retainedIndex.current = index;
+        setRemoved(removing);
+      }
       setRemoving(undefined);
       report(result);
-      setFocusTarget(
-        next
-          ? primarySelector(next.key)
-          : steamOnline
-            ? "#mods-browse"
-            : "#mods-import",
-      );
+      removalFocus.current = next
+        ? primarySelector(next.key)
+        : steamOnline
+          ? "#mods-browse"
+          : "#mods-import";
     });
   };
   const confirmPublish = () => {
@@ -710,19 +728,27 @@ function ModsLibrary(): React.JSX.Element {
               </Stack>
             )}
             {loaded &&
-              !entries.length &&
+              !displayedEntries.length &&
               !library.unreadable &&
               !Object.values(notices).some((notice) => notice.result.error) && (
                 <Typography color="text.secondary">
                   Install your first mod below
                 </Typography>
               )}
-            <Stack
+            <TransitionGroup
               component="ul"
-              spacing={1.5}
-              sx={{ listStyle: "none", m: 0, p: 0 }}
+              style={{ listStyle: "none", margin: 0, padding: 0 }}
+              childFactory={(
+                child: React.ReactElement<
+                  React.ComponentProps<typeof RemovalCollapse>
+                >,
+              ) =>
+                React.cloneElement(child, {
+                  animate: child.props.id === exitingMod.current,
+                })
+              }
             >
-              {entries.map((entry) => {
+              {displayedEntries.map((entry) => {
                 const p = entry.pack;
                 const issue = issues.get(entry.key);
                 const diagnostics = modPlayerDiagnostics(
@@ -740,152 +766,162 @@ function ModsLibrary(): React.JSX.Element {
                 const offlineWorkshop =
                   entry.source === "workshop" && !steamOnline;
                 return (
-                  <Paper
+                  <RemovalCollapse
                     key={entry.key}
+                    id={entry.key}
                     component="li"
-                    variant="outlined"
-                    className="modEntry"
-                    data-mod-key={entry.key}
-                    aria-labelledby={`mod-title-${entry.key}`}
                   >
-                    <Typography
-                      id={`mod-title-${entry.key}`}
-                      component="h3"
-                      variant="h6"
-                      sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                    <Paper
+                      sx={{ mb: 1.5 }}
+                      variant="outlined"
+                      className="modEntry"
+                      data-mod-key={entry.key}
+                      aria-labelledby={`mod-title-${entry.key}`}
                     >
-                      {p.title}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ overflowWrap: "anywhere" }}
-                    >
-                      by {p.creator} · {versionLabel(p.version)} ·{" "}
-                      {entry.source === "workshop" ? "Workshop" : "Local file"}
-                      {!entry.enabled && " · Disabled"}
-                    </Typography>
-                    {summary && (
-                      <Typography variant="body2" sx={{ mt: 0.5 }}>
-                        {summary}
-                      </Typography>
-                    )}
-                    {!peakReady &&
-                      (preparationError ? (
-                        <Alert severity="error" sx={{ mt: 1 }}>
-                          {preparationError}
-                          <Box className="settingsKeyboardRow">
-                            <Button
-                              onClick={() => setPeakRetry((value) => value + 1)}
-                            >
-                              Retry preparation
-                            </Button>
-                          </Box>
-                        </Alert>
-                      ) : (
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          role="status"
-                          sx={{ mt: 1, alignItems: "center" }}
-                        >
-                          <CircularProgress size={20} />
-                          <Typography>Preparing scenario…</Typography>
-                        </Stack>
-                      ))}
-                    {diagnostics.map((diagnostic, index) => (
-                      <Alert
-                        key={`${diagnostic.path}:${index}`}
-                        severity={diagnostic.severity}
-                        sx={{ mt: 1 }}
+                      <Typography
+                        id={`mod-title-${entry.key}`}
+                        component="h3"
+                        variant="h6"
+                        sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
                       >
-                        <strong>{diagnostic.path}</strong>:{" "}
-                        <span>{diagnostic.message}</span>
-                      </Alert>
-                    ))}
-                    {offlineWorkshop && (
+                        {p.title}
+                      </Typography>
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mt: 0.5 }}
+                        sx={{ overflowWrap: "anywhere" }}
                       >
-                        Connect to Steam to unsubscribe. You can disable it now.
+                        by {p.creator} · {versionLabel(p.version)} ·{" "}
+                        {entry.source === "workshop"
+                          ? "Workshop"
+                          : "Local file"}
+                        {!entry.enabled && " · Disabled"}
                       </Typography>
-                    )}
-                    <Stack
-                      className="settingsKeyboardRow"
-                      direction="row"
-                      spacing={1}
-                      useFlexGap
-                      sx={{ mt: 1.5, flexWrap: "wrap", alignItems: "center" }}
-                    >
-                      {playable && (
-                        <Button
-                          variant="contained"
-                          data-mod-primary
-                          aria-label={`Play ${p.title}`}
-                          onClick={() => {
-                            setDifficulty(chosenDifficulty);
-                            setPlaying(entry);
-                          }}
-                        >
-                          {coop ? "Choose" : "Play"}
-                        </Button>
+                      {summary && (
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                          {summary}
+                        </Typography>
                       )}
-                      {entry.source === "local" && (
-                        <Button
-                          disabled={!peakReady && !preparationError}
-                          aria-label={`Author validation report for ${p.title}`}
-                          onClick={() => {
-                            setAuthorDifficulty("Employee");
-                            setAuthoring(entry);
-                          }}
+                      {!peakReady &&
+                        (preparationError ? (
+                          <Alert severity="error" sx={{ mt: 1 }}>
+                            {preparationError}
+                            <Box className="settingsKeyboardRow">
+                              <Button
+                                onClick={() =>
+                                  setPeakRetry((value) => value + 1)
+                                }
+                              >
+                                Retry preparation
+                              </Button>
+                            </Box>
+                          </Alert>
+                        ) : (
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            role="status"
+                            sx={{ mt: 1, alignItems: "center" }}
+                          >
+                            <CircularProgress size={20} />
+                            <Typography>Preparing scenario…</Typography>
+                          </Stack>
+                        ))}
+                      {diagnostics.map((diagnostic, index) => (
+                        <Alert
+                          key={`${diagnostic.path}:${index}`}
+                          severity={diagnostic.severity}
+                          sx={{ mt: 1 }}
                         >
-                          Author report
-                        </Button>
+                          <strong>{diagnostic.path}</strong>:{" "}
+                          <span>{diagnostic.message}</span>
+                        </Alert>
+                      ))}
+                      {offlineWorkshop && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          Connect to Steam to unsubscribe. You can disable it
+                          now.
+                        </Typography>
                       )}
-                      <FormControlLabel
-                        label="Enabled"
-                        control={
-                          <Switch
-                            checked={entry.enabled}
-                            disabled={!!pending}
-                            slotProps={{
-                              input: {
-                                "aria-label": `${p.title} enabled`,
-                                ...(playable
-                                  ? {}
-                                  : { "data-mod-primary": true }),
-                              } as React.InputHTMLAttributes<HTMLInputElement>,
+                      <Stack
+                        className="settingsKeyboardRow"
+                        direction="row"
+                        spacing={1}
+                        useFlexGap
+                        sx={{ mt: 1.5, flexWrap: "wrap", alignItems: "center" }}
+                      >
+                        {playable && (
+                          <Button
+                            variant="contained"
+                            data-mod-primary
+                            aria-label={`Play ${p.title}`}
+                            onClick={() => {
+                              setDifficulty(chosenDifficulty);
+                              setPlaying(entry);
                             }}
-                            onChange={(_, enabled) =>
-                              act(`enable:${entry.key}`, {
-                                kind: "enable",
-                                key: entry.key,
-                                enabled,
-                              })
-                            }
-                          />
-                        }
-                      />
-                      {!offlineWorkshop && (
-                        <Button
-                          disabled={!!pending}
-                          aria-label={`${entry.source === "workshop" ? "Unsubscribe from" : "Remove"} ${p.title}`}
-                          onClick={() => {
-                            setRemoving(entry);
-                          }}
-                        >
-                          {entry.source === "workshop"
-                            ? "Unsubscribe"
-                            : "Remove"}
-                        </Button>
-                      )}
-                    </Stack>
-                  </Paper>
+                          >
+                            {coop ? "Choose" : "Play"}
+                          </Button>
+                        )}
+                        {entry.source === "local" && (
+                          <Button
+                            disabled={!peakReady && !preparationError}
+                            aria-label={`Author validation report for ${p.title}`}
+                            onClick={() => {
+                              setAuthorDifficulty("Employee");
+                              setAuthoring(entry);
+                            }}
+                          >
+                            Author report
+                          </Button>
+                        )}
+                        <FormControlLabel
+                          label="Enabled"
+                          control={
+                            <Switch
+                              checked={entry.enabled}
+                              disabled={!!pending}
+                              slotProps={{
+                                input: {
+                                  "aria-label": `${p.title} enabled`,
+                                  ...(playable
+                                    ? {}
+                                    : { "data-mod-primary": true }),
+                                } as React.InputHTMLAttributes<HTMLInputElement>,
+                              }}
+                              onChange={(_, enabled) =>
+                                act(`enable:${entry.key}`, {
+                                  kind: "enable",
+                                  key: entry.key,
+                                  enabled,
+                                })
+                              }
+                            />
+                          }
+                        />
+                        {!offlineWorkshop && (
+                          <Button
+                            disabled={!!pending}
+                            aria-label={`${entry.source === "workshop" ? "Unsubscribe from" : "Remove"} ${p.title}`}
+                            onClick={() => {
+                              setRemoving(entry);
+                            }}
+                          >
+                            {entry.source === "workshop"
+                              ? "Unsubscribe"
+                              : "Remove"}
+                          </Button>
+                        )}
+                      </Stack>
+                    </Paper>
+                  </RemovalCollapse>
                 );
               })}
-            </Stack>
+            </TransitionGroup>
             {!entries.length && library.unreadable && (
               <Typography color="text.secondary">
                 Reset the library to install mods again.
@@ -1197,17 +1233,24 @@ function ModsLibrary(): React.JSX.Element {
         aria-labelledby="mod-remove-title"
         aria-describedby="mod-remove-message"
         slotProps={{
-          transition: { onEntered: () => removeCancel.current?.focus() },
+          transition: {
+            onEntered: () => removeCancel.current?.focus(),
+            onExited: () => {
+              setRemoved(undefined);
+              setFocusTarget(removalFocus.current);
+              removalFocus.current = undefined;
+            },
+          },
         }}
       >
         <DialogTitle id="mod-remove-title" sx={{ overflowWrap: "anywhere" }}>
-          {removing?.source === "workshop"
-            ? `Unsubscribe from “${removing.pack.title}”?`
-            : `Remove “${removing?.pack.title}”?`}
+          {retainedMod?.source === "workshop"
+            ? `Unsubscribe from “${retainedMod.pack.title}”?`
+            : `Remove “${retainedMod?.pack.title}”?`}
         </DialogTitle>
         <DialogContent>
           <Typography id="mod-remove-message">
-            {removing?.source === "workshop"
+            {retainedMod?.source === "workshop"
               ? "This unsubscribes on Steam. Existing saves keep working."
               : "Existing saves keep working. Import the file again to reinstall."}
           </Typography>

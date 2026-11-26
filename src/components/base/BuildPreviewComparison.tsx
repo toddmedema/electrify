@@ -50,7 +50,7 @@ export type BuildPreviewMarker = {
 type Markers = Partial<Record<Metric, BuildPreviewMarker>>;
 
 export type BuildPreviewComparison = {
-  caption: string;
+  caption?: string;
   markers: Markers;
 };
 

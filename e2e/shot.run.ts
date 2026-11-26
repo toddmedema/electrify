@@ -55,9 +55,7 @@ test("capture", async ({ page, colorScheme }, info) => {
       `${request.route} shows no "Start game" button (is the scenario id valid?)`,
     ).toBeVisible();
     await start.click();
-    await expect(
-      page.getByText("Starting your mission…", { exact: true }),
-    ).toBeHidden();
+    await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     // A new game starts paused already; make sure, so the capture cannot change mid-delay.
     const running = page
       .getByRole("button", { name: "pause", exact: true })

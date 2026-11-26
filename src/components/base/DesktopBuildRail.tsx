@@ -124,6 +124,7 @@ export default function DesktopBuildRail({
   busy,
   focusRequest,
   onProject,
+  onProjectDrag,
 }: {
   game: GameType;
   project?: ProjectSelection;
@@ -131,6 +132,7 @@ export default function DesktopBuildRail({
   busy: boolean;
   focusRequest: number;
   onProject: (project: ProjectSelection | undefined) => void;
+  onProjectDrag?: (project: ProjectSelection | undefined) => void;
 }) {
   const rail = React.useRef<HTMLElement>(null);
   const origin = React.useRef<HTMLButtonElement>();
@@ -412,7 +414,9 @@ export default function DesktopBuildRail({
         ),
     );
     return {
-      caption: `Compared with typical buildable ${isStorage(facility) ? "storage" : "generators"}${siteId ? " at this site" : ""}`,
+      caption: isStorage(facility)
+        ? `Compared with typical buildable storage${siteId ? " at this site" : ""}`
+        : undefined,
       markers,
     };
     // As with the quotes, planning inputs own the forecast comparison.
@@ -479,7 +483,10 @@ export default function DesktopBuildRail({
           dismiss();
       }}
     >
-      <div className="desktopBuildSizing">{sizeControl(false)}</div>
+      <div className="desktopBuildSizing">
+        <h3>Generators</h3>
+        {sizeControl(false)}
+      </div>
       <span className="srOnly" id={previewHintId}>
         Press Right Arrow to enter the technology preview, then Tab to move
         between its controls. Escape returns to the technology.
@@ -517,9 +524,11 @@ export default function DesktopBuildRail({
             }
           >
             {storage && (
-              <div className="desktopBuildSizing">{sizeControl(true)}</div>
+              <>
+                <h3>Storage</h3>
+                <div className="desktopBuildSizing">{sizeControl(true)}</div>
+              </>
             )}
-            <h3>{storage ? "Storage" : "Generators"}</h3>
             {options
               .filter(
                 (item) => isStorage(item) === storage && sites.has(item.name),
@@ -537,6 +546,25 @@ export default function DesktopBuildRail({
                     type="button"
                     className="desktopBuildTechnology"
                     aria-disabled={!canChoose(item)}
+                    draggable={
+                      !!onProjectDrag &&
+                      !busy &&
+                      (sites.get(item.name)?.minimumDue ?? Infinity) <= cash
+                    }
+                    onDragStart={(event) => {
+                      if (!event.currentTarget.draggable || !onProjectDrag) {
+                        event.preventDefault();
+                        return;
+                      }
+                      event.dataTransfer.effectAllowed = "copy";
+                      event.dataTransfer.setData(
+                        "application/x-electrify-project",
+                        "",
+                      );
+                      dismiss();
+                      onProjectDrag(selectProject(item));
+                    }}
+                    onDragEnd={() => onProjectDrag?.(undefined)}
                     title={
                       busy || canChoose(item)
                         ? item.name
@@ -567,6 +595,7 @@ export default function DesktopBuildRail({
                   >
                     <img
                       src={`/images/${item.name.toLowerCase()}.svg`}
+                      draggable={false}
                       alt=""
                     />
                     {storage && <span>{item.name}</span>}

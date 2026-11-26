@@ -16,18 +16,16 @@ import ManualLink from "../base/ManualLink";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import { INTERTIE_ARCHETYPES } from "../../data/IntertieArchetypes";
 import * as React from "react";
+import RemovableDraggable, {
+  RemovableDragList,
+} from "../base/RemovableDraggable";
 import {
   initialIntertieBuildTier,
   largestAffordableBuildSize,
 } from "../../helpers/BuildSizing";
 import useBuildRowReveal from "../base/useBuildRowReveal";
 import { useToolState } from "../base/GameToolMemory";
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  DropResult,
-} from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, DropResult } from "@hello-pangea/dnd";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
@@ -708,8 +706,7 @@ export default function TransmissionPanel({
     focusIntertiesAfterAcquisition.current = false;
     intertiesHeadingRef.current?.focus();
   }, [acquisitionTargetId]);
-  const [cancelLine, setCancelLine] =
-    React.useState<TransmissionLineOperatingType | null>(null);
+  const [cancelLineId, setCancelLineId] = React.useState<number | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = useToolState(
     projectsOnly ? "interties.tier" : undefined,
@@ -729,6 +726,10 @@ export default function TransmissionPanel({
   const tradingLines = state.lines.filter(
     (line) => !ownedUtilityConnection(game, line.corridorId),
   );
+  const cancelLine =
+    !projectsOnly && cancelLineId === selectedLine && cancelLineId !== null
+      ? tradingLines.find(({ id }) => id === cancelLineId)
+      : undefined;
   // Drag indices describe the visible list; the reducer retains acquired connections for costs.
   const lineIndex = (visibleIndex: number) =>
     state.lines.indexOf(tradingLines[visibleIndex]);
@@ -930,12 +931,7 @@ export default function TransmissionPanel({
           >
             <Droppable droppableId="interties">
               {(droppable) => (
-                <div
-                  ref={droppable.innerRef}
-                  {...droppable.droppableProps}
-                  role="list"
-                  aria-label="Interties"
-                >
+                <RemovableDragList provided={droppable} label="Interties">
                   {tradingLines.map((line, index) => {
                     const inherited = inheritedUtilityForCorridor(
                       line.corridorId,
@@ -1063,12 +1059,12 @@ export default function TransmissionPanel({
                       </span>
                     );
                     return (
-                      <Draggable
+                      <RemovableDraggable
+                        animate={building}
                         key={line.id}
                         draggableId={`t${line.id}`}
                         index={index}
                         isDragDisabled={reorderDisabled}
-                        disableInteractiveElementBlocking
                       >
                         {(provided, snapshot) => (
                           <div
@@ -1078,7 +1074,7 @@ export default function TransmissionPanel({
                             data-corridor-id={line.corridorId}
                             style={{
                               userSelect: "none",
-                              ...provided.draggableProps.style,
+                              ...provided.draggableProps?.style,
                             }}
                             className={`transmissionLine${selectedLine === line.id ? " selected" : ""}${snapshot.isDragging ? " dragging" : ""}`}
                           >
@@ -1180,32 +1176,6 @@ export default function TransmissionPanel({
                             </div>
                             {selectedLine === line.id && (
                               <div className="transmissionLineDetails">
-                                {cancelLine?.id === line.id && (
-                                  <ConfirmDialog
-                                    open
-                                    destructive
-                                    title={`Cancel construction of ${line.name}?`}
-                                    cancelLabel="Never mind"
-                                    confirmLabel="Cancel construction"
-                                    onCancel={() => setCancelLine(null)}
-                                    onConfirm={() => {
-                                      onCancel?.(line.id);
-                                      setCancelLine(null);
-                                    }}
-                                  >
-                                    <Typography>
-                                      Receive{" "}
-                                      {formatMoneyConcise(
-                                        line.buildCost - line.loanAmountLeft,
-                                      )}{" "}
-                                      back
-                                      {line.loanAmountLeft > 0
-                                        ? " after settling the outstanding loan"
-                                        : ""}
-                                      .
-                                    </Typography>
-                                  </ConfirmDialog>
-                                )}
                                 <dl className="transmissionMetrics facilityStats">
                                   <div className="facilityStat">
                                     <dt>Import capacity</dt>
@@ -1470,7 +1440,7 @@ export default function TransmissionPanel({
                                         variant="outlined"
                                         startIcon={<CancelIcon />}
                                         aria-label={`Cancel construction of ${line.name}`}
-                                        onClick={() => setCancelLine(line)}
+                                        onClick={() => setCancelLineId(line.id)}
                                       >
                                         <span className="facilityActionLabel">
                                           Cancel construction
@@ -1507,11 +1477,10 @@ export default function TransmissionPanel({
                             )}
                           </div>
                         )}
-                      </Draggable>
+                      </RemovableDraggable>
                     );
                   })}
-                  {droppable.placeholder}
-                </div>
+                </RemovableDragList>
               )}
             </Droppable>
           </DragDropContext>
@@ -1621,6 +1590,32 @@ export default function TransmissionPanel({
       )}
       {projectsOnly && (
         <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
+      )}
+      {cancelLine && (
+        <ConfirmDialog
+          open
+          destructive
+          title={`Cancel construction of ${cancelLine.name}?`}
+          cancelLabel="Never mind"
+          confirmLabel="Cancel construction"
+          onCancel={() => setCancelLineId(null)}
+          onConfirm={() => {
+            setCancelLineId(null);
+            onCancel?.(cancelLine.id);
+          }}
+        >
+          <Typography>
+            Receive{" "}
+            {formatMoneyConcise(
+              cancelLine.buildCost - cancelLine.loanAmountLeft,
+            )}{" "}
+            back
+            {cancelLine.loanAmountLeft > 0
+              ? " after settling the outstanding loan"
+              : ""}
+            .
+          </Typography>
+        </ConfirmDialog>
       )}
       {review && (
         <PurchaseReviewDialog

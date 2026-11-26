@@ -576,10 +576,8 @@ it("shows the owning site quote directly in the preview build cost", () => {
     screen.queryByRole("button", { name: "Choose sites for Offshore Wind" }),
   ).not.toBeInTheDocument();
   expect(
-    within(preview).getByText(
-      "Compared with typical buildable generators at this site",
-    ),
-  ).toBeVisible();
+    within(preview).queryByText(/Compared with typical buildable generators/),
+  ).not.toBeInTheDocument();
   expect(onProject).not.toHaveBeenCalled();
 });
 

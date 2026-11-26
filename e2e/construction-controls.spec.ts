@@ -297,6 +297,10 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("dialog")
         .getByRole("button", { name: "Take loan" })
         .click();
+      if (testInfo.project.use.hasTouch) {
+        await page.mouse.move(0, 0);
+        await expect(page.locator(".snackbarContent")).toBeHidden();
+      }
     };
     await build();
     const line = pane.locator(".transmissionLine").first();
@@ -353,10 +357,23 @@ for (const theme of ["light", "dark"] as const) {
       .toBe("none");
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await cancel.click();
+    const closedDuringExit = line.evaluate(async (element) => {
+      const deadline = performance.now() + 3000;
+      while (element.isConnected && performance.now() < deadline) {
+        await new Promise(requestAnimationFrame);
+        if (element.closest(".MuiCollapse-root[inert]")) {
+          return !Array.from(document.querySelectorAll('[role="dialog"]')).some(
+            (dialog) => dialog.textContent?.includes("Cancel construction of"),
+          );
+        }
+      }
+      return false;
+    });
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Cancel construction", exact: true })
       .click();
+    expect(await closedDuringExit).toBe(true);
     await expect(line).toHaveCount(0);
     await build();
     await speed("fast speed").click();

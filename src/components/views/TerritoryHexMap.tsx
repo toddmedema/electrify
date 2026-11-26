@@ -161,6 +161,7 @@ interface Props {
   projectPlanning?: boolean;
   projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
+  onProjectDrop?: (key: TerritoryMapTileKey) => void;
   projectWindOutput?: Partial<Record<TerrainType, number>>;
 }
 export default function TerritoryHexMap({
@@ -177,8 +178,10 @@ export default function TerritoryHexMap({
   projectPlanning = false,
   projectPending = false,
   projectSites,
+  onProjectDrop,
   projectWindOutput,
 }: Props) {
+  const showingProjectSites = projectPlanning || !!onProjectDrop;
   const mapId = React.useId();
   const workspace = useGameWorkspaceLayout();
   const dark = useTheme().palette.mode === "dark";
@@ -244,8 +247,10 @@ export default function TerritoryHexMap({
   );
   const purchaseQuotes = React.useMemo(
     () =>
-      buyMode && !projectPlanning ? tilePurchaseQuotes(game, views) : undefined,
-    [buyMode, projectPlanning, game, views],
+      buyMode && !showingProjectSites
+        ? tilePurchaseQuotes(game, views)
+        : undefined,
+    [buyMode, showingProjectSites, game, views],
   );
   React.useEffect(() => {
     if (projectPlanning) setBuyMode(false);
@@ -739,15 +744,16 @@ export default function TerritoryHexMap({
       color: "var(--interactive-blue)",
       reason,
     });
-    if (buyMode && view.connectable) return available("");
-    if (projectPlanning && projectSites?.has(territoryMapTileKey(tile)))
+    if (buyMode && !showingProjectSites && view.connectable)
+      return available("");
+    if (showingProjectSites && projectSites?.has(territoryMapTileKey(tile)))
       return available("Compatible site");
     if (view.ownerKey && !view.owned)
       return {
         color: color(view.ownerKey),
         reason: "",
       };
-    if (projectPlanning) return unavailable("Unavailable for this project");
+    if (showingProjectSites) return unavailable("Unavailable for this project");
     if (view.connection) return unavailable("");
     if (buyMode || tile.city) return unavailable("");
     if (view.reserved)
@@ -1078,6 +1084,20 @@ export default function TerritoryHexMap({
         aria-label="Territory map"
         data-camera-scale={scale}
         ref={viewport}
+        onDragOver={(event) => {
+          if (!onProjectDrop) return;
+          const key = pointerTile(event);
+          if (!key || !projectSites?.has(key)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(event) => {
+          if (!onProjectDrop) return;
+          const key = pointerTile(event);
+          if (!key || !projectSites?.has(key)) return;
+          event.preventDefault();
+          onProjectDrop(key);
+        }}
         onPointerDown={(event) => {
           const middle = event.button === 1;
           if (event.button !== 0 && !middle) return;
@@ -1423,7 +1443,7 @@ export default function TerritoryHexMap({
                 }
                 tabIndex={key === activeRoving ? 0 : -1}
                 aria-label={
-                  projectPlanning
+                  showingProjectSites
                     ? `Inspect ${territoryTileLabel(tile)} · ${projectLabel ?? "unavailable for this project"}`
                     : quote
                       ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} (${money(quote.price)}) · ${tilePurchaseBenefitLabel(quote)} · ${formatConnectionDuration(quote.buildMonths)}${unaffordable ? "; not enough available cash" : ""}`

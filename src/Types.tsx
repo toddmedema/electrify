@@ -841,7 +841,7 @@ export interface TutorialStepType {
   // Optional for unguided capstones: ordinary objectives can point at a control for a restrained
   // outline, while a capstone deliberately leaves the player to find the answer themselves.
   target?: string;
-  // The one thing to do right now, as a short imperative ("Tap 1× to start time"). Every step
+  // The one thing to do right now, as a short imperative ("Select slow speed to start time"). Every step
   // has one, explanations included - there it names what to look at and says to tap Next - so
   // the objective always opens on a deed instead of a paragraph to read
   action: string;

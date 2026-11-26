@@ -854,7 +854,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
       .click();
     await expect(
-      surface.getByText("Connected · total project cost", { exact: true }),
+      surface.getByText("Choose a highlighted site.", { exact: true }),
     ).toBeVisible();
     const markers = map.locator(
       '[data-project-site="owned"] .territoryTilePrice',

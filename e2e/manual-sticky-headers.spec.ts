@@ -23,6 +23,29 @@ async function openManual(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Manual" })).toBeVisible();
 }
 
+test("manual entry titles keep their height when toggled", async ({ page }) => {
+  await openManual(page);
+  const title = page.getByRole("button", { name: "Customer programs" });
+  const measureTitle = () =>
+    title.evaluate((element) => ({
+      height: element.getBoundingClientRect().height,
+      dividerWidth: getComputedStyle(element).borderBottomWidth,
+    }));
+
+  await expect(title).toHaveAttribute("aria-expanded", "false");
+  const collapsed = await measureTitle();
+  await title.click();
+  await expect(title).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(measureTitle).toEqual({
+    height: collapsed.height,
+    dividerWidth: "0px",
+  });
+
+  await title.click();
+  await expect(title).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(measureTitle).toEqual(collapsed);
+});
+
 // The manual's list is the scroller, except on short windows (<=768x600) where #gameCard
 // takes over and the list stops scrolling (app.scss). These measurements find whichever one
 // actually is, so the assertions hold in both layouts. Playwright can't pass functions as

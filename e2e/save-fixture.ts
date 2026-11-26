@@ -112,12 +112,12 @@ async function selectedRecord(
     .first();
   const id =
     saveId ||
-    ((await live.count())
-      ? await live.getAttribute("data-active-save-id")
-      : undefined) ||
-    ((await currentRow.count())
-      ? await currentRow.getAttribute("data-save-id")
-      : undefined) ||
+    (await live.evaluateAll(([element]) =>
+      element?.getAttribute("data-active-save-id"),
+    )) ||
+    (await currentRow.evaluateAll(([element]) =>
+      element?.getAttribute("data-save-id"),
+    )) ||
     selectContinueSave(entries.map((record) => record.metadata))?.id;
   return entries.find((record) => record.metadata.id === id);
 }
