@@ -150,6 +150,33 @@
       padding: 0 16px 8px;
     }
 
+    .buildComparisonCaption {
+      margin: 0 16px 4px;
+      color: var(--font-color-secondary);
+    }
+
+    .buildComparisonMarker {
+      display: inline-block;
+      min-width: 58px;
+      margin-inline-start: 8px;
+      text-align: end;
+      white-space: nowrap;
+      font-size: 0.75rem;
+      color: var(--font-color-secondary);
+
+      &[data-tone="good"] {
+        color: var(--delta-good);
+      }
+
+      &[data-tone="bad"] {
+        color: var(--delta-bad);
+      }
+    }
+
+    .expand-details {
+      min-height: var(--control-size);
+    }
+
     .MuiTableContainer-root {
       width: auto;
       margin-inline: 16px;

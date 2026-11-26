@@ -149,16 +149,22 @@ for (const theme of ["light", "dark"] as const) {
       const generator = preview.getByRole("table", {
         name: "generator properties",
       });
-      const headings = generator.getByRole("rowheader");
-      for (const [index, label] of [
+      await expect(generator.getByRole("rowheader")).toHaveText([
         "Build cost",
         "Build time",
         "Lifetime cost",
         "Expected capacity factor",
-      ].entries()) {
-        await expect(headings.nth(index)).toBeVisible();
-        await expect(headings.nth(index)).toHaveText(label);
-      }
+        "Direct emissions",
+      ]);
+      await expect(
+        preview.getByText("Compared with typical buildable generators"),
+      ).toBeVisible();
+      const advanced = preview.getByRole("button", { name: "Advanced" });
+      await expect(advanced).toHaveAttribute("aria-expanded", "false");
+      const advancedGenerator = preview.getByRole("table", {
+        name: "advanced generator properties",
+      });
+      await expect(advancedGenerator).toHaveCount(0);
       const readouts = await generator.getByRole("row").evaluateAll((rows) =>
         rows.slice(0, 4).map((row) => {
           const label = row.children[0];
@@ -183,6 +189,16 @@ for (const theme of ["light", "dark"] as const) {
       await expect(wind).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
       await wind.press("ArrowRight");
       await expect(preview).toBeFocused();
+      await advanced.focus();
+      await page.keyboard.press("Enter");
+      await expect(advanced).toHaveAttribute("aria-expanded", "true");
+      await expect(
+        advancedGenerator.getByRole("rowheader", {
+          name: "Typical monthly output",
+        }),
+      ).toBeVisible();
+      await page.keyboard.press("Space");
+      await expect(advancedGenerator).toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(preview).toHaveCount(0);
       await expect(wind).toBeFocused();
@@ -324,7 +340,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(after.facilities).toEqual(before.facilities);
   });
 
-  test(`storage hover orders its readouts like the generator card · ${theme}`, async ({
+  test(`storage hover shows five readouts with advanced details on demand · ${theme}`, async ({
     page,
   }, info) => {
     test.skip(
@@ -333,8 +349,8 @@ for (const theme of ["light", "dark"] as const) {
     );
     await startMap(page, theme);
     await editSavedGame(page, ({ game }) => {
-      // The Valley starts before utility-scale batteries are available.
-      const minute = 180 * MINUTES_PER_MONTH;
+      // Compare lithium and iron-air batteries after both enter the catalogue.
+      const minute = (2031 - game.startingYear) * 12 * MINUTES_PER_MONTH;
       const offset = minute - game.date.minute;
       game.date = getDateFromMinute(minute, game.startingYear);
       game.objectiveProgress = undefined;
@@ -361,6 +377,27 @@ for (const theme of ["light", "dark"] as const) {
       "Discharge power",
       "Duration at full power",
       "Round-trip efficiency",
+    ]);
+    await expect(
+      battery.getByText("Compared with typical buildable storage"),
+    ).toBeVisible();
+    await expect(
+      storage
+        .getByRole("row", { name: /^Round-trip efficiency/ })
+        .getByText(/Higher/),
+    ).toHaveAttribute("data-tone", "good");
+    const advanced = battery.getByRole("button", { name: "Advanced" });
+    await expect(advanced).toHaveAttribute("aria-expanded", "false");
+    await reviewScreenshot(battery, {
+      path: info.outputPath(`build-rail-battery-${theme}.png`),
+    });
+    await advanced.click();
+    await expect(advanced).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      battery
+        .getByRole("table", { name: "advanced storage properties" })
+        .getByRole("rowheader"),
+    ).toHaveText([
       "Fixed operating cost",
       "Ramp up/down time",
       "Accounting lifetime",
@@ -368,7 +405,7 @@ for (const theme of ["light", "dark"] as const) {
       "Construction emissions",
     ]);
     await reviewScreenshot(battery, {
-      path: info.outputPath(`build-rail-battery-${theme}.png`),
+      path: info.outputPath(`build-rail-battery-advanced-${theme}.png`),
     });
   });
 

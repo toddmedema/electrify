@@ -36,6 +36,7 @@ import { withTerritoryCatalogueLimits } from "../../helpers/ProjectBuild";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
+import type { BuildPreviewComparison } from "../base/BuildPreviewComparison";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
   averageBuildSize,
@@ -81,6 +82,7 @@ interface StorageBuildItemProps {
   /** Expanded canonical card without purchasing controls or dialogs. */
   preview?: boolean;
   previewSiteIssue?: string;
+  previewComparison?: BuildPreviewComparison;
   game: GameType;
   cash: number;
   interestRate: number;
@@ -203,12 +205,14 @@ export function StorageBuildItem(
       ? `${formatWatts(siteMaxPower)} max power`
       : undefined;
 
+  const comparison = props.previewComparison?.markers;
   const dischargePower = (
     <BuildMetric
       asDetailRow={props.preview}
       label="Discharge power"
       entry={MANUAL_ENTRY.POWER_AND_ENERGY}
       value={formatWatts(storage.peakW)}
+      comparison={comparison?.dischargePower}
     />
   );
   const metrics = (
@@ -219,6 +223,7 @@ export function StorageBuildItem(
         label="Build cost"
         entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
         value={formatPurchasePrice(storage.buildCost)}
+        comparison={comparison?.buildCost}
         note={pickingSite ? "Before site costs" : undefined}
       />
       <BuildMetric
@@ -226,6 +231,7 @@ export function StorageBuildItem(
         label="Build time"
         entry={MANUAL_ENTRY.HOW_TO_PLAY}
         value={`${Math.round(storage.yearsToBuild * 12)} mo`}
+        comparison={comparison?.buildTime}
       />
       {props.preview && dischargePower}
       <BuildMetric
@@ -233,12 +239,14 @@ export function StorageBuildItem(
         label={props.preview ? "Duration at full power" : "At full power"}
         entry={MANUAL_ENTRY.POWER_AND_ENERGY}
         value={`${formatNumber(storage.peakWh / storage.peakW)} hr`}
+        comparison={comparison?.duration}
       />
       <BuildMetric
         asDetailRow={props.preview}
         label={props.preview ? "Round-trip efficiency" : "Efficiency"}
         entry={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}
         value={`${Math.round(storage.roundTripEfficiency * 100)}%`}
+        comparison={comparison?.efficiency}
       />
     </>
   );
@@ -249,6 +257,12 @@ export function StorageBuildItem(
       name={displayName}
       iconSrc={`/images/${storage.name.toLowerCase()}.svg`}
       preview={props.preview}
+      comparisonCaption={props.previewComparison?.caption}
+      previewSummary={
+        props.preview && (
+          <BuildDetails label="storage properties">{metrics}</BuildDetails>
+        )
+      }
       description={props.preview ? storage.description : undefined}
       review={
         props.preview
@@ -314,8 +328,11 @@ export function StorageBuildItem(
       }
       metrics={props.preview ? undefined : metrics}
       details={
-        <BuildDetails label="storage properties">
-          {props.preview && metrics}
+        <BuildDetails
+          label={
+            props.preview ? "advanced storage properties" : "storage properties"
+          }
+        >
           <BuildDetailRow
             label={props.preview ? "Fixed operating cost" : "Fixed"}
             value={`${formatMoneyConcise(storage.annualOperatingCost)}/yr`}
