@@ -1600,6 +1600,7 @@ export interface GameType {
         peakW: number;
         peakWh?: number;
         yearsToBuildLeft: number;
+        yearsToBuild?: number;
       };
     }[];
     tileOwners?: Partial<
@@ -1623,6 +1624,7 @@ export interface GameType {
           peakW: number;
           peakWh?: number;
           yearsToBuildLeft: number;
+          yearsToBuild?: number;
         }
       >
     >;

@@ -31,6 +31,7 @@ import {
 import { getTerrainModifiers } from "../src/helpers/TerrainModifiers";
 import { loadSimData } from "../src/testing/SimData";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
+import { facilityConstructionStage } from "../src/components/base/FacilityMapStatus";
 import { hexCenter } from "../src/components/base/TerritoryHexGeometry";
 import { expect, test } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
@@ -298,19 +299,54 @@ async function expectPhysicalMap(network: Locator, game: GameType) {
   for (const shape of connections) {
     const from = views.find(({ tile }) => tile.id === shape.from)!;
     const to = views.find(({ tile }) => tile.id === shape.to)!;
-    const submerged = [from, to].some(
-      (view) =>
-        !view.tile.city &&
-        !view.facility &&
-        ["lake", "river", "ocean"].includes(view.tile.terrain),
-    );
+    const submerged = [from, to].some(({ tile, facility }) => {
+      const stage = facilityConstructionStage(facility);
+      return (
+        !tile.city &&
+        ["lake", "river", "ocean"].includes(tile.terrain) &&
+        (!facility || (stage !== undefined && stage < 3))
+      );
+    });
     expect(shape.kind).toBe(submerged ? "submerged" : "overhead");
     expect(shape.start.every(Number.isFinite)).toBe(true);
     expect(shape.end.every(Number.isFinite)).toBe(true);
     if (submerged) expect(shape.lowY).toBeCloseTo(0.006);
     else {
-      expect(shape.start[1]).toBeGreaterThan(0.1);
-      expect(shape.end[1]).toBeGreaterThan(0.1);
+      for (const [view, endpoint] of [
+        [from, shape.start],
+        [to, shape.end],
+      ] as const) {
+        const tileId = view.tile.id;
+        const junction = scene.find(
+          ({ id }) => id === `grid-junction:${tileId}`,
+        );
+        if (!junction) {
+          expect(
+            endpoint[1],
+            `permanent terminal at ${tileId}`,
+          ).toBeGreaterThan(0.1);
+          continue;
+        }
+        expect(
+          view.facility?.yearsToBuildLeft,
+          `junction at ${tileId} serves a plant under construction`,
+        ).toBeGreaterThan(0);
+        // A temporary post ends at the top of its rendered junction.
+        expect(
+          endpoint[1],
+          `junction terminal height at ${tileId}`,
+        ).toBeCloseTo(junction.max[1], 5);
+        for (const axis of [0, 2] as const) {
+          expect(
+            endpoint[axis],
+            `junction terminal footprint at ${tileId}`,
+          ).toBeGreaterThanOrEqual(junction.min[axis]);
+          expect(
+            endpoint[axis],
+            `junction terminal footprint at ${tileId}`,
+          ).toBeLessThanOrEqual(junction.max[axis]);
+        }
+      }
       const [startY, endY] = [shape.start[1], shape.end[1]];
       // A steep line can sag below its straight path while still climbing.
       expect((startY + endY) / 2 - shape.midY).toBeGreaterThan(0.001);
@@ -783,7 +819,7 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeDefined();
       expect(geometry!.active).toBe(kind === "producing");
       if (kind === "construction")
-        expect(geometry!.modelKey).toMatch(/:construction$/);
+        expect(geometry!.modelKey).toBe("structure:wind:small:construction:0");
       await expect(
         badge.locator(":scope > .facilityMapStatusArtwork"),
       ).toHaveAttribute("aria-hidden", "true");
@@ -1516,7 +1552,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       surface.getByRole("tab", { name: "Generators", exact: true }),
     ).toHaveCount(0);
-    await expectPhysicalMap(network, built);
+    const scene = await expectPhysicalMap(network, built);
+    expect(
+      scene.find(({ id }) => id === `grid-junction:${tile.id}`),
+    ).toMatchObject({
+      modelKey: "structure:construction-grid-junction",
+    });
     await inspectTile(page, neighbor);
     await expect(
       surface.getByRole("button", { name: /^Connect \(/ }),
