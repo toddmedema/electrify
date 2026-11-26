@@ -4,6 +4,8 @@
   inset: auto 0 -4px;
   padding: 4px 0;
   pointer-events: none;
+  // Give the glow room above and below the track while containing it at each end.
+  clip-path: inset(-4px 0);
   z-index: 100;
 
   &::before {
@@ -18,5 +20,15 @@
     position: relative;
     height: 1px;
     background: var(--font-color-faded);
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: 0;
+      inline-size: min(100%, 8px);
+      background: linear-gradient(to right, transparent, var(--tutorial-glint));
+      filter: drop-shadow(0 0 1px var(--tutorial-glow));
+    }
   }
 }
