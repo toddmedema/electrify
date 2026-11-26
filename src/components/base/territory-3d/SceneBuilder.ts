@@ -10,10 +10,12 @@ import { farmLayout, terrainArtHash } from "./TerrainVariants";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import {
   territoryMapTileKey,
+  type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../../helpers/TerritoryMapState";
 import { combustibleTile } from "../../../helpers/TerritoryWildfire";
 import {
+  facilityConstructionStage,
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
@@ -24,7 +26,9 @@ import { getTowerConstructionModel } from "./StructureModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
 import { tilePosition3D } from "./Projection";
+import { surfaceHeight } from "./SurfaceHeight";
 import type {
+  FacilityConstructionStage,
   FacilitySize,
   MapInstance,
   MapModel,
@@ -42,8 +46,15 @@ interface TileScene {
   growth?: readonly CityGrowthSector[];
   terrain: MapInstance;
   model?: MapModel;
+  construction?: { stage: FacilityConstructionStage; model: MapModel };
+  gridJunction?: MapInstance;
   structure?: MapInstance;
   hail?: MapInstance;
+}
+interface WireEndpoint {
+  position: Vec3;
+  model?: MapModel;
+  gridJunction?: MapInstance;
 }
 
 function fillFraction(
@@ -78,6 +89,7 @@ export interface ModelFactories {
     kind: StructureKind,
     growth?: readonly CityGrowthSector[],
     size?: FacilitySize,
+    stage?: FacilityConstructionStage,
   ) => MapModel;
 }
 const fuelModels: Record<FuelNameType, StructureKind> = {
@@ -110,8 +122,15 @@ export function structureKind(
       : facility.name === "Iron-Air Battery"
         ? "iron-air"
         : "battery";
-  if (facility?.fuel === "Natural Gas" && facility.name === "Natural Gas Steam")
-    return "gas-steam";
+  if (facility?.fuel === "Natural Gas") {
+    if (facility.name === "Natural Gas Steam") return "gas-steam";
+    if (facility.name === "Natural Gas CC") return "gas-combined-cycle";
+  }
+  if (
+    facility?.fuel === "Geothermal" &&
+    facility.name === "Enhanced Geothermal"
+  )
+    return "enhanced-geothermal";
   if (facility?.fuel === "Sun" && view.disaster?.hail)
     return "solar-hail-damaged";
   if (facility?.fuel) return fuelModels[facility.fuel];
@@ -140,13 +159,13 @@ function terminal(
   );
   return add(position, selected);
 }
-const constructionModels = new WeakMap<MapModel, MapModel>();
-function underConstruction(model: MapModel): MapModel {
-  const cached = constructionModels.get(model);
+const retrofitModels = new WeakMap<MapModel, MapModel>();
+function offlineRetrofitModel(model: MapModel): MapModel {
+  const cached = retrofitModels.get(model);
   if (cached) return cached;
   const value: MapModel = {
     ...model,
-    key: `${model.key}:construction`,
+    key: `${model.key}:retrofit`,
     parts: model.parts.map((part) => {
       const colors = new Float32Array(part.mesh.colors.length);
       for (let i = 0; i < colors.length; i += 3) {
@@ -161,13 +180,56 @@ function underConstruction(model: MapModel): MapModel {
       return { ...part, mesh: { ...part.mesh, colors } };
     }),
   };
-  constructionModels.set(model, value);
+  retrofitModels.set(model, value);
   return value;
+}
+
+// A low junction at the front corner keeps the existing grid continuous while the
+// site's own switchgear is absent. The center of the tile belongs to the project.
+const gridJunctionOffset: Vec3 = [0.3, 0, 0.35];
+const gridJunctionTerminals: readonly Vec3[] = [
+  [-0.026, 0.078, 0],
+  [0.026, 0.078, 0],
+];
+const gridJunctionMesh = new MeshBuilder()
+  .box([0, -0.009, 0], [0.084, 0.05, 0.048], PALETTE.rock)
+  .box([0, 0.033, 0], [0.077, 0.034, 0.042], PALETTE.steelShade);
+for (const [x, y, z] of gridJunctionTerminals)
+  gridJunctionMesh.cylinder([x, 0.05, z], 0.01, 0.008, y - 0.05, PALETTE.cream);
+const gridJunctionModel: MapModel = {
+  key: "structure:construction-grid-junction",
+  parts: [{ mesh: gridJunctionMesh.build(), castsShadow: true }],
+  terminals: gridJunctionTerminals,
+  footprint: 0.1,
+  height: 0.078,
+};
+
+function gridJunction(
+  terrain: MapInstance,
+  tileKey: TerritoryMapTileKey,
+): MapInstance {
+  const [x, , z] = gridJunctionOffset;
+  // Trees and farm props must not lift the junction above the terrain.
+  const y = surfaceHeight(
+    terrain.model,
+    x,
+    z,
+    terrain.model.supportY === undefined,
+  );
+  return {
+    id: `grid-junction:${tileKey}`,
+    position: add(terrain.position, [x, y, z]),
+    fog: terrain.fog,
+    active: false,
+    model: gridJunctionModel,
+  };
 }
 
 /** Static wire geometry changes with topology/terminals, never with every power tick. */
 export class SceneBuilder {
   private wireKey?: string;
+  private wires?: readonly HexWire[];
+  private overheadWireTiles = new Set<string>();
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
   private terrainAt = new Map<string, TerrainType>();
@@ -193,8 +255,16 @@ export class SceneBuilder {
       this.cells.clear();
       this.wireKey = undefined;
     }
-    const models = new Map<string, MapModel>();
-    const positions = new Map<string, Vec3>();
+    const endpoints = new Map<string, WireEndpoint>();
+    if (wires !== this.wires) {
+      this.wires = wires;
+      this.overheadWireTiles.clear();
+      for (const wire of wires)
+        if (wire.kind === "overhead") {
+          this.overheadWireTiles.add(wire.from);
+          this.overheadWireTiles.add(wire.to);
+        }
+    }
     const byId = new Map<string, TerritoryTileView>(
       views.map((view) => [territoryMapTileKey(view.tile), view]),
     );
@@ -292,11 +362,16 @@ export class SceneBuilder {
         cell.terrain = { ...cell.terrain, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
-      if (model) models.set(tileKey, model);
-      positions.set(tileKey, position);
+      const endpoint: WireEndpoint = { position };
+      endpoints.set(tileKey, endpoint);
       instances.push(cell.terrain);
       if (!model) continue;
-      if (kind === "solar-hail-damaged" && view.disaster?.hail === "impact") {
+      const stage = size ? facilityConstructionStage(view.facility) : undefined;
+      if (
+        stage === undefined &&
+        kind === "solar-hail-damaged" &&
+        view.disaster?.hail === "impact"
+      ) {
         cell.hail ??= {
           id: `hail:${tileKey}`,
           model: hailModel(cell.terrain.model, model, tile.q, tile.r),
@@ -311,6 +386,12 @@ export class SceneBuilder {
         view.facility && !tile.city && view.operatingFacility
           ? facilityOperatingStatus(view.operatingFacility, minute)
           : facilityMapStatus(view, minute);
+      if (stage !== undefined && kind && cell.construction?.stage !== stage)
+        cell.construction = {
+          stage,
+          model: this.factories.structure(kind, undefined, size, stage),
+        };
+      else if (stage === undefined) cell.construction = undefined;
       const connection = view.connection;
       const displayedModel =
           kind === "tower" && connection
@@ -318,14 +399,23 @@ export class SceneBuilder {
                 (minute - connection.startedMinute) /
                   (connection.towerMinute - connection.startedMinute),
               )
-            : status?.kind === "construction"
-              ? underConstruction(model)
-              : model,
+            : (cell.construction?.model ??
+              (status?.kind === "construction"
+                ? offlineRetrofitModel(model)
+                : model)),
         producing = status?.kind === "producing",
         active = producing || status?.kind === "charging",
         motionKey = view.operatingFacility
           ? `${runKey}:facility:${view.operatingFacility.id}`
           : undefined;
+      // Commissioning and the completed plant share the same fitted terminals.
+      if (stage === undefined || displayedModel.terminals.length)
+        endpoint.model = model;
+      else if (this.overheadWireTiles.has(tileKey)) {
+        cell.gridJunction ??= gridJunction(cell.terrain, tileKey);
+        instances.push(cell.gridJunction);
+        endpoint.gridJunction = cell.gridJunction;
+      }
       const waterLevel = tile.city
         ? undefined
         : reservoirFill(view.operatingFacility);
@@ -350,11 +440,18 @@ export class SceneBuilder {
     }
     for (const id of this.cells.keys())
       if (!byId.has(id)) this.cells.delete(id);
+    const wireEndpoint = (id: string, kind: HexWire["kind"]) => {
+      const endpoint = endpoints.get(id);
+      return kind === "overhead"
+        ? (endpoint?.gridJunction ?? endpoint)
+        : endpoint;
+    };
     const key = wires
-      .map(
-        (wire) =>
-          `${wire.id}:${wire.kind}:${models.get(wire.from)?.key}:${models.get(wire.to)?.key}:${byId.get(wire.from)?.visibilityDistance}:${byId.get(wire.to)?.visibilityDistance}`,
-      )
+      .map(({ id, kind, from, to }) => {
+        const a = wireEndpoint(from, kind);
+        const b = wireEndpoint(to, kind);
+        return `${id}:${kind}:${a?.model?.key}:${b?.model?.key}:${a?.position[1]}:${b?.position[1]}:${byId.get(from)?.visibilityDistance}:${byId.get(to)?.visibilityDistance}`;
+      })
       .join("|");
     if (key !== this.wireKey) {
       this.wireKey = key;
@@ -366,11 +463,11 @@ export class SceneBuilder {
       ];
       const connections: MapWireConnection[][] = [[], [], [], []];
       for (const wire of wires) {
-        const from = positions.get(wire.from),
-          to = positions.get(wire.to);
+        const from = wireEndpoint(wire.from, wire.kind),
+          to = wireEndpoint(wire.to, wire.kind);
         if (!from || !to) continue;
-        const a = terminal(models.get(wire.from), from, to),
-          b = terminal(models.get(wire.to), to, from);
+        const a = terminal(from.model, from.position, to.position),
+          b = terminal(to.model, to.position, from.position);
         const fog = Math.max(
           byId.get(wire.from)!.visibilityDistance,
           byId.get(wire.to)!.visibilityDistance,

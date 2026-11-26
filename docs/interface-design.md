@@ -1,0 +1,33 @@
+# Interface design
+
+Guidance for UI work in Electrify, referenced from [AGENTS.md](../AGENTS.md#interface-design).
+
+- Organize each screen around the player's next decision: one clearly dominant action, with
+  navigation, account actions, and secondary controls quieter than the game state and choice in
+  front of the player.
+- Follow the established 4 px spacing rhythm, building common gaps and padding from 4, 8, 12, and
+  16 px; keep interactive controls at least 40 px high on desktop and 44 px on coarse-pointer
+  devices.
+- Preserve the palette's semantic roles: electric blue means interaction, red a shortage or harmful
+  state, amber warning, and green favorable change. Use the cool neutral surfaces for structure
+  instead of introducing decorative colors.
+- **Never change the CTA color.** Every CTA, button and link, the home-screen smoke and the logo
+  are one blue per theme: `--interactive-blue`, `#0084f8` in light and `#629be1` in dark (`--brand`
+  on the static pages in `public/legal.css`). Do not re-declare it, add a deeper, lighter or
+  per-screen blue for buttons or links, or nudge it for a contrast score; fix the label instead.
+  Only hover and pressed states may shade it. `src/CtaColor.test.ts` and the home CTA test in
+  `e2e/main-menu.spec.ts` fail on any change, and only an explicit instruction in the task itself
+  may move them.
+- Design light and dark modes as separate contrast systems rather than mechanically inverting
+  colors; use the shared theme and CSS tokens, and verify text, controls, charts, and SVGs in both
+  palettes.
+- Make dense information readable through hierarchy: clear headings, direct labels, restrained
+  dividers, and small tonal steps between page, panel, card, selected, and chart surfaces; prefer
+  these to heavy shadows, ornamental decoration, or unnecessary nested cards.
+- Reflow by priority instead of shrinking the desktop composition: on phones, show one primary
+  pane, abbreviate or collapse secondary controls, allow appropriate rails to scroll, and stack
+  actions before they crowd or overflow. Keep charts and critical status legible. Design for a
+  minimum viewport width of 360 px and reserve short forms and alternate layouts for widths in
+  that supported range.
+- Never make color or an icon the only carrier of meaning: pair symbols and state colors with text,
+  and distinguish chart series with direct labels, patterns, or line styles as well as color.

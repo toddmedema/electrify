@@ -2,91 +2,80 @@
 
 This is a React 18 / Redux Toolkit / TypeScript electricity-market game built with Create React
 App. Keep changes focused: the simulation is deliberately centralized and many authored data
-files are large, so broad rewrites create expensive review diffs.
+files are large, so broad rewrites create expensive review diffs. This file is the only agent
+guide; do not add a `CLAUDE.md`. If your tooling does not format on save, run
+`npx prettier --write <files>` over the files you changed before `check`.
 
 ## Start here
 
-- Use Node 26. Verify with `node --version` and put the installed Node 26 on `PATH` if needed.
-  Install exactly the lockfile with `npm ci` in a new checkout or when the lockfile changes;
-  reuse that install across turns while it still matches the lockfile.
-- Reserve the checkout before editing with `npm run task -- claim` (Codex supplies the chat ID;
-  otherwise pass an ID or set `ELECTRIFY_TASK_ID`). If another task owns it, use an isolated
-  worktree. Release it with `npm run task -- release` when finished. See
-  [development coordination](docs/development-workflow.md) for recovery and command behavior.
-- In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA. If it finds
-  Git LFS pointers, try `git lfs checkout` for cached objects, then `git lfs pull` if needed.
-  For missing files, stage intentional deletions or renames; otherwise restore the files.
-- For broader local coverage, `npm run check` runs eight gates. It checks types (including `e2e/`),
-  lint, formatting, native unit tests, CI tooling, the covered Jest
-  suite, the long simulation suites (`npm run test:sim`, which includes every scenario through
-  the headless simulation), and a short run of the simulation CLI. CI also runs the Firestore
-  rules tests (`npm run test:rules`, which needs Java 21); run them yourself when you change
-  `firebase/firestore.rules`. It checks assets first, prints each gate's result as it finishes,
-  and continues after gate failures.
-- Before pushing, choose conservative local checks for the changed behavior and its callers.
-  Run `npm run check:prepush` on the commit you will push to check for stale site pages and metadata.
-  Run the affected suites, types, lint and relevant integration or browser journeys. Broaden
-  coverage for shared simulation, save, co-op, build or workflow changes. Record the commands
-  and results in the PR. Hosted CI runs the complete suite on the pushed revision.
-  The fifteen-gate `npm run check:ci` is available for broad local verification or reproducing
-  CI failures. A full local run is optional before opening or updating a PR.
-- After a failed check, fix the issue and rerun the failed gates with the printed command, such as
-  `npm run check -- --steps lint,tests`. Keep the earlier passing results only while their inputs
-  remain unchanged. A test-query lint fix does not require repeating successful simulations;
-  changes to simulation inputs do. `npm run check:ci -- --resume` accounts for all fifteen gates
-  and reruns failed or invalidated gates, verifying any reused source, environment, reports,
-  and build artifacts. Unknown inputs invalidate conservatively. Without `--resume`, checks run
-  fresh. A partial check is never evidence that all gates ran.
-  `npm run check:ci -- --steps browser --resume` also verifies its web-build prerequisite.
+- Use Node 26 (`node --version`; put it on `PATH` if needed). Install exactly the lockfile with
+  `npm ci` in a new checkout or when the lockfile changes; reuse that install while it still
+  matches.
+- Reserve the checkout before editing with `npm run task -- claim`. If no task ID is supplied by
+  your environment, set `ELECTRIFY_TASK_ID` or pass the same ID to both claim and release. Use an
+  isolated worktree if another task owns the checkout. Release it with `npm run task -- release`
+  when finished. See [development coordination](docs/development-workflow.md) for recovery.
+- In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA; if it finds
+  Git LFS pointers, try `git lfs checkout`, then `git lfs pull`. For missing files, stage
+  intentional deletions or renames; otherwise restore them.
+- `npm run check` runs eight gates: types (including `e2e/`), lint, formatting, native unit tests,
+  CI tooling, covered Jest tests, long simulations of every scenario (`npm run test:sim`), and a
+  simulation CLI smoke run. It checks assets first, prints results as each gate finishes, and
+  continues after failures. CI also runs the Firestore rules tests (`npm run test:rules`, which
+  needs Java 21). Run them yourself when you change `firebase/firestore.rules`.
+- Before pushing, run the local checks that cover the changed behavior and its callers (broaden
+  for shared simulation, save, co-op, build or workflow changes); record the commands and results
+  in the PR. Run `npm run check:prepush` on the commit you will push to catch stale site pages and
+  metadata. Hosted CI runs the complete suite on the pushed revision; `npm run check:ci` (fifteen
+  gates) is available for broad local verification or reproducing CI failures.
+- After fixing a failed gate, use its printed retry command, such as
+  `npm run check -- --steps lint,tests`. Keep earlier passes only while their inputs are unchanged.
+  `npm run check:ci -- --resume` accounts for all fifteen gates, reruns failed or invalidated gates,
+  and verifies reused evidence. A partial check is never evidence that all gates ran. See the
+  [resume rules](docs/development-workflow.md#resume-verified-validation).
 - For prose-only Markdown changes, review the text and run `git diff --check`; app tests, builds
-  and simulations are unnecessary. Changes to scripts, configuration or executable examples
-  need the relevant checks. Do not run the full game suite just to save a proposal.
-- Local checks default to at most four Jest workers to limit shared-machine contention, and keep
-  heavy suites serial. The simulation CLI runs its single suite in process. Override the cap with
-  `ELECTRIFY_CHECK_WORKERS` only for a measured need. The npm build/test/check commands queue
-  heavy work across local worktrees; do not pause a running test process to make room. When using
-  subagents, give them focused checks and let the integrating agent own validation of the combined change.
-- `npm run fix` applies every mechanical fix: it runs `lint:fix` and `format`. Review its diff; it
-  does not fix types or tests.
-- Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` starts Jest's
-  interactive watch mode and never exits in a non-interactive shell. Coverage thresholds apply
-  only to `test:ci`, which skips `*.sim.test.tsx`. Name a suite that way when it plays long
-  simulations and isn't needed for coverage: `test:sim` runs those without instrumentation in a
-  separate CI job.
-- Iterate on game economics with `npm run sim -- --scenario <id>`. See `src/testing/README.md`
-  for simulation flags and traps.
-- Performance work starts from `docs/perf-plan.md`. `npm run perf:bench` reports tick and
-  rollover cost and gates same-process ratios; `npm run perf:bundle` gates gzip bytes after a
-  build; `src/testing/GoldenOutputs.sim.test.tsx` pins every scenario's output. Rebaseline all of
-  them with `npm run perf:rebaseline`, last, and explain the move in the PR. Append `?perf=1`
+  and simulations are unnecessary. Changes to scripts, configuration or executable examples need
+  the relevant checks.
+- Local checks default to at most four Jest workers. Override with `ELECTRIFY_CHECK_WORKERS`
+  only for a measured need. Heavy suites run serially, and the simulation CLI runs in process.
+  Heavy work queues across worktrees. Let running tests finish.
+- `npm run fix` applies every mechanical fix (`lint:fix`, `format`); review its diff. It does not
+  fix types or tests.
+- Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` runs in
+  interactive watch mode and never exits in a non-interactive shell. Name long simulations
+  `*.sim.test.tsx` when they are outside the coverage requirement. `test:ci` skips them, and
+  `test:sim` runs them without instrumentation.
+- Iterate on game economics with `npm run sim -- --scenario <id>`; see `src/testing/README.md` for
+  simulation flags and traps.
+- Start performance work from [the performance plan](docs/perf-plan.md). `npm run perf:bench`
+  reports tick and rollover times and gates same-process ratios. `npm run perf:bundle` gates gzip
+  bytes after a build. `src/testing/GoldenOutputs.sim.test.tsx` pins every scenario's output.
+  Rebaseline with `npm run perf:rebaseline` last and explain the move in the PR. Append `?perf=1`
   to a dev URL for the frame-budget overlay.
-- Build with `npm run build`. For UI flow or layout changes, search affected `e2e/` specs for
-  the old controls and reuse the navigation helpers in `e2e/layout.ts`. Run changed specs with
-  `ELECTRIFY_E2E_ALL_SPECS=1 npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px`. Include
-  `--project=mobile-360px` when minimum-width layout changes. New assertions must be reached,
+- Build with `npm run build`. For UI flow or layout changes, search affected `e2e/` specs for the
+  old controls and reuse the helpers in `e2e/layout.ts`. Run changed specs with
+  `ELECTRIFY_E2E_ALL_SPECS=1 npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px`.
+  Add `--project=mobile-360px` for minimum-width layout changes. New assertions must be reached,
   even when an earlier failure also occurs on the base branch.
-- `check:ci` runs the production browser selection in `e2e/ci.playwright.config.ts` and
-  `e2e/browser-projects.ts`. `test:e2e:ci -- <spec>` selects only cases already in that matrix.
-  To test an arbitrary spec against production, run `test:e2e` with
-  `ELECTRIFY_E2E_ALL_SPECS=1` and `E2E_BASE_URL` pointing to your hosted web build.
-  Local `check:ci` keeps web and desktop artifacts in `.tmp/check-builds/web` and
-  `.tmp/check-builds/desktop`. Standalone `build` and `desktop:build` still default to `build/`.
-- Local npm browser/check commands reserve and print an unused `E2E_PORT`. To keep a specific
-  port across invocations, set it explicitly; an occupied or reserved port fails before tests.
-  Preserve other tasks' servers except for the verified merged-PR cleanup below. An
-  already-running dev server may serve another checkout.
-- Agents may automatically stop preview servers or obsolete validation for PRs freshly verified
-  as merged and free their validation/port reservations. Verify the matching checkout/head and
-  exact process tree, with no later unmerged work. Prefer graceful shutdown and normal
-  reservation cleanup; remove stale reservations only after proving their recorded owner and
-  process group are gone. Preserve unrelated and unmerged work, and never remove a lease
-  already acquired by another task.
-- Keep local validation windowless: use `npm run check` and headless Chromium through
-  `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus;
-  leave it to CI unless the user explicitly requests a local native-window test. It requires
-  `npm run test:desktop -- --headed`. Do not add `--headed`, `--debug`, or `--ui`, set `PWDEBUG`,
-  or launch `desktop:start` during routine local validation. `test:desktop:native` is a
-  windowless Node unit suite and remains part of `check`.
+- `check:ci` uses `e2e/ci.playwright.config.ts` and `e2e/browser-projects.ts`.
+  `npm run check:ci -- --steps browser --resume` also verifies the web-build prerequisite.
+  `npm run test:e2e:ci -- <spec>` selects only cases in the CI matrix. For other specs against
+  production, run `test:e2e` with `ELECTRIFY_E2E_ALL_SPECS=1` and `E2E_BASE_URL` pointing at
+  your hosted web build. Local `check:ci` writes to `.tmp/check-builds/web` and
+  `.tmp/check-builds/desktop`. Standalone `build` and `desktop:build` default to `build/`.
+- Local npm browser/check commands reserve and print an unused `E2E_PORT`. Set it explicitly for
+  a stable port across runs. An occupied or reserved port fails before tests. Verify which
+  checkout an existing server is serving before using it.
+- After freshly verifying a PR is merged, agents may stop its preview servers or obsolete
+  validation and free their validation or port reservations. Verify the matching checkout and
+  head, the exact process tree, and the absence of later unmerged work. Prefer graceful shutdown
+  and normal reservation cleanup. Remove stale reservations only after proving the owner and
+  process group are gone. Leave other tasks' servers, work, and leases alone.
+- Keep local validation windowless with `npm run check` and headless Chromium through
+  `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus. Run
+  `npm run test:desktop -- --headed` locally only if the user explicitly requests a native-window
+  test. During routine local validation, avoid `--headed`, `--debug`, `--ui`, `PWDEBUG`, and
+  `desktop:start`. `test:desktop:native` is a windowless Node unit suite and remains part of `check`.
 
 ## Verification design
 
@@ -101,76 +90,60 @@ Every turn re-reads the whole conversation, so many small turns and large images
 
 - Batch independent lookups: several `rg -n` or `sed -n` calls in one command, or parallel tool
   calls, instead of one lookup per turn.
-- Prefer DOM text, computed styles and test assertions to screenshots. When you need an image,
-  use `npm run shot` (see `npm run shot -- --help`) instead of a throwaway Playwright script: it
-  is headless, writes device-scale-1 PNGs, and `--clip <selector>` captures just the component.
-  It photographs the dev server that `npm start` is running in this checkout.
+- Prefer DOM text, computed styles and test assertions to screenshots. When you need an image, use
+  `npm run shot` (see `npm run shot -- --help`). It captures headless, device-scale-1 PNGs from
+  this checkout's `npm start` server by default. Use `--clip <selector>` to capture one component.
 - Look at each image once; do not reopen unchanged screenshots after later edits.
-- For any task that uses subagents, follow the
-  [multi-agent-work skill](.agents/skills/multi-agent-work/SKILL.md): one shared brief, capped
-  read-only reviewer findings, a fresh coder per cluster of about five findings, and a final
-  review of `git diff origin/master...`.
+- For any task that uses subagents, follow the [multi-agent-work skill](.agents/skills/multi-agent-work/SKILL.md):
+  give subagents focused checks and let the integrating agent own validation of the combined change.
 
 ## Run compatibility manifest
 
 `src/data/RunCompatibility.json` is a generated, git-ignored identity of the game reducer's
-runtime dependency graph and shipped data. Type-only, comment and formatting changes do not
-move official-run compatibility; co-op also retains a broad source/data/lockfile identity.
-The npm entry points for
-`start`, `build`, `test*`, `sim`, and `typecheck` regenerate it automatically, so never commit or
-merge it. Run `npm run compatibility:generate` by hand only if your editor complains that the file
-is missing. See `docs/run-compatibility.md` for why the hash is intentionally broad.
-
-## Claude Code
-
-This file is the only agent guide; do not add a `CLAUDE.md`. `.claude/settings.json` allows the
-npm scripts above without a prompt and formats each file Claude edits with Prettier, so formatting
-failures should be rare. Generated `.codex/` hook copies are local and may be stale; keep them
-untracked. Agents without a verified hook should format the files they changed before `check`
-(for example, `npx prettier --write <files>`).
+runtime dependency graph and shipped data. Type-only, comment, and formatting changes leave
+official-run compatibility intact. Co-op also uses a broad source/data/lockfile identity. The npm
+entry points for `start`, `build`, `test*`, `sim`, and `typecheck` regenerate the manifest. Never
+commit or merge it. Run `npm run compatibility:generate` by hand only if your editor needs the
+missing file. See [run compatibility](docs/run-compatibility.md) for scope.
 
 ## Pull requests
 
-- After required local checks pass, create or update the PR and report remote CI's current
-  status. Monitor it to completion only when asked to monitor, merge, or deliver green CI.
-- When CI fails, run `npm run ci:failures` (or `npm run ci:failures -- <pr>`). It lists the failed
-  jobs, gates, tests and assertion excerpts, plus the local command that reproduces each
-  failure. Reproduce the failure, fix the cause, rerun the matching local gate, push, and report
-  the current status. Never weaken a test, raise a ceiling or rebaseline just to get green; when a change
-  intentionally moves a ceiling, explain the move in the PR.
-- If a failure is unrelated to your change (it also fails on `master`, or it is a known flake that
-  passes on retry), rerun only the failed jobs once with `gh run rerun <run-id> --failed`. If it
-  fails again, or after three fix attempts, stop and report the failing test, the evidence and
-  your diagnosis instead of retrying further.
+- After required local checks pass, create or update the PR and report remote CI's current status;
+  monitor it to completion only when asked to monitor, merge, or deliver green CI.
+- When CI fails, run `npm run ci:failures` or `npm run ci:failures -- <pr>` for failed jobs,
+  gates, tests, assertion excerpts, and local reproduction commands. Reproduce the failure, fix
+  the cause, rerun the matching gate, push, and report status. Never weaken a test, raise a ceiling
+  or rebaseline just to get green; when a change intentionally moves a ceiling, explain the move in
+  the PR.
+- If a failure is unrelated to your change (also fails on `master`, or a known flake that passes on
+  retry), rerun only the failed jobs once with `gh run rerun <run-id> --failed`; if it fails again,
+  or after three fix attempts, stop and report the failing test, evidence and diagnosis instead of
+  retrying further.
 - Merge the base again when needed for conflicts or relevant changes, rather than restarting
   validation for every unrelated base commit. Stop temporary preview servers when finished.
 - Stage explicit task files and inspect `git diff --cached` before committing; leave unrelated
   edits, generated hook configuration, scratch tests, and review artifacts out of the PR.
-- For user-visible UI work with design choices, share the first usable interaction in chat
-  before final QA. Use a reproducible game state and show desktop and mobile when the layout
-  reflows. Use a short clip when motion matters. Call out any open design decision and
-  continue routine verification while feedback is pending.
-- When opening a pull request with user-visible UI changes, capture 1-3 screenshots of the
-  finished interface and embed them in the pull request description. Choose views that clearly
-  show the change, including both desktop and mobile layouts when responsive behavior is relevant.
-  `npm run shot` produces small, clipped captures at each width and theme.
-- Keep review screenshots in a temporary location and upload them with GitHub CLI 2.99 or newer
-  using `gh pr create --attach`, `gh pr edit --attach`, or `gh pr comment --attach`. Do not commit
-  screenshots that exist only to illustrate a pull request; GitHub-hosted attachments keep them
-  out of the repository and its Git LFS history. Remove the temporary files after a successful
-  upload.
-- Review screenshots before uploading them: exclude sensitive or user-specific data, transient
-  errors, debug UI, and unrelated windows or overlays. Non-UI changes do not need screenshots.
-- If the current environment cannot capture or upload images, say so in the pull request
-  description and tell the user instead of silently omitting the screenshots.
+- For user-visible UI work with design choices, share the first usable interaction in chat before
+  final QA: a reproducible game state, desktop and mobile when the layout reflows, a short clip
+  when motion matters. Call out open design decisions and continue routine verification while
+  feedback is pending.
+- When opening a pull request with user-visible UI changes, capture 1–3 screenshots of the finished
+  interface with `npm run shot` (small, clipped captures at each width and theme) and embed them in
+  the description; choose views that clearly show the change, including both desktop and mobile when
+  responsive behavior is relevant.
+- Review screenshots before uploading: exclude sensitive or user-specific data, transient errors,
+  debug UI, and unrelated windows. Keep them in a temporary location and use GitHub CLI 2.99 or
+  newer to upload them with `gh pr create --attach`, `gh pr edit --attach`, or
+  `gh pr comment --attach`. Remove the files after a successful upload. Non-UI changes do not need
+  screenshots. If you cannot capture or upload, say so in the PR description and tell the user.
 
 ## Repository map
 
 - `src/Store.tsx` assembles the `card`, `game`, `settings`, `ui`, and `user` slices. Use the typed
   hooks it exports in function components.
-- `src/reducers/Game.tsx` owns the simulation clock and state transitions. Pure calculations
-  belong in `src/helpers/`; authored scenarios, facilities, economics, weather, and stories belong
-  in `src/data/`.
+- `src/reducers/Game.tsx` owns the simulation clock and state transitions; pure calculations belong
+  in `src/helpers/`, and authored scenarios, facilities, economics, weather, and stories belong in
+  `src/data/`.
 - `src/reducers/GameActions.tsx` intentionally breaks reducer import cycles. Put cross-slice game
   action creators there instead of importing `Game.tsx` from another slice.
 - `src/Types.tsx` is the canonical domain model and `src/Constants.tsx` holds shared simulation
@@ -179,22 +152,19 @@ untracked. Agents without a verified hook should format the files they changed b
   `FacilityShoppingType`): a field only one side declares reads as `T | undefined` on the union.
   Narrow with `isStorage` instead of casting. Key maps by the domain union (`FuelNameType`,
   `DifficultyType`) rather than `string`.
-- `src/components/views/` contains screens; adjacent `*Container.tsx` files provide Redux wiring.
-  Reusable UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current
-  screen from the card-navigation state.
-- Save structure changes append an ordered migration in `src/SaveUpgrade.ts`, which derives
-  the version re-exported by `src/SaveSchema.ts`. Keep old steps unchanged and validate decoded,
+- `src/components/views/` contains screens with adjacent `*Container.tsx` Redux wiring; reusable
+  UI and charts live in `src/components/base/`. `Compositor.tsx` selects the current screen from
+  card-navigation state.
+- Save structure changes append an ordered migration in `src/SaveUpgrade.ts`, which derives the
+  version re-exported by `src/SaveSchema.ts`; keep old steps unchanged and validate decoded,
   upgraded payloads before use. Cover retained progress, malformed/future-schema rejection,
-  idempotent current-format round trips and deterministic resumed simulation; see `docs/saves.md`.
+  idempotent current-format round trips and deterministic resumed simulation (`docs/saves.md`).
 - `src/testing/Simulator.tsx` drives the real reducer, not a second model. Add economic invariants
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
-- Background reading, loaded only when relevant: `docs/demand-model.md` (customer demand),
-  `docs/facilities-economics.md` (facility cost sources), `docs/construction-emissions.md`
-  (embodied emissions sources), `docs/hydro-sites.md` (hydro site catalogue and provenance),
-  `docs/intertie-trends.md` (neighbour emissions, prices and intertie opening years),
-  `docs/intertie-balance.md` (intertie access rules and balance evidence),
-  `docs/run-compatibility.md` (challenge compatibility), and
-  `src/testing/SCENARIO_CHOICE_BALANCE.md` (scenario choice balance).
+- Background reading, loaded only when relevant: `docs/demand-model.md`,
+  `docs/facilities-economics.md`, `docs/construction-emissions.md`, `docs/hydro-sites.md`,
+  `docs/intertie-trends.md`, `docs/intertie-balance.md`, `docs/run-compatibility.md`, and
+  `src/testing/SCENARIO_CHOICE_BALANCE.md`.
 - Several files are large: `app.scss`, `reducers/Game.tsx`, `views/Insights.tsx`,
   `data/WorldEvents.tsx`, `data/TransmissionProfiles.ts`, `data/Scenarios.tsx`, and `Types.tsx`.
   Search them for the symbol you need and read that range instead of loading the whole file.
@@ -214,44 +184,15 @@ untracked. Agents without a verified hook should format the files they changed b
 
 ## Interface design
 
-- Organize each screen around the player's next decision. Give it one clearly dominant action;
-  keep navigation, account actions, and secondary controls quieter than the game state and choice
-  in front of the player.
-- Follow the established 4 px spacing rhythm, building common gaps and padding from 4, 8, 12, and
-  16 px. Keep interactive controls at least 40 px high on desktop and 44 px on coarse-pointer
-  devices.
-- Preserve the palette's semantic roles. Electric blue means interaction, red means a shortage or
-  harmful state, amber means warning, and green means favorable change. Use the cool neutral
-  surfaces for structure instead of introducing decorative colors.
-- **Never change the CTA color.** Every CTA, button and link, the home-screen smoke and the logo
-  are one blue per theme: `--interactive-blue`, `#0084f8` in light and `#629be1` in dark (`--brand`
-  on the static pages in `public/legal.css`). Do not re-declare it, add a deeper, lighter or
-  per-screen blue for buttons or links, or nudge it for a contrast score; fix the label instead.
-  Only hover and pressed states may shade it. `src/CtaColor.test.ts` and the home CTA test in
-  `e2e/main-menu.spec.ts` fail on any change, and only an explicit instruction in the task itself
-  may move them.
-- Design light and dark modes as separate contrast systems rather than mechanically inverting
-  colors. Use the shared theme and CSS tokens, and verify text, controls, charts, and SVGs in both
-  palettes.
-- Make dense information readable through hierarchy: clear headings, direct labels, restrained
-  dividers, and small tonal steps between page, panel, card, selected, and chart surfaces. Prefer
-  these tools to heavy shadows, ornamental decoration, or unnecessary nested cards.
-- Reflow by priority instead of shrinking the desktop composition. On phones, show one primary
-  pane, abbreviate or collapse secondary controls, allow appropriate rails to scroll, and stack
-  actions before they crowd or overflow. Keep charts and critical status legible.
-- Design for a minimum viewport width of 360 px, the narrowest common modern smartphone (many
-  Samsung Galaxy models). Don't add short forms or layouts just for narrower widths.
-- Never make color or an icon the only carrier of meaning. Pair symbols and state colors with text;
-  distinguish chart series with direct labels, patterns, or line styles as well as color.
+Before UI work, read and follow the [interface design guidance](docs/interface-design.md). It
+covers action hierarchy, spacing and control heights, palette and contrast, reflow down to 360 px,
+and accessible labels for controls and charts.
 
 ## Task guidance skills
 
-Read the matching file before starting; each holds guidance only that task needs.
-
-- Writing or editing scenario, event and story copy:
-  [.agents/skills/scenario-writing/SKILL.md](.agents/skills/scenario-writing/SKILL.md).
-- Designing or revising scenario and facility icons:
-  [.agents/skills/icon-design/SKILL.md](.agents/skills/icon-design/SKILL.md).
+Read the matching skill before starting: [scenario copy](.agents/skills/scenario-writing/SKILL.md)
+for scenario, event and story text; [icon design](.agents/skills/icon-design/SKILL.md) for scenario
+and facility icons.
 
 ## Guardrails
 
