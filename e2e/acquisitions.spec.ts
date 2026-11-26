@@ -498,15 +498,7 @@ for (const theme of ["light", "dark"] as const) {
       });
       await expect
         .poll(() =>
-          network.evaluate(
-            (element) =>
-              element
-                .querySelector(".territoryMapViewport")!
-                .getBoundingClientRect().width +
-              (element
-                .querySelector(".desktopBuildRail")
-                ?.getBoundingClientRect().width ?? 0),
-          ),
+          viewport.evaluate((element) => element.getBoundingClientRect().width),
         )
         .toBe(width);
       const camera = await readTerritoryMapCamera(viewport);
@@ -778,12 +770,33 @@ for (const theme of ["light", "dark"] as const) {
       await touch.detach();
     }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+
+    const initialScene = await expectPhysicalMap(network, built);
+    expect(
+      initialScene.find(({ id }) => id === `structure:${site.id}`)?.modelKey,
+    ).toBe("structure:wind:small:construction:0");
+
+    // Restore a deterministic midpoint so the map can show a partially drawn ring.
+    const midpoint = await editSavedGame(page, ({ game }) => {
+      const building = game.facilities.find(
+        (facility) => facility.id === plant.id,
+      )!;
+      building.yearsToBuildLeft = building.yearsToBuild / 2;
+      return game;
+    });
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await returnToTerritoryMap(page);
     await showMapFacilityStatus(network);
 
     const states = [
-      [getTerritoryTile(hydro.tileId, built)!, "producing", "Generating"],
-      [getTerritoryTile(oil.tileId, built)!, "idle", "Idle"],
-      [getTerritoryTile(biomass.tileId, built)!, "paused", "Operation paused"],
+      [getTerritoryTile(hydro.tileId, midpoint)!, "producing", "Generating"],
+      [getTerritoryTile(oil.tileId, midpoint)!, "idle", "Idle"],
+      [
+        getTerritoryTile(biomass.tileId, midpoint)!,
+        "paused",
+        "Operation paused",
+      ],
       [site, "construction", "Under construction"],
     ] as const;
     const centers = states.map(([tile]) => hexCenter(tile));
@@ -818,13 +831,19 @@ for (const theme of ["light", "dark"] as const) {
         `${kind} is represented by solid 3D geometry`,
       ).toBeDefined();
       expect(geometry!.active).toBe(kind === "producing");
-      if (kind === "construction")
-        expect(geometry!.modelKey).toBe("structure:wind:small:construction:0");
+      if (kind === "construction") {
+        expect(geometry!.modelKey).toBe("structure:wind:small:construction:2");
+        await expect(target).toHaveAccessibleDescription(/50% complete/);
+        await expect(badge.locator('circle[pathLength="1"]')).toHaveAttribute(
+          "stroke-dasharray",
+          "0.5 1",
+        );
+      }
       await expect(
         badge.locator(":scope > .facilityMapStatusArtwork"),
       ).toHaveAttribute("aria-hidden", "true");
     }
-    await expectPhysicalMap(network, built);
+    await expectPhysicalMap(network, midpoint);
     if (info.project.name === "desktop-chromium" && theme === "dark")
       await reviewScreenshot(
         network.locator(`[data-status-tile="${hydro.tileId}"]`),
@@ -836,9 +855,9 @@ for (const theme of ["light", "dark"] as const) {
       );
     await info.attach("facility-state-source", {
       body: JSON.stringify({
-        minute: built.date.minute,
+        minute: midpoint.date.minute,
         centers,
-        facilities: built.facilities.filter((facility) =>
+        facilities: midpoint.facilities.filter((facility) =>
           [hydro.id, oil.id, biomass.id, plant.id].includes(facility.id),
         ),
       }),
@@ -917,19 +936,12 @@ for (const theme of ["light", "dark"] as const) {
         .getBoundingClientRect();
       return {
         map: { width: map.width, height: map.height },
-        railWidth:
-          element.querySelector(".desktopBuildRail")?.getBoundingClientRect()
-            .width ?? 0,
         workspace: { width: workspace.width, height: workspace.height },
         overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     expect(
-      Math.abs(
-        dimensions.map.width +
-          dimensions.railWidth -
-          dimensions.workspace.width,
-      ),
+      Math.abs(dimensions.map.width - dimensions.workspace.width),
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(dimensions.map.height - dimensions.workspace.height),
@@ -2046,6 +2058,47 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   expect(after.transmission?.lines).toEqual(before.transmission?.lines);
   await expect(state).toHaveAttribute("data-save-state", "saved");
   await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
+});
+
+test("keyboard focus reveals a zoomed-out tile beside the build rail", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium");
+  await page.setViewportSize({ width: 1024, height: 800 });
+  const network = await startMap(page, "light");
+  const game = (await readSavedGame(page))!;
+  const western = territoryTileViews(game).reduce((edge, view) =>
+    hexCenter(view.tile).x < hexCenter(edge.tile).x ? view : edge,
+  ).tile;
+  const tile = network.locator(`[data-map-target="${western.id}"]`);
+  const viewport = network.locator(".territoryMapViewport");
+  const rail = buildRail(page);
+  const bounds = (await viewport.boundingBox())!;
+  const railBounds = (await rail.boundingBox())!;
+  const railRight = railBounds.x + railBounds.width;
+
+  await panToTile(page, western);
+  await viewport.dispatchEvent("wheel", {
+    deltaY: 1200,
+    clientX: bounds.x + bounds.width / 2,
+    clientY: bounds.y + bounds.height / 2,
+  });
+  await viewport.dispatchEvent("wheel", {
+    deltaX: bounds.x + bounds.width / 2 - railRight + 24,
+  });
+  await expect
+    .poll(async () => {
+      const box = (await tile.boundingBox())!;
+      return box.x + box.width / 2;
+    })
+    .toBeLessThan(railRight);
+
+  await page.keyboard.press("Tab");
+  await tile.focus();
+  await expect(tile).toBeFocused();
+  await expect
+    .poll(async () => (await tile.boundingBox())!.x)
+    .toBeGreaterThanOrEqual(railRight);
 });
 
 test("map tile hover and right-click expose the tile's own actions", async ({

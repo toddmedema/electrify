@@ -44,12 +44,9 @@ all term emissions, but its verdict is made only at term end. These timing chang
 campaign definitions; existing challenge and mod goals retain their authored behavior unless
 explicitly marked as checkpoints.
 
-Every term requires solvency. The customer-growth target replaces the 90% retention goal in
-Beyond the Dynamo; the other terms retain that safeguard. Later terms add term-end debt and
-billed-rate limits. Terms 7–8 also limit emissions intensity; the final term has a single
-whole-term carbon budget without additional intensity checks. The historical task appears first, with shared
-safeguards after it. The handover dialog previews the incoming CEO's exact goals by privately
-running the same transition used by Continue; this neither advances nor replaces the live company.
+Every term requires solvency, reliability and one historical objective. The handover
+dialog previews the incoming CEO's goal from the company they will inherit.
+Completed terms retain the goals and verdicts recorded under their original rules.
 
 Financial coverage excludes grants, capital purchases and loan principal; it includes fuel,
 maintenance, imports, interest, carbon charges and program expenses. Efficiency uses measured
@@ -65,20 +62,15 @@ records archive their bounded evidence, recomputed verdicts, and debriefs. Save 
 the generation sequence, physical and financial baselines, and evidence, including after the
 global clock passes 1,200 months. These corruption checks do not authenticate edited saves.
 
-Cash and purchases use the current year's nominal dollars. Campaign rate and debt goals are
-frozen in the CEO term's final-year nominal dollars and compare directly with actual billed
-rates and outstanding principal. Published targets are rounded to three significant digits;
+Cash and purchases use the current year's nominal dollars. The campaign's affordability goal is frozen in the CEO term's final-year nominal
+dollars and compares directly with actual billed rates. Published targets are rounded to three significant digits;
 the displayed value is the enforced limit. Large goal amounts use k/M/B suffixes. The
 authored competitor benchmark is rebased at each handover, independently
 from the player's price; price memory is preserved. Opening cash is the down payment for the
 100 kW steam quote plus six months of opening forecast operating outlay.
 
-Debt allowances scale with frozen opening peak demand. The authored 2023-dollar allowances per
-MW are $20 million for terms 2–3, $30 million for terms 4–5, $20 million for term 6, and
-$15 million for terms 7–9, converted to each term's final-year dollars. The conversion factors
-are frozen with the company context and archived at handover, so cold imports do not need
-economy data to interpret financial evidence. These are game parameters, not historical
-borrowing limits. They make later borrowing depend on the inherited company's size.
+Archived terms can include a published debt target scaled to opening peak demand.
+The frozen conversion factors let cold imports verify those recorded goals.
 
 The final carbon budget is a planning proxy: opening representative-month average demand,
 annualized to 8,760 hours and twenty years, at 0.25 tonnes/MWh with a 1.3 demand allowance.

@@ -261,17 +261,23 @@ for (const theme of ["light", "dark"] as const) {
     await expect(handover).toBeVisible();
     await expect(handover.locator("..")).toHaveCSS("opacity", "1");
     await expectDialogToFit(handover);
+    if (page.viewportSize()!.width < 600) {
+      await expect(page.locator("#appbar .missionSummaryHeadline")).toHaveCSS(
+        "overflow",
+        "hidden",
+      );
+    }
     await expect(
       handover.getByRole("heading", {
         name: "Next: Beyond the Dynamo (1902–1921)",
       }),
     ).toBeVisible();
-    await expect(handover.getByRole("img", { name: "Met" })).toHaveCount(2);
+    await expect(handover.getByRole("img", { name: "Met" })).toHaveCount(1);
     const nextGoals = handover.getByRole("list", { name: "Next term goals" });
     await expect(nextGoals).toContainText(/Reach ≥\d[\d,.]* customers/);
-    await expect(nextGoals.getByRole("listitem")).toHaveCount(2);
+    await expect(nextGoals.getByRole("listitem")).toHaveCount(1);
     await expect(handover).not.toContainText("1882 dollars");
-    await expect(nextGoals).toContainText(/Debt ≤\$\d+(?:\.\d+)?[kMB]/);
+    await expect(nextGoals).not.toContainText(/Debt ≤\$\d+(?:\.\d+)?[kMB]/);
     await expect(nextGoals).not.toContainText("Retain 90% of customers");
     await expect(nextGoals).not.toContainText(/by|·|each month/);
     await expect(
@@ -281,11 +287,6 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       handover.getByText("First Light (1882–1901)", { exact: true }),
     ).toHaveCount(0);
-    await expect(
-      handover
-        .getByRole("list", { name: "Term results" })
-        .getByText("Retain 90% of customers", { exact: true }),
-    ).toBeVisible();
     await expect(handover.getByText("Objectives", { exact: true })).toHaveCount(
       0,
     );
@@ -300,15 +301,19 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(0);
     const goal = handover
       .getByRole("list", { name: "Term results" })
-      .getByText("Retain 90% of customers", { exact: true });
-    const [checkBox, goalBox, beginBox, exitBox] = await Promise.all([
+      .getByText("Revenue covers operating costs by 1885", { exact: true });
+    const [checkBox, firstLineCenter, beginBox, exitBox] = await Promise.all([
       handover
         .getByRole("list", { name: "Term results" })
         .locator("li")
-        .filter({ hasText: "Retain 90% of customers" })
+        .filter({ hasText: "Revenue covers operating costs by 1885" })
         .getByRole("img", { name: "Met" })
         .boundingBox(),
-      goal.boundingBox(),
+      goal.evaluate(
+        (element) =>
+          element.getBoundingClientRect().top +
+          parseFloat(getComputedStyle(element).lineHeight) / 2,
+      ),
       handover
         .getByRole("button", { name: "Begin next term", exact: true })
         .boundingBox(),
@@ -317,9 +322,7 @@ for (const theme of ["light", "dark"] as const) {
         .boundingBox(),
     ]);
     expect(
-      Math.abs(
-        checkBox!.y + checkBox!.height / 2 - goalBox!.y - goalBox!.height / 2,
-      ),
+      Math.abs(checkBox!.y + checkBox!.height / 2 - firstLineCenter),
     ).toBeLessThanOrEqual(1);
     expect(Math.abs(beginBox!.y - exitBox!.y)).toBeLessThanOrEqual(1);
     await expect(handover.locator(".campaignHandoverActions")).toHaveCSS(
@@ -397,7 +400,7 @@ for (const theme of ["light", "dark"] as const) {
     const finalGoals = lateHandover.getByRole("list", {
       name: "Next term goals",
     });
-    await expect(finalGoals.getByRole("listitem")).toHaveCount(4);
+    await expect(finalGoals.getByRole("listitem")).toHaveCount(1);
     await expect(finalGoals).not.toContainText("kg CO₂e");
     await expect(finalGoals).not.toContainText(/by|·|this term/);
     await expect(

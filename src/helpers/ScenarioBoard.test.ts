@@ -315,7 +315,6 @@ it("serves each city with a utility and sells both sites from the plant border",
   const restored = parseSave(saved)!.game;
   expect(restored.objectiveProgress!.entries.map(({ id }) => id)).toEqual([
     "acquire-neighbor",
-    "retain-customers",
   ]);
   expect(gameObjectiveResults(restored)).toEqual(
     gameObjectiveResults(legacyPurchased),

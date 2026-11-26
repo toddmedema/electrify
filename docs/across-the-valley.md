@@ -1,8 +1,8 @@
 # Across the Valley
 
 Scenario 116 is a fictional Vermont Investor utility, January 2005–December 2024.
-Acquire three competing utilities by December 2014 and retain 90% of your expanded
-customer base in December 2024. Build facilities, sign power agreements, and connect
+Acquire three competing utilities by December 2014. Build facilities, sign power
+agreements, and connect
 individual building sites as your service area grows.
 All owned customers and facilities share one company power pool. Location controls
 finite suitable sites. Connecting uses the existing tile price; there is no
@@ -189,9 +189,8 @@ They do not track separate operating customer populations. Network impairment
 uses combined company retention while each asset keeps its purchase vintage and
 480-month depreciation schedule.
 
-The end-of-2024 retention goal is 90% of the original 90,000 customers plus the
-customers transferred in purchases before that evaluation. A purchase during
-Keep playing leaves the recorded mission result final. Valley's nuclear purchase drops from 160 MW to 80 MW in January 2017, and all bounded
+A purchase during Keep playing leaves the recorded mission result final.
+Valley's nuclear purchase drops from 160 MW to 80 MW in January 2017, and all bounded
 purchased-power rights serve the combined company without external resale.
 
 Inherited Ridge gas keeps a fixed $147,475 opening cold-weather package value,
@@ -255,7 +254,7 @@ npm run test:once -- UtilityExpansionBalance --runInBand
 ```
 
 Reports record company-wide energy, finances, customer retention, accepted
-transactions, acquisition and retention outcomes. Early losses are not evidence about
+transactions and the acquisition outcome. Early losses are not evidence about
 later events. Current-format saves persist the aggregate customer and market
 totals, transaction and financial ledgers, and one forecast timeline.
 
@@ -268,8 +267,8 @@ net worth. Separate controls check that unused finite agreements still charge
 their minimum and that signing a neighbor PPA cannot create duplicate power
 after buying its seller.
 
-Prepared cash and financed portfolios retain their full-term service, acquisition,
-retention and financial-invariant checks. Unprepared acquisition controls must
+Prepared cash and financed portfolios track full-term service, acquisitions, customer
+retention and financial invariants. Unprepared acquisition controls must
 expose the 2020 loss of contracted coverage instead of receiving free replacement
 market access. CEO cash plans also exercise neighboring acquisition dates in
 January, March and May 2014. Report current integrated outcomes with the PR;

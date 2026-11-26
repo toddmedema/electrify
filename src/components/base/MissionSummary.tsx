@@ -141,6 +141,8 @@ export default function MissionSummary({
   gridSupplyRiskVisible?: boolean;
 }) {
   const mission = getMissionStatus(game);
+  const goal = eventsOnly ? undefined : mission.headline;
+  const goalId = React.useId();
   const calculatedRisk = useMissionRisk(game, mission, upcoming, !eventsOnly);
   const companyRisk =
     gridSupplyRiskVisible && calculatedRisk?.id.startsWith("supply-plan:")
@@ -205,72 +207,64 @@ export default function MissionSummary({
       className={`missionSummary${warning ? " statusWarning" : ""}`}
       aria-label="Mission progress"
     >
-      <div className="missionSummaryHeader">
-        <div className="missionSummaryCopy">
-          {/* A risk to the goal takes the goal's place so the bar stays one line; the goal
-              itself is always one tap away in the dock's Scenario action. */}
-          {shownRisk ? (
-            <StatusReadout
-              className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
-              textClassName="missionRiskText"
-              concept={warning ? "danger" : "forecast"}
-              color={warning ? "inherit" : "primary"}
-              aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
-              title={shownRisk.label}
-              onClick={() =>
-                shownRisk.id.startsWith("active:")
-                  ? onActiveEvents?.()
-                  : onEvidence?.(shownRisk.target)
-              }
-            >
-              {shortLabel}
-            </StatusReadout>
-          ) : (
-            !eventsOnly &&
-            mission.headline &&
-            mission.headline.id !== "decisions" && (
-              <span
-                className="missionSummaryHeadline"
-                title={`${mission.headline.label}: ${mission.headline.current}. ${mission.headline.target}. ${mission.headline.timing}`}
-              >
-                {mission.headline.compact}
-              </span>
-            )
-          )}
-          {/* Leads with the goal or its risk, so a warning icon lines up with the grid readout's. */}
-          <Button
-            className="missionSummaryMonths"
-            color="primary"
-            aria-label={
-              mission.monthsRemaining === 0
-                ? "Term complete"
-                : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`
-            }
-            aria-expanded={scenarioOpen}
-            aria-controls={scenarioOpen ? "tool-SCENARIO" : undefined}
-            onClick={
-              scenarioOpen
-                ? onCloseScenario
-                : () => onEvidence?.("mission-details")
+      <div className="missionSummaryCopy">
+        {shownRisk && (
+          <StatusReadout
+            className={`missionRiskButton${warning ? "" : " missionRiskEvent"}`}
+            textClassName="missionRiskText"
+            concept={warning ? "danger" : "forecast"}
+            color={warning ? "inherit" : "primary"}
+            aria-label={`${shownRisk.shortLabel}. ${shownRisk.label}`}
+            title={shownRisk.label}
+            onClick={() =>
+              shownRisk.id.startsWith("active:")
+                ? onActiveEvents?.()
+                : onEvidence?.(shownRisk.target)
             }
           >
-            {/* A crowded single-row bar hides the tail to read "144 mo left"; the full text
-                stays in the DOM, so it reads the same everywhere else. */}
-            <span>
-              {mission.monthsRemaining === 0 ? (
-                "Term complete"
-              ) : (
-                <>
-                  {mission.monthsRemaining} mo
-                  <span className="missionSummaryMonthsTail">
-                    {mission.monthsRemaining === 1 ? "nth" : "nths"}
-                  </span>{" "}
-                  left
-                </>
-              )}
+            {shortLabel}
+          </StatusReadout>
+        )}
+        <Button
+          className="missionSummaryMonths"
+          color="primary"
+          aria-label={
+            mission.monthsRemaining === 0
+              ? "Term complete"
+              : `${mission.monthsRemaining} ${mission.monthsRemaining === 1 ? "month" : "months"} left`
+          }
+          aria-describedby={goal ? goalId : undefined}
+          aria-expanded={scenarioOpen}
+          aria-controls={scenarioOpen ? "tool-SCENARIO" : undefined}
+          onClick={
+            scenarioOpen
+              ? onCloseScenario
+              : () => onEvidence?.("mission-details")
+          }
+        >
+          <span>
+            {mission.monthsRemaining === 0 ? (
+              "Term complete"
+            ) : (
+              <>
+                {mission.monthsRemaining} mo
+                <span className="missionSummaryMonthsTail">
+                  {mission.monthsRemaining === 1 ? "nth" : "nths"}
+                </span>{" "}
+                left
+              </>
+            )}
+          </span>
+          {goal && (
+            <span
+              className="missionSummaryHeadline"
+              id={goalId}
+              title={`${goal.label}: ${goal.current}. ${goal.target}. ${goal.timing}`}
+            >
+              {goal.compact}
             </span>
-          </Button>
-        </div>
+          )}
+        </Button>
       </div>
       <span className="srOnly" aria-live="polite">
         {announcement}

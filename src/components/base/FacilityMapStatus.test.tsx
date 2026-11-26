@@ -79,15 +79,18 @@ it("keeps cables buried on wet construction sites until switchgear is fitted", (
 
 it("prioritizes construction over operation pause and retained output", () => {
   const { view, facility } = ready();
+  facility.yearsToBuild = 1;
   facility.yearsToBuildLeft = 0.25;
   expect(facilityMapStatus(view, 0)).toEqual({
     kind: "construction",
     label: "Under construction",
+    progress: 0.75,
   });
   facility.paused = true;
   expect(facilityMapStatus(view, 0)).toEqual({
     kind: "construction",
     label: "Under construction; operation paused",
+    progress: 0.75,
   });
 });
 
@@ -103,7 +106,7 @@ it("shows added-capacity construction without classifying the operating base as 
     costPerStartDelta: 0,
     startsMinute: 0,
     yearsToBuild: 0.25,
-    yearsToBuildLeft: 0.25,
+    yearsToBuildLeft: 0.125,
     quoteKey: "status-only-fixture",
   };
   expect(facilityOperatingStatus(facility, 0)).toEqual({
@@ -113,12 +116,14 @@ it("shows added-capacity construction without classifying the operating base as 
   expect(facilityMapStatus(view, 0)).toEqual({
     kind: "construction",
     label: "Generating; capacity upgrade in progress",
+    progress: 0.5,
   });
   facility.paused = true;
   expect(facilityOperatingStatus(facility, 0).kind).toBe("paused");
   expect(facilityMapStatus(view, 0)).toEqual({
     kind: "construction",
     label: "Operation paused; capacity upgrade in progress",
+    progress: 0.5,
   });
 });
 
@@ -150,6 +155,7 @@ it.each(["producing", "charging", "paused"] as const)(
 
 it("keeps construction progressing when only facility operation is paused", () => {
   const { game, facility } = ready();
+  facility.yearsToBuild = 1;
   facility.yearsToBuildLeft = 0.25;
   facility.paused = true;
   tickState(game);
@@ -157,10 +163,12 @@ it("keeps construction progressing when only facility operation is paused", () =
     (view) => view.operatingFacility?.id === facility.id,
   )!;
   expect(view.facility!.yearsToBuildLeft).toBeLessThan(0.25);
-  expect(facilityMapStatus(view, game.date.minute)).toEqual({
+  const status = facilityMapStatus(view, game.date.minute);
+  expect(status).toMatchObject({
     kind: "construction",
     label: "Under construction; operation paused",
   });
+  expect(status?.progress).toBeGreaterThan(0.75);
 });
 
 it("shows operation pause while a plant still has measured output", () => {
@@ -209,6 +217,7 @@ it("recognizes only an active offline retrofit as construction", () => {
   expect(facilityMapStatus(view, 99)).toEqual({
     kind: "construction",
     label: "Retrofitting",
+    progress: 0.99,
   });
   facility.paused = true;
   expect(facilityMapStatus(view, 99)?.label).toBe(
@@ -265,9 +274,13 @@ it("keeps a scheduled permanent shutdown truthful in both status consumers", () 
   });
 });
 
-it.each([0, 1])(
-  "reports only known peer construction progress %i",
-  (yearsToBuildLeft) => {
+it.each([
+  [0, 2, undefined],
+  [1, undefined, undefined],
+  [1, 2, 0.5],
+] as const)(
+  "reports only known peer construction progress with %i years left of %s",
+  (yearsToBuildLeft, yearsToBuild, progress) => {
     const { view } = ready();
     const foreign: TerritoryTileView = {
       ...view,
@@ -275,11 +288,11 @@ it.each([0, 1])(
       ownerKey: "peer:other",
       ownerName: "Other utility",
       operatingFacility: undefined,
-      facility: { ...view.facility!, yearsToBuildLeft },
+      facility: { ...view.facility!, yearsToBuild, yearsToBuildLeft },
     };
     expect(facilityMapStatus(foreign, 0)).toEqual(
       yearsToBuildLeft > 0
-        ? { kind: "construction", label: "Under construction" }
+        ? { kind: "construction", label: "Under construction", progress }
         : { kind: "unknown", label: "Operating status unavailable" },
     );
   },

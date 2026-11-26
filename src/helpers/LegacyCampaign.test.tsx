@@ -20,7 +20,10 @@ import cloneDeep from "lodash.clonedeep";
 import { TICKS_PER_MONTH, TICK_MINUTES } from "../Constants";
 import { LEGACY_SCENARIOS } from "../data/LegacyCampaign";
 import { getScenario } from "../data/Scenarios";
-import { scenarioRules } from "./ScenarioRules";
+import {
+  retiredLegacyScenarioObjectives,
+  scenarioRules,
+} from "./ScenarioRules";
 import {
   MINUTES_PER_MONTH,
   summarizeTimeline,
@@ -35,11 +38,15 @@ import {
   gameObjectiveResults,
   scenarioObjectiveDefinitions,
   objectiveOwnedVintageFuels,
+  objectiveContextForDefinitions,
   objectiveContextForGame,
 } from "./ObjectiveRules";
 import {
   objectiveMonthObservation,
   objectiveTargetMet,
+  createObjectiveProgress,
+  evaluateScenarioObjectives,
+  recordObjectiveMonth,
 } from "./ScenarioObjectives";
 import { roundToSignificantDigits } from "./Math";
 import { EMPTY_HISTORY } from "./DateTime";
@@ -110,7 +117,8 @@ test("campaign money uses final-year nominal limits and actual monthly amounts",
   );
   const scenario = LEGACY_SCENARIOS[2];
   const goals = scenarioObjectiveDefinitions(scenario, third);
-  const debt = goals.find((goal) => goal.metric === "monthEndDebt")!;
+  const archivedGoals = retiredLegacyScenarioObjectives(scenario, third);
+  const debt = archivedGoals.find((goal) => goal.metric === "monthEndDebt")!;
   const rate = goals.find((goal) => goal.metric === "monthlyBilledRate")!;
   const expectedDebt = roundToSignificantDigits(
     third.campaign!.debtAllowance *
@@ -149,6 +157,55 @@ test("campaign money uses final-year nominal limits and actual monthly amounts",
     objectiveMonthObservation(rate, { month: 228, history: row }, context, 100),
   ).toEqual([228, expectedRate * 1000, 1000]);
   expectColdImport(serializeSave(third));
+});
+
+test("continues a schema 27 handover while preserving the original term verdicts", () => {
+  const game = closingCompany();
+  const scenario = LEGACY_SCENARIOS[0];
+  const definitions = retiredLegacyScenarioObjectives(scenario, game);
+  const context = objectiveContextForDefinitions(game, scenario, definitions);
+  let previous = createObjectiveProgress(
+    definitions,
+    context,
+    game.campaign!.openingCustomers,
+  );
+  for (const history of game.monthlyHistory.slice().reverse()) {
+    const month = (history.year - game.startingYear) * 12 + history.month - 1;
+    previous = recordObjectiveMonth(
+      previous,
+      definitions,
+      { month, history },
+      context,
+    );
+  }
+  const verdicts = evaluateScenarioObjectives(definitions, previous, context);
+  const term = game.campaign!.completedTerms[0];
+  term.objectiveProgress = previous;
+  term.objectiveResults = definitions.map(({ id }) =>
+    verdicts.find((verdict) => verdict.id === id)!,
+  );
+  term.debrief.objectiveResults = term.objectiveResults;
+  game.objectiveProgress = previous;
+  const save = { ...serializeSave(game), schemaVersion: 27 };
+  const restored = parseSave(JSON.parse(JSON.stringify(save)))!;
+  expect(restored.game.campaign!.completedTerms[0]).toEqual(term);
+  expect(restored.game.objectiveProgress?.entries).toEqual([
+    expect.objectContaining({
+      id: "first-profitable-year",
+      observations: previous.entries.find(
+        ({ id }) => id === "first-profitable-year",
+      )!.observations,
+    }),
+  ]);
+  const successor = reducer(restored.game, continueLegacyCampaign());
+  expect(successor.campaign!.generationIndex).toBe(1);
+  expect(
+    scenarioObjectiveDefinitions(LEGACY_SCENARIOS[1], successor),
+  ).toHaveLength(1);
+  expectColdImport(serializeSave(successor));
+  const corrupt = cloneDeep(restored);
+  corrupt.game.campaign!.completedTerms[0].objectiveProgress.checksum = `sha256-${"0".repeat(64)}`;
+  expect(parseSave(corrupt)).toBeNull();
 });
 
 test("oil retirement counts paused commissioned equipment, excludes replacements, and deduplicates cohort facts", () => {

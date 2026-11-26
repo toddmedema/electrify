@@ -329,6 +329,7 @@ function legacyScenarioRules(
   scenario: ScenarioType,
   parameters: Pick<GameType, "difficulty" | "seed"> &
     Partial<Pick<GameType, "campaign" | "customerMarketSize">>,
+  includeRetiredObjectives = false,
 ): CompiledScenarioRules {
   const index = LEGACY_GENERATIONS.findIndex(
     (generation) => generation.scenarioId === scenario.id,
@@ -363,6 +364,7 @@ function legacyScenarioRules(
       : undefined;
   const key = canonicalRuleJson([
     scenario.id,
+    includeRetiredObjectives,
     offset,
     parameters.difficulty,
     parameters.seed,
@@ -378,12 +380,16 @@ function legacyScenarioRules(
   ]);
   const cached = legacyRulesCache.get(key);
   if (cached) return cached;
-  const definitions = legacyRuleDefinitions(index, {
-    ...context,
-    goalRateIndex,
-    goalCostIndex,
-    ...(endMarketCustomers === undefined ? {} : { endMarketCustomers }),
-  });
+  const definitions = legacyRuleDefinitions(
+    index,
+    {
+      ...context,
+      goalRateIndex,
+      goalCostIndex,
+      ...(endMarketCustomers === undefined ? {} : { endMarketCustomers }),
+    },
+    includeRetiredObjectives,
+  );
   const local = compileScenarioRules(definitions, {
     namespace: {
       kind: "official",
@@ -444,6 +450,16 @@ function legacyScenarioRules(
     legacyRulesCache.delete(legacyRulesCache.keys().next().value!);
   legacyRulesCache.set(key, rules);
   return rules;
+}
+
+export function retiredLegacyScenarioObjectives(
+  scenario: ScenarioType,
+  game: Pick<
+    GameType,
+    "difficulty" | "seed" | "campaign" | "customerMarketSize"
+  >,
+): CompiledRuleObjective[] {
+  return legacyScenarioRules(scenario, game, true).objectives;
 }
 
 /** Static objective/catalog readers use fixed defaults; every live/forecast reader binds its game. */
