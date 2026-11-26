@@ -456,10 +456,10 @@
     "durationYears": 20,
     "theme": "Rapid growth",
     "icon": "/images/across-the-valley.svg",
-    "dek": "The utility across the valley is for sale. Buying it brings more customers, more equipment and more obligations than the purchase price alone suggests.",
+    "dek": "Acquire three competing utilities by December 2014. Each deal brings customers, equipment and commitments to keep the larger grid running.",
     "description": "Connect and acquire neighboring utilities in a fictional Vermont power market. Compare purchase terms, network costs and supply obligations in Electrify.",
     "setup": [
-      "Begin in 2005 running Champlain Electric, a fictional utility around Burlington. You can connect with neighbors and acquire another company, turning a local operation into a larger regional utility.",
+      "Begin in 2005 running Champlain Electric, a fictional utility around Burlington. Buying three neighboring utilities by December 2014 turns a local operation into a larger regional utility.",
       "The deal brings a whole company with it. Supply contracts, debt, customers and network upkeep all affect what expansion costs. Upkeep rises later in your term, while power-purchase limits become tighter from 2017."
     ],
     "decisions": [
@@ -558,7 +558,7 @@
     "description": "Explore the 1902–1921 term of Electrify's Legacy campaign. Grow an inherited utility, finance expansion and prepare the company for its next handover.",
     "setup": [
       "Beyond the Dynamo is the second Legacy generation, reached by continuing the company founded in First Light. Your opening fleet and finances depend on the decisions made during that first term.",
-      "The goal now is growth. Reach more customers as electricity demand rises, while keeping end-of-term debt within the published allowance. Extra sales are useful only if the utility can afford the system needed to serve them."
+      "Grow your customer base by term end as more people use electricity. Budget for the capacity you need to serve them."
     ],
     "decisions": [
       {
@@ -567,7 +567,7 @@
       },
       {
         "title": "Finance expansion carefully",
-        "body": "Weigh borrowing against the revenue new capacity can earn. The campaign checks the debt you leave at the end of your term."
+        "body": "Weigh borrowing against the revenue new capacity can earn. Your successor takes over the debt you leave at the end of your term."
       },
       {
         "title": "Work with the inherited company",
@@ -591,7 +591,7 @@
     "description": "Keep electricity affordable in the 1922–1941 Legacy campaign term. Balance an inherited utility's prices, construction plans and debt in Electrify.",
     "setup": [
       "This third Legacy term begins with the company handed down from Beyond the Dynamo. Its customers, aging plants and financial commitments remain yours to manage.",
-      "Demand continues to rise, but raising prices is not an unlimited source of construction money. Your featured objective sets an affordability goal for the end of the term, alongside the need to retain customers and manage debt."
+      "Demand continues to rise, but raising prices is not an unlimited source of construction money. Meet the affordability target at the end of the term."
     ],
     "decisions": [
       {
@@ -633,7 +633,7 @@
       },
       {
         "title": "Keep expansion affordable",
-        "body": "Balance the cost of extra reserve with the campaign's customer-bill and debt objectives. Readiness is part of the service your utility sells."
+        "body": "Balance the cost of extra reserve with what your company can afford to build. Readiness is part of the service your utility sells."
       },
       {
         "title": "Prepare another handover",
@@ -669,8 +669,8 @@
         "body": "Review the inherited fleet's fuel exposure before the shocks arrive. Decisions made in the quieter years shape the bills that follow."
       },
       {
-        "title": "Meet the term's goals together",
-        "body": "Track efficiency savings alongside customer retention, affordability and debt. A successful policy still has to fit the utility's finances."
+        "title": "Budget for efficiency",
+        "body": "Compare measured electricity savings with the cost of the programs that deliver them."
       }
     ],
     "takeaway": "Try meeting more of your customers' needs with less electricity to generate.",
@@ -703,7 +703,7 @@
       },
       {
         "title": "Balance reserve with customer bills",
-        "body": "Compare local backup, connections and spending against affordability and debt limits. The company has to survive the crisis and the next handover."
+        "body": "Compare the cost of local backup, connections and emergency purchases. The company has to survive the crisis and the next handover."
       }
     ],
     "takeaway": "Bring your inherited company through a term when access to power can no longer be taken for granted.",
@@ -723,7 +723,7 @@
     "description": "Serve evening demand as your utility gets cleaner in Electrify's 2002–2021 Legacy term. Plan around solar timing and a wildfire import restriction.",
     "setup": [
       "The seventh Legacy generation begins in 2002 with the company you have carried through six previous terms. Its inherited fleet may offer a useful foundation or a lot of unfinished work.",
-      "Your featured objective focuses on serving evening demand, alongside a cleaner electricity supply. A northern import restriction during July and August 2021 adds another reason to look closely at local supply and storage."
+      "Serve 99.5% of evening demand at the end of the term. A northern import restriction during July and August 2021 adds another reason to look closely at local supply and storage."
     ],
     "decisions": [
       {
@@ -736,7 +736,7 @@
       },
       {
         "title": "Lower emissions without losing service",
-        "body": "Compare the emissions goal with reliability, bills and debt. A cleaner portfolio has to keep supplying the customers it serves."
+        "body": "Check that a cleaner portfolio can still supply customers throughout the evening."
       }
     ],
     "takeaway": "Continue the campaign and build for the hours when a sunny day has already ended.",
@@ -756,7 +756,7 @@
     "description": "Renew an inherited utility in Electrify's 2022–2041 Legacy term. Retire old oil equipment, reduce emissions and build for rising electricity demand.",
     "setup": [
       "The eighth Legacy term begins in 2022 with everything earlier leaders left behind. Electricity demand rises, while oil equipment at least thirty years old loses output from 2030.",
-      "Your featured objective requires retiring oil equipment commissioned through 2000. What needs replacing depends on your own campaign history. You also need cleaner electricity, affordable bills and a manageable financial handover."
+      "Your featured objective requires retiring oil equipment commissioned through 2000. What needs replacing depends on your own campaign history. Check the replacement fleet early enough to retire the older units by the deadline."
     ],
     "decisions": [
       {
@@ -802,7 +802,7 @@
       },
       {
         "title": "Finish with a viable company",
-        "body": "Keep customer retention, affordability and debt alongside the climate objective. Two centuries of expansion end with a utility that still has people to serve."
+        "body": "Keep the grid reliable and solvent as you work within the term’s carbon budget."
       }
     ],
     "takeaway": "Follow your company to 2061 and see what your long sequence of choices adds up to.",

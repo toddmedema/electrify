@@ -208,7 +208,7 @@ it.each(parcelCheckpointLineages)(
     );
     expect(
       restored.grids[0].objectiveProgress?.entries.map(({ id }) => id),
-    ).toEqual(["acquire-neighbor", "retain-customers"]);
+    ).toEqual(["acquire-neighbor"]);
     expect(restored.grids.map((grid) => currentTick(grid)!.cash)).toEqual(
       world.grids.map((grid) => currentTick(grid)!.cash),
     );
@@ -387,6 +387,32 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
     }
   });
 
+  it("keeps archived goals for a retired company in a schema 27 Valley match", () => {
+    const saved = checkpoint("preview", 23);
+    saved.gameSchema = 27;
+    saved.rules =
+      "coop-2-1a95347433b292b1c39f0acd04a8d123c411a599ee4d43c03bf2f4aed2753fd7";
+    for (const grid of saved.grids)
+      grid.utilityExpansion!.sellerFleet = "authored";
+    saved.outcomes[saved.seats[0].id] = {
+      outcome: "bankrupt",
+      title: "Bankrupt!",
+      month: 1,
+    };
+    const restored = restoreWorld(saved, "schema27");
+    const resumed = restoreWorld(checkpointWorld(restored), "round-trip");
+    const [retired, active] = resumed.grids;
+    expect(retired.objectiveProgress).toEqual(saved.grids[0].objectiveProgress);
+    expect(active.objectiveProgress?.entries.map(({ id }) => id)).toEqual([
+      "acquire-neighbor",
+    ]);
+    expect(
+      roomView(resumed, resumed.seats[1].id)
+        .game?.multiplayer?.results?.[0].objectiveResults?.map(({ id }) => id)
+        .sort(),
+    ).toEqual(["acquire-neighbor", "retain-customers"]);
+  });
+
   function recomputeChecksum(progress: ObjectiveProgress) {
     const {
       version,
@@ -427,7 +453,7 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
   it("rejects a corrupt preview checksum with the original rules digest", () => {
     const saved = checkpoint("preview");
     saved.grids[0].objectiveProgress!.checksum = unknownDigest;
-    expect(() => restoreWorld(saved, "corrupt")).toThrow(/invalid grids/);
+    expect(() => restoreWorld(saved, "corrupt")).toThrow(/unsupported format/);
   });
 
   it("rejects a corrupt retired checksum or evidence chain before rebuilding", () => {

@@ -112,7 +112,11 @@ Schema 26 adds dated tile connection construction. Existing tile receipts remain
 Schema 27 records the seller fleet rules for Across the Valley. Existing runs
 retain their original NPC generator ages and acquisition prices.
 
-Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25 and 26 co-op identities
+Schema 28 keeps the recorded observations for the remaining official goal in
+ongoing Across the Valley and Legacy runs. Completed Legacy terms retain their
+original objectives and verdicts.
+
+Recognized published schema 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26 and 27 co-op identities
 have ordered transitions that preserve the run's original scoring provenance.
 Existing company-local land rights, including old duplicate ownership, are
 retained. New claims are exclusive and checked in host command order. Other

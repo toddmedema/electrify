@@ -10,6 +10,14 @@ import { validTransmissionLine, parseSave, serializeSave } from "./SaveGame";
 import { upgradeSave } from "./SaveUpgrade";
 import { createGame } from "./testing/Simulator";
 import { retiredValleyOpeningProgress } from "./testing/SaveTestHelpers";
+import { VALLEY_TWO_GOAL_OBJECTIVES } from "./data/UtilityExpansionObjectives";
+import { getScenario } from "./data/Scenarios";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./helpers/DateTime";
+import { objectiveContextForDefinitions } from "./helpers/ObjectiveRules";
+import {
+  createObjectiveProgress,
+  recordObjectiveMonth,
+} from "./helpers/ScenarioObjectives";
 import { currentTick } from "./helpers/GameSelectors";
 import { getBuildFacilityQuote } from "./data/Facilities";
 import { facilityExpansionQuote } from "./helpers/FacilityExpansion";
@@ -37,6 +45,7 @@ import reducer, {
   applyAcquireUtility,
   buildFacility,
   generateForecastTimeline,
+  generateNewTimeline,
   tickState,
 } from "./reducers/Game";
 import { expandFacility } from "./reducers/GameActions";
@@ -128,10 +137,7 @@ it.each([
     expect(parsed).not.toBeNull();
     expect(parsed!.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     const migratedProgress = expect.objectContaining({
-      entries: [
-        expect.objectContaining({ id: "acquire-neighbor" }),
-        expect.objectContaining({ id: "retain-customers" }),
-      ],
+      entries: [expect.objectContaining({ id: "acquire-neighbor" })],
     });
     expect(parsed!.game.objectiveProgress).toEqual(
       evidence === "current"
@@ -162,6 +168,46 @@ it.each([
     expect(JSON.stringify(roundTrip)).toEqual(JSON.stringify(resumed));
   },
 );
+
+it("retains recorded acquisition evidence when migrating a schema 27 Valley save", () => {
+  const game = createGame({ scenarioId: 116, seed: 61 });
+  runMonths(game, 1);
+  game.date = getDateFromMinute(120 * MINUTES_PER_MONTH, game.startingYear);
+  game.monthlyHistory[0] = { ...game.monthlyHistory[0], year: 2014, month: 12 };
+  delete game.transmission!.agreementAccounts;
+  game.timeline = generateNewTimeline(game, 1e9, 90000);
+  const definitions = VALLEY_TWO_GOAL_OBJECTIVES;
+  const context = objectiveContextForDefinitions(
+    game,
+    getScenario(116)!,
+    definitions,
+  );
+  const progress = recordObjectiveMonth(
+    createObjectiveProgress(
+      definitions,
+      context,
+      game.objectiveProgress!.retentionBaseline,
+    ),
+    definitions,
+    { month: 119, history: game.monthlyHistory[0], ownedUtilities: [] },
+    context,
+  );
+  const old = {
+    ...serializeSave({ ...game, objectiveProgress: progress }),
+    schemaVersion: 27,
+  };
+  const restored = parseSave(old)!;
+  expect(restored.game.objectiveProgress?.entries).toEqual([
+    expect.objectContaining({
+      id: "acquire-neighbor",
+      observations: [[119, 0, 1]],
+    }),
+  ]);
+  expect(parseSave(restored)).toEqual(restored);
+  const corrupt = cloneDeep(old);
+  corrupt.game.objectiveProgress!.entries[0].observations[0][1] = 3;
+  expect(parseSave(corrupt)).toBeNull();
+});
 
 it.each([22, 23])(
   "rejects corrupt evidence from either Valley ruleset through schema %i solo import",

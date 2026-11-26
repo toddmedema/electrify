@@ -50,7 +50,11 @@ import { CUSTOM_SCENARIO_ID, getScenario } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
-import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import {
+  gameObjectiveResults,
+  hasArchivedValleyGoals,
+  migrateSingleOfficialGoal,
+} from "../helpers/ObjectiveRules";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import { pendingTileConnections } from "../helpers/TerritoryConnections";
 import { MINUTES_PER_MONTH, summarizeHistory } from "../helpers/DateTime";
@@ -1192,6 +1196,18 @@ function validGrid(
   peers?: TerritoryPurchaseContext,
 ) {
   const g = world.grids[i];
+  let objectiveProgress = g.objectiveProgress;
+  if (world.outcomes[world.seats[i].id]) {
+    try {
+      if (hasArchivedValleyGoals(g)) {
+        const migrated = migrateSingleOfficialGoal(g);
+        if (!migrated) return false;
+        objectiveProgress = migrated;
+      }
+    } catch {
+      return false;
+    }
+  }
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
   const expectedConnections = initial.grids[i].transmission!.lines;
   const nativeLines = isUtilityExpansionGame(g)
@@ -1214,6 +1230,7 @@ function validGrid(
       serializeSave({
         ...g,
         multiplayer: undefined,
+        objectiveProgress,
         transmission: intertiesEnabledForScenario(scenario, g.location)
           ? {
               buyingRule: g.transmission!.buyingRule,
@@ -1834,12 +1851,21 @@ function upgradeTerritoryWorld(value: unknown): unknown {
         ? "acquisition-preview"
         : undefined;
   for (let i = 0; i < result.grids.length; i++) {
+    const grid = result.grids[i];
     const upgraded = upgradeSave(
-      { schemaVersion: old.gameSchema, game: result.grids[i] },
+      { schemaVersion: old.gameSchema, game: grid },
       publishedValleyRules,
     );
     if (!upgraded) return value;
-    result.grids[i] = upgraded.game as GameType;
+    const migrated = upgraded.game as GameType;
+    const seat = result.seats?.[i];
+    const ending = seat && result.outcomes?.[seat.id];
+    if (ending && hasArchivedValleyGoals(grid) && migrated.multiplayer) {
+      // A retired company keeps the goals that produced its recorded outcome.
+      migrated.objectiveProgress = grid.objectiveProgress;
+      migrated.multiplayer.ending = ending;
+    }
+    result.grids[i] = migrated;
   }
   result.gameSchema = SAVE_SCHEMA_VERSION;
   result.rules = RULES;
