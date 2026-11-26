@@ -234,3 +234,133 @@ for (const theme of ["light", "dark"]) {
     });
   });
 }
+
+async function systemPalette(group: Locator) {
+  return group.evaluate((element) => {
+    // Resolve system colors inside the same document and color scheme as the controls.
+    const probe = document.createElement("span");
+    probe.style.cssText =
+      "forced-color-adjust:none;color:ButtonText;background:ButtonFace;border-color:Highlight;outline-color:HighlightText";
+    element.append(probe);
+    const style = getComputedStyle(probe);
+    const palette = {
+      ink: style.color,
+      face: style.backgroundColor,
+      highlight: style.borderTopColor,
+      highlightText: style.outlineColor,
+      hover: matchMedia("(hover: hover) and (pointer: fine)").matches,
+      forced: matchMedia("(forced-colors: active)").matches,
+      dark: matchMedia("(prefers-color-scheme: dark)").matches,
+    };
+    probe.remove();
+    return palette;
+  });
+}
+
+async function expectSpeedPaint(
+  button: Locator,
+  palette: Awaited<ReturnType<typeof systemPalette>>,
+  state: "selected" | "rest" | "hover" | "focus",
+) {
+  const paint = await button.evaluate((element) => {
+    const group = element.parentElement!;
+    const glyph = element.querySelector("svg");
+    const style = getComputedStyle(element);
+    return {
+      ink: glyph ? getComputedStyle(glyph).fill : style.color,
+      floor: glyph ? 3 : 4.5,
+      segment: style.backgroundColor,
+      track: getComputedStyle(group).backgroundColor,
+      thumb: getComputedStyle(group, "::before").backgroundColor,
+      outline: style.outlineColor,
+    };
+  });
+  const selected = state === "selected";
+  const background = selected ? paint.thumb : paint.segment;
+  expect
+    .soft(contrastRatio(paint.ink, background, paint.track), state)
+    .toBeGreaterThanOrEqual(paint.floor);
+  expect
+    .soft(paint.ink, state)
+    .toBe(selected ? palette.highlightText : palette.ink);
+  if (selected) {
+    expect(paint.thumb).toBe(palette.highlight);
+    expect(paint.segment).toBe("rgba(0, 0, 0, 0)");
+  }
+  if (state === "hover") expect.soft(paint.segment, state).toBe(palette.face);
+  if (state === "focus") {
+    await expect(button).toHaveCSS("outline-style", "solid");
+    expect
+      .soft(contrastRatio(paint.outline, paint.track), "focus ring")
+      .toBeGreaterThanOrEqual(3);
+  }
+}
+
+for (const app of ["light", "dark"] as const) {
+  for (const system of ["light", "dark"] as const) {
+    test(`forced colors keep speed controls readable with ${app} app and ${system} system`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({
+        forcedColors: "active",
+        colorScheme: system,
+        reducedMotion: "reduce",
+      });
+      await page.addInitScript(
+        (theme) => localStorage.setItem("theme", theme),
+        app,
+      );
+      await page.goto("/?scenario=111");
+      await page
+        .getByRole("button", { name: "Start game", exact: true })
+        .click();
+      const speeds = page.getByRole("group", {
+        name: "game speed",
+        exact: true,
+      });
+      await expect(speeds).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute("data-theme", app);
+      const palette = await systemPalette(speeds);
+      expect(palette.forced).toBe(true);
+      expect(palette.dark).toBe(system === "dark");
+
+      const pause = speeds.getByRole("button", { name: "pause", exact: true });
+      const slow = speeds.getByRole("button", {
+        name: "slow speed",
+        exact: true,
+      });
+      for (const [selected, other] of [
+        [slow, pause],
+        [pause, slow],
+      ]) {
+        await selected.click();
+        await expect(selected).toHaveAttribute("data-thumb", "true");
+        await expect(other).toHaveAttribute("aria-pressed", "false");
+        // A pointer click leaves the selected control hovered on desktop.
+        await expectSpeedPaint(selected, palette, "selected");
+        await page.mouse.move(0, 0);
+        await expectSpeedPaint(other, palette, "rest");
+        if (palette.hover) {
+          await other.hover();
+          await expectSpeedPaint(other, palette, "hover");
+          await page.mouse.move(0, 0);
+        }
+        await selected.press(selected === pause ? "ArrowRight" : "ArrowLeft");
+        await expect(other).toBeFocused();
+        await expectSpeedPaint(other, palette, "focus");
+        await other.press(selected === pause ? "ArrowLeft" : "ArrowRight");
+        await expect(selected).toBeFocused();
+        await expectSpeedPaint(selected, palette, "selected");
+      }
+      const build = page
+        .getByRole("navigation", { name: "Game actions" })
+        .getByRole("button", { name: "Build", exact: true });
+      await expect(build).toHaveAttribute("aria-expanded", "false");
+      await expectGlyphContrast(build, palette.hover);
+      await build.click();
+      await expect(build).toHaveAttribute("aria-expanded", "true");
+      await page.mouse.move(0, 0);
+      await expectGlyphContrast(build, palette.hover);
+    });
+  }
+}

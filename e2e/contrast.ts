@@ -17,18 +17,32 @@ export async function foregroundContrast(locator: Locator): Promise<number> {
   });
   let painted = [255, 255, 255];
   for (const background of backgrounds.reverse()) {
-    const [red, green, blue, alpha] = colorChannels(background);
-    painted = [red, green, blue].map(
-      (value, channel) => value * alpha + painted[channel] * (1 - alpha),
-    );
+    painted = composite(colorChannels(background), painted);
   }
   return rgbContrast(colorChannels(foreground), painted);
 }
 
 /** WCAG contrast between computed colors, for text on a painted
  * pseudo-element that foregroundContrast's ancestor walk cannot see. */
-export function contrastRatio(foreground: string, background: string): number {
-  return rgbContrast(colorChannels(foreground), colorChannels(background));
+export function contrastRatio(
+  foreground: string,
+  background: string,
+  underlay?: string,
+): number {
+  const surface = colorChannels(background);
+  return rgbContrast(
+    colorChannels(foreground),
+    underlay ? composite(surface, colorChannels(underlay)) : surface,
+  );
+}
+
+function composite(
+  [red, green, blue, alpha]: number[],
+  underlay: number[],
+): number[] {
+  return [red, green, blue].map(
+    (value, channel) => value * alpha + underlay[channel] * (1 - alpha),
+  );
 }
 
 function colorChannels(color: string): number[] {

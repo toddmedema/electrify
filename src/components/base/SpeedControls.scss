@@ -8,6 +8,7 @@
   --speed-segment: 46px;
   // The thumb, ring and hover wash all sit this far inside a segment, so they share one shape.
   --speed-inset: 4px;
+  --speed-hover: var(--bg-selected);
   // Decelerates into place like a spring settling; reduced motion removes it below.
   --speed-ease: cubic-bezier(0.32, 0.72, 0, 1);
   // Co-op labels sit this much high, leaving room under them for the other players' pips.
@@ -81,7 +82,7 @@
 
       @media (hover: hover) and (pointer: fine) {
         &:hover:not([data-thumb="true"]) {
-          background-color: var(--bg-selected);
+          background-color: var(--speed-hover);
         }
       }
 
@@ -192,6 +193,8 @@
   @media (forced-colors: active) {
     .speedToggles.MuiToggleButtonGroup-root {
       forced-color-adjust: none;
+      --speed-hover: ButtonFace;
+      --focus-ring: ButtonText;
       background: Canvas;
       box-shadow: inset 0 0 0 1px ButtonBorder;
 
@@ -201,6 +204,10 @@
 
       > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
         color: ButtonText;
+
+        .MuiSvgIcon-root {
+          color: inherit;
+        }
 
         &[data-thumb="true"] {
           color: HighlightText;
