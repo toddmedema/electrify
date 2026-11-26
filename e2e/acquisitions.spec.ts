@@ -2007,6 +2007,47 @@ test("normal valley play saves across the first year and resumes from IndexedDB"
   await expect(page.getByText("Save failed", { exact: true })).toHaveCount(0);
 });
 
+test("keyboard focus reveals a zoomed-out tile beside the build rail", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium");
+  await page.setViewportSize({ width: 1024, height: 800 });
+  const network = await startMap(page, "light");
+  const game = (await readSavedGame(page))!;
+  const western = territoryTileViews(game).reduce((edge, view) =>
+    hexCenter(view.tile).x < hexCenter(edge.tile).x ? view : edge,
+  ).tile;
+  const tile = network.locator(`[data-map-target="${western.id}"]`);
+  const viewport = network.locator(".territoryMapViewport");
+  const rail = buildRail(page);
+  const bounds = (await viewport.boundingBox())!;
+  const railBounds = (await rail.boundingBox())!;
+  const railRight = railBounds.x + railBounds.width;
+
+  await panToTile(page, western);
+  await viewport.dispatchEvent("wheel", {
+    deltaY: 1200,
+    clientX: bounds.x + bounds.width / 2,
+    clientY: bounds.y + bounds.height / 2,
+  });
+  await viewport.dispatchEvent("wheel", {
+    deltaX: bounds.x + bounds.width / 2 - railRight + 24,
+  });
+  await expect
+    .poll(async () => {
+      const box = (await tile.boundingBox())!;
+      return box.x + box.width / 2;
+    })
+    .toBeLessThan(railRight);
+
+  await page.keyboard.press("Tab");
+  await tile.focus();
+  await expect(tile).toBeFocused();
+  await expect
+    .poll(async () => (await tile.boundingBox())!.x)
+    .toBeGreaterThanOrEqual(railRight);
+});
+
 test("map tile hover and right-click expose the tile's own actions", async ({
   page,
 }, info) => {

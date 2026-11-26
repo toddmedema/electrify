@@ -791,6 +791,10 @@ export default function TerritoryHexMap({
   }, [allWires, renderedTiles]);
   const revealTile = (tile: { q: number; r: number }) => {
     const target = hexCenter(tile);
+    const railWidth =
+      viewport.current
+        ?.closest(".territoryNetwork")
+        ?.querySelector<HTMLElement>(".desktopBuildRail")?.offsetWidth ?? 0;
     setCamera((current) => ({
       x:
         current.x +
@@ -800,7 +804,9 @@ export default function TerritoryHexMap({
         ) +
         Math.min(
           0,
-          target.x - current.x + Math.max(0, worldWidth / 2 - HEX_WIDTH),
+          target.x -
+            current.x +
+            Math.max(0, worldWidth / 2 - HEX_WIDTH - railWidth / scale),
         ),
       y:
         current.y +
@@ -1386,7 +1392,7 @@ export default function TerritoryHexMap({
               view.connection &&
                 tileConnectionLabel(view.connection, game.date.minute),
               construction !== undefined &&
-                `${Math.round(construction * 100)}% complete`,
+                `${Math.min(99, Math.floor(construction * 100))}% complete`,
               disaster?.condition,
               disaster?.facilityImpact,
               view.owned

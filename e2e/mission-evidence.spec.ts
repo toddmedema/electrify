@@ -100,7 +100,7 @@ async function range(page: Page) {
     ]);
 }
 for (const theme of ["light", "dark"]) {
-  test(`grid warnings separate current reserve from future supply risk in ${theme}`, async ({
+  test(`grid warnings separate current reserve from future supply risk in ${theme} @minimum-phone`, async ({
     page,
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
