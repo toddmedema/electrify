@@ -989,9 +989,9 @@ function buildRoomView(
                       name: facility.name,
                       peakW: facility.peakW,
                       yearsToBuildLeft: facility.yearsToBuildLeft,
-                      ...(facility.yearsToBuildLeft > 0 && {
-                        yearsToBuild: facility.yearsToBuild,
-                      }),
+                      ...(facility.yearsToBuildLeft > 0
+                        ? { yearsToBuild: facility.yearsToBuild }
+                        : {}),
                       ...(facility.fuel !== undefined
                         ? { fuel: facility.fuel }
                         : {}),
@@ -1514,9 +1514,9 @@ function territoryGameForWorld(
                         name: facility.name,
                         peakW: facility.peakW,
                         yearsToBuildLeft: facility.yearsToBuildLeft,
-                        ...(facility.yearsToBuildLeft > 0 && {
-                          yearsToBuild: facility.yearsToBuild,
-                        }),
+                        ...(facility.yearsToBuildLeft > 0
+                          ? { yearsToBuild: facility.yearsToBuild }
+                          : {}),
                         ...(facility.fuel !== undefined
                           ? { fuel: facility.fuel }
                           : {}),

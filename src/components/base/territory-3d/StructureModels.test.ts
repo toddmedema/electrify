@@ -10,7 +10,14 @@ import type {
 } from "./Types";
 
 // The union owns the inventory: adding a kind requires giving it these contracts.
-const inventory: Record<StructureKind, true> = {
+const sharedFinishedArt = {
+  "gas-combined-cycle": "gas",
+  "enhanced-geothermal": "geothermal",
+} as const;
+const inventory: Record<
+  Exclude<StructureKind, keyof typeof sharedFinishedArt>,
+  true
+> = {
   "city-small": true,
   "city-medium": true,
   "city-large": true,
@@ -41,6 +48,68 @@ const variants: { kind: StructureKind; size: FacilitySize }[] = kinds.map(
 );
 for (const kind of facilityKinds)
   variants.push({ kind, size: "small" }, { kind, size: "large" });
+
+const constructionKinds: StructureKind[] = [
+  ...facilityKinds,
+  "gas-combined-cycle",
+  "enhanced-geothermal",
+];
+const constructionVariants = constructionKinds.flatMap((kind) =>
+  (["small", "medium", "large"] as const).map((size) => ({ kind, size })),
+);
+
+it.each(constructionVariants)(
+  "$kind ($size) has four distinct inert construction models",
+  ({ kind, size }) => {
+    const finished = getStructureModel(kind, [], size);
+    const sequence = ([0, 1, 2, 3] as const).map((stage) => {
+      const model = getStructureModel(kind, [], size, stage);
+      expect(getStructureModel(kind, [], size, stage)).toBe(model);
+      expect(model.parts.length).toBeGreaterThan(0);
+      const world = model.parts.flatMap((part) => {
+        expect(part.motion).toBeUndefined();
+        expect(part.mesh.positions.length).toBeGreaterThan(0);
+        return vertices(part.mesh).map((point) => posed(part, point, 0));
+      });
+      expect(world.every((point) => point.every(Number.isFinite))).toBe(true);
+      expect(world.length / 3).toBeLessThan(1500);
+      expect(model.footprint).toBeLessThan(1);
+      expect(model.terminals).toEqual(stage === 3 ? finished.terminals : []);
+      for (const [x, y, z] of model.terminals)
+        expect(
+          world.some(
+            ([px, py, pz]) => Math.hypot(x - px, y - py, z - pz) < 0.000001,
+          ),
+        ).toBe(true);
+      return model;
+    });
+    const geometry = [...sequence, finished].map(({ parts }) =>
+      parts.flatMap(({ mesh }) => Array.from(mesh.positions)),
+    );
+    for (let index = 0; index < geometry.length; index++)
+      for (const previous of geometry.slice(0, index))
+        expect(
+          previous.length !== geometry[index].length ||
+            previous.some(
+              (value, coordinate) => value !== geometry[index][coordinate],
+            ),
+        ).toBe(true);
+  },
+);
+
+it.each(Object.entries(sharedFinishedArt))(
+  "%s shares the commissioned artwork of %s but has its own build sequence",
+  (kind, completed) => {
+    for (const size of ["small", "medium", "large"] as const) {
+      expect(getStructureModel(kind as StructureKind, [], size)).toBe(
+        getStructureModel(completed, [], size),
+      );
+      const siteWork = (variant: StructureKind) =>
+        getStructureModel(variant, [], size, 0).parts[0].mesh.positions;
+      expect(siteWork(kind as StructureKind)).not.toEqual(siteWork(completed));
+    }
+  },
+);
 
 it.each(["city-small", "city-medium", "city-large"] as const)(
   "%s grows distinct solid buildings within the tile and retains its wire terminals",

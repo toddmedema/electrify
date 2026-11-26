@@ -31,7 +31,10 @@ import {
   formatTerrainPercent,
   tileHasConstructionTechnology,
 } from "../base/TerritoryTileFacts";
-import { facilityMapStatus } from "../base/FacilityMapStatus";
+import {
+  facilityMapStatus,
+  needsSubmergedCable,
+} from "../base/FacilityMapStatus";
 import useFacilityMapMotion from "../base/useFacilityMapMotion";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
@@ -159,15 +162,6 @@ interface Props {
   projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
   projectWindOutput?: Partial<Record<TerrainType, number>>;
-}
-function needsSubmergedCable({ tile, facility }: TerritoryTileView) {
-  return (
-    !tile.city &&
-    !facility &&
-    (tile.terrain === "lake" ||
-      tile.terrain === "ocean" ||
-      tile.terrain === "river")
-  );
 }
 export default function TerritoryHexMap({
   game,

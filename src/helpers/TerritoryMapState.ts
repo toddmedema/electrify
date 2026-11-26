@@ -28,8 +28,8 @@ export interface TileFacilityView {
   fuel?: FuelNameType;
   peakW: number;
   peakWh?: number;
-  yearsToBuild?: number;
   yearsToBuildLeft: number;
+  yearsToBuild?: number;
 }
 /** Retained facility IDs are company-local; the map identifies them by physical position. */
 export type TerritoryMapTileKey =

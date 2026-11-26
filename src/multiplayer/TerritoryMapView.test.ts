@@ -82,8 +82,9 @@ it("projects actual foregrounds on other companies' claimed land without changin
     seat: "0",
     name: "Wind",
     peakW: 50e6,
-    yearsToBuild: world.grids[0].facilities.find((f) => f.tileId === tile.id)!
-      .yearsToBuild,
+    yearsToBuild: world.grids[0].facilities.find(
+      (facility) => facility.tileId === tile.id,
+    )!.yearsToBuild,
     yearsToBuildLeft: expect.any(Number),
   });
   expect(Object.keys(view.multiplayer!.tileFacilities!)).toEqual([tile.id]);

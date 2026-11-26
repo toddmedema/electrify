@@ -60,6 +60,7 @@ export interface TerrainModelOptions {
   adjacentEdges?: number;
 }
 export type FacilitySize = "small" | "medium" | "large";
+export type FacilityConstructionStage = 0 | 1 | 2 | 3;
 export type StructureKind =
   | "city-small"
   | "city-medium"
@@ -71,6 +72,7 @@ export type StructureKind =
   | "offshore-wind"
   | "airborne-wind"
   | "gas"
+  | "gas-combined-cycle"
   | "gas-steam"
   | "oil"
   | "coal"
@@ -78,6 +80,7 @@ export type StructureKind =
   | "nuclear"
   | "hydro"
   | "geothermal"
+  | "enhanced-geothermal"
   | "battery"
   | "iron-air"
   | "pumped-hydro";

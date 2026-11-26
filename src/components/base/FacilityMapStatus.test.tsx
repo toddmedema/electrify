@@ -15,6 +15,7 @@ import {
 import {
   facilityMapStatus,
   facilityOperatingStatus,
+  needsSubmergedCable,
 } from "./FacilityMapStatus";
 
 function ready() {
@@ -48,6 +49,33 @@ function storage(): StorageOperatingType {
     lifetimeExpenses: 0,
   };
 }
+
+it("keeps cables buried on wet construction sites until switchgear is fitted", () => {
+  const { view, facility } = ready();
+  const tile = { ...view.tile, terrain: "lake" as const };
+  const unbuilt = { ...facility, yearsToBuild: 1, yearsToBuildLeft: 1 };
+  expect(needsSubmergedCable({ tile })).toBe(true);
+  expect(needsSubmergedCable({ tile, facility: unbuilt })).toBe(true);
+  expect(
+    needsSubmergedCable({
+      tile,
+      facility: { ...unbuilt, yearsToBuildLeft: 0.5 },
+    }),
+  ).toBe(true);
+  expect(
+    needsSubmergedCable({
+      tile,
+      facility: { ...unbuilt, yearsToBuildLeft: 0.25 },
+    }),
+  ).toBe(false);
+  expect(needsSubmergedCable({ tile, facility })).toBe(false);
+  expect(
+    needsSubmergedCable({
+      tile: { ...tile, terrain: "plains" },
+      facility: unbuilt,
+    }),
+  ).toBe(false);
+});
 
 it("prioritizes construction over operation pause and retained output", () => {
   const { view, facility } = ready();
