@@ -127,24 +127,40 @@ test("dragging a facility selects a compatible site and waits for confirmation",
   await inspector
     .getByRole("button", { name: /^Cancel construction of/ })
     .click();
-  const measuredExit = details.evaluate(async (element) => {
-    const row = element.closest(".MuiCollapse-root");
-    const initial = row?.getBoundingClientRect().height ?? 0;
-    const deadline = performance.now() + 3000;
-    while (row?.isConnected && performance.now() < deadline) {
-      await new Promise(requestAnimationFrame);
-      const height = row.getBoundingClientRect().height;
-      if (row.hasAttribute("inert") && height > 0 && height < initial - 1)
-        return true;
-    }
-    return false;
+  // Arm the observer before confirming. A busy renderer can skip every frame
+  // between the start and the end of the short collapse.
+  const measuredExit = await details.evaluateHandle((element) => {
+    const row = element.closest<HTMLElement>(".MuiCollapse-root")!;
+    const state = { inert: false, from: 0, to: -1 };
+    const observer = new MutationObserver(() => {
+      if (!row.inert || row.style.height !== "0px") return;
+      const height = row
+        .getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "height",
+        );
+      if (!(height?.effect instanceof KeyframeEffect)) return;
+      const [first, last] = height.effect.getKeyframes();
+      state.inert = row.inert;
+      state.from = parseFloat(String(first.height));
+      state.to = parseFloat(String(last.height));
+      observer.disconnect();
+    });
+    observer.observe(row, { attributeFilter: ["inert", "style"] });
+    return state;
   });
   await page
     .getByRole("dialog", { name: /^Cancel construction of/ })
     .getByRole("button", { name: "Cancel construction", exact: true })
     .click();
-  expect(await measuredExit).toBe(true);
   await expect(details).toHaveCount(0);
+  const { inert, from, to } = await measuredExit.jsonValue();
+  expect(inert).toBe(true);
+  expect(from).toBeGreaterThan(0);
+  expect(to).toBe(0);
+  await measuredExit.dispose();
 });
 
 for (const theme of ["light", "dark"] as const) {

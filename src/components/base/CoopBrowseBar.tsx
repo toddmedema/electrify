@@ -241,7 +241,10 @@ export default function CoopBrowseBar({
                         ".coopBrowseKickTarget, .coopBrowseActions button",
                       );
                     Array.from(actions ?? [])
-                      .find((button) => button !== trigger)
+                      .find(
+                        (button) =>
+                          button !== trigger && !button.closest("[inert]"),
+                      )
                       ?.focus();
                     coopControls()?.kick?.(id);
                   }}

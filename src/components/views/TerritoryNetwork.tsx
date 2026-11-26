@@ -345,9 +345,11 @@ function TileNetwork(props: Props) {
     return new Map<TerritoryMapTileKey, ReadyProjectSite>(
       views.flatMap(({ tile, owned, connectable }) => {
         if (!owned && !connectable) return [];
+        const key = territoryMapTileKey(tile);
         const quote = projectSiteQuote(game, mapProject, tile.id, connections);
-        return quote.facility
-          ? [[territoryMapTileKey(tile), quote] as const]
+        // A retained site's economic ID can resolve to a different company's position.
+        return quote.facility && territoryMapTileKey(quote.tile) === key
+          ? [[key, quote] as const]
           : [];
       }),
     );
