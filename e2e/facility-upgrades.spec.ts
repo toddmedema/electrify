@@ -21,19 +21,28 @@ for (const theme of ["light", "dark"]) {
       has: page.locator(".facilityName", { hasText: /^Natural Gas Peaker$/ }),
     });
     await row.locator(".facilityDisclosure").click();
-    const conversion = row.getByRole("region", {
-      name: "Combined-cycle conversion",
-    });
-    const action = conversion.getByRole("button", {
+    const actions = row.locator(".facilityActions");
+    await expect(row.getByText("Combined-cycle conversion")).toHaveCount(0);
+    await expect(row.getByText(/output afterward/)).toHaveCount(0);
+    const action = actions.getByRole("button", {
       name: /^Convert \([^)]+\)$/,
     });
     await expect(action).toBeDisabled();
     await expect(action).toHaveAccessibleDescription(/more cash needed/);
+    const labels = await actions.getByRole("button").allInnerTexts();
+    const upgradeIndex = labels.findIndex((label) =>
+      label.startsWith("Upgrade capacity"),
+    );
+    const convertIndex = labels.findIndex((label) =>
+      label.startsWith("Convert"),
+    );
+    expect(upgradeIndex).toBeGreaterThanOrEqual(0);
+    expect(convertIndex).toBeGreaterThan(upgradeIndex);
     const resilience = row.getByRole("region", { name: "Upgrades" });
     await expect(resilience).toContainText("Cold-weather package");
     await expect(resilience).not.toContainText("Cold protection");
     await expect(resilience).toContainText("Rated to");
-    const layout = await conversion.evaluate((element) => {
+    const layout = await actions.evaluate((element) => {
       const button = element.querySelector("button")!;
       const note = element.querySelector(".facilityRetrofit p")!;
       return {

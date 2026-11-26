@@ -23,6 +23,7 @@ const controls = {
   back: jest.fn(),
   copyCode: jest.fn(),
   openSaves: jest.fn(),
+  kick: jest.fn(),
 };
 beforeEach(() => {
   jest.clearAllMocks();
@@ -45,8 +46,12 @@ test("guests see who they follow and every player's state as a named icon", () =
     within(roster).getByRole("img", { name: "Connecting" }),
   ).toBeInTheDocument();
   expect(screen.queryByText("Invite via Steam")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByText("Leave"));
-  expect(controls.back).toHaveBeenCalled();
+  expect(
+    screen.queryByRole("button", { name: "Leave" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Manage lobby" }),
+  ).not.toBeInTheDocument();
 });
 
 test("a host alone invites friends first, can copy the code and cannot start yet", () => {
@@ -85,7 +90,7 @@ test("saves are offered only where the host chooses a new game", () => {
   expect(screen.queryByText("Load multiplayer save")).not.toBeInTheDocument();
 });
 
-test("the host sees how many guests are ready and starts for everyone", () => {
+test("the host sees how many guests are ready and waits for the rest", () => {
   const onStart = jest.fn();
   const host = coop({
     role: "host",
@@ -105,8 +110,94 @@ test("the host sees how many guests are ready and starts for everyone", () => {
   expect(screen.getByRole("button", { name: "Copy code" })).toHaveClass(
     "MuiButton-outlined",
   );
-  fireEvent.click(screen.getByText("Start for everyone"));
-  expect(onStart).toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "Waiting for players" }),
+  ).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Waiting for players" }));
+  expect(onStart).not.toHaveBeenCalled();
+});
+
+test("a host without a kick action does not offer Kick", () => {
+  registerCoopControls({ ...controls, kick: undefined });
+  render(
+    <CoopBrowseBar
+      coop={coop({
+        role: "host",
+        players: coop().players.map((player) => ({
+          ...player,
+          connected: true,
+        })),
+      })}
+    />,
+  );
+  expect(screen.queryByRole("button", { name: /^Kick / })).toBeNull();
+});
+
+test("the host kicks a guest from the name chip after it offers Kick?", () => {
+  const host = coop({
+    role: "host",
+    players: coop().players.map((player) => ({ ...player, connected: true })),
+  });
+  render(<CoopBrowseBar coop={host} />);
+  const cleo = screen.getByRole("button", { name: "Kick Cleo" });
+  expect(cleo).toHaveTextContent("Reviewing");
+  expect(cleo).not.toHaveTextContent("Kick?");
+  fireEvent.mouseEnter(cleo);
+  expect(cleo).toHaveTextContent("Kick?");
+  expect(cleo).not.toHaveTextContent("Reviewing");
+  fireEvent.click(cleo);
+  expect(controls.kick).toHaveBeenCalledWith("c");
+  expect(screen.queryByRole("button", { name: "Kick Alice" })).toBeNull();
+});
+
+test("a tap reveals Kick? and a second tap removes the guest", () => {
+  const host = coop({
+    role: "host",
+    players: coop().players.map((player) => ({ ...player, connected: true })),
+  });
+  render(<CoopBrowseBar coop={host} />);
+  const cleo = screen.getByRole("button", { name: "Kick Cleo" });
+  // Touch sends pointerdown, then a compatibility mouseenter, then click.
+  fireEvent.pointerDown(cleo, { pointerType: "touch" });
+  fireEvent.mouseEnter(cleo);
+  fireEvent.focus(cleo);
+  fireEvent.click(cleo, { detail: 1 });
+  expect(controls.kick).not.toHaveBeenCalled();
+  expect(cleo).toHaveTextContent("Kick?");
+  fireEvent.pointerDown(cleo, { pointerType: "touch" });
+  fireEvent.click(cleo, { detail: 1 });
+  expect(controls.kick).toHaveBeenCalledTimes(1);
+  expect(controls.kick).toHaveBeenCalledWith("c");
+});
+
+test("an online host waits until every guest is ready", () => {
+  const onStart = jest.fn();
+  const players = coop().players.map((player) => ({
+    ...player,
+    connected: true,
+  }));
+  const { rerender } = render(
+    <CoopStartButton
+      coop={coop({ role: "host", inviteCode: "012345", players })}
+      onStart={onStart}
+    />,
+  );
+  const waiting = screen.getByRole("button", { name: "Waiting for players" });
+  expect(waiting).toBeDisabled();
+  fireEvent.click(waiting);
+  expect(onStart).not.toHaveBeenCalled();
+  rerender(
+    <CoopStartButton
+      coop={coop({
+        role: "host",
+        inviteCode: "012345",
+        players: players.map((player) => ({ ...player, ready: true })),
+      })}
+      onStart={onStart}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start for everyone" }));
+  expect(onStart).toHaveBeenCalledTimes(1);
 });
 
 test("a guest's one action marks Ready for the selection on screen, then clears it", () => {
@@ -160,10 +251,15 @@ test("guests hear what the host has open as it changes", () => {
 });
 
 test("a setup that can't be played can't be started or marked ready", () => {
+  const players = coop().players.map((player) => ({
+    ...player,
+    connected: true,
+    ready: !player.host,
+  }));
   render(
     <>
       <CoopStartButton
-        coop={coop({ role: "host" })}
+        coop={coop({ role: "host", players })}
         onStart={jest.fn()}
         disabled
       />

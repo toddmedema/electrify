@@ -108,26 +108,22 @@ it("updates the connected picker immediately when synced wins unlock another lev
   expect(screen.getByText("Employee/Employee")).toBeInTheDocument();
 });
 
-test("online host back returns to the lobby and guest back leaves", () => {
+test("online host back and guest back both leave the lobby", () => {
   const back = jest.fn();
-  const returnToLobby = jest.fn();
   registerCoopControls({
     start: jest.fn(),
     ready: jest.fn(),
     back,
-    returnToLobby,
     copyCode: jest.fn(),
     openSaves: jest.fn(),
   });
   mockApp.ui.coop = { role: "host" };
   mapDispatchToProps(jest.fn()).onBack();
-  expect(returnToLobby).toHaveBeenCalledTimes(1);
-  expect(back).not.toHaveBeenCalled();
+  expect(back).toHaveBeenCalledTimes(1);
 
   mockApp.ui.coop = { role: "guest" };
   mapDispatchToProps(jest.fn()).onBack();
-  expect(back).toHaveBeenCalledTimes(1);
-  expect(returnToLobby).toHaveBeenCalledTimes(1);
+  expect(back).toHaveBeenCalledTimes(2);
 });
 
 test("a local host back uses the co-op control that returns to the join stage", () => {

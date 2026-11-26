@@ -37,7 +37,19 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
   }, [activeKey, events]);
 
   const focusDetails = React.useCallback((element: HTMLDivElement | null) => {
-    element?.focus();
+    // The opening key has already been delivered. Focus the action after it,
+    // and leave a control the player reached in the meantime alone.
+    window.setTimeout(() => {
+      if (!element?.isConnected) return;
+      const active = document.activeElement;
+      if (
+        active instanceof HTMLElement &&
+        active !== element &&
+        element.contains(active)
+      )
+        return;
+      element.querySelector<HTMLButtonElement>("button")?.focus();
+    }, 0);
   }, []);
 
   const closeDetails = (restoreFocus = false) => {
@@ -127,7 +139,6 @@ export default function InsightEventRail(props: Props): React.JSX.Element {
                 id={`insight-event-details-${events.indexOf(selected) + 1}`}
                 key={selected.key}
                 className="insightEventDetails"
-                tabIndex={-1}
                 ref={focusDetails}
                 role="dialog"
                 aria-label={selected.title || "Scenario event"}

@@ -7,11 +7,16 @@ export default function FacilityUpgradeAction(props: {
   cost: number;
   shortfall: number;
   onClick: () => void;
+  className?: string;
 }) {
   const shortfallId = React.useId();
   const { formatMoneyConcise, formatPurchasePrice } = useMoney();
   return (
-    <div className="facilityRetrofit">
+    <div
+      className={["facilityRetrofit", props.className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <Button
         variant="outlined"
         disabled={props.shortfall > 0}

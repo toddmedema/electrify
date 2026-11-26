@@ -28,6 +28,7 @@ import { monthMinute, topBarForecastEndMinute } from "../../helpers/Projection";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { getScenario } from "../../data/Scenarios";
 import { corridorsForLocation } from "../../data/AdjacentMarkets";
+import { focusInitialDialogAction } from "./dialogFocus";
 import { setManualHelpAnchor } from "./ManualHelpAnchor";
 import { MONTHS } from "../../Constants";
 import { useScreenEdgeMargin } from "../../ScreenEdgePadding";
@@ -144,7 +145,6 @@ export default function GridStatus({
     riskMonthStart > game.date.minute
       ? peakShortfallInMonth(forecast, riskMonthStart)
       : undefined;
-  const title = React.useRef<HTMLHeadingElement>(null);
   const id = React.useId();
   const close = () => {
     const trigger = anchor;
@@ -221,7 +221,11 @@ export default function GridStatus({
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         marginThreshold={edgeMargin}
         slotProps={{
-          transition: { onEntered: () => title.current?.focus() },
+          transition: {
+            onEntered: (node: HTMLElement) => {
+              focusInitialDialogAction(node);
+            },
+          },
           paper: {
             className: "gridStatusPopover",
             role: "dialog",
@@ -230,9 +234,7 @@ export default function GridStatus({
         }}
       >
         <div className="gridStatusHeading">
-          <h2 id={`${id}-title`} ref={title} tabIndex={-1}>
-            Grid status
-          </h2>
+          <h2 id={`${id}-title`}>Grid status</h2>
           <IconButton aria-label="Close grid status" onClick={close}>
             <CloseIcon />
           </IconButton>

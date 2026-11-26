@@ -1,6 +1,5 @@
 import { currencyForLocation } from "../../helpers/Currency";
 import { useMoney } from "./CurrencyContext";
-import GasConversion from "./GasConversion";
 import CoalRepower from "./CoalRepower";
 import FacilityUpgradeAction from "./FacilityUpgradeAction";
 import { currentCash } from "../../helpers/GameSelectors";
@@ -628,13 +627,6 @@ export default function FacilityDetails(props: Props): React.JSX.Element {
       )}
       {props.game && facility.fuel === "Coal" && (
         <CoalRepower
-          facility={facility}
-          game={props.game}
-          onRetrofit={props.onRetrofit}
-        />
-      )}
-      {props.game && !permanentlyShutdown && (
-        <GasConversion
           facility={facility}
           game={props.game}
           onRetrofit={props.onRetrofit}

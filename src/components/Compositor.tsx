@@ -28,6 +28,7 @@ import { rememberToolInput } from "./base/GameToolMemory";
 import { GAME_TOOLS, GameTool } from "./base/Navigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
 import DeferredSnackbar from "./base/DeferredSnackbar";
+import { focusInitialDialogAction } from "./base/dialogFocus";
 import { isBlackoutToast } from "../helpers/BlackoutToast";
 import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
@@ -756,7 +757,7 @@ export default class Compositor extends React.Component<Props, {}> {
           aria-labelledby="app-dialog-title"
           slotProps={{
             transition: {
-              onEntered: () => {
+              onEntered: (node: HTMLElement) => {
                 // Feedback can open before the tutorial dialog finishes entering.
                 if (this.props.ui.feedback) return;
                 if (
@@ -766,6 +767,7 @@ export default class Compositor extends React.Component<Props, {}> {
                   this.dialogCancelRef.current?.focus();
                 else if (this.props.ui.dialog.tutorialComplete)
                   this.tutorialPrimaryRef.current?.focus();
+                else focusInitialDialogAction(node);
               },
             },
           }}

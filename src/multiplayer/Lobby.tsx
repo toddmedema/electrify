@@ -19,6 +19,7 @@ import { seatAssignments } from "./Slots";
 import { crossplayFailure } from "./CrossplayApi";
 import { parseCrossplayInvite } from "./CrossplayInvite";
 import CoopInviteCode from "../components/base/CoopInviteCode";
+import { focusInitialDialogAction } from "../components/base/dialogFocus";
 import "./Lobby.css";
 
 /**
@@ -32,10 +33,8 @@ export default function Lobby({
   onJoined,
   onDiscardInvite,
   onOpenSaves,
-  onCopyLink,
   canAuthenticate = true,
   onChooseNew,
-  onContinueSetup,
   onCopyCode,
   onClose,
   onLeave,
@@ -50,12 +49,9 @@ export default function Lobby({
   onJoined?: () => void;
   onDiscardInvite?: () => void;
   onOpenSaves?: () => void;
-  onCopyLink?: () => void;
   canAuthenticate?: boolean;
   /** Host: set the multiplayer save aside and choose a new game. */
   onChooseNew: () => void;
-  /** Host: reopen Custom setup for the room that is already open. */
-  onContinueSetup?: () => void;
   onCopyCode: () => void;
   onClose: () => void;
   onLeave: () => void;
@@ -94,14 +90,29 @@ export default function Lobby({
     entryVersion.current++;
     onClose();
   }
-  const title = useRef<HTMLHeadingElement>(null);
   const mode =
     !lobby.lobbyId || entryOperation === "join"
       ? "entry"
       : pendingCampaign
         ? "campaign"
         : "waiting";
-  useEffect(() => title.current?.focus(), [mode]);
+  const openedMode = useRef<typeof mode | null>(null);
+  useEffect(() => {
+    // The opening animation moves focus itself, and only when the player has not
+    // already navigated. A later mode change moves to that mode's first action.
+    if (openedMode.current === null) {
+      openedMode.current = mode;
+      return;
+    }
+    if (openedMode.current === mode) return;
+    openedMode.current = mode;
+    focusInitialDialogAction(
+      document
+        .getElementById("multiplayer-lobby-title")
+        ?.closest<HTMLElement>('[role="dialog"]') ?? null,
+      { force: true },
+    );
+  }, [mode]);
   const host = !!lobby.selfId && lobby.selfId === lobby.hostId;
   const hostName =
     lobby.members.find((member) => member.id === lobby.hostId)?.name ||
@@ -142,13 +153,9 @@ export default function Lobby({
       aria-labelledby="multiplayer-lobby-title"
       slotProps={{
         transition: {
-          onEntered: () => {
+          onEntered: (node: HTMLElement) => {
             // Replace MUI's container autofocus, preserving navigation during the animation.
-            if (
-              document.activeElement ===
-              title.current?.closest('[role="dialog"]')
-            )
-              title.current?.focus();
+            focusInitialDialogAction(node);
           },
         },
       }}
@@ -174,9 +181,7 @@ export default function Lobby({
           component="h2"
           variant="h6"
           id="multiplayer-lobby-title"
-          ref={title}
-          tabIndex={-1}
-          sx={{ outline: "none", overflowWrap: "anywhere", minWidth: 0 }}
+          sx={{ overflowWrap: "anywhere", minWidth: 0 }}
         >
           {pendingCampaign ? "Pick your company" : "Play with friends"}
         </Typography>
@@ -316,50 +321,6 @@ export default function Lobby({
               )}
             </>
           )}
-          {mode === "waiting" &&
-            host &&
-            session.onlineCampaigns &&
-            !lobby.campaignLocked && (
-              <>
-                {lobby.inviteCode && (
-                  <CoopInviteCode
-                    code={lobby.inviteCode}
-                    onCopy={onCopyCode}
-                    onCopyLink={lobby.inviteToken ? onCopyLink : undefined}
-                  />
-                )}
-                {lobby.members.map((member) => (
-                  <Stack
-                    key={member.id}
-                    direction="row"
-                    spacing={1}
-                    sx={{
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <Typography sx={{ overflowWrap: "anywhere" }}>
-                      {member.name} ·{" "}
-                      {member.id === lobby.selfId
-                        ? "Host"
-                        : connected(member.id)
-                          ? "Connected"
-                          : "Connecting"}
-                    </Typography>
-                    {member.id !== lobby.selfId && (
-                      <Button
-                        aria-label={`Remove ${member.name}`}
-                        onClick={() =>
-                          run(() => session.removePlayer(member.id), "host")
-                        }
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </Stack>
-                ))}
-              </>
-            )}
           {mode === "waiting" && lobby.campaignLocked && (
             <>
               <Typography>
@@ -387,25 +348,23 @@ export default function Lobby({
               )}
             </>
           )}
-          {mode === "waiting" &&
-            !lobby.campaignLocked &&
-            (!host || !session.onlineCampaigns) && (
-              <Stack
-                direction="row"
-                spacing={1}
-                role="status"
-                sx={{ alignItems: "center" }}
-              >
-                <CircularProgress size={20} />
-                <Typography>
-                  {host
-                    ? "Opening your lobby…"
-                    : connected(lobby.hostId!)
-                      ? `Waiting for ${hostName} to share the custom setup…`
-                      : `Connecting to ${hostName}…`}
-                </Typography>
-              </Stack>
-            )}
+          {mode === "waiting" && !lobby.campaignLocked && (
+            <Stack
+              direction="row"
+              spacing={1}
+              role="status"
+              sx={{ alignItems: "center" }}
+            >
+              <CircularProgress size={20} />
+              <Typography>
+                {host
+                  ? "Opening your lobby…"
+                  : connected(lobby.hostId!)
+                    ? `Waiting for ${hostName} to share the custom setup…`
+                    : `Connecting to ${hostName}…`}
+              </Typography>
+            </Stack>
+          )}
           {mode === "waiting" &&
             session.onlineCampaigns &&
             !lobby.campaignLocked &&
@@ -459,19 +418,6 @@ export default function Lobby({
       )}
       {mode !== "entry" && (
         <DialogActions>
-          {mode === "waiting" &&
-            host &&
-            session.onlineCampaigns &&
-            !lobby.campaignLocked && (
-              <>
-                {onContinueSetup && (
-                  <Button variant="contained" onClick={onContinueSetup}>
-                    Continue setup
-                  </Button>
-                )}
-                <Button onClick={onClose}>Close</Button>
-              </>
-            )}
           {mode === "campaign" && host && (
             <Button disabled={busy} onClick={onChooseNew}>
               Choose a new game

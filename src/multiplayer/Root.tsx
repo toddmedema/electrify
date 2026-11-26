@@ -33,7 +33,6 @@ import {
   registerCoopControls,
   registerLobbyOpener,
   registerMultiplayerRuntime,
-  showMultiplayerLobby,
 } from "./Registry";
 import Lobby from "./Lobby";
 import SavesDialog from "./SavesDialog";
@@ -305,10 +304,6 @@ export default function MultiplayerRoot() {
                 activity: (reason) => session.setActivity(reason),
                 leave: (options) => session.leave(options),
                 exportSave: () => session.exportSave(),
-                subscribeStatus: session.subscribe,
-                deviceSaveTime: () => session.getSnapshot().lobby.savedAt,
-                onlineSaveTime: () => session.getSnapshot().lobby.sharedAt,
-                reconnect,
               });
               setOpen(false);
               sync();
@@ -374,23 +369,12 @@ export default function MultiplayerRoot() {
           .setReady(ready && browse ? selectionKey(browse) : "")
           .catch(() => undefined);
       },
-      returnToLobby: () => {
-        choosing.current = false;
-        setOpen(true);
-        syncCoop();
-      },
       back: () => {
-        const { lobby } = session.getSnapshot();
-        const host = lobby.hostId === lobby.selfId;
-        // A host alone in its lobby has nobody to warn.
-        if (host && lobby.members.length < 2) return leaveLobby();
         store.dispatch(
           dialogOpen({
             open: true,
-            title: "Leave the lobby?",
-            message: host
-              ? "Your friends will return to the main menu."
-              : "You'll stop following the host's game choice.",
+            title: "Leave this lobby?",
+            message: "Are you sure you want to leave this multiplayer lobby?",
             closeText: "Stay",
             actionLabel: "Leave lobby",
             destructive: true,
@@ -403,7 +387,18 @@ export default function MultiplayerRoot() {
       },
       copyCode,
       copyLink,
-      manageLobby: showMultiplayerLobby,
+      kick: (playerId) => {
+        void session.removePlayer(playerId).catch((error) => {
+          store.dispatch(
+            dialogOpen({
+              open: true,
+              title: "Could not remove player",
+              message: crossplayFailure(error, "Could not remove that player."),
+              closeText: "OK",
+            }),
+          );
+        });
+      },
       openSaves: () => setSavesOpen(true),
     });
     const acceptInvite = (invite: string) => {
@@ -457,7 +452,7 @@ export default function MultiplayerRoot() {
       registerMultiplayerRuntime(undefined);
       session.dispose();
     };
-  }, [session, syncCoop, leaveLobby, copyCode, copyLink, desktop, reconnect]);
+  }, [session, syncCoop, leaveLobby, copyCode, copyLink, desktop]);
   useEffect(() => {
     if (!hasView) return;
     return registerShutdownCheckpoint((reason) => {
@@ -610,12 +605,10 @@ export default function MultiplayerRoot() {
           onDiscardInvite={discardInvite}
           onHosted={startChoosing}
           onOpenSaves={() => setSavesOpen(true)}
-          onCopyLink={() => void copyLink()}
           onChooseNew={() => {
             session.cancelCampaign();
             startChoosing();
           }}
-          onContinueSetup={startChoosing}
           onCopyCode={copyCode}
           onClose={() => {
             discardInvite();

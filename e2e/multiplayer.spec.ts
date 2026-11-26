@@ -416,10 +416,14 @@ test("V2 joins immediately by invite and lets the host remove a guest", async ({
   await expect(lobby(guest).getByRole("alert")).toBeVisible();
   await campaign.requestJoin(guest, invite);
   await campaign.waitForGuest(host, guest);
-  await host.getByRole("button", { name: "Manage lobby", exact: true }).click();
-  const remove = lobby(host).getByRole("button", { name: "Remove WindyWren" });
-  await remove.click();
-  await expect(remove).toHaveCount(0);
+  const kick = host.getByRole("button", {
+    name: "Kick WindyWren",
+    exact: true,
+  });
+  await kick.hover();
+  await expect(kick).toContainText("Kick?");
+  await kick.click();
+  await expect(kick).toHaveCount(0);
   await expect(entry(guest)).toBeVisible();
   await entry(guest).click();
   await campaign.requestJoin(guest, invite);
@@ -618,16 +622,16 @@ test(
     await expect(warning).toHaveAccessibleDescription(
       /(?:waiting for the host|connection .* was interrupted).*Reconnect to continue this session.*won't create a new save.*Play with friends → Multiplayer saves/i,
     );
-    await expect(warning.getByRole("heading")).toBeFocused();
+    const reconnect = warning.getByRole("button", {
+      name: "Reconnect",
+      exact: true,
+    });
+    await expect(reconnect).toBeFocused();
     await expect(
       warning.getByRole("button", { name: "Return to main menu", exact: true }),
     ).toBeVisible();
     await guest.keyboard.press("Escape");
     await expect(warning).toBeVisible();
-    const reconnect = warning.getByRole("button", {
-      name: "Reconnect",
-      exact: true,
-    });
     await campaign.fixture.disconnect(guest);
     await reconnect.click();
     await expect

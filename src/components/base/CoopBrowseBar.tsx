@@ -47,6 +47,99 @@ function PlayerState({
   );
 }
 
+/** The host removes a guest by hovering their chip, then clicking it. */
+function RosterPlayer({
+  player,
+  canKick,
+}: {
+  player: CoopSelectionType["players"][number];
+  canKick: boolean;
+}): React.JSX.Element {
+  const [armed, setArmed] = React.useState(false);
+  // Set only by a hover or a previous tap. Focus and the tap's own mouseenter
+  // must not count, or the first press removes the guest immediately.
+  const prompted = React.useRef(false);
+  const confirmGesture = React.useRef(false);
+  const touchGesture = React.useRef(false);
+  const reveal = () => {
+    prompted.current = true;
+    setArmed(true);
+  };
+  const hide = () => {
+    prompted.current = false;
+    setArmed(false);
+  };
+  const hideUnlessFocused = (target: EventTarget) => {
+    if (target === document.activeElement) return;
+    hide();
+  };
+  const identity = (
+    <CouchPlayerText className="coopBrowseName" seatId={player.id}>
+      {player.name}
+    </CouchPlayerText>
+  );
+  if (!canKick)
+    return (
+      <li>
+        {identity}
+        <PlayerState player={player} />
+      </li>
+    );
+  return (
+    <li>
+      <button
+        type="button"
+        className="coopBrowseKickTarget"
+        aria-label={`Kick ${player.name}`}
+        onPointerDown={(event) => {
+          touchGesture.current = event.pointerType !== "mouse";
+          confirmGesture.current = prompted.current;
+        }}
+        onPointerEnter={(event) => {
+          if (event.pointerType === "mouse") reveal();
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType !== "mouse") return;
+          hideUnlessFocused(event.currentTarget);
+        }}
+        onMouseEnter={() => {
+          // A tap's compatibility mouseenter follows pointerdown. Ignore it.
+          if (touchGesture.current) return;
+          reveal();
+        }}
+        onMouseLeave={(event) => {
+          if (touchGesture.current) return;
+          hideUnlessFocused(event.currentTarget);
+        }}
+        onFocus={() => setArmed(true)}
+        onBlur={hide}
+        onClick={(event) => {
+          const wasTouch = touchGesture.current;
+          touchGesture.current = false;
+          // Keyboard activation follows focus, which already showed Kick?.
+          // A mouse click confirms a hover. A second tap confirms the first.
+          if (
+            event.detail === 0 ||
+            confirmGesture.current ||
+            (prompted.current && !wasTouch)
+          ) {
+            coopControls()?.kick?.(player.id);
+            return;
+          }
+          reveal();
+        }}
+      >
+        {identity}
+        {armed ? (
+          <span className="coopBrowseKick">Kick?</span>
+        ) : (
+          <PlayerState player={player} />
+        )}
+      </button>
+    </li>
+  );
+}
+
 /**
  * Who is choosing a co-op game together and who is ready. Hosts drive the selection screens and
  * invite friends from here; guests follow them read-only, so the bar names the host. Friends
@@ -108,32 +201,28 @@ export default function CoopBrowseBar({
           </div>
           <ul className="coopBrowseRoster" aria-label="Players">
             {coop.players.map((player) => (
-              <li key={player.id}>
-                <CouchPlayerText className="coopBrowseName" seatId={player.id}>
-                  {player.name}
-                </CouchPlayerText>
-                <PlayerState player={player} />
-              </li>
+              <RosterPlayer
+                key={player.id}
+                player={player}
+                canKick={
+                  host &&
+                  !coop.starting &&
+                  !player.host &&
+                  !!coopControls()?.kick
+                }
+              />
             ))}
           </ul>
-          {!coop.starting && (
+          {!coop.starting && host && coop.inviteCode && (
             <div className="coopBrowseActions">
-              {host && coop.inviteCode && (
-                <CoopInviteCode
-                  code={coop.inviteCode}
-                  prominent={alone}
-                  onCopy={() => coopControls()?.copyCode()}
-                  onCopyLink={
-                    coop.hasInviteLink ? coopControls()?.copyLink : undefined
-                  }
-                />
-              )}
-              {host && coopControls()?.manageLobby && (
-                <Button onClick={() => coopControls()?.manageLobby?.()}>
-                  Manage lobby
-                </Button>
-              )}
-              <Button onClick={() => coopControls()?.back()}>Leave</Button>
+              <CoopInviteCode
+                code={coop.inviteCode}
+                prominent={alone}
+                onCopy={() => coopControls()?.copyCode()}
+                onCopyLink={
+                  coop.hasInviteLink ? coopControls()?.copyLink : undefined
+                }
+              />
             </div>
           )}
         </div>
@@ -159,11 +248,12 @@ export function CoopStartButton({
   disabled?: boolean;
 }): React.JSX.Element {
   if (coop.role === "host") {
-    // A friend still connecting, or nobody here yet, would leave a company without a player.
+    // Online guests mark Ready. Local couch has no ready step, so connection is enough.
+    const needsReady = !!coop.inviteCode || !!coop.modSummary;
     const waiting =
       coop.players.length < 2 ||
       coop.players.some(
-        (p) => !p.connected || (!!coop.modSummary && !p.host && !p.ready),
+        (p) => !p.connected || (needsReady && !p.host && !p.ready),
       );
     return (
       <Button
@@ -179,7 +269,9 @@ export function CoopStartButton({
           ? "Starting…"
           : coop.players.length < 2
             ? "Invite a friend to start"
-            : "Start for everyone"}
+            : waiting
+              ? "Waiting for players"
+              : "Start for everyone"}
       </Button>
     );
   }

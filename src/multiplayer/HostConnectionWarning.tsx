@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { focusInitialDialogAction } from "../components/base/dialogFocus";
 import {
   Button,
   Dialog,
@@ -27,20 +28,23 @@ export default function HostConnectionWarning({
   onReconnect: () => Promise<void>;
   onReturnToMenu?: () => Promise<void>;
 }) {
-  const title = useRef<HTMLHeadingElement>(null);
   const [action, setAction] = useState<"reconnect" | "leave">();
   const activeAction = useRef<typeof action>();
   const [actionError, setActionError] = useState<string>();
   const menuOnly = !!endReason;
   // When the current session ends during a retry, the Reconnect button disappears.
   useEffect(() => {
+    if (!open || !menuOnly) return;
+    const dialog = document
+      .getElementById("multiplayer-interruption-title")
+      ?.closest<HTMLElement>('[role="dialog"]');
+    const active = document.activeElement;
     if (
-      open &&
-      menuOnly &&
-      (document.activeElement === document.body ||
-        document.activeElement === title.current?.closest('[role="dialog"]'))
+      active === document.body ||
+      active === document.documentElement ||
+      active === dialog
     )
-      title.current?.focus();
+      focusInitialDialogAction(dialog ?? null);
   }, [open, menuOnly]);
   useEffect(() => {
     if (!open && actionError) setActionError(undefined);
@@ -93,22 +97,14 @@ export default function HostConnectionWarning({
       onClose={() => {}}
       slotProps={{
         transition: {
-          onEntered: () => {
-            if (
-              document.activeElement ===
-              title.current?.closest('[role="dialog"]')
-            ) {
-              title.current?.focus();
-            }
+          onEntered: (node: HTMLElement) => {
+            // Replace MUI's container autofocus, preserving navigation during the animation.
+            focusInitialDialogAction(node);
           },
         },
       }}
     >
-      <DialogTitle
-        id="multiplayer-interruption-title"
-        ref={title}
-        tabIndex={-1}
-      >
+      <DialogTitle id="multiplayer-interruption-title">
         {menuOnly ? "Multiplayer session ended" : "Multiplayer connection"}
       </DialogTitle>
       <DialogContent>

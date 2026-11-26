@@ -49,6 +49,7 @@ export function onlineSessionServices(
   let authority: AuthorityWindow | undefined;
   let presence: string | undefined;
   let connected: string[] = [];
+  let roster = new Set<string>();
   let refreshedInvite:
     | {
         code: string;
@@ -107,7 +108,12 @@ export function onlineSessionServices(
 
   const peers = new TurnPeers(api, {
     message: (sender, payload) => {
-      if (!liveAuthority() || !connected.includes(sender)) return;
+      if (
+        !liveAuthority() ||
+        !connected.includes(sender) ||
+        (roster.size > 0 && !roster.has(sender))
+      )
+        return;
       for (const listener of listeners)
         listener({ kind: "message", sender, payload });
     },
@@ -127,6 +133,13 @@ export function onlineSessionServices(
     readTransfer: (peer, reference, signal) =>
       readTransfer(api, peer, reference, signal),
   });
+
+  function retainMembers(members: LobbyState["members"]) {
+    if (!members.length) return;
+    roster = new Set(members.map((member) => member.id));
+    // A link can open before the peer is published as connected; close it too.
+    for (const id of peers.retained()) if (!roster.has(id)) peers.forget(id);
+  }
 
   function expire(error?: string) {
     clearTimeout(expiry);
@@ -207,6 +220,9 @@ export function onlineSessionServices(
       return lobby;
     applied = sequence;
     roomId = result.lobby.lobbyId;
+    const fresh = performance.now() - monotonic < MAX_AUTHORITY_MS;
+    // A late reply can predate a guest who has since joined and connected.
+    if (fresh) retainMembers(result.lobby.members);
     const grant = result.authority;
     presence = grant?.presence;
     if (
@@ -227,7 +243,6 @@ export function onlineSessionServices(
     ) {
       refreshedInvite = undefined;
     }
-    const fresh = performance.now() - monotonic < MAX_AUTHORITY_MS;
     const lobbyView = {
       ...result.lobby,
       savedAt:
@@ -379,7 +394,8 @@ export function onlineSessionServices(
         type Reply = SessionReply<Request>;
         if (input.kind === "state") return lobby as Reply;
         if (input.kind === "send") {
-          if (!liveAuthority()) throw new PeerDisconnectedError();
+          if (!liveAuthority() || (roster.size > 0 && !roster.has(input.to)))
+            throw new PeerDisconnectedError();
           await peers.send(input.to, input.payload);
           return undefined as Reply;
         }
