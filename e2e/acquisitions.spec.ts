@@ -42,6 +42,7 @@ import {
   returnToTerritoryMap,
   selectTerritoryMapTile,
   setMapProjectCapacity,
+  showMapFacilityStatus,
   waitForTileConnection,
 } from "./layout";
 import { editSavedGame, readSavedGame, readSaveRecords } from "./save-fixture";
@@ -733,6 +734,7 @@ for (const theme of ["light", "dark"] as const) {
       await touch.detach();
     }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
+    await showMapFacilityStatus(network);
 
     // Restore a deterministic midpoint so the map can show a partially drawn ring.
     await editSavedGame(page, ({ game }) => {
@@ -2060,7 +2062,8 @@ test("map tile hover and right-click expose the tile's own actions", async ({
 
   await target.hover();
   const tooltip = network.getByRole("tooltip");
-  await expect(tooltip).toHaveText("Forest · Unconnected");
+  await expect(tooltip).toHaveText("Forest");
+  await expect(target).toHaveAccessibleDescription("Forest · Unconnected");
   await expect(target).not.toHaveAttribute("title", /.+/);
 
   await target.click({ button: "right" });

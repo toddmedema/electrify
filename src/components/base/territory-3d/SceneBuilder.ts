@@ -10,7 +10,6 @@ import { farmLayout, terrainArtHash } from "./TerrainVariants";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import {
   territoryMapTileKey,
-  type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../../helpers/TerritoryMapState";
 import { combustibleTile } from "../../../helpers/TerritoryWildfire";
@@ -24,32 +23,17 @@ import { hailModel } from "./Hailstones";
 import { getTowerConstructionModel } from "./StructureModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
-import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
-import { rotorAngle } from "./RotorPose";
-import { HEX_WIDTH } from "../TerritoryHexGeometry";
+import { tilePosition3D } from "./Projection";
 import type {
   FacilitySize,
   MapInstance,
   MapModel,
-  ModelPart,
-  MapFrame,
   MapWireConnection,
   StructureKind,
   TerrainModelOptions,
   Vec3,
 } from "./Types";
 
-import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
-
-/** Undefined allows ground hit testing; null means the point is outside the painted frame. */
-export type ScenePicker = (point: {
-  x: number;
-  y: number;
-}) => TerritoryMapTileKey | null | undefined;
-type PickFrame = Pick<
-  MapFrame,
-  "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
->;
 interface TileScene {
   weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
@@ -60,12 +44,6 @@ interface TileScene {
   model?: MapModel;
   structure?: MapInstance;
   hail?: MapInstance;
-}
-
-function waterRange(part: ModelPart) {
-  return part.material === "watershed-water"
-    ? WATERSHED_LEVEL_OFFSETS
-    : part.waterLevelRange;
 }
 
 function fillFraction(
@@ -92,44 +70,6 @@ function reservoirFill(facility?: FacilityOperatingType) {
   return facility.fuel === "Hydro"
     ? fillFraction(facility.reservoirWh, facility.reservoirCapacityWh)
     : undefined;
-}
-
-const pickBounds = new WeakMap<MapModel, readonly number[]>();
-function bounds(model: MapModel): readonly number[] {
-  const cached = pickBounds.get(model);
-  if (cached) return cached;
-  const value = [Infinity, -Infinity, Infinity, -Infinity];
-  for (const part of model.parts) {
-    if (part.motion === "steam") continue;
-    const vertices = part.mesh.positions,
-      offset = part.position ?? [0, 0, 0],
-      [empty, full] = waterRange(part) ?? [0, 0];
-    for (let i = 0; i < vertices.length; i += 3) {
-      const radius =
-        part.motion === "rotor" || part.motion === "sway"
-          ? Math.hypot(vertices[i], vertices[i + 1])
-          : undefined;
-      const x0 = offset[0] + (radius === undefined ? vertices[i] : -radius),
-        x1 = offset[0] + (radius === undefined ? vertices[i] : radius),
-        y0 =
-          offset[1] +
-          (radius === undefined ? vertices[i + 1] : -radius) -
-          (part.motion === "flow" ? 0.018 : 0) +
-          Math.min(empty, full),
-        y1 =
-          offset[1] +
-          (radius === undefined ? vertices[i + 1] : radius) +
-          (part.motion === "flow" ? 0.018 : 0) +
-          Math.max(empty, full),
-        z = offset[2] + vertices[i + 2];
-      value[0] = Math.min(value[0], x0);
-      value[1] = Math.max(value[1], x1);
-      value[2] = Math.min(value[2], z * CAMERA_SIN - y1 * CAMERA_COS);
-      value[3] = Math.max(value[3], z * CAMERA_SIN - y0 * CAMERA_COS);
-    }
-  }
-  pickBounds.set(model, value);
-  return value;
 }
 
 export interface ModelFactories {
@@ -518,107 +458,5 @@ export class SceneBuilder {
     )
       this.instances = instances;
     return this.instances;
-  }
-
-  /** Pick the nearest solid terrain or structure triangle; silhouette gaps retain the ground tile. */
-  pick(
-    point: { x: number; y: number },
-    frame: PickFrame,
-    motionPhase?: (key: string) => number,
-    instances: readonly MapInstance[] = this.instances,
-  ): TerritoryMapTileKey | undefined {
-    if (frame.scale <= 0) return undefined;
-    const x =
-        ((point.x - frame.width / 2) / frame.scale + frame.cameraX) / HEX_WIDTH,
-      y =
-        ((point.y - frame.height / 2) / frame.scale + frame.cameraY) /
-        HEX_WIDTH;
-    let depth = -Infinity,
-      tileKey: TerritoryMapTileKey | undefined;
-    for (const instance of instances) {
-      if (
-        !instance.id.startsWith("terrain:") &&
-        !instance.id.startsWith("structure:")
-      )
-        continue;
-      const px = x - instance.position[0],
-        py =
-          y -
-          instance.position[2] * CAMERA_SIN +
-          instance.position[1] * CAMERA_COS,
-        box = bounds(instance.model);
-      if (px < box[0] || px > box[1] || py < box[2] || py > box[3]) continue;
-      for (const part of instance.model.parts) {
-        if (
-          part.motion === "steam" ||
-          (part.hideWhenInactive && !instance.active)
-        )
-          continue;
-        const phase = part.motion
-            ? (motionPhase?.(instance.motionKey ?? instance.id) ?? 0) +
-              (part.phaseOffset ?? 0) * Math.PI * 2
-            : 0,
-          angle =
-            part.motion === "rotor"
-              ? rotorAngle(phase)
-              : part.motion === "sway"
-                ? Math.sin(phase) * 0.045
-                : 0,
-          range = waterRange(part),
-          rise =
-            (part.motion === "flow" ? Math.sin(phase) * 0.018 : 0) +
-            (range
-              ? waterLevelOffset(
-                  range,
-                  part.material === "watershed-water"
-                    ? frame.weather?.waterLevel
-                    : instance.waterLevel,
-                )
-              : 0),
-          c = Math.cos(angle),
-          s = Math.sin(angle),
-          offset = part.position ?? [0, 0, 0],
-          positions = part.mesh.positions;
-        const vertex = (i: number) => {
-          const vx = positions[i] * c - positions[i + 1] * s + offset[0],
-            vy = positions[i] * s + positions[i + 1] * c + offset[1] + rise,
-            vz = positions[i + 2] + offset[2];
-          return [
-            vx,
-            vz * CAMERA_SIN - vy * CAMERA_COS,
-            vy * CAMERA_SIN + vz * CAMERA_COS,
-          ];
-        };
-        for (let i = 0; i < positions.length; i += 9) {
-          const a = vertex(i),
-            b = vertex(i + 3),
-            d = vertex(i + 6),
-            denominator =
-              (b[1] - d[1]) * (a[0] - d[0]) + (d[0] - b[0]) * (a[1] - d[1]);
-          if (Math.abs(denominator) < 1e-12) continue;
-          const u =
-              ((b[1] - d[1]) * (px - d[0]) + (d[0] - b[0]) * (py - d[1])) /
-              denominator,
-            v =
-              ((d[1] - a[1]) * (px - d[0]) + (a[0] - d[0]) * (py - d[1])) /
-              denominator,
-            w = 1 - u - v;
-          if (u < -1e-7 || v < -1e-7 || w < -1e-7) continue;
-          const hitDepth =
-            u * a[2] +
-            v * b[2] +
-            w * d[2] +
-            instance.position[1] * CAMERA_SIN +
-            instance.position[2] * CAMERA_COS;
-          if (hitDepth > depth) {
-            depth = hitDepth;
-            tileKey = instance.id.startsWith("structure:")
-              ? (instance.id.slice(10) as TerritoryMapTileKey)
-              : (instance.id.slice(8) as TerritoryMapTileKey);
-          }
-        }
-      }
-    }
-    return tileKey;
   }
 }

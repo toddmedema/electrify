@@ -347,7 +347,7 @@ for (const theme of ["light", "dark"] as const) {
       ).toBeVisible();
     } else {
       await expect(
-        surface.getByRole("heading", { name: "Plan a project", exact: true }),
+        surface.getByRole("heading", { name: "Build", exact: true }),
       ).toBeVisible();
       await expect(
         surface.getByRole("tab", { name: "Generators", exact: true }),

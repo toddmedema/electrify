@@ -1140,21 +1140,14 @@ $topbar_height: 56px;
   font-size: var(--font-size-body2);
 }
 
-// In a game the offline notice shrinks to a dot on the menu button, explained inside the menu
-.gameMenuButton {
-  position: relative;
-}
-
+// In a game the offline notice shrinks to a dot beside its menu item text
 .offlineDot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   border: 1px solid var(--warning-dot-rim);
   background: var(--warning-dot);
-  pointer-events: none;
 }
 
 .gameMenuOffline.MuiMenuItem-root.Mui-disabled {
@@ -1163,11 +1156,6 @@ $topbar_height: 56px;
   opacity: 1;
   color: var(--font-color-faded);
   font-size: var(--font-size-body2);
-
-  .offlineDot {
-    position: static;
-    flex: 0 0 auto;
-  }
 }
 
 // Never squeezed by whatever is below it, on either layout
