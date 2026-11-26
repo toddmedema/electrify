@@ -340,6 +340,7 @@ html[data-couch-seat] #appbar #topbar {
         -webkit-line-clamp: 2;
         text-align: right;
         white-space: normal;
+        overflow: hidden;
         overflow-wrap: anywhere;
       }
     }

@@ -261,6 +261,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(handover).toBeVisible();
     await expect(handover.locator("..")).toHaveCSS("opacity", "1");
     await expectDialogToFit(handover);
+    if (page.viewportSize()!.width < 600) {
+      await expect(page.locator("#appbar .missionSummaryHeadline")).toHaveCSS(
+        "overflow",
+        "hidden",
+      );
+    }
     await expect(
       handover.getByRole("heading", {
         name: "Next: Beyond the Dynamo (1902–1921)",
