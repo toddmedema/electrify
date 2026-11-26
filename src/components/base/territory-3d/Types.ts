@@ -124,11 +124,6 @@ export interface MapFrame {
   motionAllowed: boolean;
   playbackRate: number;
 }
-/** Camera and geometry from the last successful draw submission. */
-export interface PaintedScene {
-  frame: MapFrame;
-  instances: readonly MapInstance[];
-}
 export interface RendererDiagnostics {
   frames: number;
   drawCalls: number;
