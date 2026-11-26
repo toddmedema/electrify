@@ -6,16 +6,11 @@ import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import type { TerritoryTileDefinition } from "../../../data/TerritoryTiles";
 import type { HexWire } from "../TerritoryHexGeometry";
 import { SceneBuilder } from "./SceneBuilder";
-import type { ScenePicker } from "./SceneBuilder";
 import { MapRenderer } from "./Renderer";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
 import TerritoryCanvas3D from "./TerritoryCanvas3D";
-import type {
-  RendererHandle,
-  RendererLoader,
-  RendererState,
-} from "./TerritoryCanvas3D";
+import type { RendererLoader, RendererState } from "./TerritoryCanvas3D";
 import { mapLighting } from "./Lighting";
 import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
 import type { MapFrame } from "./Types";
@@ -52,7 +47,6 @@ export default function TerritoryScene3D({
   daylight,
   dark,
   onState,
-  onPicker,
 }: {
   views: readonly TerritoryTileView[];
   tiles: readonly TerritoryTileDefinition[];
@@ -79,8 +73,6 @@ export default function TerritoryScene3D({
   };
   dark: boolean;
   onState: (state: RendererState) => void;
-  /** Accept points relative to the center shared by the live viewport and the last paint. */
-  onPicker: (picker: ScenePicker | undefined) => void;
 }) {
   const {
     x: cameraX,
@@ -121,26 +113,6 @@ export default function TerritoryScene3D({
   );
   const lightingTransitionMs =
     speed === "SLOW" || speed === "NORMAL" ? TICK_MS[speed] : undefined;
-  const renderer = React.useRef<RendererHandle>();
-  const setRenderer = React.useCallback((value: RendererHandle | undefined) => {
-    renderer.current = value;
-  }, []);
-  React.useLayoutEffect(() => {
-    onPicker(({ x, y }) => {
-      const handle = renderer.current;
-      const painted = handle?.getPaintedScene();
-      if (!handle || !painted) return;
-      const { width, height } = painted.frame;
-      if (Math.abs(x) > width / 2 || Math.abs(y) > height / 2) return null;
-      return builder.pick(
-        { x: x + width / 2, y: y + height / 2 },
-        painted.frame,
-        handle.motionPhase,
-        painted.instances,
-      );
-    });
-    return () => onPicker(undefined);
-  }, [builder, onPicker]);
   return (
     <TerritoryCanvas3D
       instances={instances}
@@ -148,7 +120,6 @@ export default function TerritoryScene3D({
       runKey={runKey}
       loadRenderer={loadRenderer}
       onState={onState}
-      onRenderer={setRenderer}
     />
   );
 }

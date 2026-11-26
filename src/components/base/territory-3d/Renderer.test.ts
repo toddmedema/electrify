@@ -989,25 +989,6 @@ it("raises river and lake water in the same draw passes when the watershed gets 
   renderer.dispose();
 });
 
-it("provides the last submitted camera and instances while a newer frame waits to draw", () => {
-  const { renderer } = setup();
-  const original = scene(false);
-  const next = original.slice(1);
-  const shifted = { ...frame, cameraX: 100 };
-  renderer.update(original, frame);
-  expect(renderer.getPaintedScene()).toBeUndefined();
-  flush(0);
-  renderer.update(next, shifted);
-  expect(renderer.getPaintedScene()).toEqual({ frame, instances: original });
-  flush(50);
-  expect(renderer.getPaintedScene()).toEqual({
-    frame: shifted,
-    instances: next,
-  });
-  renderer.dispose();
-  expect(renderer.getPaintedScene()).toBeUndefined();
-});
-
 it("raises real Hydro and upper Pumped Hydro water while lowering the lower basin", () => {
   const { renderer, gl } = setup();
   const instances: MapInstance[] = (["hydro", "pumped-hydro"] as const).map(

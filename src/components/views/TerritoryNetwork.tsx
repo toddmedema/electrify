@@ -125,7 +125,8 @@ function DeferredProjectBuild(
         <TileWorkspaceSurface
           id="tool-BUILD_GENERATORS"
           closeLabel="Close project"
-          title="Plan a project"
+          title="Build"
+          titleIcon={<ConceptIcon concept="build" decorative />}
           focusKey="project-loading"
           returnFocusSelector=".desktopBuildRail, #buildNav"
           onClose={props.onClose}

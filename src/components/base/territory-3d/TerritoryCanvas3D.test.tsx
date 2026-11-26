@@ -42,8 +42,6 @@ test("delayed loading uses the latest frame, retains one renderer and disposes d
     update: jest.fn(),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
-    getPaintedScene: jest.fn(),
-    motionPhase: jest.fn(),
   };
   const factory = jest.fn(() => renderer),
     state = jest.fn();
@@ -90,8 +88,6 @@ test("delayed loading ignores a camera update that suspends before commit", asyn
     update: jest.fn(),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
-    getPaintedScene: jest.fn(),
-    motionPhase: jest.fn(),
   };
   const pending = new Promise<void>(() => {});
   const attempted = jest.fn();
@@ -151,8 +147,7 @@ test("unmounting during a delayed import never creates a renderer", async () => 
 });
 
 test("renderer import failure reports an unavailable renderer and retains no diagnostics", async () => {
-  const state = jest.fn(),
-    connected = jest.fn();
+  const state = jest.fn();
   const utils = render(
     <TerritoryCanvas3D
       instances={[]}
@@ -162,12 +157,10 @@ test("renderer import failure reports an unavailable renderer and retains no dia
         throw new Error("chunk unavailable");
       }}
       onState={state}
-      onRenderer={connected}
     />,
   );
   await waitFor(() => expect(state).toHaveBeenLastCalledWith("unavailable"));
   expect(state).toHaveBeenCalledWith("loading");
-  expect(connected).toHaveBeenLastCalledWith(undefined);
   // The decorative canvas is intentionally absent from the accessibility tree.
   // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access
   const canvas = utils.container.querySelector("canvas") as MapCanvas;
@@ -175,16 +168,13 @@ test("renderer import failure reports an unavailable renderer and retains no dia
 });
 
 test("a renderer update failure disposes partially initialized resources", async () => {
-  const state = jest.fn(),
-    connected = jest.fn();
+  const state = jest.fn();
   const renderer: RendererHandle = {
     update: jest.fn(() => {
       throw new Error("GPU unavailable");
     }),
     dispose: jest.fn(),
     diagnostics: jest.fn(),
-    getPaintedScene: jest.fn(),
-    motionPhase: jest.fn(),
   };
   render(
     <TerritoryCanvas3D
@@ -193,10 +183,8 @@ test("a renderer update failure disposes partially initialized resources", async
       runKey="one"
       loadRenderer={async () => () => renderer}
       onState={state}
-      onRenderer={connected}
     />,
   );
   await waitFor(() => expect(state).toHaveBeenLastCalledWith("unavailable"));
   expect(renderer.dispose).toHaveBeenCalledTimes(1);
-  expect(connected).toHaveBeenLastCalledWith(undefined);
 });
