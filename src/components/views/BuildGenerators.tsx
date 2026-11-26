@@ -96,6 +96,12 @@ import {
   largeMassUnit,
 } from "../../helpers/Units";
 import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
+import {
+  directEmissionsPerMWh,
+  generatorOutputPending,
+  typicalCapacityFactor,
+  type BuildPreviewComparison,
+} from "../base/BuildPreviewComparison";
 import { useUnits } from "../base/UnitsContext";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
@@ -222,21 +228,11 @@ function ExpectedOutputMetric(props: {
   );
 }
 
-/**
- * Hydro can only deliver the water that arrives, so its typical output follows the forecast
- * inflow rather than the design capacity factor, which a drought year can fall well short of.
- */
-function typicalCapacityFactor(
-  generator: GeneratorShoppingType,
-  shape?: ExpectedOutputShape,
-): number {
-  return shape?.kind === "water-inflow" ? shape.mean : generator.capacityFactor;
-}
-
 interface GeneratorBuildItemProps {
   /** Expanded canonical card without purchasing controls or dialogs. */
   preview?: boolean;
   previewSiteIssue?: string;
+  previewComparison?: BuildPreviewComparison;
   game?: GameType;
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onDismissHydroPrimer?: () => void;
@@ -283,7 +279,6 @@ export function GeneratorBuildItem(
     useMoney();
   const { generator, cash } = props;
   const units = useUnits();
-  const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
     props.seed,
@@ -374,10 +369,10 @@ export function GeneratorBuildItem(
     !pickingSite && !affordable ? (
       <BuildCashWarning cash={cash} downpayment={downpayment} />
     ) : undefined;
-  const outputPending =
-    props.forecastPending &&
-    (generator.fuel === "Hydro" ||
-      WEATHER_DEPENDENT_FUELS.includes(generator.fuel));
+  const outputPending = generatorOutputPending(
+    generator,
+    !!props.forecastPending,
+  );
   const canBuild = buildable && !shortfall && (pickingSite || !outputPending);
   const buildSubtitle = (buildable && shortfall) || secondaryText;
   const offerAffordableSize =
@@ -390,7 +385,7 @@ export function GeneratorBuildItem(
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
-  const kgCO2ePerMWh = Math.round(1000000 * generator.btuPerWh * kgCO2ePerBtu);
+  const kgCO2ePerMWh = directEmissionsPerMWh(generator);
   const constructionKgco2eTotal =
     (generator.constructionKgco2ePerW || 0) * generator.peakW;
   const buildTileId = props.tileId ?? props.territoryAvailability?.tileId;
@@ -598,6 +593,7 @@ export function GeneratorBuildItem(
     );
   }
 
+  const comparison = props.previewComparison?.markers;
   const metrics = (
     <>
       <BuildMetric
@@ -605,6 +601,7 @@ export function GeneratorBuildItem(
         label="Build cost"
         entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
         value={formatPurchasePrice(generator.buildCost)}
+        comparison={comparison?.buildCost}
         note={
           [
             pickingSite && "Before site costs",
@@ -621,6 +618,7 @@ export function GeneratorBuildItem(
         label="Build time"
         entry={MANUAL_ENTRY.HOW_TO_PLAY}
         value={formatBuildMonths(generator.yearsToBuild)}
+        comparison={comparison?.buildTime}
       />
       {!props.preview && (
         <ExpectedOutputMetric
@@ -639,12 +637,60 @@ export function GeneratorBuildItem(
     </>
   );
 
+  const lifetimeCost = props.secondaryMetric !== "lcWh" && (
+    <BuildDetailRow
+      label="Lifetime cost"
+      value={
+        outputPending
+          ? "Calculating…"
+          : formatForecastMoney(generator.lcWh * 1000000) + "/MWh"
+      }
+      entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+      comparison={comparison?.lifetimeCost}
+    />
+  );
+  const expectedCapacity = (
+    <BuildDetailRow
+      label={
+        waterShape
+          ? "Capacity factor, this forecast"
+          : "Expected capacity factor"
+      }
+      value={
+        props.forecastPending && !outputShape
+          ? "Calculating…"
+          : percent(capacityFactor)
+      }
+      entry={MANUAL_ENTRY.CAPACITY_FACTOR}
+      comparison={comparison?.capacityFactor}
+    />
+  );
+  const directEmissions = (
+    <BuildDetailRow
+      label="Direct emissions"
+      value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
+      entry={MANUAL_ENTRY.EMISSIONS}
+      comparison={comparison?.directEmissions}
+    />
+  );
+
   return (
     <BuildOptionCard
       name={generator.name}
       iconSrc={iconSrc}
       compared={props.compared}
       preview={props.preview}
+      comparisonCaption={props.previewComparison?.caption}
+      previewSummary={
+        props.preview && (
+          <BuildDetails label="generator properties">
+            {metrics}
+            {lifetimeCost}
+            {expectedCapacity}
+            {directEmissions}
+          </BuildDetails>
+        )
+      }
       review={
         props.preview
           ? undefined
@@ -729,34 +775,15 @@ export function GeneratorBuildItem(
               </Stack>
             </Box>
           )}
-          <BuildDetails label="generator properties">
-            {props.preview && metrics}
-            {props.secondaryMetric !== "lcWh" && (
-              <BuildDetailRow
-                label="Lifetime cost"
-                value={
-                  (outputPending
-                    ? "Calculating…"
-                    : formatForecastMoney(generator.lcWh * 1000000)) +
-                  (outputPending ? "" : "/MWh")
-                }
-                entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-              />
-            )}
-            <BuildDetailRow
-              // Lifetime cost still assumes average water years; this is the year ahead
-              label={
-                waterShape
-                  ? "Capacity factor, this forecast"
-                  : "Expected capacity factor"
-              }
-              value={
-                props.forecastPending && !outputShape
-                  ? "Calculating…"
-                  : percent(capacityFactor)
-              }
-              entry={MANUAL_ENTRY.CAPACITY_FACTOR}
-            />
+          <BuildDetails
+            label={
+              props.preview
+                ? "advanced generator properties"
+                : "generator properties"
+            }
+          >
+            {!props.preview && lifetimeCost}
+            {!props.preview && expectedCapacity}
             {props.preview && (
               <BuildDetailRow
                 label={
@@ -846,11 +873,7 @@ export function GeneratorBuildItem(
                 entry={MANUAL_ENTRY.PROJECT_SITES}
               />
             )}
-            <BuildDetailRow
-              label="Direct emissions"
-              value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
-              entry={MANUAL_ENTRY.EMISSIONS}
-            />
+            {!props.preview && directEmissions}
             <BuildDetailRow
               label="Construction emissions"
               value={`${formatLargeMassValueConcise(
