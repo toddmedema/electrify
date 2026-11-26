@@ -1,4 +1,8 @@
 import { TransitionGroup } from "react-transition-group";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
 import RemovalCollapse from "../base/RemovalCollapse";
 import { getTerritoryDefinition } from "../../data/Territories";
 import TerritoryBuildDestination, {
@@ -33,6 +37,7 @@ import {
   Stack,
   Typography,
   IconButton,
+  useMediaQuery,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
@@ -1042,6 +1047,12 @@ function GeneratorComparison(props: {
   onRemove: (name: string) => void;
 }): React.JSX.Element | null {
   const { formatForecastMoney, formatPurchasePrice } = useMoney();
+  const scale = React.useSyncExternalStore(
+    subscribeInterfaceScale,
+    getInterfaceScale,
+  );
+  const wideEnoughToWrap = useMediaQuery("(min-width: 600px)");
+  const orientation = scale > 1 && wideEnoughToWrap ? "vertical" : "horizontal";
   if (props.generators.length === 0) {
     return null;
   }
@@ -1075,7 +1086,7 @@ function GeneratorComparison(props: {
           <RemovalCollapse
             key={generator.name}
             id={`comparison-${encodeURIComponent(generator.name)}`}
-            orientation="horizontal"
+            orientation={orientation}
           >
             <div className="generatorComparisonChoice">
               <img

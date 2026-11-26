@@ -513,11 +513,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
     if (guest) return;
     removedKey.current = facilityKey(scenario.facilities[index]);
     const row = trigger.closest(".startingFacility");
-    const neighbor =
-      (row?.nextElementSibling?.classList.contains("startingFacility") &&
-        row.nextElementSibling) ||
-      (row?.previousElementSibling?.classList.contains("startingFacility") &&
-        row.previousElementSibling);
+    const activeRows = Array.from(
+      row?.parentElement?.querySelectorAll(".startingFacility:not([inert])") ??
+        [],
+    );
+    const position = row ? activeRows.indexOf(row) : -1;
+    const neighbor = activeRows[position + 1] ?? activeRows[position - 1];
     const next = neighbor
       ? neighbor.querySelector<HTMLButtonElement>("button")
       : document.getElementById("addFacilityName");

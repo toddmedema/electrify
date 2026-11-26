@@ -273,6 +273,7 @@ function TileNetwork(props: Props) {
   );
   const close = React.useCallback(() => {
     if (projectBusy.current) return;
+    soldMapFacility.current = undefined;
     setPlanning(false);
     setCandidate(undefined);
     setInspected(undefined);
@@ -377,6 +378,7 @@ function TileNetwork(props: Props) {
       ({ tile }) => territoryMapTileKey(tile) === key,
     );
     if (!activated) return;
+    if (key !== inspected) soldMapFacility.current = undefined;
     const id = activated.tile.id;
     if (!mode && planning && !catalogue) {
       // A peer's retained alias can share an economic ID with a local site.
@@ -587,6 +589,39 @@ function TileNetwork(props: Props) {
               {view.disaster.condition}
             </Typography>
           )}
+          <TransitionGroup
+            key={inspected}
+            component={null}
+            childFactory={(
+              child: React.ReactElement<
+                React.ComponentProps<typeof RemovalCollapse>
+              >,
+            ) =>
+              React.cloneElement(child, {
+                animate: child.props.id === soldMapFacility.current,
+              })
+            }
+          >
+            {operatingFacility && (
+              <RemovalCollapse
+                key={operatingFacility.id}
+                id={String(operatingFacility.id)}
+                onExited={() => {
+                  if (soldMapFacility.current === String(operatingFacility.id))
+                    soldMapFacility.current = undefined;
+                }}
+              >
+                <ExpandedFacilityDetails
+                  showStatus
+                  facility={operatingFacility}
+                  game={game}
+                  expandRequest={expandRequest}
+                  {...props.facilityActions}
+                  onSell={sellMapFacility}
+                />
+              </RemovalCollapse>
+            )}
+          </TransitionGroup>
           {showSiteCatalogue ? (
             <GameWorkspaceContext.Provider value={true}>
               <GameBuildCompleteContext.Provider value={closeSiteCatalogue}>
@@ -676,34 +711,6 @@ function TileNetwork(props: Props) {
                   )}
                 </div>
               ) : null}
-              <TransitionGroup
-                component={null}
-                childFactory={(
-                  child: React.ReactElement<
-                    React.ComponentProps<typeof RemovalCollapse>
-                  >,
-                ) =>
-                  React.cloneElement(child, {
-                    animate: child.props.id === soldMapFacility.current,
-                  })
-                }
-              >
-                {operatingFacility && (
-                  <RemovalCollapse
-                    key={operatingFacility.id}
-                    id={String(operatingFacility.id)}
-                  >
-                    <ExpandedFacilityDetails
-                      showStatus
-                      facility={operatingFacility}
-                      game={game}
-                      expandRequest={expandRequest}
-                      {...props.facilityActions}
-                      onSell={sellMapFacility}
-                    />
-                  </RemovalCollapse>
-                )}
-              </TransitionGroup>
               {!view.owned && !tile.city && (
                 <TileTerrainModifiers terrain={tile.terrain} />
               )}

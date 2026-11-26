@@ -706,8 +706,7 @@ export default function TransmissionPanel({
     focusIntertiesAfterAcquisition.current = false;
     intertiesHeadingRef.current?.focus();
   }, [acquisitionTargetId]);
-  const [cancelLine, setCancelLine] =
-    React.useState<TransmissionLineOperatingType | null>(null);
+  const [cancelLineId, setCancelLineId] = React.useState<number | null>(null);
   const [selectedLine, setSelectedLine] = React.useState<number | null>(null);
   const [tier, setTier] = useToolState(
     projectsOnly ? "interties.tier" : undefined,
@@ -727,6 +726,10 @@ export default function TransmissionPanel({
   const tradingLines = state.lines.filter(
     (line) => !ownedUtilityConnection(game, line.corridorId),
   );
+  const cancelLine =
+    !projectsOnly && cancelLineId === selectedLine && cancelLineId !== null
+      ? tradingLines.find(({ id }) => id === cancelLineId)
+      : undefined;
   // Drag indices describe the visible list; the reducer retains acquired connections for costs.
   const lineIndex = (visibleIndex: number) =>
     state.lines.indexOf(tradingLines[visibleIndex]);
@@ -1173,32 +1176,6 @@ export default function TransmissionPanel({
                             </div>
                             {selectedLine === line.id && (
                               <div className="transmissionLineDetails">
-                                {cancelLine?.id === line.id && (
-                                  <ConfirmDialog
-                                    open
-                                    destructive
-                                    title={`Cancel construction of ${line.name}?`}
-                                    cancelLabel="Never mind"
-                                    confirmLabel="Cancel construction"
-                                    onCancel={() => setCancelLine(null)}
-                                    onConfirm={() => {
-                                      setCancelLine(null);
-                                      onCancel?.(line.id);
-                                    }}
-                                  >
-                                    <Typography>
-                                      Receive{" "}
-                                      {formatMoneyConcise(
-                                        line.buildCost - line.loanAmountLeft,
-                                      )}{" "}
-                                      back
-                                      {line.loanAmountLeft > 0
-                                        ? " after settling the outstanding loan"
-                                        : ""}
-                                      .
-                                    </Typography>
-                                  </ConfirmDialog>
-                                )}
                                 <dl className="transmissionMetrics facilityStats">
                                   <div className="facilityStat">
                                     <dt>Import capacity</dt>
@@ -1463,7 +1440,7 @@ export default function TransmissionPanel({
                                         variant="outlined"
                                         startIcon={<CancelIcon />}
                                         aria-label={`Cancel construction of ${line.name}`}
-                                        onClick={() => setCancelLine(line)}
+                                        onClick={() => setCancelLineId(line.id)}
                                       >
                                         <span className="facilityActionLabel">
                                           Cancel construction
@@ -1613,6 +1590,32 @@ export default function TransmissionPanel({
       )}
       {projectsOnly && (
         <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
+      )}
+      {cancelLine && (
+        <ConfirmDialog
+          open
+          destructive
+          title={`Cancel construction of ${cancelLine.name}?`}
+          cancelLabel="Never mind"
+          confirmLabel="Cancel construction"
+          onCancel={() => setCancelLineId(null)}
+          onConfirm={() => {
+            setCancelLineId(null);
+            onCancel?.(cancelLine.id);
+          }}
+        >
+          <Typography>
+            Receive{" "}
+            {formatMoneyConcise(
+              cancelLine.buildCost - cancelLine.loanAmountLeft,
+            )}{" "}
+            back
+            {cancelLine.loanAmountLeft > 0
+              ? " after settling the outstanding loan"
+              : ""}
+            .
+          </Typography>
+        </ConfirmDialog>
       )}
       {review && (
         <PurchaseReviewDialog

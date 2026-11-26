@@ -193,7 +193,7 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .screenHeaderBar,
   .screenCatalog > .cardList,
   .screenCatalog > .constructionHeader,
-  .screenCatalog > .generatorComparison {
+  .screenCatalog > .generatorComparisonSlot {
     max-width: 64rem;
   }
   .screenPage > .scrollable > *,
@@ -361,8 +361,16 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   .facilityRow .MuiBadge-badge {
     font-size: 0.625rem;
   }
-  .generatorComparisonChoices {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  @media (min-width: 600px) {
+    .generatorComparisonChoices {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+      gap: 8px;
+    }
+    .generatorComparisonChoice {
+      width: 100%;
+      margin-inline-end: 0;
+    }
   }
   .generatorComparisonChoice img {
     width: 2.5rem;

@@ -116,6 +116,35 @@ test("dragging a facility selects a compatible site and waits for confirmation",
     before.territoryNetwork!.tilePurchases,
   );
   expect(currentTick(after)!.cash).toBe(currentTick(before)!.cash);
+
+  await project.getByRole("button", { name: "Cash", exact: true }).click();
+  await expect(project).toHaveCount(0);
+  await site.press("Enter");
+  const inspector = page.locator(".tileWorkspaceInspector");
+  const details = inspector.locator(".facilityDetails");
+  await expect(details).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await inspector
+    .getByRole("button", { name: /^Cancel construction of/ })
+    .click();
+  const measuredExit = details.evaluate(async (element) => {
+    const row = element.closest(".MuiCollapse-root");
+    const initial = row?.getBoundingClientRect().height ?? 0;
+    const deadline = performance.now() + 3000;
+    while (row?.isConnected && performance.now() < deadline) {
+      await new Promise(requestAnimationFrame);
+      const height = row.getBoundingClientRect().height;
+      if (row.hasAttribute("inert") && height > 0 && height < initial - 1)
+        return true;
+    }
+    return false;
+  });
+  await page
+    .getByRole("dialog", { name: /^Cancel construction of/ })
+    .getByRole("button", { name: "Cancel construction", exact: true })
+    .click();
+  expect(await measuredExit).toBe(true);
+  await expect(details).toHaveCount(0);
 });
 
 for (const theme of ["light", "dark"] as const) {
