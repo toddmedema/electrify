@@ -14,6 +14,9 @@ const cpuFixtures = [
   // site-pages.test.js compares the sizes of the responsive previews.
   "public/images/gameplay-preview.png",
   "public/images/gameplay-preview-*.webp",
+  // CtaColor.test.ts reads the fill colors in both home wordmarks.
+  "public/images/logo-home.svg",
+  "public/images/logo-home-dark.svg",
   // MenuAssets.test.ts reads the three PCM cues. Music tests mock the downloads.
   "public/audio/menu/back.wav",
   "public/audio/menu/confirm.wav",

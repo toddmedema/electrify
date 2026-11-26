@@ -71,6 +71,8 @@ import {
 import { isDesktopScreen, isSideToolLayout } from "../Globals";
 import { store } from "../Store";
 import LazyViewBoundary, { lazyView } from "./base/LazyViewBoundary";
+import { loadSavedGames } from "./views/SavedGamesLoader";
+import SavedGamesShell from "./views/SavedGamesShell";
 const GameWorkspace = lazyView(() => import("./base/GameWorkspace"));
 const DataCenterSetupContainer = lazyView(
   () => import("./views/DataCenterSetupContainer"),
@@ -95,9 +97,7 @@ const CustomGameContainer = lazyView(
     import(/* webpackChunkName: "custom-game" */ "./views/CustomGameContainer"),
 );
 
-const SavedGames = lazyView(
-  () => import(/* webpackChunkName: "saved-games" */ "./views/SavedGames"),
-);
+const SavedGames = lazyView(loadSavedGames);
 
 const AchievementGallery = lazyView(() =>
   import(
@@ -556,7 +556,7 @@ export default class Compositor extends React.Component<Props, {}> {
         );
       case "SAVED_GAMES":
         return (
-          <React.Suspense fallback={<p role="status">Loading saved games…</p>}>
+          <React.Suspense fallback={<SavedGamesShell />}>
             <SavedGames />
           </React.Suspense>
         );

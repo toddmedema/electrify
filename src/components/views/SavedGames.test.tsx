@@ -1,3 +1,4 @@
+import * as React from "react";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import {
@@ -23,6 +24,7 @@ import {
   exportSaveRecovery,
 } from "../../SaveSession";
 import SavedGames from "./SavedGames";
+import SavedGamesShell from "./SavedGamesShell";
 import uiReducer from "../../reducers/UI";
 import { reportSaveDeleteFailure } from "../../SaveDiagnostics";
 
@@ -63,8 +65,8 @@ function entry(overrides: Partial<SaveMetadata> = {}): SaveMetadata {
     ...overrides,
   };
 }
-function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
-  const testStore = configureStore({
+function createLibraryStore(overrides: Partial<SaveLibraryState> = {}) {
+  return configureStore({
     reducer: {
       saves: savesReducer,
       game: () => ({ inGame: true }),
@@ -79,6 +81,9 @@ function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
       },
     },
   });
+}
+function renderLibrary(overrides: Partial<SaveLibraryState> = {}) {
+  const testStore = createLibraryStore(overrides);
   return {
     ...render(
       <Provider store={testStore}>
@@ -129,6 +134,68 @@ it("preserves player-authored titles and completed outcomes", () => {
     screen.getByRole("heading", { name: "Wind experiment — Ontario" }),
   ).toBeInTheDocument();
   expect(screen.getByText("Completed")).toBeInTheDocument();
+});
+
+it("shows no loading message while the library is still being read", () => {
+  renderLibrary({ loading: true, entries: [] });
+  expect(screen.getByRole("heading", { name: "Saved games" })).toBeVisible();
+  expect(screen.queryByText(/loading/i)).not.toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  // Nothing is claimed about an empty library until it has actually been read.
+  expect(screen.queryByText("No saved games yet")).not.toBeInTheDocument();
+});
+
+describe("replacing the page shell while the screen's code downloads", () => {
+  // Mirrors Compositor: the shell is the Suspense fallback of the lazily loaded screen.
+  function mountShellThenScreen() {
+    let load!: (module: { default: typeof SavedGames }) => void;
+    const Screen = React.lazy(
+      () => new Promise<{ default: typeof SavedGames }>((r) => (load = r)),
+    );
+    render(
+      <Provider store={createLibraryStore()}>
+        <React.Suspense fallback={<SavedGamesShell />}>
+          <Screen />
+        </React.Suspense>
+      </Provider>,
+    );
+    return () => act(async () => load({ default: SavedGames }));
+  }
+
+  it("keeps keyboard focus on Back when the player had already focused it", async () => {
+    const finishLoading = mountShellThenScreen();
+    const shellBack = screen.getByRole("button", { name: "Back" });
+    shellBack.focus();
+    expect(shellBack).toHaveFocus();
+    await finishLoading();
+    const back = screen.getByRole("button", { name: "Back" });
+    expect(back).not.toBe(shellBack);
+    expect(back).toHaveFocus();
+  });
+
+  it("does not take focus the player never put on the shell", async () => {
+    const finishLoading = mountShellThenScreen();
+    expect(document.body).toHaveFocus();
+    await finishLoading();
+    expect(document.body).toHaveFocus();
+  });
+
+  it("does not carry focus from a shell that left some other way into a later screen", async () => {
+    const { unmount } = render(
+      <Provider store={createLibraryStore()}>
+        <SavedGamesShell />
+      </Provider>,
+    );
+    screen.getByRole("button", { name: "Back" }).focus();
+    unmount();
+    await Promise.resolve();
+    render(
+      <Provider store={createLibraryStore()}>
+        <SavedGames />
+      </Provider>,
+    );
+    expect(screen.getByRole("button", { name: "Back" })).not.toHaveFocus();
+  });
 });
 
 it("shows an empty library without search", () => {

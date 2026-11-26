@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -18,7 +17,7 @@ import {
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useAppDispatch, useAppSelector } from "../../Store";
-import { navigate, navigateBack } from "../../reducers/Card";
+import { navigate } from "../../reducers/Card";
 import { snackbarOpen } from "../../reducers/UI";
 import { reportSaveDeleteFailure } from "../../SaveDiagnostics";
 import { isResumableStatus, sortSaves } from "../../SaveModel";
@@ -42,6 +41,7 @@ import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
 import { isDesktopApp } from "../../Desktop";
 import { restoreMenuFocus } from "../base/useMenuKeys";
+import { takeShellFocus, useLeaveSavedGames } from "./SavedGamesShell";
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -52,6 +52,15 @@ const STATUS_LABELS: Record<SaveStatus, string> = {
 
 export default function SavedGames(): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const onBack = useLeaveSavedGames();
+  const page = React.useRef<HTMLDivElement>(null);
+  // Replacing the page shell must not drop focus the player had already put on Back.
+  React.useLayoutEffect(() => {
+    if (takeShellFocus())
+      page.current
+        ?.querySelector<HTMLElement>('button[aria-label="Back"]')
+        ?.focus({ preventScroll: true });
+  }, []);
   const saves = useAppSelector((state) => state.saves);
   const inGame = useAppSelector((state) => state.game.inGame);
   const [search, setSearch] = React.useState("");
@@ -189,10 +198,6 @@ export default function SavedGames(): React.JSX.Element {
       if (save.id === saves.activeId && inGame) focusGameMenu();
     });
   };
-  const onBack = () => {
-    dispatch(navigateBack());
-    restoreMenuFocus("[data-saves-trigger]");
-  };
   const focusGameMenu = () => {
     restoreMenuFocus(".gameMenuButton");
   };
@@ -212,6 +217,7 @@ export default function SavedGames(): React.JSX.Element {
   );
   return (
     <ScreenPage
+      ref={page}
       id="gameCard"
       title="Saved games"
       onBack={onBack}
@@ -338,17 +344,6 @@ export default function SavedGames(): React.JSX.Element {
                 </Stack>
               </Stack>
             </Paper>
-          )}
-          {saves.loading && !entries.length && (
-            <Stack
-              direction="row"
-              spacing={1}
-              role="status"
-              sx={{ alignItems: "center" }}
-            >
-              <CircularProgress size={20} />
-              <Typography>Loading saved games…</Typography>
-            </Stack>
           )}
           {!saves.loading && !entries.length && !pending && !saves.error && (
             <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>

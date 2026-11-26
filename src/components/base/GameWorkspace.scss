@@ -157,10 +157,10 @@
   .gameDockAction.MuiButton-root {
     border: 0;
     border-radius: var(--radius-pill);
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     @media (hover: hover) and (pointer: fine) {
       &:hover {
-        color: var(--interactive-strong);
+        color: var(--interactive-blue);
         background: var(--interactive-tint);
       }
     }

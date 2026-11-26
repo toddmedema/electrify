@@ -209,7 +209,7 @@
     padding-inline: clamp(2px, 12% - 2px, 8px);
     box-sizing: border-box;
     border: 1px solid
-      color-mix(in srgb, var(--interactive-strong) 40%, transparent);
+      color-mix(in srgb, var(--interactive-blue) 40%, transparent);
     border-radius: var(--radius-lg);
     background: color-mix(in srgb, var(--bg-raised) 88%, transparent);
     box-shadow: 0 2px 8px var(--shadow-ring);
@@ -219,7 +219,7 @@
     b {
       font-size: 13px;
       line-height: 18px;
-      color: var(--interactive-strong);
+      color: var(--interactive-blue);
     }
   }
   &:hover .territoryTilePrice,
@@ -427,7 +427,7 @@
   }
   .MuiListItemIcon-root {
     min-width: 32px;
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
   }
   .MuiListSubheader-root {
     background: transparent;

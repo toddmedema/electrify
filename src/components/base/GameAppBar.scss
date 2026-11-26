@@ -114,7 +114,7 @@ html[data-couch-seat] #appbar #topbar {
       background: var(--interactive-tint);
     }
     &:focus-visible {
-      outline: 2px solid var(--interactive-strong);
+      outline: 2px solid var(--interactive-blue);
       outline-offset: 2px;
     }
     @media (pointer: coarse) {

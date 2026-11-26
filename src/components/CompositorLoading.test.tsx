@@ -22,6 +22,10 @@ jest.mock("./base/ManualHelpPopover", () => {
   if (++mockHelpAttempts === 1) throw new Error("Help download failed");
   return { __esModule: true, default: () => <p>Recovered help</p> };
 });
+jest.mock("./views/SavedGames", () => ({
+  __esModule: true,
+  default: () => <p>Saved games list</p>,
+}));
 jest.mock("./base/GameWorkspace", () => () => {
   const [clicks, setClicks] = jest
     .requireActual<typeof import("react")>("react")
@@ -266,4 +270,31 @@ it("keeps toast results visible through page clicks while allowing timeout and e
     renderCard.mockRestore();
     jest.useRealTimers();
   }
+});
+
+it("opens Saved games at once, with no loading message, while its code arrives", async () => {
+  const state = store.getState();
+  render(
+    <Provider store={store}>
+      <Compositor
+        card={{ ...state.card, name: "SAVED_GAMES" }}
+        settings={state.settings}
+        ui={state.ui}
+        transition="next"
+        scenarioId={1}
+        tutorialStep={-1}
+        closeDialog={jest.fn()}
+        closeSnackbar={jest.fn()}
+        onTutorialStep={jest.fn()}
+        onTutorialEnd={jest.fn()}
+      />
+    </Provider>,
+  );
+  // Before the screen's chunk has resolved: the frame is already there, empty.
+  expect(screen.getByText("Saved games")).toBeVisible();
+  expect(screen.getByRole("button", { name: /back/i })).toBeVisible();
+  expect(screen.queryByText(/loading/i)).toBeNull();
+  expect(screen.queryByText("Saved games list")).toBeNull();
+  expect(await screen.findByText("Saved games list")).toBeVisible();
+  expect(screen.queryByText(/loading/i)).toBeNull();
 });

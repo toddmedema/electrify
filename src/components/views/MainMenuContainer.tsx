@@ -13,6 +13,7 @@ import { selectContinueSave } from "../../SaveModel";
 import { showMultiplayerLobby } from "../../multiplayer/Registry";
 import { resumeSavedGame, runSaveTransition } from "../../SaveSession";
 import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
+import { loadSavedGames } from "./SavedGamesLoader";
 
 function getNextTutorial() {
   const played = getPlayedScenarioIds();
@@ -45,6 +46,10 @@ export const mapDispatchToProps = (
     onPlayWithFriends: showMultiplayerLobby,
     onSavedGames: () => {
       dispatch(navigate("SAVED_GAMES"));
+    },
+    onSavedGamesVisible: () => {
+      // Best effort: the screen still loads on demand if this fetch fails.
+      void loadSavedGames().catch(() => undefined);
     },
     onManual: () => {
       dispatch(navigate("MANUAL"));
