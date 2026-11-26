@@ -98,18 +98,18 @@
   &:hover:not([aria-disabled="true"])::before,
   &:focus-visible::before,
   &[aria-pressed="true"]::before {
-    border-color: var(--interactive-strong);
+    border-color: var(--interactive-blue);
     background: var(--bg-sunken);
   }
   &:focus-visible {
     outline: none;
     &::before {
-      outline: 2px solid var(--interactive-strong);
+      outline: 2px solid var(--interactive-blue);
       outline-offset: -2px;
     }
   }
   &[aria-pressed="true"]::before {
-    box-shadow: inset 3px 0 var(--interactive-strong);
+    box-shadow: inset 3px 0 var(--interactive-blue);
   }
   &[aria-disabled="true"] {
     cursor: default;
@@ -142,7 +142,7 @@
   flex-direction: column;
   overflow: hidden;
   &:focus-visible {
-    outline: 2px solid var(--interactive-strong);
+    outline: 2px solid var(--interactive-blue);
     outline-offset: -2px;
   }
   .desktopBuildPreviewScroll {
@@ -250,6 +250,6 @@
   input {
     width: 100%;
     min-height: 44px;
-    accent-color: var(--interactive-strong);
+    accent-color: var(--interactive-blue);
   }
 }

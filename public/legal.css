@@ -1,8 +1,16 @@
 :root {
   color-scheme: light dark;
+  /* ==========================================================================
+     DANGER: DO NOT CHANGE --brand. It is the CTA blue, the link blue and the logo's
+     blue (public/images/logo-home.svg): #0084f8 in light, #629be1 in dark (below).
+     Do not add a deeper or lighter blue for links or buttons, and do not set one
+     per page. The owner has ordered that the CTA color STOP being changed. Only
+     hover gets its own shade (--brand-hover). src/CtaColor.test.ts enforces this.
+     ========================================================================== */
   --brand: #0084f8;
-  --brand-strong: #006bc7;
-  --brand-deep: #1565c0;
+  --brand-hover: #1565c0;
+  --brand-label: #08131c;
+  --brand-hover-label: #ffffff;
   --brand-wash: rgba(0, 132, 248, 0.1);
   --page: #f2f7fb;
   --surface: #ffffff;
@@ -18,9 +26,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --brand: #64b5f6;
-    --brand-strong: #8bc8f8;
-    --brand-deep: #b8ddfa;
+    --brand: #629be1;
+    --brand-hover: #b8ddfa;
+    --brand-hover-label: var(--brand-label);
     --brand-wash: rgba(100, 181, 246, 0.13);
     --page: #0d141a;
     --surface: #172028;
@@ -63,13 +71,19 @@ body {
 }
 
 a {
-  color: var(--brand-strong);
+  color: var(--brand);
   text-decoration-thickness: 0.08em;
   text-underline-offset: 0.18em;
 }
 
+/* Keep logo-blue text large enough to read on light surfaces. */
+:where(a:not([class], .topnav a, .impact-list a, .scenario-theme-nav a)) {
+  font-size: max(1em, 1.1875rem);
+  font-weight: 700;
+}
+
 a:hover {
-  color: var(--brand-deep);
+  color: var(--brand-hover);
 }
 
 :focus-visible {
@@ -149,28 +163,22 @@ a:hover {
   text-decoration: none;
 }
 
-.topnav a:hover,
-.topnav a[aria-current="page"] {
+.topnav a:not(.topnav__play):is(:hover, [aria-current="page"]) {
   background: var(--brand-wash);
-  color: var(--brand-deep);
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--brand);
 }
 
 .topnav .topnav__play {
   margin-left: 0.35rem;
-  background: var(--brand-strong);
-  color: #ffffff;
+  background: var(--brand);
+  color: var(--brand-label);
 }
 
 .topnav .topnav__play:hover {
-  background: var(--brand-deep);
-  color: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  .topnav .topnav__play,
-  .topnav .topnav__play:hover {
-    color: #08131c;
-  }
+  background: var(--brand-hover);
+  color: var(--brand-hover-label);
 }
 
 .hero {
@@ -208,7 +216,7 @@ a:hover {
 
 .eyebrow {
   margin: 0 0 0.8rem;
-  color: var(--brand-strong);
+  color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -272,22 +280,16 @@ a:hover {
 }
 
 .button--primary {
-  border-color: var(--brand-strong);
-  background: var(--brand-strong);
-  color: #ffffff;
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-label);
+  transition-property: transform, border-color;
 }
 
 .button--primary:hover {
-  border-color: var(--brand-deep);
-  background: var(--brand-deep);
-  color: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  .button--primary,
-  .button--primary:hover {
-    color: #08131c;
-  }
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+  color: var(--brand-hover-label);
 }
 
 .page-content {
@@ -462,7 +464,7 @@ a:hover {
 }
 
 .impact-list a::after {
-  color: var(--brand-strong);
+  color: var(--brand);
   content: "\2197";
   font-size: 1.1rem;
 }

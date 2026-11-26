@@ -1,4 +1,4 @@
-import { foregroundContrast } from "./contrast";
+import { expectReadableText } from "./contrast";
 import { expect, test } from "./fixtures";
 
 test("reduced motion keeps the home decoration still and actions usable", async ({
@@ -32,6 +32,7 @@ for (const theme of ["light", "dark"] as const) {
         authRequests.push(request.url());
     });
     await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Play", exact: true }),
     ).toBeVisible();
@@ -70,12 +71,37 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeGreaterThan(0);
     expect(authRequests).toEqual([]);
     const controls = page.locator(
-      "#menuCard .MuiButton-text.MuiButton-colorPrimary, .homeExplore a",
+      "#centeredMenu button, #menuCard .homeExplore a",
     );
     expect(await controls.count()).toBeGreaterThanOrEqual(10);
+    const paletteFloor = theme === "light" ? 3.5 : 4.5;
+    const hasHover = await page.evaluate(
+      () => matchMedia("(hover: hover)").matches,
+    );
+    // Check the rendered font as well as the color pair, including the filled selection.
     for (const control of await controls.all()) {
-      expect(await foregroundContrast(control)).toBeGreaterThanOrEqual(4.5);
+      await expectReadableText(control, paletteFloor);
     }
+    for (const control of await controls.all()) {
+      await control.focus();
+      await expect(control).toBeFocused();
+      await expectReadableText(control, paletteFloor);
+      if (hasHover) {
+        await control.hover();
+        await expectReadableText(control, paletteFloor);
+      }
+    }
+    // Tab from the preceding link so coarse-pointer projects use keyboard focus styling.
+    await explore
+      .getByRole("link", { name: "Compare simulators" })
+      .press("Tab");
+    const about = explore.getByRole("link", { name: "About", exact: true });
+    await expect(about).toBeFocused();
+    await expect(about).toHaveCSS(
+      "background-color",
+      theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)",
+    );
+    await expectReadableText(about, paletteFloor);
     await explore.getByRole("link", { name: "For teachers" }).click();
     await expect(page).toHaveURL(/classroom\.html$/);
   });

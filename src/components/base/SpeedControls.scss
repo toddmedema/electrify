@@ -8,6 +8,7 @@
   --speed-segment: 46px;
   // The thumb, ring and hover wash all sit this far inside a segment, so they share one shape.
   --speed-inset: 4px;
+  --speed-hover: var(--bg-selected);
   // Decelerates into place like a spring settling; reduced motion removes it below.
   --speed-ease: cubic-bezier(0.32, 0.72, 0, 1);
   // Co-op labels sit this much high, leaving room under them for the other players' pips.
@@ -62,7 +63,7 @@
       border-radius: var(--radius-pill);
       background: transparent;
       background-clip: content-box;
-      color: var(--interactive-strong);
+      color: var(--font-color-primary);
       font-size: var(--font-size-caption);
       font-variant-numeric: tabular-nums;
       font-weight: 500;
@@ -74,31 +75,36 @@
         background-color: transparent;
       }
 
-      // Pressed: the label dims a little, in place of Material's ripple.
-      &:active {
-        opacity: 0.72;
+      // Depress the label without dimming its ink or moving the hit target.
+      &:active :is(.speedLabel, .multiplayerSpeedLabel) {
+        display: inline-flex;
+        translate: 0 1px;
       }
 
       @media (hover: hover) and (pointer: fine) {
         &:hover:not([data-thumb="true"]) {
-          background-color: var(--interactive-tint);
+          background-color: var(--speed-hover);
         }
       }
 
       .MuiSvgIcon-root {
+        color: var(--interactive-blue);
         font-size: 1.125rem; // 18px: a pause glyph that sits inside a 32px thumb, not against it
       }
 
       // Under the thumb: the label takes the thumb's ink and a little more weight, which
       // together with the thumb's position carries "running here" without colour alone.
       &[data-thumb="true"] {
-        color: var(--interactive-contrast);
+        color: #0a0a0a;
         font-weight: 600;
+
+        .MuiSvgIcon-root {
+          color: inherit;
+        }
       }
 
       &.Mui-selected:not([data-thumb="true"]) {
         background-color: transparent;
-        color: var(--interactive-strong);
         font-weight: 600;
       }
     }
@@ -148,7 +154,7 @@
       position: absolute;
       inset: var(--speed-inset);
       box-sizing: border-box;
-      border: 2px solid var(--couch-player-color, var(--interactive-strong));
+      border: 2px solid var(--couch-player-color, var(--interactive-blue));
       border-radius: var(--radius-pill);
       pointer-events: none;
     }
@@ -172,7 +178,10 @@
   @media (prefers-reduced-motion: reduce) {
     .speedToggles.MuiToggleButtonGroup-root {
       &::before,
-      > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
+      > .MuiToggleButtonGroup-grouped.MuiToggleButton-root,
+      // The root and its painted paths must take the label ink on the same frame.
+      > .MuiToggleButton-root :is(.speedLabel, .multiplayerSpeedLabel),
+      > .MuiToggleButton-root :is(.speedLabel, .multiplayerSpeedLabel) :is(svg, path) {
         transition: none;
       }
     }
@@ -188,6 +197,8 @@
   @media (forced-colors: active) {
     .speedToggles.MuiToggleButtonGroup-root {
       forced-color-adjust: none;
+      --speed-hover: ButtonFace;
+      --focus-ring: ButtonText;
       background: Canvas;
       box-shadow: inset 0 0 0 1px ButtonBorder;
 
@@ -197,6 +208,10 @@
 
       > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
         color: ButtonText;
+
+        .MuiSvgIcon-root {
+          color: inherit;
+        }
 
         &[data-thumb="true"] {
           color: HighlightText;

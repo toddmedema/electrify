@@ -66,13 +66,22 @@
   /* The label on an --interactive-blue fill. Pure white takes the logo blue to 3.7:1, where
      #f5f5f5 manages only 3.4:1 */
   --interactive-contrast: #ffffff;
+  // ==========================================================================
+  // DANGER: DO NOT CHANGE --interactive-blue. DO NOT RE-DECLARE IT ANYWHERE.
+  //
+  // This is THE call-to-action blue. It is also the logo's blue (logo-home.svg)
+  // and the blue of the home-screen smoke. They are one color, on purpose, and
+  // the owner has ordered that it STOP being changed. Not for a contrast score,
+  // not for an audit, not "just on the home screen", not "just in dark mode".
+  // If a label looks too faint on it, fix the label. Never touch the blue.
+  //
+  // src/CtaColor.test.ts fails the build if this value moves, if another rule
+  // re-declares the token, or if a home-screen CTA stops using it.
+  // ==========================================================================
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
-  /* The deeper blue for small interactive text and the speed thumb, where the logo blue falls
-     short of 4.5:1: 5.6:1 on white and under a white label, 4.9:1 on --speed-track */
-  --interactive-strong: #0066cc;
   /* The recessed channel the speed thumb slides in: a tonal step below the bar */
   --speed-track: var(--bg-sunken);
-  --speed-thumb: var(--interactive-strong);
+  --speed-thumb: var(--interactive-blue);
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
@@ -153,9 +162,19 @@
      trades chroma for lightness: oklch(0.68 0.12 254) against light's oklch(0.62 0.2 254).
      6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
      (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
+  // ==========================================================================
+  // DANGER: DO NOT CHANGE --interactive-blue (DARK). DO NOT RE-DECLARE IT ANYWHERE.
+  //
+  // This is THE call-to-action blue. It is also the logo's blue (logo-home.svg)
+  // and the blue of the home-screen smoke. They are one color, on purpose, and
+  // the owner has ordered that it STOP being changed. Not for a contrast score,
+  // not for an audit, not "just on the home screen", not "just in dark mode".
+  // If a label looks too faint on it, fix the label. Never touch the blue.
+  //
+  // src/CtaColor.test.ts fails the build if this value moves, if another rule
+  // re-declares the token, or if a home-screen CTA stops using it.
+  // ==========================================================================
   --interactive-blue: #629be1;
-  /* Small interactive text: 7.8:1 on --speed-track, 6.6:1 on the selected tint */
-  --interactive-strong: #8db6ee;
   /* --bg-sunken is nearly the page here, so the channel steps up to the raised surface instead */
   --speed-track: var(--bg-raised);
   --speed-thumb: var(--interactive-blue);
@@ -1111,7 +1130,7 @@ $topbar_height: 56px;
   max-height: 40%;
   overflow: auto;
   box-sizing: border-box;
-  background: var(--bg-raised);
+  background: var(--bg-primary);
   border-top: 1px solid var(--border-subtle);
   color: var(--font-color-primary);
   p {
@@ -1125,6 +1144,8 @@ $topbar_height: 56px;
   gap: 8px;
   .MuiButton-root {
     min-height: 44px;
+    font-size: 1.1875rem;
+    font-weight: 700;
   }
 }
 
@@ -2527,14 +2548,16 @@ $pane_header_height: 48px;
     min-height: 40px;
     max-width: 100%;
     padding-inline: 8px;
-    border: 0;
+    border: 1px solid var(--interactive-blue);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
-    color: var(--interactive-strong);
     font: inherit;
     font-size: var(--font-size-caption);
     cursor: pointer;
 
+    &:not(:disabled) {
+      color: var(--font-color-primary);
+    }
     &:hover {
       background: var(--interactive-tint);
     }
@@ -3415,6 +3438,9 @@ $pane_header_height: 48px;
       .MuiButton-root {
         margin: 0;
         width: min(100%, 208px);
+        // The logo blue on white (or white on blue) needs large, bold labels.
+        font-size: 1.1875rem;
+        font-weight: 700;
       }
     }
   }
@@ -3879,8 +3905,7 @@ $pane_header_height: 48px;
 
       &.Mui-selected {
         border-color: $interactive_blue !important;
-        // The stronger blue keeps the small label above 4.5:1 on the selected tint.
-        color: var(--interactive-strong);
+        color: var(--font-color-primary);
         font-weight: 600;
       }
     }
@@ -5139,7 +5164,8 @@ $sizemap: (
 $homeSmokeCycle: 5.6s;
 
 .homeSmokePuff {
-  // The logo's own blue on each palette, so the puffs match logo-home(-dark).svg
+  // DANGER: the smoke is the logo's own blue on each palette (logo-home(-dark).svg), the
+  // same --interactive-blue the CTAs use. Do not give it a color of its own.
   fill: var(--interactive-blue);
   animation:
     homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3) infinite,
@@ -8964,7 +8990,7 @@ option {
       gap: 8px;
       width: fit-content;
       padding: 0 8px;
-      color: var(--interactive-strong);
+      color: var(--font-color-primary);
       font-size: var(--font-size-body2);
       font-weight: var(--font-weight-emphasis);
       cursor: pointer;
@@ -8974,6 +9000,7 @@ option {
         display: none;
       }
       &::after {
+        color: var(--interactive-blue);
         content: "+";
       }
       &:hover {
@@ -9146,16 +9173,15 @@ option {
   }
 }
 
-// Keep title-screen text legible while leaving the logo's established blue intact.
-#menuCard,
-.couchSettingsPrompt {
-  --home-link: #0868be;
-  --interactive-blue: var(--home-link);
-}
-#menuCard .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled),
-.couchSettingsPrompt .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled) {
-  color: var(--home-link);
-}
+// ============================================================================
+// DANGER: EVERY HOME-SCREEN BUTTON AND LINK, AND THE LOGO SMOKE, ARE THE LOGO BLUE.
+//
+// Never re-declare --interactive-blue here (this block used to, and it turned every
+// CTA and the smoke a different blue from the logo). Never add a "more legible",
+// deeper, lighter or per-screen blue for a button or a link: no --home-link, no
+// --interactive-strong, no hex. Everything reads --interactive-blue, in both themes.
+// src/CtaColor.test.ts and e2e/main-menu.spec.ts enforce all of this.
+// ============================================================================
 #menuCard {
   .homeExplore {
     display: flex;
@@ -9169,13 +9195,10 @@ option {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
-    color: var(--home-link);
-    font-size: 0.8125rem;
+    color: var(--interactive-blue);
+    font-size: 1.1875rem;
+    font-weight: 700;
   }
-}
-html[data-theme="dark"] #menuCard,
-html[data-theme="dark"] .couchSettingsPrompt {
-  --home-link: #8bc8f8;
 }
 
 .homeWordmark {
@@ -9194,7 +9217,7 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   a:focus {
   background-color: var(--interactive-blue);
   color: var(--interactive-contrast);
-  outline: 2px solid var(--home-link);
+  outline: 2px solid var(--interactive-blue);
   outline-offset: 2px;
 }
 

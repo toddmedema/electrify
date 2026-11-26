@@ -4,7 +4,6 @@ import * as React from "react";
 import { homeLogoSource } from "../../HomeLogo";
 import { Box, Button, Stack, SvgIcon, Typography } from "@mui/material";
 import EmailIcon from "@mui/icons-material/Email";
-import InfoIcon from "@mui/icons-material/Info";
 import ShareIcon from "@mui/icons-material/Share";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -32,6 +31,8 @@ export interface DispatchProps {
   onPlayWithFriends?: () => void;
   onTutorials: () => void;
   onSavedGames: () => void;
+  /** Saves is on screen: fetch the screen behind it now, so pressing it opens instantly. */
+  onSavedGamesVisible?: () => void;
   onSettings: () => void;
   onMods: () => void;
   onAchievements?: () => void;
@@ -107,6 +108,10 @@ const MainMenu = (props: Props): React.JSX.Element => {
           rel: "noopener noreferrer",
         }
       : { href: path };
+  const { hasSavedGames, onSavedGamesVisible } = props;
+  React.useEffect(() => {
+    if (hasSavedGames) onSavedGamesVisible?.();
+  }, [hasSavedGames, onSavedGamesVisible]);
   const [shareStatus, setShareStatus] = React.useState("");
   const onShare = async () => {
     const result = await shareText(buildGameShareContent());
@@ -186,6 +191,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
           spacing={1}
           useFlexGap
         >
+          {/* Exactly one button here carries data-main-action: it is the filled default the
+              menu focuses and returns to. A second one fills two buttons at once. */}
           {props.hasSavedGame && (
             <Button
               data-main-action
@@ -221,7 +228,6 @@ const MainMenu = (props: Props): React.JSX.Element => {
           )}
           {props.onPlayWithFriends && (
             <Button
-              data-main-action
               data-multiplayer-entry
               size="large"
               color="primary"
@@ -332,13 +338,10 @@ const MainMenu = (props: Props): React.JSX.Element => {
         <MenuIconButton onClick={props.onFeedback} label="Send feedback">
           <EmailIcon />
         </MenuIconButton>
-        <MenuIconButton {...sitePage("/about.html")} label="About Electrify">
-          <InfoIcon />
-        </MenuIconButton>
         {canShare() && (
           <MenuIconButton onClick={onShare} label="Share Electrify">
-            {/* Share has one extra pixel of leading whitespace beside the other footer glyphs. */}
-            <ShareIcon sx={{ transform: "translateX(-1px)" }} />
+            {/* Share's glyph has three extra pixels of leading whitespace beside Feedback's. */}
+            <ShareIcon sx={{ transform: "translateX(-3px)" }} />
           </MenuIconButton>
         )}
       </footer>

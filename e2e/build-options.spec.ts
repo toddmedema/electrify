@@ -1,3 +1,4 @@
+import { expectReadableText } from "./contrast";
 import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
@@ -874,6 +875,8 @@ for (const theme of ["light", "dark"] as const) {
       const period = daily.getByRole("combobox", {
         name: "Average day period",
       });
+      await expect(period).toBeVisible();
+      await expectReadableText(period);
       await expect(period.locator("option")).toHaveText([
         "12 month avg",
         "Jan",

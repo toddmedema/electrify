@@ -202,6 +202,10 @@ for (const theme of ["light", "dark"] as const) {
       );
       const limit = nuclear.getByText("98% limit", { exact: true });
       await expect(limit).toBeVisible();
+      // The restored mission's announced event adds a header row above the fleet on phones.
+      await expect(
+        page.getByRole("button", { name: /^Upcoming:/ }),
+      ).toBeVisible();
       await limit.hover();
       await expect(page.getByRole("tooltip")).toHaveText(
         "Limited due to Extreme heat",

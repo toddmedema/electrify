@@ -11,6 +11,13 @@ Guidance for UI work in Electrify, referenced from [AGENTS.md](../AGENTS.md#inte
 - Preserve the palette's semantic roles: electric blue means interaction, red a shortage or harmful
   state, amber warning, and green favorable change. Use the cool neutral surfaces for structure
   instead of introducing decorative colors.
+- **Never change the CTA color.** Every CTA, button and link, the home-screen smoke and the logo
+  are one blue per theme: `--interactive-blue`, `#0084f8` in light and `#629be1` in dark (`--brand`
+  on the static pages in `public/legal.css`). Do not re-declare it, add a deeper, lighter or
+  per-screen blue for buttons or links, or nudge it for a contrast score; fix the label instead.
+  Only hover and pressed states may shade it. `src/CtaColor.test.ts` and the home CTA test in
+  `e2e/main-menu.spec.ts` fail on any change, and only an explicit instruction in the task itself
+  may move them.
 - Design light and dark modes as separate contrast systems rather than mechanically inverting
   colors; use the shared theme and CSS tokens, and verify text, controls, charts, and SVGs in both
   palettes.
