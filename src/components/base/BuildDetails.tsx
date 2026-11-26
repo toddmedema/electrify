@@ -6,6 +6,10 @@ import {
   TableContainer,
   TableRow,
 } from "@mui/material";
+import {
+  BuildComparisonMarker,
+  type BuildPreviewMarker,
+} from "./BuildPreviewComparison";
 import ManualLink from "./ManualLink";
 import type { ManualEntryTitleType } from "./ManualEntries";
 
@@ -26,6 +30,8 @@ export function BuildDetailRow(props: {
   label: string;
   value: React.ReactNode;
   entry?: ManualEntryTitleType;
+  comparison?: BuildPreviewMarker;
+  note?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <TableRow className={props.entry ? "manual-help-region" : undefined}>
@@ -49,6 +55,10 @@ export function BuildDetailRow(props: {
       </TableCell>
       <TableCell align="right" className="buildDetailValue">
         {props.value}
+        {props.comparison && (
+          <BuildComparisonMarker marker={props.comparison} />
+        )}
+        {props.note}
       </TableCell>
     </TableRow>
   );
