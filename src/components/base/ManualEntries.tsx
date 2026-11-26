@@ -259,7 +259,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             after the window.
           </li>
           <li>
-            <strong>Peak curtailment contracts:</strong> Industrial and
+            <strong>Peak curtailment contracts:</strong> Industrial, mining and
             data-center demand drops 10%, and that energy isn't used later.
             Participants get 10% off all day.
           </li>
