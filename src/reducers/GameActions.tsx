@@ -88,6 +88,10 @@ export const cloudSavePromptVisible = createAction<boolean>(
 export const generatorSizeChanged = createAction("game/generatorSizeChanged");
 export const prepareStorageReorder = createAction("game/prepareStorageReorder");
 
+export const tutorialInspectedMapFacility = createAction<number>(
+  "tutorial/inspectedMapFacility",
+);
+
 export const beginIntertieStress = createAction("game/beginIntertieStress");
 
 /** A dated acquisition quote, revalidated atomically at the host's tick boundary. */

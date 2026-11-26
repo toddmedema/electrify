@@ -5,7 +5,8 @@ import { getNextTutorial, getScenario, TUTORIALS } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
   AppStateType,
-  GameToolType,
+  GameType,
+  TutorialActionType,
   TutorialStepChangeType,
   TutorialStepType,
   TutorialUiIdType,
@@ -18,13 +19,12 @@ import { dialogOpen } from "./UI";
 const NOTHING_HIDDEN: TutorialUiIdType[] = [];
 
 /** Authored order, rather than play history, also supports jumping directly into a lesson. */
-export const selectTutorialActions = createSelector(
+export const tutorialActionsForGame = createSelector(
   [
-    (state: AppStateType) =>
-      getScenario(state.game.scenarioId, state.game.customScenario),
-    (state: AppStateType) => state.game.tutorialStep,
+    (game: GameType) => getScenario(game.scenarioId, game.customScenario),
+    (game: GameType) => game.tutorialStep,
   ],
-  (scenario, stepIndex): GameToolType[] | undefined => {
+  (scenario, stepIndex): TutorialActionType[] | undefined => {
     if (!scenario?.tutorialSteps) return undefined;
     const previous = TUTORIALS.slice(
       0,
@@ -42,6 +42,9 @@ export const selectTutorialActions = createSelector(
     );
   },
 );
+
+export const selectTutorialActions = (state: AppStateType) =>
+  tutorialActionsForGame(state.game);
 
 /** The game chrome the current tutorial step keeps out of the way; empty outside a walkthrough. */
 export function selectTutorialHiddenUi(
@@ -155,12 +158,19 @@ export function changeTutorialStep(
 
 function matchesActionGate(
   step: TutorialStepType,
-  actionType: string | undefined,
+  action: unknown,
+  state: AppStateType,
 ): boolean {
-  if (step.advanceOnAction === undefined || actionType === undefined) {
-    return false;
-  }
-  return ([] as string[]).concat(step.advanceOnAction).includes(actionType);
+  const gate = step.advanceOnAction;
+  if (typeof gate === "function") return gate(action, state);
+  return (
+    gate !== undefined &&
+    typeof action === "object" &&
+    action !== null &&
+    "type" in action &&
+    typeof action.type === "string" &&
+    ([] as string[]).concat(gate).includes(action.type)
+  );
 }
 
 // True while a gate-driven advance is mid-flight. changeTutorialStep's own dispatches
@@ -179,10 +189,6 @@ export const tutorialGateMiddleware: Middleware =
     if (advancing) {
       return result;
     }
-    const actionType =
-      typeof action === "object" && action !== null && "type" in action
-        ? String((action as { type: unknown }).type)
-        : undefined;
     advancing = true;
     try {
       // The dispatched action can only satisfy the step it landed on; steps reached by
@@ -204,10 +210,11 @@ export const tutorialGateMiddleware: Middleware =
         if (!step || (!isGatedStep(step) && !step.continueOn)) {
           break;
         }
-        const byAction = freshAction && matchesActionGate(step, actionType);
+        let byAction = false;
         let byState = false;
         let capstoneFailed = false;
         try {
+          byAction = freshAction && matchesActionGate(step, action, state);
           byState = !!(
             (step.advanceOn && step.advanceOn(state)) ||
             (step.continueOn && step.continueOn(state)) ||
@@ -220,7 +227,10 @@ export const tutorialGateMiddleware: Middleware =
           // A broken gate must not kill the dispatch it rides on
         }
         if (!byState && capstoneFailed && step.capstone) {
-          const { failureMessage } = step.capstone;
+          const { failureMessage, retryFromPreviousStep } = step.capstone;
+          const retryStep = retryFromPreviousStep
+            ? Math.max(0, stepIndex - 1)
+            : stepIndex;
           // Freeze the failed state before presenting it. Otherwise a fast clock can keep
           // mutating the consequence behind the modal while the player is deciding what to do.
           (api.dispatch as AppDispatch)(setSpeed("PAUSED"));
@@ -237,7 +247,7 @@ export const tutorialGateMiddleware: Middleware =
                 restartTutorialAtStep(
                   api.dispatch as AppDispatch,
                   state.game.scenarioId,
-                  stepIndex,
+                  retryStep,
                 ),
             }),
           );

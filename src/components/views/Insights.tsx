@@ -154,11 +154,9 @@ import ChartSupplyDemandRanges, {
   supplyDemandMonthlyRanges,
 } from "../base/ChartSupplyDemandRanges";
 import ChartMonthlySpareCapacity from "../base/ChartMonthlySpareCapacity";
-import { getTutorialStep } from "../../data/Scenarios";
 import { ToolScrollMemory } from "../base/GameToolMemory";
 
 // Matched by target rather than step number, which shifts whenever a tutorial step is edited.
-const TUTORIAL_POWER_EXCHANGE_TARGET = '[data-layer="powerExchange"]';
 
 export type InsightLayerId =
   | "supplyDemand"
@@ -616,9 +614,7 @@ function requiredTutorialLayers(scenarioId: number): InsightLayerId[] {
     case 3:
       return ["customers"];
     case 5:
-      return ["supplyDemand", "fuelPrices", "weather"];
-    case 112:
-      return ["powerExchange"];
+      return ["supplyDemand"];
     default:
       return [];
   }
@@ -628,9 +624,6 @@ export function withRequiredLayers(
   layers: InsightLayerId[],
   scenarioId: number,
 ): InsightLayerId[] {
-  if (scenarioId === 112) {
-    return ["powerExchange", ...layers.filter((id) => id !== "powerExchange")];
-  }
   const next = [...layers];
   for (const id of requiredTutorialLayers(scenarioId)) {
     if (!next.includes(id)) {
@@ -829,7 +822,6 @@ export default class Insights extends React.Component<Props, State> {
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.evidenceRunId !== this.props.evidenceRunId ||
       nextProps.activeCard !== this.props.activeCard ||
-      nextProps.game.tutorialStep !== this.props.game.tutorialStep ||
       nextProps.game.date.monthsElapsed !==
         this.props.game.date.monthsElapsed ||
       (!nextProps.live &&
@@ -869,7 +861,6 @@ export default class Insights extends React.Component<Props, State> {
       this.paneObserver = new ResizeObserver(measure);
       this.paneObserver.observe(pane);
     }
-    this.scrollTutorialPowerExchangeIntoView();
     this.resolveEvidence();
   }
 
@@ -905,9 +896,6 @@ export default class Insights extends React.Component<Props, State> {
         this.setState({ temporaryLayer: undefined });
     }
     this.resolveEvidence();
-    if (this.props.game.tutorialStep !== previousProps.game.tutorialStep) {
-      this.scrollTutorialPowerExchangeIntoView();
-    }
     if (
       this.props.focusLayer &&
       this.props.focusLayer !== previousProps.focusLayer &&
@@ -996,21 +984,6 @@ export default class Insights extends React.Component<Props, State> {
     );
   }
 
-  private scrollTutorialPowerExchangeIntoView() {
-    if (
-      getTutorialStep(this.props.game)?.target !==
-        TUTORIAL_POWER_EXCHANGE_TARGET ||
-      window.innerWidth > 768
-    ) {
-      return;
-    }
-    window.setTimeout(() => {
-      document
-        .querySelector<HTMLElement>(TUTORIAL_POWER_EXCHANGE_TARGET)
-        ?.scrollIntoView?.({ block: "nearest" });
-    }, 0);
-  }
-
   private setLayers(
     layers: InsightLayerId[],
     preset: InsightPresetId = this.state.preset,
@@ -1020,12 +993,8 @@ export default class Insights extends React.Component<Props, State> {
       preset,
       this.state.presetLibrary,
     )?.layers;
-    // Mission 7 temporarily puts its teaching track first. Keep that guided ordering out of the
-    // player's saved preset so finishing the mission does not rearrange their normal Insights.
-    if (this.props.game.scenarioId !== 112) {
-      setStorageKeyValue(LAYERS_KEY, required);
-      setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
-    }
+    setStorageKeyValue(LAYERS_KEY, required);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, preset);
     this.setState({
       temporaryLayer: undefined,
       layers: required,
@@ -1054,10 +1023,8 @@ export default class Insights extends React.Component<Props, State> {
       return;
     }
     const layers = [...preset.layers];
-    if (this.props.game.scenarioId !== 112) {
-      setStorageKeyValue(LAYERS_KEY, layers);
-      setStorageKeyValue(ACTIVE_PRESET_KEY, id);
-    }
+    setStorageKeyValue(LAYERS_KEY, layers);
+    setStorageKeyValue(ACTIVE_PRESET_KEY, id);
     this.setState({
       layers,
       preset: id,

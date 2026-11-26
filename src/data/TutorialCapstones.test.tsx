@@ -1,32 +1,25 @@
 import cloneDeep from "lodash.clonedeep";
 import { getStore } from "../StoreRegistry";
-import {
-  AppStateType,
-  GameType,
-  isStorage,
-  MonthlyHistoryType,
-  ScenarioType,
-  TickPresentFutureType,
-} from "../Types";
+import { AppStateType, GameType, isStorage, ScenarioType } from "../Types";
 import gameReducer, {
   buildFacility,
-  buildTransmissionLine,
   delta,
   initGame,
   reprioritizeFacility,
+  sellFacility,
   start,
   tickState,
   togglePauseFacility,
 } from "../reducers/Game";
-import {
-  getTimeFromTimeline,
-  MINUTES_PER_MONTH,
-  summarizeTimeline,
-} from "../helpers/DateTime";
+import { getTimeFromTimeline, MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { powerAgreementQuote } from "../helpers/PowerAgreements";
 import { selectProjection } from "../helpers/Projection";
 import { GENERATORS, STORAGE } from "./Facilities";
 import { createGame } from "../testing/Simulator";
-import { prepareStorageReorder } from "../reducers/GameActions";
+import {
+  acceptPowerAgreement,
+  prepareStorageReorder,
+} from "../reducers/GameActions";
 import { TUTORIALS } from "./Scenarios";
 
 function tutorial(id: number): ScenarioType {
@@ -60,6 +53,24 @@ describe("authored tutorial capstones", () => {
   afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
+  });
+
+  it.each([
+    [1, "Natural Gas Peaker", "Solar"],
+    [2, "Battery", "Solar"],
+  ])("requires the named technology in Mission %s", (id, correct, wrong) => {
+    const build = (name: string) =>
+      createGame({
+        scenarioId: id,
+        initialBuild: {
+          name,
+          ...(name === "Battery" ? { peakWh: 100e6 } : { peakW: 20e6 }),
+          financed: true,
+        },
+      });
+    const gate = tutorial(id).tutorialSteps![0].advanceOn!;
+    expect(gate(appState(build(wrong)))).toBe(false);
+    expect(gate(appState(build(correct)))).toBe(true);
   });
 
   it.each([
@@ -119,13 +130,24 @@ describe("authored tutorial capstones", () => {
     expect(capstone(1).success(appState(game))).toBe(false);
   });
 
+  it("protects the two facilities needed by the storage reorder lesson", () => {
+    const game = createGame({ scenarioId: 2 });
+    for (const facility of game.facilities) {
+      expect(gameReducer(game, sellFacility(facility.id))).toBe(game);
+    }
+  });
+
   it("requires Coal to move above Pumped Hydro, and rejects unrelated actions and the wrong order", () => {
-    const step = tutorial(2).tutorialSteps![5];
+    const steps = tutorial(2).tutorialSteps!;
+    const preparation = steps.findIndex(
+      (step) => step.phase === "STORAGE_ORDER_PREPARE",
+    );
+    const step = steps[preparation + 1];
     let game = createGame({ scenarioId: 2 });
     const originalOrder = game.facilities.map((f) => f.id);
     game = gameReducer(game, prepareStorageReorder());
     expect(game.facilities.map((f) => f.id)).toEqual(originalOrder);
-    game = gameReducer(game, delta({ tutorialStep: 4 }));
+    game = gameReducer(game, delta({ tutorialStep: preparation }));
     game = gameReducer(game, prepareStorageReorder());
     expect(game.facilities.map((f) => f.name)).toEqual([
       "Pumped Hydro",
@@ -329,58 +351,41 @@ describe("authored tutorial capstones", () => {
       expect(game.date.monthsElapsed).toBe(7);
     });
 
-    it("makes a player who builds nothing fail at month seven, not succeed on the starting fleet", () => {
+    it("makes a player who builds nothing fail after August, not succeed on the starting fleet", () => {
       const objective = capstone(5);
       const game = createGame({ scenarioId: 5 });
       expect(
-        tickUntil(game, (state) => state.game.date.monthsElapsed >= 7, 800),
+        tickUntil(game, (state) => state.game.date.monthsElapsed >= 8, 800),
       ).toBe(true);
-      // The heat wave comes later in the month, so only the month-seven rule decides this
-      expect(hasBlackout(appState(game))).toBe(false);
+      expect(hasBlackout(appState(game))).toBe(true);
       expect(objective.success(appState(game))).toBe(false);
       expect(objective.failure!(appState(game))).toBe(true);
     });
   });
 
-  it("requires Mission 7 to settle a new safe-export month after observing imports", () => {
+  it("requires a signed agreement and a completed delivery month in Mission 7", () => {
     const objective = capstone(112);
-    const game = cloneDeep(
-      gameReducer(
-        createGame({ scenarioId: 112 }),
-        buildTransmissionLine({
-          corridorId: "california-north",
-          financed: true,
-        }),
-      ),
+    const unsigned = createGame({ scenarioId: 112 });
+    const quote = powerAgreementQuote(unsigned, "valley-purchase", 3)!;
+    const signed = gameReducer(
+      unsigned,
+      acceptPowerAgreement({
+        blockId: quote.id,
+        quoteKey: quote.quoteKey,
+        durationYears: quote.durationYears,
+      }),
     );
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
-    game.transmission!.buyingRule = "SHORTAGES";
-    game.transmission!.sellingRule = "SURPLUS";
-    game.date.monthsElapsed = 15;
-    const month = summarizeTimeline(game.timeline, game.startingYear);
-    const imported: MonthlyHistoryType = {
-      ...month,
-      chartAverage: {
-        ...month.chartAverage,
-        importedW: 1,
-        exportedW: 0,
-      } as TickPresentFutureType,
-      minimumSupplyMarginW: 0,
-    };
-    const olderExport: MonthlyHistoryType = {
-      ...month,
-      chartAverage: {
-        ...month.chartAverage,
-        importedW: 0,
-        exportedW: 1,
-      } as TickPresentFutureType,
-      minimumSupplyMarginW: 1,
-    };
-    game.monthlyHistory = [imported, olderExport];
-
-    expect(objective.success(appState(game))).toBe(false);
-
-    game.monthlyHistory = [olderExport, imported];
-    expect(objective.success(appState(game))).toBe(true);
+    expect(signed.transmission?.acceptedAgreements).toHaveLength(1);
+    expect(objective.success(appState(signed))).toBe(false);
+    const unsignedAfterMonth = cloneDeep(unsigned);
+    expect(
+      tickUntil(
+        unsignedAfterMonth,
+        (state) => state.game.date.monthsElapsed >= 1,
+        120,
+      ),
+    ).toBe(true);
+    expect(objective.success(appState(unsignedAfterMonth))).toBe(false);
+    expect(tickUntil(cloneDeep(signed), objective.success, 120)).toBe(true);
   });
 });

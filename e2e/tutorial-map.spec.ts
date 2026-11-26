@@ -1,0 +1,212 @@
+import { expect, test, type Page } from "./fixtures";
+import { reviewScreenshot } from "./review-screenshot";
+import {
+  buildTutorialProject,
+  startTutorialMission,
+  tutorialCoal,
+  tutorialMap,
+} from "./tutorial-fixture";
+import { dragCoalAbovePumpedHydro } from "./layout";
+
+const hud = (page: Page) => page.locator(".tutorialHud");
+const goal = (page: Page, text: string, timeout?: number) =>
+  expect(hud(page).locator(".tutorialHudAction")).toHaveText(text, { timeout });
+const next = (page: Page, name = "Next") =>
+  hud(page).getByRole("button", { name, exact: true }).click();
+const action = (page: Page, name: string) =>
+  page
+    .getByRole("navigation", { name: "Game actions" })
+    .getByRole("button", { name, exact: true })
+    .click();
+const complete = (page: Page) =>
+  expect(page.getByRole("dialog", { name: /Mission complete!/ })).toBeVisible({
+    timeout: 35000,
+  });
+
+async function startMission(page: Page, id: number) {
+  await startTutorialMission(
+    page,
+    id,
+    test.info().project.use.hasTouch ? "dark" : "light",
+  );
+  await expect(
+    tutorialMap(page).locator("canvas.territory3DCanvas"),
+  ).toHaveAttribute("data-renderer", "ready");
+}
+
+async function inspectCoal(page: Page) {
+  const coal = tutorialMap(page).locator(
+    '[data-map-facility="Coal"][data-owned="true"]',
+  );
+  await coal.click();
+  await expect(
+    page.getByRole("dialog", { name: "Coal", exact: true }),
+  ).toBeVisible();
+}
+
+test("Mission 1 · inspect the 3D map, read Fleet and keep a full day supplied", async ({
+  page,
+}, info) => {
+  await startMission(page, 0);
+  await goal(page, "Inspect the coal plant on the map");
+  await expect(tutorialCoal(page)).toHaveClass(/tutorialTarget/);
+  await inspectCoal(page);
+  await goal(page, "Open Fleet");
+  await reviewScreenshot(page, { path: info.outputPath("map-tutorial.png") });
+  await action(page, "Fleet");
+  await page.locator("#chartSupplyDemand").click();
+  await goal(page, "Start the clock");
+  await page.getByRole("button", { name: "slow speed", exact: true }).click();
+  await goal(page, "Reach midnight without a blackout");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await complete(page);
+  await page
+    .getByRole("button", { name: "Next tutorial", exact: true })
+    .click();
+  await goal(page, "Build a gas peaker");
+});
+
+test("Mission 2 · buy two generators on the map and find construction", async ({
+  page,
+}) => {
+  await startMission(page, 1);
+  await goal(page, "Build a gas peaker");
+  await buildTutorialProject(page, "Natural Gas Peaker");
+  await goal(page, "Find your project on the map");
+  await tutorialMap(page)
+    .locator('[data-map-construction="true"][data-owned="true"]')
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Natural Gas Peaker", exact: true }),
+  ).toBeVisible();
+  await next(page);
+  await goal(page, "Build a second type of generator");
+  await buildTutorialProject(page, "Solar");
+  await complete(page);
+});
+
+test("Mission 3 · move Coal above storage and cover the daily peak with a battery", async ({
+  page,
+}) => {
+  await startMission(page, 2);
+  await goal(page, "Build a battery");
+  await buildTutorialProject(page, "Lithium Battery", true);
+  await action(page, "Fleet");
+  await goal(page, "Find Pumped Hydro’s charge level");
+  await next(page);
+  await goal(page, "Move Coal above Pumped Hydro");
+  if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
+    await dragCoalAbovePumpedHydro(page);
+  } else {
+    const handle = page.getByRole("button", {
+      name: "Reorder Coal",
+      exact: true,
+    });
+    await handle.press("Space");
+    await handle.press("ArrowUp");
+    await handle.press("Space");
+  }
+  await next(page, "Start final challenge");
+  await goal(page, "Cover peak demand with storage");
+  await buildTutorialProject(page, "Lithium Battery", true, "19");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await complete(page);
+});
+
+test("Mission 4 · use Insights and Programs to earn profit", async ({
+  page,
+}) => {
+  await startMission(page, 4);
+  await action(page, "Insights");
+  await goal(page, "Compare revenue and costs");
+  await next(page);
+  await action(page, "Programs");
+  await page.locator("#rateSlider input").focus();
+  for (let i = 0; i < 30; i++)
+    await page.locator("#rateSlider input").press("ArrowRight");
+  await next(page);
+  await goal(page, "Finish the month with a profit");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await complete(page);
+});
+
+test("Mission 5 · use Programs and Insights to attract customers", async ({
+  page,
+}) => {
+  await startMission(page, 3);
+  await action(page, "Programs");
+  await page.locator("#rateSlider input").focus();
+  for (let i = 0; i < 10; i++)
+    await page.locator("#rateSlider input").press("ArrowLeft");
+  await next(page);
+  await goal(page, "Find customer growth in Insights");
+  await expect(page.locator("#chartInsightsCustomers")).toBeVisible();
+  await next(page);
+  await goal(page, "Grow customers 5% while staying profitable");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await complete(page);
+});
+
+test("Mission 6 · read a shortage forecast and finish a new generator", async ({
+  page,
+}) => {
+  test.setTimeout(75000);
+  await startMission(page, 5);
+  await action(page, "Insights");
+  await goal(page, "Find the summer shortage");
+  await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible();
+  await next(page);
+  await goal(page, "Order a plant that can finish before August");
+  await buildTutorialProject(page, "Oil", false, "15");
+  await goal(page, "Keep the lights on through August");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await goal(page, "Find your plant’s opening in Events", 35000);
+  const opening = page
+    .locator(".eventLogItem.kind-CONSTRUCTION")
+    .filter({ hasText: "Construction complete: Oil" });
+  await expect(opening).toBeVisible();
+  await expect(opening).toHaveClass(/tutorialTarget/);
+  await next(page);
+  await complete(page);
+});
+
+test("Mission 7 · review and accept a real regional agreement", async ({
+  page,
+}) => {
+  await startMission(page, 112);
+  await action(page, "Agreements");
+  await page
+    .getByRole("button", {
+      name: "Review Valley Electric supply agreement",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page.getByRole("dialog", {
+      name: "Review Valley Electric supply agreement",
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Accept agreement", exact: true })
+    .click();
+  await goal(page, "Run one month to see the agreement in use");
+  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await goal(page, "Check how much contracted energy you used");
+  const agreement = page.getByRole("article", {
+    name: "Valley Electric supply",
+    exact: true,
+  });
+  await agreement.getByText("Details", { exact: true }).click();
+  await expect(
+    agreement.getByText("Contract energy used", { exact: true }),
+  ).toBeInViewport();
+  const usage = agreement.getByRole("meter", {
+    name: "Share of available contracted energy used",
+  });
+  expect(Number(await usage.getAttribute("value"))).toBeGreaterThan(0);
+  await next(page, "Finish tutorial");
+  await complete(page);
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Next tutorial" }),
+  ).toHaveCount(0);
+});

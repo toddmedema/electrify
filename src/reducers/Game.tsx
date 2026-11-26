@@ -50,6 +50,7 @@ import {
   type CombinedUtilityDemandProfile,
 } from "../helpers/CombinedUtilityDemand";
 import {
+  isTutorialMapGame,
   isUtilityExpansionGame,
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
@@ -2113,7 +2114,8 @@ export const gameSlice = createSlice({
         );
       }
 
-      if (isUtilityExpansionGame(state)) {
+      const utilityExpansion = isUtilityExpansionGame(state);
+      if (utilityExpansion || isTutorialMapGame(state)) {
         state.territoryNetwork = {
           version: 3,
           landPurchases: [],
@@ -2126,6 +2128,8 @@ export const gameSlice = createSlice({
         });
         if (!assignTerritoryTiles(state))
           throw new Error("Invalid starting tile placement");
+      }
+      if (utilityExpansion) {
         state.transmission!.inheritedAgreementTerms = 3;
         state.utilityExpansion = {
           sellerFleet: "seeded",

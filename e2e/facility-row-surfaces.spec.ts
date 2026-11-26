@@ -1,41 +1,15 @@
+import { buildTutorialProject, startTutorialMission } from "./tutorial-fixture";
 import { expect, test } from "./fixtures";
 
-for (const theme of ["light", "dark"]) {
+for (const theme of ["light", "dark"] as const) {
   test(`storage tutorial ring stays separate from expanded details in ${theme}`, async ({
     page,
   }, testInfo) => {
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-      localStorage.setItem(
-        "plays",
-        JSON.stringify({
-          plays: [0, 1].map((scenarioId) => ({
-            scenarioId,
-            timesPlayed: 1,
-            date: "2026-09-10",
-          })),
-        }),
-      );
-    }, theme);
-    await page.goto("/");
-    await page.getByRole("button", { name: "Play", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Start Storage", exact: true })
-      .click();
-    // Tutorial initialization replaces the entering game card. Its first objective must
-    // be active before Build can open a catalog that survives that navigation.
-    await expect(page.locator(".tutorialHud")).toContainText("Tap Build");
-    await expect(page.locator(".cardTransitions > main")).toHaveCount(1);
-    await page.locator(".button-buildFacility").click();
-    await page.getByRole("tab", { name: "Storage", exact: true }).click();
-    await page
-      .getByRole("button", { name: /Review purchase of/ })
-      .first()
-      .click();
-    await page.getByRole("button", { name: "Take loan", exact: true }).click();
+    await startTutorialMission(page, 2, theme);
+    await buildTutorialProject(page, "Lithium Battery", true);
+    await page.getByRole("button", { name: "Fleet", exact: true }).click();
     await expect(page.locator(".tutorialHud")).toContainText(
-      "Check the storage bar",
+      "Find Pumped Hydro’s charge level",
     );
     // Keep the pointer off the toast so its auto-dismiss timer is not paused by hover; it
     // covers the new row until it leaves.

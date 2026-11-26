@@ -5,7 +5,6 @@ import {
   isGatedStep,
   ScenarioType,
   TUTORIAL_UI_SELECTORS,
-  TutorialStepType,
 } from "../Types";
 import { getScenarioLocation } from "../helpers/Locations";
 import { intertiesEnabledForScenario } from "./AdjacentMarkets";
@@ -88,7 +87,7 @@ describe("tutorial mission metadata", () => {
     ).toBe(false);
   });
 
-  it("opens Programs for pricing, keeping its rate escape hatch", () => {
+  it("opens Programs for pricing through the dock", () => {
     const pricing = TUTORIALS.find(
       (tutorial) => tutorial.name === "Mission 5: Pricing",
     )!;
@@ -98,42 +97,24 @@ describe("tutorial mission metadata", () => {
     expect(
       firstStep.advanceOn?.({ card: { name: "PROGRAMS" } } as AppStateType),
     ).toBe(true);
-    // Already did the next step's deed, so no tap is owed
-    expect(
-      firstStep.advanceOn?.({
-        card: { name: "FACILITIES" },
-        game: { dollarsPerkWh: 0.06 },
-      } as unknown as AppStateType),
-    ).toBe(true);
   });
 
-  it("gives every mission deterministic unguided proof points", () => {
+  it("gives every mission a deterministic challenge", () => {
     TUTORIALS.forEach((tutorial) => {
       expect(tutorial.seed).toEqual(expect.any(Number));
       const capstones = tutorial.tutorialSteps!.filter((step) => step.capstone);
-      expect(capstones).toHaveLength(tutorial.id === 112 ? 2 : 1);
-      capstones.forEach((step) => {
-        expect(step.target).toBeUndefined();
-      });
+      expect(capstones).toHaveLength(1);
     });
   });
-  it("authors the Interties mission as a fixed two-plant California lesson", () => {
-    const interties = getScenario(112)!;
-    expect(interties).toMatchObject({
+  it("starts the Interties lesson on the Valley grid with real agreements", () => {
+    const mission = getScenario(112)!;
+    expect(mission).toMatchObject({
       name: "Mission 7: Interties",
       seed: 249007,
-      startingYear: 2019,
-      durationMonths: 24,
+      locationId: "BurlingtonVT",
+      startingYear: 2005,
       intertiesEnabled: true,
     });
-    expect(interties.facilities).toEqual([
-      expect.objectContaining({ fuel: "Sun", peakW: 800000000 }),
-      expect.objectContaining({
-        name: "Natural Gas Peaker",
-        peakW: 500000000,
-      }),
-    ]);
-    expect(interties.tutorialSteps).toHaveLength(20);
   });
 
   it("starts Forecasting with a small solar plant beside its coal plant", () => {
@@ -142,28 +123,6 @@ describe("tutorial mission metadata", () => {
     expect(solar).toMatchObject({ fuel: "Sun" });
     expect(others).toEqual([]);
     expect(solar.peakW!).toBeLessThan(coal.peakW!);
-  });
-
-  it("follows Forecasting's coal plant, not the solar plant, through its pause and resume steps", () => {
-    const steps = getScenario(5)!.tutorialSteps!;
-    const pause = steps.find((s) => s.target === '[aria-label="Pause Coal"]')!;
-    const resume = steps.find(
-      (s) => s.target === '[aria-label="Resume Coal"]',
-    )!;
-    const paused = (coal: boolean, solar: boolean) =>
-      ({
-        game: {
-          facilities: [
-            { fuel: "Sun", paused: solar },
-            { fuel: "Coal", paused: coal },
-          ],
-        },
-      }) as unknown as AppStateType;
-
-    expect(pause.advanceOn!(paused(false, true))).toBe(false);
-    expect(pause.advanceOn!(paused(true, false))).toBe(true);
-    expect(resume.advanceOn!(paused(true, false))).toBe(false);
-    expect(resume.advanceOn!(paused(false, true))).toBe(true);
   });
 
   it("keeps interties out of earlier tutorials without disabling ordinary California games", () => {
@@ -252,16 +211,6 @@ describe("tutorial step actions", () => {
     });
   });
 
-  // A capstone is a new challenge, and a deed's last tap must not drop the player into it (or
-  // rebuild their grid) unannounced. A manual step before it says what is coming and lets them
-  // begin when ready. Missions 1, 4 and 5 are the exception: their last guided deed is the player
-  // starting the clock, which is the explicit start, and a Next there would leave the clock
-  // running toward the scenario's own end while they read.
-  const CLOCK_START_LEAD_INS = [
-    0, // Mission 1: Electricity
-    4, // Mission 4: Finances
-    3, // Mission 5: Pricing
-  ];
   const capstoneLeadIns = TUTORIALS.flatMap((tutorial) =>
     tutorial.tutorialSteps!.flatMap((step, index) =>
       step.capstone
@@ -275,43 +224,11 @@ describe("tutorial step actions", () => {
         : [],
     ),
   );
-  const isManual = (step: TutorialStepType) =>
-    !isGatedStep(step) && !step.continueOn && !step.continueOnClick;
-
-  it("introduces every capstone with a manual Next step", () => {
-    capstoneLeadIns
-      .filter(({ tutorial }) => !CLOCK_START_LEAD_INS.includes(tutorial.id))
-      .forEach(({ tutorial, before }) => {
-        expect({ mission: tutorial.name, manual: isManual(before) }).toEqual({
-          mission: tutorial.name,
-          manual: true,
-        });
-      });
-  });
-
-  it("limits the exception to a step that starts the clock", () => {
-    const started = (speed: string) =>
-      ({ game: { speed } }) as unknown as AppStateType;
-    capstoneLeadIns
-      .filter(({ tutorial }) => CLOCK_START_LEAD_INS.includes(tutorial.id))
-      .forEach(({ tutorial, before }) => {
-        expect({
-          mission: tutorial.name,
-          startsClock: before.advanceOn?.(started("SLOW")),
-          pausedCounts: before.advanceOn?.(started("PAUSED")),
-        }).toEqual({
-          mission: tutorial.name,
-          startsClock: true,
-          pausedCounts: false,
-        });
-      });
-  });
-
   it("names the restart before a capstone that rebuilds the grid", () => {
     const restarting = capstoneLeadIns.filter(
       ({ capstone }) => !capstone.capstone!.preserveProgress,
     );
-    expect(restarting.map(({ tutorial }) => tutorial.id)).toEqual([2, 5]);
+    expect(restarting.map(({ tutorial }) => tutorial.id)).toEqual([2]);
     restarting.forEach(({ before }) => {
       expect(before.nextLabel).toBe("Start final challenge");
     });
@@ -332,28 +249,16 @@ describe("tutorial step actions", () => {
     );
   });
 
-  it("explains monthly demand changes just before the generator capstone", () => {
-    const generators = capstoneLeadIns.find(
-      ({ tutorial }) => tutorial.id === 1,
-    )!;
-    expect(generators.before.target).toBe("#chartSupplyDemand");
-    expect((generators.before.content.props as { text: string }).text).toMatch(
-      /one day per month.*seasons/,
-    );
-  });
-
-  it("opens the first mission with a manual introduction before hands-on steps", () => {
+  it("opens the first mission on a hands-on map action", () => {
     const [intro] = TUTORIALS[0].tutorialSteps!;
-    expect(isGatedStep(intro)).toBe(false);
-    expect(intro.target).toBeUndefined();
-    expect(intro.continueOn).toBeUndefined();
-    expect(intro.continueOnClick).toBeUndefined();
+    expect(isGatedStep(intro)).toBe(true);
+    expect(intro.card).toBe("FACILITIES");
+    expect(intro.revealActions).toBeUndefined();
   });
 
   it("moves the hands-on first-mission steps on from a tap on their targets", () => {
     TUTORIALS[0]
-      .tutorialSteps!.slice(1)
-      .filter((step) => !step.capstone)
+      .tutorialSteps!.filter((step) => !step.capstone)
       .forEach((step, index) => {
         expect({
           index,
@@ -367,10 +272,10 @@ describe("tutorial step actions", () => {
   it("opens the first mission without navigation, building or speed controls", () => {
     const [first] = TUTORIALS[0].tutorialSteps!;
     expect(first.hideUi).toEqual(
-      expect.arrayContaining(["nav", "build", "speed", "menu", "sidePanes"]),
+      expect.arrayContaining(["speed", "menu", "facilityActions"]),
     );
     const capstone = TUTORIALS[0].tutorialSteps!.find((step) => step.capstone)!;
-    expect(capstone.hideUi).not.toContain("speed");
+    expect(capstone.hideUi ?? []).not.toContain("speed");
   });
 });
 

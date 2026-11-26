@@ -1,250 +1,52 @@
-import { expect, Page, test } from "./fixtures";
-import {
-  dragCoalAbovePumpedHydro,
-  isPaneLayout,
-  openPane,
-  waitForSettled,
-} from "./layout";
+import { expect, test } from "./fixtures";
+import { startTutorialMission } from "./tutorial-fixture";
 
-async function startLesson(page: Page, name: string) {
-  await page.addInitScript(
-    ({ lesson, theme }) => {
-      localStorage.clear();
-      localStorage.setItem("theme", theme);
-      localStorage.setItem(
-        "plays",
-        JSON.stringify({
-          plays: [0, 1, 2, 4, 3, 5]
-            .slice(
-              0,
-              [
-                "Electricity",
-                "Generators",
-                "Storage",
-                "Finances",
-                "Pricing",
-                "Forecasting",
-              ].indexOf(lesson),
-            )
-            .map((scenarioId) => ({
-              scenarioId,
-              timesPlayed: 1,
-              date: "2026-09-18",
-            })),
-        }),
-      );
-    },
-    {
-      lesson: name,
-      theme: test.info().project.name.startsWith("mobile-") ? "dark" : "light",
-    },
-  );
-  await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page
-    .getByRole("button", { name: `Start ${name}`, exact: true })
-    .click();
-  await expect(page.locator(".tutorialHud")).toBeVisible();
-}
-
-async function captureTutorial(page: Page, name: string) {
-  await expect(page.locator(".snackbar")).toBeHidden();
-  await page.screenshot({
-    path: test.info().outputPath(name),
-    animations: "disabled",
-  });
-}
-
-async function next(page: Page) {
-  await page
-    .locator(".tutorialHud")
-    .getByRole("button", { name: "Next", exact: true })
-    .click();
-}
-
-async function expectTargetVisible(page: Page, selector: string) {
-  await expect
-    .poll(async () =>
-      page
-        .locator(selector)
-        .first()
-        .evaluate((element) => {
-          const box = element.getBoundingClientRect();
-          const hudBottom = document
-            .querySelector(".tutorialHud")!
-            .getBoundingClientRect().bottom;
-          const footer = document
-            .querySelector("#navfooter")
-            ?.getBoundingClientRect();
-          const bottom =
-            footer?.height && box.left < footer.right && box.right > footer.left
-              ? footer.top
-              : innerHeight;
-          return (
-            box.top >= hudBottom && box.bottom <= bottom + 1 && box.height > 0
-          );
-        }),
-    )
-    .toBe(true);
-  await expect(
-    page.locator(".tutorialTargetRing:visible").first(),
-  ).toBeVisible();
-}
-
-test("Pricing reveals customers once and keeps the chosen rate when 1x starts its challenge", async ({
+test("resizing keeps the Finances lesson waiting for its dock action", async ({
   page,
 }) => {
-  await startLesson(page, "Pricing");
-  await page.locator("#programsNav").click();
-  await captureTutorial(page, "pricing-mechanisms.png");
+  await startTutorialMission(page, 4);
+  const hud = page.locator(".tutorialHud");
+  const insights = page.getByRole("button", { name: "Insights", exact: true });
+  for (const width of [390, 768, 884, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(hud).toContainText("Open Insights");
+    await expect(insights).toHaveClass(/tutorialTarget/);
+    await expect(insights).toHaveAttribute("aria-expanded", "false");
+    await expect(page.locator(".tutorialTargetRing:visible")).toHaveCount(1);
+  }
+  await insights.click();
+  await expect(hud).toContainText("Compare revenue and costs");
+  await page.getByRole("button", { name: /^Layers \(/ }).click();
+  for (const name of ["Profit", "Finance details"]) {
+    const layer = page.getByRole("checkbox", { name, exact: true });
+    await expect(layer).toBeChecked();
+    await expect(layer).toBeDisabled();
+  }
+});
+
+test("Pricing preserves the chosen rate while switching to Insights and starting the challenge", async ({
+  page,
+}) => {
+  await startTutorialMission(page, 3);
+  await page.getByRole("button", { name: "Programs", exact: true }).click();
   const rate = page.locator("#rateSlider input");
-  await rate.focus();
   await rate.press("ArrowLeft");
-  await expectTargetVisible(page, "#chartInsightsCustomers");
-  const originalViewport = page.viewportSize()!;
+  const chosenRate = await rate.inputValue();
+  const hud = page.locator(".tutorialHud");
+  const next = hud.getByRole("button", { name: "Next", exact: true });
+  await next.click();
   for (const width of [390, 768, 884, 1280]) {
     await page.setViewportSize({ width, height: 1024 });
-    await expectTargetVisible(page, "#chartInsightsCustomers");
-    await expect(page.locator(".tutorialHud")).toContainText(
-      "Find customer growth",
+    await expect(page.locator("#chartInsightsCustomers")).toHaveClass(
+      /tutorialTarget/,
     );
   }
-  await page.setViewportSize(originalViewport);
-  await expectTargetVisible(page, "#chartInsightsCustomers");
-  await openPane(
-    page.getByRole("region", { name: "Programs", exact: true }),
-    page.locator("#programsNav"),
-  );
-  await expect(rate).toHaveValue("0.069");
-  await openPane(
-    page.getByRole("region", { name: "Insights", exact: true }),
-    page.locator("#insightsNav"),
-  );
-  await next(page);
+  await next.click();
+  await expect(hud).toContainText("Grow customers 5%");
   await page.getByRole("button", { name: "slow speed", exact: true }).click();
-  await expect(page.locator(".tutorialHud")).toContainText("Grow customers 5%");
-  await openPane(
-    page.getByRole("region", { name: "Programs", exact: true }),
-    page.locator("#programsNav"),
-  );
-  await expect(rate).toHaveValue("0.069");
-  await expect(
-    page.getByRole("button", { name: "slow speed", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-});
-
-test("Storage requires a drag, then resets to the coal-only purchase challenge", async ({
-  page,
-}) => {
-  await startLesson(page, "Storage");
-  await page.locator(".button-buildFacility").click();
-  await page.getByRole("tab", { name: "Storage", exact: true }).click();
-  await page
-    .getByRole("button", { name: /Review purchase of/ })
-    .first()
-    .click();
-  await page.getByRole("button", { name: "Take loan", exact: true }).click();
-  await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
-  await next(page);
-  const hud = page.locator(".tutorialHud");
-  await expect(hud).toContainText("Drag Coal above Pumped Hydro");
-  await expect(
-    hud.getByRole("button", { name: "Next", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator(".tutorialHudVisuallyHidden")).toHaveText("6 of 8");
-  await captureTutorial(page, "storage-challenge-handoff.png");
-  await dragCoalAbovePumpedHydro(page);
-  // The grid only resets once the player agrees to start the final challenge
-  await expect(hud).toContainText("Restart for the final challenge");
-  await expect(page.locator(".facilityRowHeader")).toHaveCount(3);
-  await hud
-    .getByRole("button", { name: "Start final challenge", exact: true })
-    .click();
-  await expect(hud).toContainText("Build storage to cover peak demand");
-  await expect(page.locator(".facilityRowHeader")).toHaveCount(1);
-  await expect(
-    page.getByRole("button", { name: "pause", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-});
-
-test("Forecasting reveals later charts and waits for explicit fresh-challenge approval while running", async ({
-  page,
-}) => {
-  await startLesson(page, "Forecasting");
-  const paneLayout = isPaneLayout(page);
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
-  if (!paneLayout) {
-    // Single-pane mode: the next step is the navigation itself, so tap it to reach the chart
-    await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
-    // The card transition briefly mounts the outgoing layout beside the new one
-    await waitForSettled(page, "#insightsNav");
-    await expect(page.locator("#insightsNav")).toHaveClass(/tutorialTarget/);
-    await page.locator("#insightsNav").click();
-  }
-  await expectTargetVisible(page, "#chartForecastSupplyDemand");
-  await next(page);
-  await expect(
-    page.getByRole("button", { name: "slow speed", exact: true }),
-  ).toHaveCount(1);
-  await page.getByRole("button", { name: "slow speed", exact: true }).click();
-  if (!paneLayout) {
-    await expect(page.locator(".tutorialHud")).toContainText("Tap Events");
-    await waitForSettled(page, "#eventsNav");
-    await expect(page.locator("#eventsNav")).toHaveClass(/tutorialTarget/);
-    await page.locator("#eventsNav").click();
-  }
-  await expect(page.locator(".tutorialHud")).toContainText(
-    "Read the blackout event",
-  );
-  await expectTargetVisible(page, ".eventLogItem");
-  await next(page);
-  await expect(
-    page.getByRole("button", { name: "Resume Coal", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
-  if (!paneLayout) {
-    await expect(page.locator(".tutorialHud")).toContainText("Tap Insights");
-    await waitForSettled(page, "#insightsNav");
-    await expect(page.locator("#insightsNav")).toHaveClass(/tutorialTarget/);
-    await page.locator("#insightsNav").click();
-  }
-  await expectTargetVisible(page, "#chartForecastFuelPrices");
-  await next(page);
-  await expectTargetVisible(page, "#chartForecastWeather");
-  await next(page);
-  const start = page.getByRole("button", {
-    name: "Start final challenge",
-    exact: true,
-  });
-  await expect(start).toBeVisible();
-  await page.getByRole("button", { name: "slow speed", exact: true }).click();
-  await expect(start).toBeVisible();
-  await expect(page.locator(".tutorialHud")).toContainText(
-    "Restart for the final challenge",
-  );
-  await captureTutorial(page, "forecasting-restart.png");
-  await start.click();
-  await expect(page.locator(".tutorialHud")).toContainText(
-    "Finish new generation",
-  );
-  // The restart's card transition briefly mounts the outgoing layout beside the new one.
-  const pause = page.getByRole("button", { name: "pause", exact: true });
-  await expect(pause).toHaveCount(1);
-  await expect(pause).toHaveAttribute("aria-pressed", "true");
-});
-
-test("resizing keeps the navigation lesson waiting for its dock action", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await startLesson(page, "Pricing");
-  await expect(page.locator(".tutorialHud")).toContainText("Tap Programs");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(page.locator(".tutorialHud")).toContainText("Tap Programs");
-  await expect(page.locator("#rateSlider")).toHaveCount(0);
-  await page.locator("#programsNav").click();
-  await expect(page.locator(".tutorialHud")).toContainText(
-    "Drag the rate slider",
-  );
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  const programs = page.getByRole("button", { name: "Programs", exact: true });
+  if ((await programs.getAttribute("aria-expanded")) !== "true")
+    await programs.click();
+  await expect(rate).toHaveValue(chosenRate);
 });

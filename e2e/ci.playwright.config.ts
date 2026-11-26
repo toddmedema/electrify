@@ -13,6 +13,7 @@ const smoke = [
   "mission-evidence.spec.ts",
   "tutorial-exit.spec.ts",
   "tutorial-actions.spec.ts",
+  "tutorial-map.spec.ts",
   "cloud-saves.spec.ts",
   "menu-keyboard.spec.ts",
   "main-menu.spec.ts",

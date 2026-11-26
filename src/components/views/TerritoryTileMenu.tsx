@@ -41,7 +41,7 @@ export default function TerritoryTileMenu({
   projectSite: boolean;
   onClose: () => void;
   onChooseSite: () => void;
-  onBuild: () => void;
+  onBuild?: () => void;
   onExpand: () => void;
   onAcquire: (id: UtilityAcquisitionId) => void;
 }) {
@@ -99,7 +99,7 @@ export default function TerritoryTileMenu({
       onSelect: () => void purchase(quote.tileId, quote.quoteKey),
     });
   }
-  if (showBuild) {
+  if (showBuild && onBuild) {
     tileActions.push({
       label: "Build",
       icon: <ConceptIcon concept="build" fontSize="small" decorative />,

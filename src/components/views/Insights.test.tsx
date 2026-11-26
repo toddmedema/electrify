@@ -1748,77 +1748,6 @@ describe("Insights layers", () => {
       "profit",
       "financeDetails",
     ]);
-    expect(withRequiredLayers(["cash", "powerExchange"], 112)).toEqual([
-      "powerExchange",
-      "cash",
-    ]);
-  });
-
-  it("puts Mission 7's required exchange track first once its line opens", () => {
-    localStorage.setItem(
-      "insightsLayers",
-      JSON.stringify(["cash", "supplyDemand"]),
-    );
-    const game = cloneDeep(
-      gameReducer(
-        createGame({ scenarioId: 112 }),
-        buildTransmissionLine({
-          corridorId: "california-north",
-          financed: true,
-        }),
-      ),
-    );
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
-
-    renderInsights(112, game);
-
-    expect(screen.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent(
-      "Power exchange",
-    );
-    const exchange = screen.getByRole("region", {
-      name: "Power exchange evidence",
-    });
-    expect(
-      within(exchange).getByRole("button", { name: "What is Power exchange?" }),
-    ).toBeVisible();
-    expect(within(exchange).queryByText("How interties work")).toBeNull();
-    expect(localStorage.getItem("insightsLayers")).toBe(
-      JSON.stringify(["cash", "supplyDemand"]),
-    );
-  });
-
-  it("keeps Mission 7's exchange checked across presets without changing saved layers", async () => {
-    const savedLayers = JSON.stringify(INSIGHT_PRESETS.reliability.layers);
-    localStorage.setItem("insightsLayers", savedLayers);
-    localStorage.setItem("insightsActivePreset", "reliability");
-    const game = cloneDeep(
-      gameReducer(
-        createGame({ scenarioId: 112 }),
-        buildTransmissionLine({
-          corridorId: "california-north",
-          financed: true,
-        }),
-      ),
-    );
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
-    renderInsights(112, game);
-    expect(
-      screen.getByRole("combobox", { name: "Insight preset" }),
-    ).toHaveTextContent("Reliability");
-    await user.click(labelledButton(/Layers/));
-    const exchange = labelledCheckbox("Power exchange");
-    expect(exchange).toBeChecked();
-    expect(exchange).toBeDisabled();
-
-    await choosePreset("Overview");
-    const overviewExchange = labelledCheckbox("Power exchange");
-    expect(overviewExchange).toBeChecked();
-    expect(overviewExchange).toBeDisabled();
-    expect(
-      screen.getByRole("heading", { name: "Power exchange" }),
-    ).toBeVisible();
-    expect(localStorage.getItem("insightsLayers")).toBe(savedLayers);
-    expect(localStorage.getItem("insightsActivePreset")).toBe("reliability");
   });
 
   it("plots the exchange over the forecast's own time axis, beside the current reading", () => {
@@ -1866,46 +1795,6 @@ describe("Insights layers", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(expand).toHaveFocus();
-  });
-
-  it("scrolls the power exchange into view on the phone step that points to it", () => {
-    jest.useFakeTimers();
-    const game = cloneDeep(
-      gameReducer(
-        createGame({ scenarioId: 112 }),
-        buildTransmissionLine({
-          corridorId: "california-north",
-          financed: true,
-        }),
-      ),
-    );
-    game.transmission!.lines[0].yearsToBuildLeft = 0;
-    game.tutorialStep = getScenario(112)!.tutorialSteps!.findIndex(
-      (step) => step.target === '[data-layer="powerExchange"]',
-    );
-    expect(game.tutorialStep).toBeGreaterThan(0);
-    const width = window.innerWidth;
-    const scrolled: Element[] = [];
-    Object.defineProperty(window, "innerWidth", {
-      configurable: true,
-      value: 390,
-    });
-    const original = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
-      scrolled.push(this);
-    };
-    try {
-      renderInsights(112, game);
-      act(() => jest.runOnlyPendingTimers());
-      expect(scrolled).toHaveLength(1);
-      expect(scrolled[0]).toHaveAttribute("data-layer", "powerExchange");
-    } finally {
-      HTMLElement.prototype.scrollIntoView = original;
-      Object.defineProperty(window, "innerWidth", {
-        configurable: true,
-        value: width,
-      });
-    }
   });
 
   it("gives the customer chart two significant digits on axes and three on inspection", () => {

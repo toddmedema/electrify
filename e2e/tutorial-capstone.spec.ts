@@ -1,3 +1,4 @@
+import { readTutorialSupplyChart } from "./tutorial-fixture";
 import { TUTORIALS } from "../src/data/Scenarios";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogActionsOnOneRow } from "./dialog-layout";
@@ -22,25 +23,11 @@ async function completeMission(
     page.getByRole("heading", { name: "Step 1 of 5" }),
   ).toBeVisible();
   await expect(page.locator(".tutorialHud")).toContainText(
-    "You are the CEO of an electricity generation company, and your goal is to keep the lights on without going bankrupt.",
+    "Inspect the coal plant on the map",
   );
-  await expect(page.locator(".tutorialTargetRing")).toHaveCount(0);
-  await reviewScreenshot(page, {
-    path: testInfo.outputPath("introduction.png"),
-    animations: "disabled",
-  });
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Step 2 of 5" }),
-  ).toBeVisible();
-  await expect(page.getByText("Tap your coal plant")).toBeVisible();
-  // The first hands-on step keeps everything it doesn't use
-  // stays out of the way until a later step needs it
   await expect(page.locator("#navfooter")).toBeHidden();
-  await expect(page.locator(".button-buildFacility")).toBeHidden();
   await expect(page.locator(".gameMenuButton")).toBeHidden();
   await expect(page.locator("#speedChangeButtons")).toBeHidden();
-
   const expectObjectiveDocked = async () => {
     const objective = page.locator(".tutorialHud");
     const game = page.locator(".cardTransitions");
@@ -61,29 +48,7 @@ async function completeMission(
   };
   await expectObjectiveDocked();
 
-  if (testInfo.project.name === "desktop-1440px") {
-    await expect(page.locator(".gameWorkspace")).toHaveCount(1);
-    // Mission 1 keeps the action dock for later: the fleet has the screen to itself.
-    await expect(page.locator("#facilitiesPane")).toBeVisible();
-    await expect(page.locator(".gameToolPanel")).toHaveCount(0);
-    await expect(page.locator("#insightsPane")).toHaveCount(0);
-    await expect(page.locator("#eventsPane")).toHaveCount(0);
-  }
-
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await expect(
-    page.locator(".tutorialHud").getByText("Tap the supply and demand chart"),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Inspect Coal", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.locator('[data-fuel="Coal"] .facilityDetails'),
-  ).toBeVisible();
-  await page.locator("#chartSupplyDemand").click();
-  await expect(page.getByText("Select slow speed to start time")).toBeVisible();
-  await expect(page.locator("#speedChangeButtons")).toBeVisible();
-
+  await readTutorialSupplyChart(page);
   if (testInfo.project.name.startsWith("mobile-")) {
     const speedButtons = page.locator("#speedChangeButtons button");
     for (let i = 0; i < (await speedButtons.count()); i++) {
@@ -93,8 +58,9 @@ async function completeMission(
     }
   }
 
-  // Navigation belongs to later missions
-  await expect(page.locator("#navfooter")).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Fleet", exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "normal speed" }).click();
   await expect(
@@ -103,7 +69,7 @@ async function completeMission(
   // The clock keeps running into the capstone, so stop it while the setup below is arranged
   await page.getByRole("button", { name: "pause", exact: true }).click();
   await expect(
-    page.getByText("Watch coal output climb slowly as sunlight fades."),
+    page.getByText("Solar fades in the evening, so coal picks up the load."),
   ).toBeVisible();
   await expect(page.locator(".tutorialHudHint")).toHaveCount(0);
   await expectObjectiveDocked();
@@ -112,25 +78,30 @@ async function completeMission(
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
   // objective is docked outside the game surface, so the same control remains operable at every
   // viewport without a small-screen workaround.
-  const coal = page.locator(".facilityRow", { hasText: "Coal" });
-  await expect(
-    coal.getByRole("button", { name: "Inspect Coal", exact: true }),
-  ).toHaveAttribute("aria-expanded", "true");
-  await page.getByRole("button", { name: "Pause Coal" }).click();
+  const coal = page
+    .getByRole("region", { name: "Fleet", exact: true })
+    .locator('.facilityRow[data-facility="Coal"]');
+  const disclosure = coal.locator(".facilityDisclosure");
+  const pauseCoal = coal.getByRole("button", {
+    name: "Pause Coal",
+    exact: true,
+  });
+  if ((await disclosure.getAttribute("aria-expanded")) !== "true")
+    await disclosure.click();
+  await pauseCoal.click();
   await page.getByRole("button", { name: "fast speed" }).click();
   await expect(
     page.getByRole("heading", { name: "Final challenge needs another try" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Demand exceeded available supply"),
-  ).toBeVisible();
+  await expect(page.getByText("Demand exceeded supply")).toBeVisible();
 
   await page.getByRole("button", { name: "Retry final challenge" }).click();
   await expect(
     page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Pause Coal" })).toBeVisible();
+  if ((await disclosure.getAttribute("aria-expanded")) !== "true")
+    await disclosure.click();
+  await expect(pauseCoal).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Resume Coal", exact: true }),
   ).toHaveCount(0);
@@ -262,17 +233,10 @@ async function completeMission(
   await expect(shareFeedback).toBeFocused();
   await primary.click();
   await expect(
-    page.getByRole("region", { name: "Step 1 of 10", exact: true }),
+    page.getByRole("region", { name: "Step 1 of 3", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".tutorialHudAction")).toHaveText(
-    "Tap Build (Q, B)",
-  );
-  await page.keyboard.press("b");
-  await expect(
-    page.getByRole("region", { name: "Build", exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".tutorialHudAction")).toHaveText(
-    "Sort generators",
+    "Build a gas peaker",
   );
 }
 

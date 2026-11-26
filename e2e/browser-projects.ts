@@ -64,6 +64,7 @@ const phone = {
     "mission-evidence",
     "pwa-sound",
     "tutorial-exit",
+    "tutorial-map",
   ],
   mixed: [
     "acquisitions",
@@ -88,6 +89,7 @@ const minimumPhone = {
     "multiline-text",
     "project-build",
     "sign-in",
+    "tutorial-map",
     "ui-chart-build-polish",
   ],
   mixed: [
@@ -129,7 +131,6 @@ const localOnly: Record<string, string[]> = {
     "pane-sticky-headers",
     "settings-responsive",
     "transmission",
-    "tutorial-interties",
     "unified-design",
   ],
   "tablet-768px": ["custom-location-picker", "insights-responsive"],
