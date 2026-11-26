@@ -175,39 +175,47 @@ test("mobile map tools slide in and out and share the Build header", async ({
   const dock = page.locator("#navfooter");
   const programs = dock.getByRole("button", { name: "Programs", exact: true });
   const panel = page.getByRole("region", { name: "Programs", exact: true });
-  // Listen before opening so the assertion is independent of Playwright's click timing.
-  await page.evaluate(() => {
-    document.body.dataset.panelPositions = "[]";
-    document.addEventListener("transitionstart", (event) => {
-      if (
-        event.propertyName !== "transform" ||
-        !(event.target instanceof HTMLElement)
-      )
-        return;
-      if (!event.target.querySelector("#tool-PROGRAMS")) return;
-      const slide = event.target
-        .getAnimations()
+  // Capture the browser's keyframes before a busy renderer can skip the slide's
+  // frames and clear the animation before transitionstart is delivered.
+  const slides = await page.locator(".gameToolTray").evaluateHandle((tray) => {
+    const offsets: { from: number; to: number }[] = [];
+    const recorded = new WeakSet<Animation>();
+    const yOffset = (transform: unknown) => {
+      if (transform === "none") return 0;
+      return typeof transform === "string"
+        ? new DOMMatrix(transform).m42
+        : Number.NaN;
+    };
+    const observer = new MutationObserver(() => {
+      const wrapper = tray.querySelector("#tool-PROGRAMS")?.parentElement;
+      const slide = wrapper
+        ?.getAnimations()
         .find(
           (animation) =>
             animation instanceof CSSTransition &&
             animation.transitionProperty === "transform",
         );
-      const destination = (slide?.effect as KeyframeEffect | undefined)
-        ?.getKeyframes()
-        .at(-1)?.transform;
-      if (typeof destination !== "string") return;
-      const positions = JSON.parse(document.body.dataset.panelPositions!);
-      const y = new DOMMatrix(destination).m42;
-      document.body.dataset.panelPositions = JSON.stringify([
-        ...positions,
-        y > 0 ? "down" : "up",
-      ]);
+      if (!(slide?.effect instanceof KeyframeEffect) || recorded.has(slide))
+        return;
+      const [first, last] = slide.effect.getKeyframes();
+      recorded.add(slide);
+      offsets.push({
+        from: yOffset(first.transform),
+        to: yOffset(last.transform),
+      });
     });
+    observer.observe(tray, {
+      subtree: true,
+      attributeFilter: ["class"],
+    });
+    return offsets;
   });
-  const positions = () =>
-    page.locator("body").getAttribute("data-panel-positions");
   await programs.click();
-  await expect.poll(positions).toBe('["up"]');
+  await expect.poll(async () => (await slides.jsonValue()).length).toBe(1);
+  const [entry] = await slides.jsonValue();
+  expect(entry.from).toBeGreaterThan(0);
+  expect(entry.to).toBe(0);
+  await expect(panel.locator("..")).toHaveCSS("transform", "none");
   const programsHeader = panel.locator(":scope > header");
   const headerStyle = (header: Locator) =>
     header.evaluate((element) => {
@@ -223,14 +231,18 @@ test("mobile map tools slide in and out and share the Build header", async ({
   await programs.click();
   await expect(panel).toHaveCount(0);
   await expect(programs).toBeFocused();
-  await expect.poll(positions).toBe('["up","down"]');
+  await expect.poll(async () => (await slides.jsonValue()).length).toBe(2);
+  const [, exit] = await slides.jsonValue();
+  expect(exit.from).toBe(0);
+  expect(exit.to).toBeGreaterThan(0);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await programs.click();
   await expect(panel).toBeVisible();
   await panel.getByRole("button", { name: "Close Programs" }).click();
   await expect(page.locator("#tool-PROGRAMS")).toHaveCount(0);
-  expect(await positions()).toBe('["up","down"]');
+  expect(await slides.jsonValue()).toHaveLength(2);
+  await slides.dispose();
 
   const build = await openMapProjectCatalogue(page);
   await expect(
@@ -242,27 +254,43 @@ test("mobile map tools slide in and out and share the Build header", async ({
 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const buildTrigger = dock.getByRole("button", { name: "Build", exact: true });
-  // Reopen on the first frame of the exit so the same panel is still mounted.
-  await buildTrigger.evaluate(async (button) => {
+  // Reopen as soon as the browser creates the exit transition, while the same
+  // panel is still mounted and its controls are inert.
+  const reopen = await buildTrigger.evaluateHandle((button) => {
     if (!(button instanceof HTMLButtonElement))
       throw new Error("Expected the Build dock button");
     const project = document.getElementById("tool-BUILD_GENERATORS")!;
-    await new Promise<void>((resolve) => {
-      const wrapper = project.parentElement!;
-      wrapper.addEventListener(
-        "transitionstart",
-        () => {
-          button.click();
-          resolve();
-        },
-        { once: true },
-      );
+    const wrapper = project.parentElement!;
+    const result = { project, reopened: false };
+    const observer = new MutationObserver(() => {
+      const sliding = wrapper
+        .getAnimations()
+        .some(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        );
+      if (!wrapper.inert || !sliding) return;
+      observer.disconnect();
       button.click();
+      result.reopened = true;
     });
+    observer.observe(wrapper, { attributeFilter: ["class", "inert"] });
+    button.click();
+    return result;
   });
+  await expect
+    .poll(() => reopen.evaluate(({ reopened }) => reopened))
+    .toBe(true);
   await expect(
     build.getByRole("heading", { name: "Build", exact: true }),
   ).toBeFocused();
+  expect(
+    await reopen.evaluate(
+      ({ project }) => document.getElementById(project.id) === project,
+    ),
+  ).toBe(true);
+  await reopen.dispose();
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -1318,7 +1346,11 @@ test("map windows move, resize, stack and remember their bounds", async ({
   await expect
     .poll(() =>
       fleet.evaluate((element: HTMLElement) => {
-        const tray = element.parentElement!;
+        const tray = element.offsetParent;
+        if (!(tray instanceof HTMLElement))
+          throw new Error(
+            "Expected a containing layout box for the Fleet window",
+          );
         return {
           rightGap: tray.clientWidth - element.offsetLeft - element.offsetWidth,
           bottomGap:
