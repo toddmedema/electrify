@@ -53,7 +53,16 @@ function view(q = 0): TerritoryTileView {
 }
 function setup() {
   const terrain = jest.fn(() => model),
-    structure = jest.fn(() => model);
+    structure = jest.fn<MapModel, Parameters<typeof getStructureModel>>(
+      (_kind, _growth, _size, stage) =>
+        stage === undefined
+          ? model
+          : {
+              ...model,
+              key: `${model.key}:construction:${stage}`,
+              terminals: stage === 3 ? model.terminals : [],
+            },
+    );
   return {
     builder: new SceneBuilder({ terrain, structure }),
     terrain,
@@ -434,29 +443,100 @@ test("submerged cable geometry reaches the land terminal", () => {
   expect(nearest).toBeLessThan(0.01);
 });
 
-test("power ticks reuse static terrain, structure and wire topology while construction stays live", () => {
+test("construction changes only at milestones, including after a jump or resume", () => {
   const tile = {
     ...view(),
     tile: { ...view().tile, terrain: "river" as const },
-    facility: { name: "Solar", fuel: "Sun", peakW: 1, yearsToBuildLeft: 1 },
+    facility: {
+      name: "Solar",
+      fuel: "Sun",
+      peakW: 1,
+      yearsToBuildLeft: 1,
+      yearsToBuild: 1,
+    },
   } satisfies TerritoryTileView;
   const { builder, terrain, structure } = setup(),
     tiles = [tile.tile];
-  const first = builder.build([tile], tiles, [], 0, "run");
-  expect(first[1].model.key).toContain("construction");
-  const second = builder.build([{ ...tile }], tiles, [], 100, "run");
-  expect(second).toBe(first);
-  const commissioned = builder.build(
-    [{ ...tile, facility: { ...tile.facility, yearsToBuildLeft: 0 } }],
-    tiles,
-    [],
-    200,
-    "run",
-  );
+  const build = (yearsToBuildLeft: number) =>
+    builder.build(
+      [{ ...tile, facility: { ...tile.facility, yearsToBuildLeft } }],
+      tiles,
+      [],
+      100,
+      "run",
+    );
+  const first = build(1);
+  expect(first[1].model.key).toBe("test-structure:construction:0");
+  expect(build(0.751)).toBe(first);
+  expect(build(0.75)[1].model.key).toBe("test-structure:construction:1");
+  expect(build(0.5)[1].model.key).toBe("test-structure:construction:2");
+  expect(build(0.25)[1].model.key).toBe("test-structure:construction:3");
+  expect(build(0.001)[1].model.key).toBe("test-structure:construction:3");
+  const commissioned = build(0);
   expect(commissioned[0]).toBe(first[0]);
   expect(commissioned[1].model).toBe(model);
   expect(terrain).toHaveBeenCalledTimes(1);
-  expect(structure).toHaveBeenCalledTimes(1);
+  expect(structure).toHaveBeenCalledTimes(5);
+  expect(build(0.7)[1].model.key).toBe("test-structure:construction:1");
+});
+
+test("routes conductors to fitted switchgear once a new plant reaches commissioning", () => {
+  const target = view();
+  const peer: TerritoryTileView = {
+    ...target,
+    ownerKey: "peer:1",
+    owned: false,
+    facility: {
+      name: "Solar",
+      fuel: "Sun",
+      peakW: 50e6,
+      yearsToBuild: 1,
+      yearsToBuildLeft: 0.5,
+    },
+  };
+  const neighbor = view(1);
+  const tiles = [target.tile, neighbor.tile];
+  const wires = hexWires(tiles, () => true);
+  const builder = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  });
+  const build = (yearsToBuildLeft: number, yearsToBuild?: number) => {
+    const scene = builder.build(
+      [
+        {
+          ...peer,
+          facility: { ...peer.facility!, yearsToBuildLeft, yearsToBuild },
+        },
+        neighbor,
+      ],
+      tiles,
+      wires,
+      0,
+      "run",
+    );
+    return {
+      plant: scene.find(({ id }) => id === `structure:${target.tile.id}`)!,
+      links: scene.flatMap(({ model }) => model.connections ?? []),
+    };
+  };
+  const legacy = build(0.1);
+  expect(legacy.plant.model).toBe(getStructureModel("solar", [], "small", 0));
+  expect(legacy.links).toHaveLength(0);
+  const installing = build(0.5, 1);
+  expect(installing.plant.model).toBe(
+    getStructureModel("solar", [], "small", 2),
+  );
+  expect(installing.links).toHaveLength(0);
+  const commissioning = build(0.24, 1);
+  const [link] = commissioning.links;
+  expect(link.from).toBe(target.tile.id);
+  expect(commissioning.plant.model.terminals).toContainEqual(link.start);
+  expect(commissioning.plant).toMatchObject({
+    active: false,
+    producing: false,
+  });
+  expect(build(0, 1).links).toEqual(commissioning.links);
 });
 
 const pickFrame = {
@@ -797,7 +877,7 @@ it("uses storage power instead of energy capacity for the construction model", (
     0,
     "run",
   );
-  expect(building.model.key).toBe("structure:battery:small:construction");
+  expect(building.model.key).toBe("structure:battery:small:construction:0");
 });
 
 it("follows measured production through idle, pause and construction without changing motion identity", () => {
@@ -983,6 +1063,23 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
   });
   expect(surfaces).toEqual(expect.arrayContaining(["ground", "panel"]));
   expect(damaged.model.key).toBe("structure:solar-hail-damaged:small");
+  const unbuilt = builder.build(
+    [
+      {
+        ...tile,
+        facility: { ...tile.facility!, yearsToBuildLeft: 1, yearsToBuild: 1 },
+        disaster: { hail: "impact", condition: "Hail strike" },
+      },
+    ],
+    board,
+    [],
+    20,
+    "run",
+  );
+  expect(unbuilt).toHaveLength(2);
+  expect(unbuilt[1].model.parts).toEqual(
+    getStructureModel("solar", [], "small", 0).parts,
+  );
   expect(damaged.model.terminals).toEqual(intact.model.terminals);
   expect(damaged.model.parts[0].mesh.positions).not.toEqual(
     intact.model.parts[0].mesh.positions,

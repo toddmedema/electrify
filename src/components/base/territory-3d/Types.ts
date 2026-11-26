@@ -72,6 +72,7 @@ export type StructureKind =
   | "offshore-wind"
   | "airborne-wind"
   | "gas"
+  | "gas-combined-cycle"
   | "gas-steam"
   | "oil"
   | "coal"
@@ -79,6 +80,7 @@ export type StructureKind =
   | "nuclear"
   | "hydro"
   | "geothermal"
+  | "enhanced-geothermal"
   | "battery"
   | "iron-air"
   | "pumped-hydro";

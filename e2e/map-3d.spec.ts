@@ -19,7 +19,7 @@ import { getStructureModel } from "../src/components/base/territory-3d/Structure
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
 import { editSavedGame, readSavedGame } from "./save-fixture";
-import { TICK_MINUTES } from "../src/Constants";
+import { TICK_MINUTES, YEARS_PER_TICK } from "../src/Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
 import {
   COLD_DEFINITION_ID,
@@ -1347,6 +1347,86 @@ test("shows extreme cold on the 3D map and explains the plant derate", async ({
     });
   }
   await closeTileSurface(inspector);
+});
+
+test("solar assembly resumes at its saved stage and adds panels as the clock advances", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({
+    reducedMotion: info.project.use.hasTouch ? "reduce" : "no-preference",
+  });
+  await startPausedMap(page, info.project.use.hasTouch ? "dark" : "light");
+  const site = "champlain:site-12";
+  await editSavedGame(page, (save) => {
+    loadSimData(save.game.location);
+    const facility = getBuildFacilityQuote(
+      save.game,
+      { name: "Solar", peakW: 6e6 },
+      "champlain",
+      site,
+    )!;
+    save.game = structuredClone(
+      gameReducer(
+        save.game,
+        buildFacility({
+          facility,
+          financed: false,
+          territoryId: "champlain",
+          tileId: site,
+        }),
+      ),
+    );
+    const solar = save.game.facilities.find(({ tileId }) => tileId === site)!;
+    solar.yearsToBuildLeft = solar.yearsToBuild / 2 + YEARS_PER_TICK / 2;
+    save.game.speed = "PAUSED";
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  const canvas = map.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const target = map.locator(`[data-map-target="${site}"]`);
+  await target.focus();
+  await expect(target).toHaveAccessibleDescription(/Under construction/);
+  await expect(target).toBeInViewport({ ratio: 0.75 });
+  const readPlant = async () =>
+    (await readyDiagnostics(canvas, true)).scene!.find(
+      ({ id }) => id === `structure:${site}`,
+    );
+  const rails = await readPlant();
+  expect(rails).toMatchObject({
+    modelKey: "structure:solar:small:construction:1",
+    active: false,
+  });
+  await target.blur();
+  const viewport = map.locator(".territoryMapViewport");
+  if (process.env.REVIEW_SCREENSHOT_DIR && !info.project.use.hasTouch) {
+    const { x, y, width, height } = (await target.boundingBox())!;
+    const { scale } = await readTerritoryMapCamera(viewport);
+    await page.mouse.move(x + width / 2, y + height / 2);
+    await page.mouse.wheel(0, -1200);
+    await expect
+      .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+      .toBeGreaterThan(scale * 1.8);
+    await page.getByRole("button", { name: "pause", exact: true }).hover();
+  }
+  await reviewScreenshot(viewport, {
+    path: info.outputPath("solar-racks.png"),
+  });
+
+  await page.getByRole("button", { name: "slow speed", exact: true }).click();
+  await expect
+    .poll(async () => (await readPlant())?.modelKey)
+    .toBe("structure:solar:small:construction:2");
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  const panels = await readPlant();
+  expect(panels).toMatchObject({ active: false, producing: false });
+  expect(panels!.triangles).toBeGreaterThan(rails!.triangles);
+  await expect(target).toHaveAccessibleDescription(/Under construction/);
+  await reviewScreenshot(viewport, {
+    path: info.outputPath("solar-installation.png"),
+  });
 });
 
 test("hail falls on the struck solar site and leaves visibly broken panels during repairs", async ({

@@ -28,6 +28,7 @@ import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
 import { rotorAngle } from "./RotorPose";
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import type {
+  FacilityConstructionStage,
   FacilitySize,
   MapInstance,
   MapModel,
@@ -58,6 +59,7 @@ interface TileScene {
   growth?: readonly CityGrowthSector[];
   terrain: MapInstance;
   model?: MapModel;
+  construction?: { stage: FacilityConstructionStage; model: MapModel };
   structure?: MapInstance;
   hail?: MapInstance;
 }
@@ -138,6 +140,7 @@ export interface ModelFactories {
     kind: StructureKind,
     growth?: readonly CityGrowthSector[],
     size?: FacilitySize,
+    stage?: FacilityConstructionStage,
   ) => MapModel;
 }
 const fuelModels: Record<FuelNameType, StructureKind> = {
@@ -170,8 +173,15 @@ export function structureKind(
       : facility.name === "Iron-Air Battery"
         ? "iron-air"
         : "battery";
-  if (facility?.fuel === "Natural Gas" && facility.name === "Natural Gas Steam")
-    return "gas-steam";
+  if (facility?.fuel === "Natural Gas") {
+    if (facility.name === "Natural Gas Steam") return "gas-steam";
+    if (facility.name === "Natural Gas CC") return "gas-combined-cycle";
+  }
+  if (
+    facility?.fuel === "Geothermal" &&
+    facility.name === "Enhanced Geothermal"
+  )
+    return "enhanced-geothermal";
   if (facility?.fuel === "Sun" && view.disaster?.hail)
     return "solar-hail-damaged";
   if (facility?.fuel) return fuelModels[facility.fuel];
@@ -200,13 +210,13 @@ function terminal(
   );
   return add(position, selected);
 }
-const constructionModels = new WeakMap<MapModel, MapModel>();
-function underConstruction(model: MapModel): MapModel {
-  const cached = constructionModels.get(model);
+const retrofitModels = new WeakMap<MapModel, MapModel>();
+function offlineRetrofitModel(model: MapModel): MapModel {
+  const cached = retrofitModels.get(model);
   if (cached) return cached;
   const value: MapModel = {
     ...model,
-    key: `${model.key}:construction`,
+    key: `${model.key}:retrofit`,
     parts: model.parts.map((part) => {
       const colors = new Float32Array(part.mesh.colors.length);
       for (let i = 0; i < colors.length; i += 3) {
@@ -221,8 +231,24 @@ function underConstruction(model: MapModel): MapModel {
       return { ...part, mesh: { ...part.mesh, colors } };
     }),
   };
-  constructionModels.set(model, value);
+  retrofitModels.set(model, value);
   return value;
+}
+
+const constructionStages = [0, 1, 2, 3] as const;
+function constructionStage(
+  facility: TerritoryTileView["facility"],
+): FacilityConstructionStage | undefined {
+  if (!facility || !(facility.yearsToBuildLeft > 0)) return undefined;
+  const total = facility.yearsToBuild;
+  if (total === undefined || !Number.isFinite(total) || total <= 0) return 0;
+  const completed = Math.max(0, 1 - facility.yearsToBuildLeft / total);
+  return constructionStages[
+    Math.min(
+      constructionStages.length - 1,
+      Math.floor(completed * constructionStages.length),
+    )
+  ];
 }
 
 /** Static wire geometry changes with topology/terminals, never with every power tick. */
@@ -255,6 +281,7 @@ export class SceneBuilder {
     }
     const models = new Map<string, MapModel>();
     const positions = new Map<string, Vec3>();
+    const disconnected = new Set<string>();
     const byId = new Map<string, TerritoryTileView>(
       views.map((view) => [territoryMapTileKey(view.tile), view]),
     );
@@ -352,11 +379,15 @@ export class SceneBuilder {
         cell.terrain = { ...cell.terrain, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
-      if (model) models.set(tileKey, model);
       positions.set(tileKey, position);
       instances.push(cell.terrain);
       if (!model) continue;
-      if (kind === "solar-hail-damaged" && view.disaster?.hail === "impact") {
+      const stage = size ? constructionStage(view.facility) : undefined;
+      if (
+        stage === undefined &&
+        kind === "solar-hail-damaged" &&
+        view.disaster?.hail === "impact"
+      ) {
         cell.hail ??= {
           id: `hail:${tileKey}`,
           model: hailModel(cell.terrain.model, model, tile.q, tile.r),
@@ -371,6 +402,12 @@ export class SceneBuilder {
         view.facility && !tile.city && view.operatingFacility
           ? facilityOperatingStatus(view.operatingFacility, minute)
           : facilityMapStatus(view, minute);
+      if (stage !== undefined && kind && cell.construction?.stage !== stage)
+        cell.construction = {
+          stage,
+          model: this.factories.structure(kind, undefined, size, stage),
+        };
+      else if (stage === undefined) cell.construction = undefined;
       const connection = view.connection;
       const displayedModel =
           kind === "tower" && connection
@@ -378,14 +415,20 @@ export class SceneBuilder {
                 (minute - connection.startedMinute) /
                   (connection.towerMinute - connection.startedMinute),
               )
-            : status?.kind === "construction"
-              ? underConstruction(model)
-              : model,
+            : (cell.construction?.model ??
+              (status?.kind === "construction"
+                ? offlineRetrofitModel(model)
+                : model)),
         producing = status?.kind === "producing",
         active = producing || status?.kind === "charging",
         motionKey = view.operatingFacility
           ? `${runKey}:facility:${view.operatingFacility.id}`
           : undefined;
+      // Use the real staged connection only once switchgear has been fitted.
+      if (stage === undefined) models.set(tileKey, model);
+      else if (displayedModel.terminals.length)
+        models.set(tileKey, displayedModel);
+      else disconnected.add(tileKey);
       const waterLevel = tile.city
         ? undefined
         : reservoirFill(view.operatingFacility);
@@ -410,7 +453,10 @@ export class SceneBuilder {
     }
     for (const id of this.cells.keys())
       if (!byId.has(id)) this.cells.delete(id);
-    const key = wires
+    const visibleWires = wires.filter(
+      ({ from, to }) => !disconnected.has(from) && !disconnected.has(to),
+    );
+    const key = visibleWires
       .map(
         (wire) =>
           `${wire.id}:${wire.kind}:${models.get(wire.from)?.key}:${models.get(wire.to)?.key}:${byId.get(wire.from)?.visibilityDistance}:${byId.get(wire.to)?.visibilityDistance}`,
@@ -425,7 +471,7 @@ export class SceneBuilder {
         new MeshBuilder(),
       ];
       const connections: MapWireConnection[][] = [[], [], [], []];
-      for (const wire of wires) {
+      for (const wire of visibleWires) {
         const from = positions.get(wire.from),
           to = positions.get(wire.to);
         if (!from || !to) continue;
