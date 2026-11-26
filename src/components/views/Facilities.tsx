@@ -80,7 +80,10 @@ import ChartSupplyDemand from "../base/ChartSupplyDemand";
 import { getDispatchOrderedFuels } from "../../helpers/Energy";
 import FlowBar from "../base/FlowBar";
 import FacilityRowText from "../base/FacilityRowText";
-import { constructionStatus } from "../base/ConstructionProgress";
+import {
+  constructionFraction,
+  constructionStatus,
+} from "../base/ConstructionProgress";
 import { SIDE_LAYOUT_MIN_WIDTH } from "../../Globals";
 import ExpandedFacilityDetails from "../base/ExpandedFacilityDetails";
 import type { FacilityCapacityUpgradeActions } from "../base/FacilityCapacityUpgrade";
@@ -351,14 +354,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
   const builtFraction = upgrading
     ? upgradeProgress(installing!, game.date.minute)
     : underConstruction
-      ? Math.max(
-          0,
-          Math.min(
-            1,
-            (facility.yearsToBuild - facility.yearsToBuildLeft) /
-              facility.yearsToBuild,
-          ),
-        )
+      ? (constructionFraction(facility) ?? 0)
       : 1;
   const limited = storyOutputMultiplier < 1;
   const unit = getWattUnit(facility.peakW);

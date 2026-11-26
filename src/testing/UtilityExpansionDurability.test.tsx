@@ -474,9 +474,9 @@ it("rejects inconsistent or forged acquisition import ledgers", () => {
     mutate(raw.game);
     expect(parseSave(raw)).toBeNull();
   }
-  expect(gameObjectiveResults(game).map((o) => o.id)).toContain(
-    "retain-customers",
-  );
+  expect(gameObjectiveResults(game).map((o) => o.id)).toEqual([
+    "acquire-neighbor",
+  ]);
 });
 
 it("acquisition preserves settled history and reforecasting cannot repay corporate loans again", () => {
@@ -620,9 +620,7 @@ it("acknowledges ownership immediately without inventing completed-month history
   expect(
     after.find((result) => result.metric === "utilityOwnership"),
   ).toMatchObject({ status: "inProgress", observed: 1, target: 3 });
-  expect(
-    after.find((result) => result.metric === "customerRetention")!.status,
-  ).toBe("pending");
+  expect(after).toHaveLength(1);
   expect(getMissionStatus(game).headline!.id).toBe("acquire-neighbor");
   expect(JSON.stringify(game.monthlyHistory)).toBe(history);
   expect(game.objectiveProgress!.completedMonths).toBe(completed);

@@ -32,8 +32,8 @@
     "sha256": "e1a48912b158443a98bfcadfbc207363f062842611e993b4f3817d3024819ea4"
   },
   "site/scenarios.json": {
-    "date": "2026-11-17",
-    "sha256": "8030ab7b4cb623333b17c776dd47ffefbb0fb8aecd217337e55b0fc0dfec796a"
+    "date": "2026-11-26",
+    "sha256": "eb327c8764782e03412e06286cc610b81d5ee1453d48251c0e56e3c76a2d4f1d"
   },
   "site/templates/pages.js": {
     "date": "2026-11-20",

@@ -1,5 +1,20 @@
 import * as React from "react";
 
+export function constructionFraction({
+  yearsToBuild,
+  yearsToBuildLeft,
+}: {
+  yearsToBuild?: number;
+  yearsToBuildLeft: number;
+}): number | undefined {
+  if (!yearsToBuild || yearsToBuild < 0 || !Number.isFinite(yearsToBuild))
+    return undefined;
+  return Math.max(
+    0,
+    Math.min(1, (yearsToBuild - yearsToBuildLeft) / yearsToBuild),
+  );
+}
+
 /**
  * What a row in the facilities list says while it is still being built. Plants and interties
  * both read from here, so the two rows can never word the same state differently.

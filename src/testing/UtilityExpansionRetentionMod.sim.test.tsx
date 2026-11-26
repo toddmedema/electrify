@@ -2,6 +2,12 @@ import { getScenario } from "../data/Scenarios";
 import type { ObjectiveProgress } from "../data/ScenarioObjectives";
 import { modScenario } from "../mods/ModScenario";
 import { parseSave, serializeSave } from "../SaveGame";
+import type { GameType } from "../Types";
+import {
+  acquisitionQuote,
+  expansionRetentionBaseline,
+} from "../helpers/Expansion";
+import { acquireUtility } from "../reducers/GameActions";
 import {
   absoluteMonth,
   gameObjectiveResults,
@@ -15,9 +21,11 @@ import {
 } from "../helpers/ScenarioObjectives";
 import {
   copyOfficialGame,
+  officialCommand,
   playOfficialExecution,
 } from "./OfficialScenarioExecutionFixtures";
 import { modPackage } from "./ModFixtures";
+import { runMonths } from "./SimulationTestHelpers";
 import {
   EXPANSION_BALANCE_CASES,
   expansionBalanceActions,
@@ -25,7 +33,7 @@ import {
 
 jest.setTimeout(120000);
 
-it("keeps a completed mod retention deadline through purchase, save/resume and the expanded 2024 goal", () => {
+it("preserves completed mod retention goals through acquisitions and save/resume, and rebases a goal before its deadline", () => {
   const scenario = modScenario(
     modPackage({
       id: "earlier-retention",
@@ -57,10 +65,13 @@ it("keeps a completed mod retention deadline through purchase, save/resume and t
   let beforeObservations:
     ObjectiveProgress["entries"][number]["observations"] | undefined;
   let restoredPurchase = false;
+  let beforeDeadline: GameType | undefined;
   const { game, violations } = playOfficialExecution(
     116,
     {
       monthClose(state) {
+        if (state.date.monthsElapsed === 239)
+          beforeDeadline = copyOfficialGame(state);
         if (state.date.monthsElapsed !== 60) return;
         completed = gameObjectiveResults(state).find(
           ({ id }) => id === "early-customers",
@@ -146,10 +157,12 @@ it("keeps a completed mod retention deadline through purchase, save/resume and t
     gameObjectiveResults(game).find(({ id }) => id === "early-customers"),
   ).toEqual(completed);
   const finalGoal = gameObjectiveResults(game).find(
-    ({ objective }) =>
-      objective.metric === "customerRetention" &&
-      objective.deadlineMonth === 239,
+    ({ id }) => id === "final-customers",
   )!;
+  expect(finalGoal.objective).toMatchObject({
+    metric: "customerRetention",
+    deadlineMonth: 239,
+  });
   expect(finalGoal.status).toBe("completed");
   expect(finalGoal.observed).toBe(
     game.monthlyHistory[0].customers /
@@ -160,4 +173,57 @@ it("keeps a completed mod retention deadline through purchase, save/resume and t
   expect(gameObjectiveResults(restored!.game)).toEqual(
     gameObjectiveResults(game),
   );
+
+  expect(beforeDeadline).toBeDefined();
+  const scoredProgress = JSON.parse(JSON.stringify(game.objectiveProgress));
+  const earlierQuote = acquisitionQuote(beforeDeadline!, "ridge-electric")!;
+  expect(earlierQuote).toBeDefined();
+  const oldBaseline = beforeDeadline!.objectiveProgress!.retentionBaseline;
+  const earlier = officialCommand(
+    beforeDeadline!,
+    acquireUtility({
+      targetId: "ridge-electric",
+      financed: true,
+      quoteKey: earlierQuote.quoteKey,
+    }),
+  );
+  expect(earlier.utilityExpansion!.acquisitions).toHaveLength(2);
+  expect(earlier.objectiveProgress!.retentionBaseline).toBe(
+    oldBaseline + earlierQuote.customers,
+  );
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(earlier)))),
+  ).not.toBeNull();
+  runMonths(earlier, 1);
+  expect(earlier.date.monthsElapsed).toBe(240);
+  expect(
+    gameObjectiveResults(earlier).find(({ id }) => id === "final-customers")!
+      .status,
+  ).toBe("completed");
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(earlier)))),
+  ).not.toBeNull();
+
+  const laterQuote = acquisitionQuote(game, "ridge-electric")!;
+  expect(laterQuote).toBeDefined();
+  const later = officialCommand(
+    game,
+    acquireUtility({
+      targetId: "ridge-electric",
+      financed: true,
+      quoteKey: laterQuote.quoteKey,
+    }),
+  );
+  expect(later.utilityExpansion!.acquisitions).toHaveLength(2);
+  expect(expansionRetentionBaseline(later)).toBe(
+    scoredProgress.retentionBaseline + laterQuote.customers,
+  );
+  expect(later.objectiveProgress).toEqual(scoredProgress);
+  expect(
+    gameObjectiveResults(later).find(({ id }) => id === "final-customers"),
+  ).toEqual(finalGoal);
+  expect(later.monthlyHistory).toEqual(game.monthlyHistory);
+  expect(
+    parseSave(JSON.parse(JSON.stringify(serializeSave(later)))),
+  ).not.toBeNull();
 });

@@ -165,7 +165,31 @@ for (const theme of ["light", "dark"] as const) {
     if (desktop) {
       // Every available technology is discoverable before opening Build.
       await expect(rail).toBeVisible();
+      await expect(rail).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const mapViewport = network.locator(".territoryMapViewport");
+      expect((await mapViewport.boundingBox())!.x).toBeLessThanOrEqual(
+        (await rail.boundingBox())!.x,
+      );
       const icons = rail.getByRole("button", { name: /^Choose sites for / });
+      const firstIcon = icons.first();
+      await expect(firstIcon).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const buttonSurface = await firstIcon.evaluate((button) => {
+        const hitArea = button.getBoundingClientRect();
+        const image = button.querySelector("img")!.getBoundingClientRect();
+        const background = getComputedStyle(button, "::before");
+        return {
+          color: background.backgroundColor,
+          widthShare: parseFloat(background.width) / hitArea.width,
+          heightShare: parseFloat(background.height) / hitArea.height,
+          iconWidth: image.width,
+          iconHeight: image.height,
+        };
+      });
+      expect(buttonSurface.color).not.toBe("rgba(0, 0, 0, 0)");
+      expect(buttonSurface.widthShare).toBeCloseTo(0.9);
+      expect(buttonSurface.heightShare).toBeCloseTo(0.9);
+      expect(buttonSurface.iconWidth).toBe(38);
+      expect(buttonSurface.iconHeight).toBe(38);
       const artwork = await icons.evaluateAll((buttons) =>
         buttons.map((button) => ({
           name: button
@@ -290,7 +314,8 @@ for (const theme of ["light", "dark"] as const) {
       await expect(wind).toBeFocused();
       await expect(tileSurfaces).toHaveCount(0);
 
-      await wind.click();
+      // The transparent edge remains part of the pointer target.
+      await wind.click({ position: { x: 2, y: 32 } });
       await expect(wind).toHaveAttribute("aria-pressed", "true");
       await expect(
         surface.getByText("Choose a highlighted site."),
@@ -584,11 +609,13 @@ for (const theme of ["light", "dark"] as const) {
         top: rail.top,
         bottom: rail.bottom,
         mapLeft: map.left,
+        mapRight: map.right,
         overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     expect(geometry.left).toBeGreaterThanOrEqual(0);
-    expect(geometry.right).toBeLessThanOrEqual(geometry.mapLeft + 1);
+    expect(geometry.left).toBeGreaterThanOrEqual(geometry.mapLeft);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.mapRight);
     expect(geometry.top).toBeGreaterThanOrEqual(0);
     expect(geometry.bottom).toBeLessThanOrEqual(560);
     expect(geometry.overflow).toBeLessThanOrEqual(1);

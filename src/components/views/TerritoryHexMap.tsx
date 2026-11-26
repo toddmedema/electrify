@@ -14,6 +14,7 @@ import {
 import {
   formatConnectionDuration,
   tileConnectionLabel,
+  type TileConnection,
 } from "../../helpers/TerritoryConnections";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
@@ -74,6 +75,16 @@ const RENDERER_MESSAGES = {
 const PAN_OVERSCAN = HEX_WIDTH / 4;
 const MIN_TILE_TARGET_HEIGHT = 44;
 const CAMERA_SHIFT_MS = 180;
+
+function tileConnectionProgress(
+  { startedMinute, connectionMinute }: TileConnection,
+  minute: number,
+): number {
+  const duration = connectionMinute - startedMinute;
+  return duration > 0
+    ? Math.max(0, Math.min(1, (minute - startedMinute) / duration))
+    : 1;
+}
 const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
   Residential: "homes",
   Commercial: "shops",
@@ -778,6 +789,10 @@ export default function TerritoryHexMap({
   }, [allWires, renderedTiles]);
   const revealTile = (tile: { q: number; r: number }) => {
     const target = hexCenter(tile);
+    const railWidth =
+      viewport.current
+        ?.closest(".territoryNetwork")
+        ?.querySelector<HTMLElement>(".desktopBuildRail")?.offsetWidth ?? 0;
     setCamera((current) => ({
       x:
         current.x +
@@ -787,7 +802,9 @@ export default function TerritoryHexMap({
         ) +
         Math.min(
           0,
-          target.x - current.x + Math.max(0, worldWidth / 2 - HEX_WIDTH),
+          target.x -
+            current.x +
+            Math.max(0, worldWidth / 2 - HEX_WIDTH - railWidth / scale),
         ),
       y:
         current.y +
@@ -1287,6 +1304,9 @@ export default function TerritoryHexMap({
                   const status = facilityMapStatus(view, game.date.minute);
                   const kind = view.connection ? "construction" : status?.kind;
                   if (!kind || kind === "unknown") return null;
+                  const progress = view.connection
+                    ? tileConnectionProgress(view.connection, game.date.minute)
+                    : status?.progress;
                   const key = territoryMapTileKey(view.tile);
                   const origin = foregroundOrigin(view.tile);
                   return (
@@ -1306,7 +1326,10 @@ export default function TerritoryHexMap({
                       viewBox="0 0 500 500"
                       overflow="visible"
                     >
-                      <FacilityMapStatusArtwork kind={kind} />
+                      <FacilityMapStatusArtwork
+                        kind={kind}
+                        progress={progress}
+                      />
                     </svg>
                   );
                 })}
@@ -1318,6 +1341,9 @@ export default function TerritoryHexMap({
               key = territoryMapTileKey(tile),
               point = hexCenter(tile);
             const status = facilityMapStatus(view, game.date.minute);
+            const construction = view.connection
+              ? tileConnectionProgress(view.connection, game.date.minute)
+              : status?.progress;
             const utility = !!tile.city && !!view.ownerKey;
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
@@ -1350,6 +1376,8 @@ export default function TerritoryHexMap({
               status?.kind === "unknown" ? undefined : status?.label,
               view.connection &&
                 tileConnectionLabel(view.connection, game.date.minute),
+              construction !== undefined &&
+                `${Math.min(99, Math.floor(construction * 100))}% complete`,
               disaster?.condition,
               disaster?.facilityImpact,
               view.owned || !view.ownerKey ? undefined : view.ownerName,

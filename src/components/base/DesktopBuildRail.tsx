@@ -525,7 +525,6 @@ export default function DesktopBuildRail({
           >
             {storage && (
               <>
-                <hr />
                 <h3>Storage</h3>
                 <div className="desktopBuildSizing">{sizeControl(true)}</div>
               </>

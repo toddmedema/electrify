@@ -1200,15 +1200,6 @@ $topbar_height: 56px;
   }
 }
 
-.missionSummaryHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  width: 100%;
-}
-
-// One line at every width: months left, then the goal or the risk to it, which truncates first.
 .missionSummaryCopy {
   display: flex;
   align-items: center;
@@ -1218,19 +1209,27 @@ $topbar_height: 56px;
   white-space: nowrap;
 }
 .missionSummaryMonths.MuiButton-root {
-  flex: 0 0 auto;
-  margin-left: auto;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  margin-inline: auto -8px;
   min-width: 0;
-  padding: 0 8px;
-  margin-inline-end: -8px;
+  padding: 4px 8px;
   font: inherit;
-  // Expand the hit area without increasing the status row's height.
-  margin-block: -12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .missionSummaryHeadline {
-  min-width: 0;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
+  color: var(--font-color-primary);
   text-overflow: ellipsis;
+}
+.missionSummary.statusWarning .missionSummaryHeadline {
+  color: inherit;
 }
 .operatingEvidence,
 .insightsTrack {
@@ -1242,8 +1241,7 @@ $topbar_height: 56px;
 }
 
 @media (pointer: coarse) {
-  .missionSummary .MuiButton-root,
-  .missionSummaryMonths {
+  .missionSummary .MuiButton-root {
     min-height: 44px;
   }
 }
@@ -1257,7 +1255,6 @@ $topbar_height: 56px;
 }
 
 @media (max-width: ($phone_width - 1px)) {
-  .missionSummaryHeader,
   .missionSummaryCopy {
     gap: 8px;
   }
@@ -1468,20 +1465,13 @@ $topbar_height: 56px;
   }
 
   .gameStatusBar .missionSummaryMonths.MuiButton-root {
-    margin-inline: 0;
+    margin-inline-end: 0;
     padding-inline: $space-1;
   }
 }
 
 .gameCashNegative {
   color: var(--delta-bad);
-}
-
-// Phones read "136 mo left": the event beside it needs the room.
-@media (max-width: 599px) {
-  .missionSummaryMonthsTail {
-    display: none;
-  }
 }
 
 // Abbreviate the months and hour together before the wide bar gets crowded.

@@ -1933,8 +1933,7 @@ export const SCENARIOS: ScenarioType[] = [
     icon: "across-the-valley",
     locationId: "BurlingtonVT",
     location: UTILITY_AREAS.champlain.location,
-    summary:
-      "Acquire three competing utilities and keep your expanded customer base supplied.",
+    summary: "Acquire three competing utilities by December 2014.",
     threat:
       "Purchased-power coverage shrinks in 2017 and 2020. Plan replacement supply as you expand.",
     themes: ["Rapid growth"],

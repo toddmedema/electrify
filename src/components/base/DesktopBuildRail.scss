@@ -1,19 +1,22 @@
 .desktopBuildRail {
-  position: relative;
+  position: absolute;
+  inset: 0 auto 0 0;
   z-index: 9;
   display: flex;
-  flex: 0 0 80px;
   flex-direction: column;
   width: 80px;
   min-height: 0;
   box-sizing: border-box;
-  border-right: 1px solid var(--border-subtle);
-  background: var(--bg-raised);
   color: var(--font-color-primary);
   outline-offset: -4px;
+  pointer-events: none;
 
   h3 {
-    margin: 4px 0;
+    width: fit-content;
+    margin: 4px auto;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
     text-align: center;
     font-size: 11px;
     font-weight: 600;
@@ -24,14 +27,21 @@
   padding: 8px 4px 0;
 }
 .desktopBuildSizing {
-  .desktopBuildSize {
+  .desktopBuildSize.MuiButton-root {
     display: flex;
     flex-direction: column;
     width: 100%;
     min-height: 44px;
     padding: 4px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-raised);
     line-height: 1.3;
     text-transform: none;
+    pointer-events: auto;
+    &:hover,
+    &[aria-expanded="true"] {
+      background: var(--bg-sunken);
+    }
     span {
       font-size: 10px;
     }
@@ -45,13 +55,14 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 4px calc(var(--game-dock-clearance, 80px) + 8px);
-  hr {
-    margin: 8px 4px 4px;
-    border: 0;
-    border-top: 1px solid var(--border-subtle);
+  pointer-events: auto;
+  section + section {
+    margin-top: 8px;
   }
 }
 .desktopBuildTechnology {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -60,8 +71,8 @@
   width: 100%;
   min-height: 64px;
   margin: 4px 0;
-  padding: 4px;
-  border: 1px solid transparent;
+  padding: 5px;
+  border: 0;
   border-radius: var(--radius-md);
   background: transparent;
   color: inherit;
@@ -69,28 +80,43 @@
   font-size: 10px;
   line-height: 1.2;
   cursor: pointer;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 5%;
+    z-index: -1;
+    box-sizing: border-box;
+    border: 1px solid var(--border-subtle);
+    border-radius: inherit;
+    background: var(--bg-raised);
+    pointer-events: none;
+  }
   img {
     width: 38px;
     height: 38px;
   }
-  &:hover:not([aria-disabled="true"]),
-  &:focus-visible,
-  &[aria-pressed="true"] {
+  &:hover:not([aria-disabled="true"])::before,
+  &:focus-visible::before,
+  &[aria-pressed="true"]::before {
     border-color: var(--interactive-strong);
     background: var(--bg-sunken);
   }
   &:focus-visible {
-    outline: 2px solid var(--interactive-strong);
-    outline-offset: -2px;
+    outline: none;
+    &::before {
+      outline: 2px solid var(--interactive-strong);
+      outline-offset: -2px;
+    }
   }
-  &[aria-pressed="true"] {
+  &[aria-pressed="true"]::before {
     box-shadow: inset 3px 0 var(--interactive-strong);
   }
   &[aria-disabled="true"] {
     cursor: default;
-    opacity: 0.5;
+    color: var(--font-color-faded);
     img {
       filter: saturate(20%);
+      opacity: 0.5;
     }
   }
 }
@@ -109,6 +135,7 @@
   border-radius: var(--radius-lg);
   background: var(--bg-raised);
   box-shadow: 0 8px 24px var(--shadow-ring);
+  pointer-events: auto;
 }
 .desktopBuildPreview {
   display: flex;

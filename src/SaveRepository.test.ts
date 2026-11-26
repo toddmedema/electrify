@@ -88,14 +88,21 @@ describe("SaveRepository", () => {
       scenarioName: "First Light",
       writerToken: "tab-one",
     });
-    const otherCompany = reducer(closingCompany(101), continueLegacyCampaign());
-    expect(parseSave(serializeSave(otherCompany))).not.toBeNull();
+    const successor = reducer(closed, continueLegacyCampaign());
+    const otherCompany = reducer(closingCompany(1e6), continueLegacyCampaign());
+    const coverageEvidence = (game: typeof successor) =>
+      game.campaign!.completedTerms[0].objectiveProgress.entries.find(
+        ({ id }) => id === "first-profitable-year",
+      )!.observations;
+    const successorSave = serializeSave(successor);
+    const otherCompanySave = serializeSave(otherCompany);
+    expect(parseSave(successorSave)).not.toBeNull();
+    expect(parseSave(otherCompanySave)).not.toBeNull();
+    expect(coverageEvidence(otherCompany)).not.toEqual(
+      coverageEvidence(successor),
+    );
     await expect(
-      repository.writeSnapshot(
-        lease(),
-        serializeSave(otherCompany),
-        "Beyond the Dynamo",
-      ),
+      repository.writeSnapshot(lease(), otherCompanySave, "Beyond the Dynamo"),
     ).rejects.toMatchObject({ code: "invalid" });
     await expect(
       repository.writeSnapshot(
@@ -104,10 +111,9 @@ describe("SaveRepository", () => {
         "Rise of Renewables",
       ),
     ).rejects.toMatchObject({ code: "invalid" });
-    const successor = reducer(closed, continueLegacyCampaign());
     const written = await repository.writeSnapshot(
       lease(),
-      serializeSave(successor),
+      successorSave,
       "Beyond the Dynamo",
     );
     expect(written.scenarioId).toBe(118);
