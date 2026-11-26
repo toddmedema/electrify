@@ -60,6 +60,8 @@
   }
 }
 .desktopBuildTechnology {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   flex-direction: column;
@@ -68,30 +70,44 @@
   width: 100%;
   min-height: 64px;
   margin: 4px 0;
-  padding: 4px;
-  border: 1px solid var(--border-subtle);
+  padding: 5px;
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--bg-raised);
+  background: transparent;
   color: inherit;
   font: inherit;
   font-size: 10px;
   line-height: 1.2;
   cursor: pointer;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 5%;
+    z-index: -1;
+    box-sizing: border-box;
+    border: 1px solid var(--border-subtle);
+    border-radius: inherit;
+    background: var(--bg-raised);
+    pointer-events: none;
+  }
   img {
     width: 38px;
     height: 38px;
   }
-  &:hover:not([aria-disabled="true"]),
-  &:focus-visible,
-  &[aria-pressed="true"] {
+  &:hover:not([aria-disabled="true"])::before,
+  &:focus-visible::before,
+  &[aria-pressed="true"]::before {
     border-color: var(--interactive-strong);
     background: var(--bg-sunken);
   }
   &:focus-visible {
-    outline: 2px solid var(--interactive-strong);
-    outline-offset: -2px;
+    outline: none;
+    &::before {
+      outline: 2px solid var(--interactive-strong);
+      outline-offset: -2px;
+    }
   }
-  &[aria-pressed="true"] {
+  &[aria-pressed="true"]::before {
     box-shadow: inset 3px 0 var(--interactive-strong);
   }
   &[aria-disabled="true"] {
