@@ -774,8 +774,16 @@ test("clicking projected mountain relief follows the hex under the pointer", asy
   await expect(mountain).toHaveAttribute("aria-pressed", "false");
   const surface = page.locator(".tileWorkspaceSurface");
   await closeTileSurface(surface);
-  await mountain.locator(".territoryTileHitArea").click();
+  await expect(surface).toBeHidden();
+  const hitArea = mountain.locator(".territoryTileHitArea");
+  // The neighboring utility label can cover the center of this hex.
+  const position = await hitArea.evaluate(({ clientWidth, clientHeight }) => ({
+    x: clientWidth / 2,
+    y: clientHeight * 0.8,
+  }));
+  await hitArea.click({ position });
   await expect(mountain).toHaveAttribute("aria-pressed", "true");
+  await expect(ground).toHaveAttribute("aria-pressed", "false");
   await expect(surface).toBeVisible();
 });
 
