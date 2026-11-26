@@ -10,6 +10,7 @@ import {
   closeTileSurface,
   readTerritoryMapCamera,
   returnToTerritoryMap,
+  showMapFacilityStatus,
 } from "./layout";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
@@ -143,6 +144,7 @@ for (const theme of ["light", "dark"] as const) {
     const reduced = await sample(canvas);
     await page.waitForTimeout(180);
     expect((await sample(canvas)).phases[key]).toBe(reduced.phases[key]);
+    await showMapFacilityStatus(map);
     await expect(
       map.locator(`[data-status-tile="${wind.tileId}"]`),
     ).toHaveAttribute("data-facility-status", "producing");

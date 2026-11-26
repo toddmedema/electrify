@@ -3,7 +3,6 @@ import type {
   MapCanvas,
   MapFrame,
   MapInstance,
-  PaintedScene,
   RendererDiagnostics,
 } from "./Types";
 import "./TerritoryCanvas3D.scss";
@@ -12,8 +11,6 @@ export type RendererState = "loading" | "ready" | "lost" | "unavailable";
 export interface RendererHandle {
   update: (instances: readonly MapInstance[], frame: MapFrame) => void;
   diagnostics: (includeScene?: boolean) => RendererDiagnostics;
-  getPaintedScene: () => PaintedScene | undefined;
-  motionPhase: (key: string) => number;
   dispose: () => void;
 }
 export type RendererFactory = (
@@ -29,21 +26,19 @@ export default function TerritoryCanvas3D({
   runKey,
   loadRenderer,
   onState,
-  onRenderer,
 }: {
   instances: readonly MapInstance[];
   frame: MapFrame;
   runKey: string;
   loadRenderer: RendererLoader;
   onState: (state: RendererState) => void;
-  onRenderer?: (renderer: RendererHandle | undefined) => void;
 }) {
   const canvas = React.useRef<MapCanvas>(null);
   const renderer = React.useRef<RendererHandle>();
-  const latest = React.useRef({ instances, frame, onState, onRenderer });
+  const latest = React.useRef({ instances, frame, onState });
   React.useLayoutEffect(() => {
-    latest.current = { instances, frame, onState, onRenderer };
-  }, [instances, frame, onState, onRenderer]);
+    latest.current = { instances, frame, onState };
+  }, [instances, frame, onState]);
   const [state, setState] = React.useState<RendererState | "loading">(
     "loading",
   );
@@ -62,7 +57,6 @@ export default function TerritoryCanvas3D({
           latest.current.onState(next);
         });
         renderer.current = value;
-        latest.current.onRenderer?.(value);
         if (!element.map3DDiagnostics)
           Object.defineProperty(element, "map3DDiagnostics", {
             value: (includeScene?: boolean) => value.diagnostics(includeScene),
@@ -74,7 +68,6 @@ export default function TerritoryCanvas3D({
         if (!live) return;
         renderer.current?.dispose();
         renderer.current = undefined;
-        latest.current.onRenderer?.(undefined);
         delete element.map3DDiagnostics;
         setState("unavailable");
         latest.current.onState("unavailable");
@@ -83,7 +76,6 @@ export default function TerritoryCanvas3D({
       live = false;
       renderer.current?.dispose();
       renderer.current = undefined;
-      latest.current.onRenderer?.(undefined);
       delete element.map3DDiagnostics;
     };
   }, [loadRenderer, runKey]);
