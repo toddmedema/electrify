@@ -1,7 +1,7 @@
 /* eslint-disable testing-library/prefer-screen-queries -- Playwright owns browser queries. */
 import { readFile } from "node:fs/promises";
 import { unlockAllDifficulties } from "./difficulty-fixture";
-import { expect, isolateAnalytics, type Browser, type Page } from "./fixtures";
+import { expect, type NewIsolatedContext, type Page } from "./fixtures";
 import { test } from "./advance-world";
 import { crossplayFixture } from "./crossplay-fixture";
 import { verifyMenuKeyboard } from "./menu-keyboard";
@@ -58,7 +58,7 @@ class V2Campaign {
   readonly modRequests: ModRequest[][] = [];
 
   constructor(
-    private readonly browser: Browser,
+    private readonly newIsolatedContext: NewIsolatedContext,
     private readonly installedMods: InstalledMod[][] = [],
     private readonly names: readonly string[] = companies,
   ) {}
@@ -67,7 +67,7 @@ class V2Campaign {
     const index = this.players.length;
     if (index === 0) await this.fixture.prepareCheckpoints();
     const name = this.names[index];
-    const context = await this.browser.newContext({
+    const context = await this.newIsolatedContext({
       viewport: { width, height: width < 600 ? 844 : 900 },
       colorScheme: index % 2 ? "dark" : "light",
       hasTouch: width < 600,
@@ -75,7 +75,6 @@ class V2Campaign {
       permissions: ["clipboard-read", "clipboard-write"],
       reducedMotion: "reduce",
     });
-    await isolateAnalytics(context);
     const page = await context.newPage();
     this.players.push(page);
     page.on("pageerror", (error) => this.errors.push(error.message));
@@ -298,12 +297,12 @@ class V2Campaign {
 }
 
 async function startCustom(
-  browser: Browser,
+  newIsolatedContext: NewIsolatedContext,
   count: number,
   compact: boolean,
   touchGuest = false,
 ) {
-  const campaign = new V2Campaign(browser);
+  const campaign = new V2Campaign(newIsolatedContext);
   const host = await campaign.addPlayer(compact ? 390 : 1280);
   const invite = await campaign.create(host);
   for (let index = 1; index < count; index++) {
@@ -394,17 +393,17 @@ async function approveIntertieUpgrade(host: Page, guest: Page) {
 }
 
 test("desktop menu keyboard journey includes Play with friends in both directions", async ({
-  browser,
+  newIsolatedContext,
 }) => {
-  const campaign = new V2Campaign(browser);
+  const campaign = new V2Campaign(newIsolatedContext);
   const page = await campaign.addPlayer(1280, false);
   await verifyMenuKeyboard(page);
 });
 
 test("V2 joins immediately by invite and lets the host remove a guest", async ({
-  browser,
+  newIsolatedContext,
 }) => {
-  const campaign = new V2Campaign(browser);
+  const campaign = new V2Campaign(newIsolatedContext);
   const host = await campaign.addPlayer(),
     guest = await campaign.addPlayer(390);
   const invite = await campaign.create(host);
@@ -434,9 +433,9 @@ test("V2 joins immediately by invite and lets the host remove a guest", async ({
 });
 
 test("focus skips a guest who is still exiting after a quick second kick", async ({
-  browser,
+  newIsolatedContext,
 }) => {
-  const campaign = new V2Campaign(browser);
+  const campaign = new V2Campaign(newIsolatedContext);
   const host = await campaign.addPlayer();
   await host.emulateMedia({ reducedMotion: "no-preference" });
   const invite = await campaign.create(host);
@@ -491,9 +490,9 @@ for (const count of [2, 4]) {
   test(
     `V2 ${count} players share time and interties while building on their own grids`,
     { tag: "@mobile" },
-    async ({ browser }, info) => {
+    async ({ newIsolatedContext }, info) => {
       const campaign = await startCustom(
-        browser,
+        newIsolatedContext,
         count,
         !!info.project.use.isMobile,
       );
@@ -562,8 +561,12 @@ for (const count of [2, 4]) {
 test(
   "V2 restores the confirmed save under a new host and keeps both company seats",
   { tag: "@mobile" },
-  async ({ browser }, info) => {
-    const campaign = await startCustom(browser, 2, !!info.project.use.isMobile);
+  async ({ newIsolatedContext }, info) => {
+    const campaign = await startCustom(
+      newIsolatedContext,
+      2,
+      !!info.project.use.isMobile,
+    );
     const [host, guest] = campaign.players;
     const original = await Promise.all(campaign.players.map(captureState));
     expect(original[0].seat).toBeTruthy();
@@ -589,9 +592,9 @@ test(
 );
 
 test("V2 saves export the confirmed campaign and require confirmation to withdraw", async ({
-  browser,
+  newIsolatedContext,
 }) => {
-  const campaign = await startCustom(browser, 2, false);
+  const campaign = await startCustom(newIsolatedContext, 2, false);
   const [host, guest] = campaign.players;
   const before = (await captureState(host)).facilities!;
   await host.locator(".button-buildFacility").click();
@@ -657,8 +660,12 @@ test("V2 saves export the confirmed campaign and require confirmation to withdra
 test(
   "V2 rejects stale guest authority and reconnects to the original host",
   { tag: "@mobile" },
-  async ({ browser }, info) => {
-    const campaign = await startCustom(browser, 2, !!info.project.use.isMobile);
+  async ({ newIsolatedContext }, info) => {
+    const campaign = await startCustom(
+      newIsolatedContext,
+      2,
+      !!info.project.use.isMobile,
+    );
     const [host, guest] = campaign.players;
     for (const page of campaign.players) await selectSpeed(page, "slow speed");
     await expect(clock(host)).toHaveAttribute("data-active-speed", "SLOW");
@@ -737,9 +744,9 @@ test(
 test(
   "V2 routes an expired multiplayer session through the confirmed save",
   { tag: "@mobile" },
-  async ({ browser }, info) => {
+  async ({ newIsolatedContext }, info) => {
     const compact = !!info.project.use.isMobile;
-    const campaign = await startCustom(browser, 2, compact);
+    const campaign = await startCustom(newIsolatedContext, 2, compact);
     const [host, guest] = campaign.players;
     if (compact) await guest.setViewportSize({ width: 360, height: 640 });
     const original = await Promise.all(campaign.players.map(captureState));
@@ -863,9 +870,9 @@ test(
 );
 
 test("V2 speed controls fit the toolbar and expose shared status across themes", async ({
-  browser,
+  newIsolatedContext,
 }) => {
-  const campaign = await startCustom(browser, 2, false, true);
+  const campaign = await startCustom(newIsolatedContext, 2, false, true);
   const [host, guest] = campaign.players;
   for (const page of campaign.players) await selectSpeed(page, "slow speed");
   for (const width of [1440, 1280, 800, 390, 360]) {
@@ -1089,9 +1096,9 @@ async function buyNativeBackup(page: Page, peakW: number, rate: number) {
 test(
   "12x multiplayer speed controls respond while video chat is encoding",
   { tag: "@mobile" },
-  async ({ browser }, info) => {
+  async ({ newIsolatedContext }, info) => {
     const { players: pages, errors } = await startCustom(
-      browser,
+      newIsolatedContext,
       2,
       !!info.project.use.isMobile,
     );
@@ -1242,11 +1249,11 @@ test(
 
 for (const width of [1280, 360]) {
   test(`online co-op opens custom setup without a catalog at ${width}px`, async ({
-    browser,
+    newIsolatedContext,
   }) => {
     const names = ["W".repeat(18), "M".repeat(18)];
     const campaign = new V2Campaign(
-      browser,
+      newIsolatedContext,
       [[cooperativeMod(width === 1280)], []],
       names,
     );
@@ -1279,11 +1286,11 @@ for (const [scenarioId, width] of [
   [107, 390],
 ] as const) {
   test(`native ${scenarioId} companies choose independently and resume the same V2 campaign at ${width}px`, async ({
-    browser,
+    newIsolatedContext,
     advanceWorldSave,
   }) => {
     test.setTimeout(240000);
-    const campaign = new V2Campaign(browser);
+    const campaign = new V2Campaign(newIsolatedContext);
     const host = await campaign.addPlayer(width, true, scenarioId),
       guest = await campaign.addPlayer(width);
     for (const page of campaign.players) {
@@ -1486,9 +1493,9 @@ for (const [scenarioId, width] of [
 }
 
 test("an unavailable V2 checkpoint leaves the match open until Save & Quit can retry", async ({
-  browser,
+  newIsolatedContext,
 }) => {
-  const campaign = await startCustom(browser, 2, false);
+  const campaign = await startCustom(newIsolatedContext, 2, false);
   const [host, guest] = campaign.players;
   const confirmed = await campaign.fixture.checkpoint();
   expect(confirmed?.matchId).toBeTruthy();

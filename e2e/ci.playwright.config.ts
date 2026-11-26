@@ -4,6 +4,7 @@ import production from "./production.playwright.config";
 
 const smoke = [
   "browser-environment.spec.ts",
+  "firebase-isolation.spec.ts",
   "build-options.spec.ts",
   "contextual-learning.spec.ts",
   "manual-help-interaction.spec.ts",

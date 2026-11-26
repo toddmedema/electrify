@@ -1,10 +1,18 @@
+const { firebaseResolverRules } = require("./firebase-hosts");
+
 /** Work around Chromium's Windows loopback allocator defect, not request failures.
  * https://issues.chromium.org/issues/572515601
  * Chromium keeps only the last --disable-features argument. Preserve the locked
  * Playwright runtime's entire list rather than silently replacing its defaults.
  */
 function browserLaunchOptions(platform = process.platform) {
-  if (platform !== "win32") return {};
+  // Browser routing can be bypassed by a service worker or an explicit continue().
+  // Force local resolution so a system proxy cannot resolve a blocked host remotely.
+  const args = [
+    "--no-proxy-server",
+    `--host-resolver-rules=${firebaseResolverRules}`,
+  ];
+  if (platform !== "win32") return { args };
   // Playwright has no public additive feature API. This small, checked adapter is
   // intentionally isolated; browser-environment.spec.ts verifies the actual launch.
   const { server } = require("playwright-core/lib/coreBundle");
@@ -22,7 +30,7 @@ function browserLaunchOptions(platform = process.platform) {
   const original = features[0];
   return {
     ignoreDefaultArgs: [original],
-    args: [original + ",TcpPortRandomizationWin"],
+    args: [...args, original + ",TcpPortRandomizationWin"],
   };
 }
 module.exports = { browserLaunchOptions };
