@@ -24,7 +24,6 @@ import type {
   MapLighting,
   MapMesh,
   ModelPart,
-  PaintedScene,
   RendererDiagnostics,
   RendererSceneInstance,
   Vec3,
@@ -270,7 +269,7 @@ export class MapRenderer {
   private instanceCount = 0;
   private poseRevision = 0;
   private paintedLighting: MapLighting | undefined;
-  private paintedScene: PaintedScene | undefined;
+  private paintedFrame: MapFrame | undefined;
   private heldLighting: MapLighting | undefined;
   private lightingTransition:
     { from: MapLighting; started: number; duration: number } | undefined;
@@ -366,12 +365,6 @@ export class MapRenderer {
     this.sceneInstances = this.instances;
   }
 
-  motionPhase = (key: string): number => this.clock.phase(key);
-
-  getPaintedScene(): PaintedScene | undefined {
-    return this.paintedScene;
-  }
-
   diagnostics(includeScene = false): RendererDiagnostics {
     return {
       frames: this.frames,
@@ -424,7 +417,7 @@ export class MapRenderer {
         const surfaceOffset = watershed
           ? waterLevelOffset(
               WATERSHED_LEVEL_OFFSETS,
-              this.paintedScene?.frame.weather?.waterLevel,
+              this.paintedFrame?.weather?.waterLevel,
             )
           : 0;
         if (watershed || part.material === "water")
@@ -1024,15 +1017,11 @@ export class MapRenderer {
       throw new Error("Map GPU buffer upload or draw failed");
     this.frames++;
     this.paintedLighting = lighting;
-    if (frame.width !== this.paintedScene?.frame.width)
+    if (frame.width !== this.paintedFrame?.width)
       this.canvas.style.width = `${frame.width}px`;
-    if (frame.height !== this.paintedScene?.frame.height)
+    if (frame.height !== this.paintedFrame?.height)
       this.canvas.style.height = `${frame.height}px`;
-    if (
-      this.paintedScene?.frame !== frame ||
-      this.paintedScene.instances !== this.instances
-    )
-      this.paintedScene = { frame, instances: this.instances };
+    this.paintedFrame = frame;
     this.instanceCount = this.sceneInstanceCount;
   }
 
@@ -1095,7 +1084,7 @@ export class MapRenderer {
       if (this.program) this.gl?.deleteProgram(this.program);
     }
     this.meshes.clear();
-    this.paintedScene = undefined;
+    this.paintedFrame = undefined;
     this.sceneFrame = undefined;
     this.sceneInstances = undefined;
     this.program = null;

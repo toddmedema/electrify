@@ -94,7 +94,7 @@ export default function ProjectBuild({
     ? `${ready.facility.name} · ${formatWatts(ready.facility.peakW)}`
     : project
       ? `${project.name} · ${formatWatts(project.peakW)}`
-      : "Plan a project";
+      : "Build";
   const confirm = async (financed?: boolean) => {
     if (lock.current || !project || !candidate) return;
     const shown = payment && (financed ? payment.loan : payment.cash);
@@ -194,7 +194,10 @@ export default function ProjectBuild({
       id="tool-BUILD_GENERATORS"
       closeLabel="Close project"
       building={catalogue}
-      title={catalogue ? "Plan a project" : title}
+      title={catalogue ? "Build" : title}
+      titleIcon={
+        (catalogue || !project) && <ConceptIcon concept="build" decorative />
+      }
       focusKey={`${catalogue}:${candidate ?? "sites"}`}
       projectCandidate={!catalogue}
       returnFocusSelector=".desktopBuildRail, #buildNav"

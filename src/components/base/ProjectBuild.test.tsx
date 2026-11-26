@@ -136,6 +136,7 @@ function runtime(submit: (command: Command) => Promise<void>) {
 it("explores two sites with the selected size and spends with one cash action after selecting a site", async () => {
   const { store, choose, close, game } = show();
   const cash = currentTick(game)!.cash;
+  expect(screen.getByRole("heading", { name: "Build" })).toBeVisible();
   choose();
   fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
   expect(screen.getByText("Estimated build cost")).toBeVisible();
