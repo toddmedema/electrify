@@ -1,5 +1,5 @@
 import { expect, test, Locator, Page } from "./fixtures";
-import { foregroundContrast } from "./contrast";
+import { expectReadableText, foregroundContrast } from "./contrast";
 import { TUTORIALS } from "../src/data/Scenarios";
 import { readSavedGame } from "./save-fixture";
 
@@ -745,6 +745,7 @@ for (const theme of ["light", "dark"]) {
       ).toBeVisible();
       const bounds = (await primary.boundingBox())!;
       for (const button of await page.locator("#centeredMenu button").all()) {
+        await expectReadableText(button);
         const box = (await button.boundingBox())!;
         expect(box.width, await button.innerText()).toBeCloseTo(
           bounds.width,
@@ -799,13 +800,35 @@ for (const theme of ["light", "dark"]) {
       await expect(manual).toHaveCSS("background-color", clear);
 
       const touch = await context.newCDPSession(page);
-      const bounds = (await manual.boundingBox())!;
-      expect(bounds.height).toBeGreaterThanOrEqual(44);
-      const point = {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height / 2,
-      };
       try {
+        for (const button of [play, settings]) {
+          await button.scrollIntoViewIfNeeded();
+          const box = (await button.boundingBox())!;
+          await touch.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: [
+              { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+            ],
+          });
+          await expect(button).toHaveAttribute("data-touch-pressed", "");
+          await button.evaluate((element) =>
+            Promise.all(
+              element.getAnimations().map((animation) => animation.finished),
+            ).then(() => undefined),
+          );
+          await expectReadableText(button);
+          await touch.send("Input.dispatchTouchEvent", {
+            type: "touchCancel",
+            touchPoints: [],
+          });
+        }
+        await manual.scrollIntoViewIfNeeded();
+        const manualBox = (await manual.boundingBox())!;
+        expect(manualBox.height).toBeGreaterThanOrEqual(44);
+        const point = {
+          x: manualBox.x + manualBox.width / 2,
+          y: manualBox.y + manualBox.height / 2,
+        };
         await touch.send("Input.dispatchTouchEvent", {
           type: "touchStart",
           touchPoints: [point],
@@ -831,7 +854,7 @@ for (const theme of ["light", "dark"]) {
         await expect(play).toBeFocused();
         await touch.send("Input.dispatchTouchEvent", {
           type: "touchMove",
-          touchPoints: [{ x: bounds.x - 20, y: point.y }],
+          touchPoints: [{ x: manualBox.x - 20, y: point.y }],
         });
         await expect(manual).toHaveCSS("background-color", clear);
         await touch.send("Input.dispatchTouchEvent", {

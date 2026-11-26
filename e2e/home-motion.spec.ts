@@ -1,4 +1,4 @@
-import { expectReadableText, foregroundContrast } from "./contrast";
+import { expectReadableText } from "./contrast";
 import { expect, test } from "./fixtures";
 
 test("reduced motion keeps the home decoration still and actions usable", async ({
@@ -70,21 +70,26 @@ for (const theme of ["light", "dark"] as const) {
         .evaluate((element: HTMLImageElement) => element.naturalWidth),
     ).toBeGreaterThan(0);
     expect(authRequests).toEqual([]);
-    // Every button and link here is the logo blue and stays that blue (see
-    // src/CtaColor.test.ts): never darken or lighten one to chase a score. Light's logo
-    // blue is 3.7:1 on white by decision, so it holds the floor the repo uses for
-    // logo-blue fills (3.5:1); dark keeps WCAG AA.
     const controls = page.locator(
-      "#menuCard :is(.mainActions, .resourceActions, .discoveryActions) .MuiButton-root, #menuCard .homeExplore a",
+      "#centeredMenu button, #menuCard .homeExplore a",
     );
     expect(await controls.count()).toBeGreaterThanOrEqual(10);
+    const paletteFloor = theme === "light" ? 3.5 : 4.5;
+    const hasHover = await page.evaluate(
+      () => matchMedia("(hover: hover)").matches,
+    );
+    // Check the rendered font as well as the color pair, including the filled selection.
     for (const control of await controls.all()) {
-      expect(await foregroundContrast(control)).toBeGreaterThanOrEqual(
-        theme === "light" ? 3.5 : 4.5,
-      );
+      await expectReadableText(control, paletteFloor);
     }
-    for (const link of await explore.getByRole("link").all()) {
-      await expectReadableText(link);
+    for (const control of await controls.all()) {
+      await control.focus();
+      await expect(control).toBeFocused();
+      await expectReadableText(control, paletteFloor);
+      if (hasHover) {
+        await control.hover();
+        await expectReadableText(control, paletteFloor);
+      }
     }
     // Tab from the preceding link so coarse-pointer projects use keyboard focus styling.
     await explore
@@ -96,10 +101,7 @@ for (const theme of ["light", "dark"] as const) {
       "background-color",
       theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)",
     );
-    expect(await foregroundContrast(about)).toBeGreaterThanOrEqual(
-      theme === "light" ? 3.5 : 4.5,
-    );
-    await expectReadableText(about);
+    await expectReadableText(about, paletteFloor);
     await explore.getByRole("link", { name: "For teachers" }).click();
     await expect(page).toHaveURL(/classroom\.html$/);
   });

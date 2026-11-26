@@ -70,7 +70,10 @@ function rgbContrast(foreground: number[], background: number[]): number {
 }
 
 /** WCAG 1.4.3 uses a 3:1 floor for at least 14pt bold or 18pt regular. */
-export async function expectReadableText(locator: Locator): Promise<void> {
+export async function expectReadableText(
+  locator: Locator,
+  minimumRatio = 3,
+): Promise<void> {
   const floor = await locator.evaluate((element) => {
     const style = getComputedStyle(element);
     const size = parseFloat(style.fontSize);
@@ -80,5 +83,5 @@ export async function expectReadableText(locator: Locator): Promise<void> {
   expect(
     await foregroundContrast(locator),
     `contrast of ${(await locator.textContent())?.trim()}`,
-  ).toBeGreaterThanOrEqual(floor);
+  ).toBeGreaterThanOrEqual(Math.max(minimumRatio, floor));
 }

@@ -3453,6 +3453,9 @@ $pane_header_height: 48px;
       .MuiButton-root {
         margin: 0;
         width: min(100%, 208px);
+        // The logo blue on white (or white on blue) needs large, bold labels.
+        font-size: 1.1875rem;
+        font-weight: 700;
       }
     }
   }
