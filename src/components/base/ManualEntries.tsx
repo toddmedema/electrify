@@ -933,7 +933,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Ramp rate is how quickly a generator changes output.{" "}
           <GameNavigationLabel destination="BUILD_GENERATORS">
             Build
-          </GameNavigationLabel>
+          </GameNavigationLabel>{" "}
           estimates its time from zero to full power.{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>
             Batteries

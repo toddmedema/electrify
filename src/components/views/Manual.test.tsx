@@ -126,6 +126,17 @@ describe("Manual", () => {
     ).toBeVisible();
   });
 
+  it.each([
+    [MANUAL_ENTRY.CAPACITY_FACTOR, /Build uses\b/],
+    [MANUAL_ENTRY.RAMP_RATE, /Build estimates\b/],
+  ])("renders a spaced Build label in %s", (title, phrase) => {
+    renderManual(title);
+    const entry = screen.getByRole("region", { name: title });
+    const build = within(entry).getByText("Build", { selector: "strong" });
+    expect(build).toContainHTML('data-concept="build"');
+    expect(entry).toHaveTextContent(phrase);
+  });
+
   it("includes every shared game symbol in the symbol guide", async () => {
     renderManual();
     await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));
