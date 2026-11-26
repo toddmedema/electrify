@@ -1,9 +1,14 @@
 import * as React from "react";
-import type { GameTool } from "./Navigation";
+import {
+  GAME_TOOLS,
+  GameNavigationLabel,
+  type GameTool,
+} from "./GameNavigation";
 
 interface ShortcutType {
   keys: string[];
   description: string;
+  tool?: (typeof GAME_TOOLS)[number];
 }
 
 // The single definition of the game's keyboard shortcuts, rendered in both Settings and the
@@ -24,11 +29,11 @@ export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
   { keys: ["4"], description: "Ultra speed (desktop-sized screens)" },
-  { keys: TOOL_SHORTCUTS.BUILD_GENERATORS, description: "Open / close Build" },
-  { keys: ["W"], description: "Open / close Programs" },
-  { keys: ["E"], description: "Open / close Insights" },
-  { keys: ["R"], description: "Open / close Events" },
-  { keys: ["T"], description: "Open / close Scenario" },
+  ...GAME_TOOLS.map((tool) => ({
+    keys: TOOL_SHORTCUTS[tool.id],
+    description: `Open / close ${tool.label}`,
+    tool,
+  })),
   { keys: ["G"], description: "Build a generator" },
   { keys: ["S"], description: "Build storage" },
   {
@@ -49,7 +54,11 @@ export const SHORTCUTS_SEARCH_TEXT = SHORTCUTS.map(
   (s) => `${s.keys.join(" ")} ${s.description}`,
 ).join(" ");
 
-export default function KeyboardShortcuts(): React.JSX.Element {
+export default function KeyboardShortcuts({
+  showNavigationIcons = false,
+}: {
+  showNavigationIcons?: boolean;
+}): React.JSX.Element {
   return (
     <table className="shortcuts">
       <caption className="srOnly">Keyboard shortcuts</caption>
@@ -61,7 +70,18 @@ export default function KeyboardShortcuts(): React.JSX.Element {
                 <kbd key={key}>{key}</kbd>
               ))}
             </th>
-            <td>{shortcut.description}</td>
+            <td>
+              {showNavigationIcons && shortcut.tool ? (
+                <>
+                  Open / close{" "}
+                  <GameNavigationLabel destination={shortcut.tool.id}>
+                    {shortcut.tool.label}
+                  </GameNavigationLabel>
+                </>
+              ) : (
+                shortcut.description
+              )}
+            </td>
           </tr>
         ))}
       </tbody>

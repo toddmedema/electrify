@@ -3311,23 +3311,6 @@ $pane_header_height: 48px;
     min-width: 0;
   }
 
-  .conceptLegend {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: $space-2;
-    margin-top: $space-4;
-  }
-
-  .conceptLegendItem {
-    display: flex;
-    align-items: center;
-    gap: $space-2;
-    padding: $space-2;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--bg-raised);
-  }
-
   .MuiCard-root {
     margin: 0 $space-2 $space-2;
     border-radius: 0;
@@ -5667,6 +5650,78 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
+.conceptLegend {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(18rem, calc((100% - var(--space-5)) / 2))), 1fr)
+  );
+  gap: var(--space-5);
+}
+
+.conceptLegendGroup {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: $space-2;
+
+  h4 {
+    margin: 0 0 $space-2;
+    font-size: var(--font-size-body1);
+    font-weight: 700;
+  }
+}
+
+.conceptLegendList {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(8.25rem, calc((100% - #{$space-3}) / 2))), 1fr)
+  );
+  gap: $space-1 $space-3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conceptLegendItem {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  min-height: 2.75rem;
+  font-size: var(--font-size-body2);
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.conceptLegendIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+
+  .MuiSvgIcon-colorWarning {
+    color: var(--warning-icon);
+  }
+}
+
+.gameNavigationLabel {
+  white-space: nowrap;
+
+  > span {
+    display: inline-block;
+    margin-inline-end: $space-1;
+    vertical-align: -0.125em;
+  }
+
+  .MuiSvgIcon-root {
+    display: block;
+    font-size: 1em;
+  }
+}
+
 // Manual prose, in the full manual and the help popover alike: a line height and half-line
 // paragraph rhythm that let long entries breathe, a measure capped near 70 characters so wide
 // windows don't stretch lines past comfortable reading, and links in the interaction blue
@@ -5677,7 +5732,7 @@ $homeSmokeCycle: 5.6s;
   // On the text itself, not the container, so composed pieces like the symbol legend keep
   // their own vertical centring
   p,
-  ul,
+  ul:not(.conceptLegendList),
   ol {
     max-width: 70ch;
     line-height: 1.5;
