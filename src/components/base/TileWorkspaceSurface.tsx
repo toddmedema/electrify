@@ -20,6 +20,8 @@ type SurfaceProps = {
   closeLabel?: string;
   title: string;
   titleIconSrc?: string;
+  /** Inline glyph (for example a MUI icon) shown before the title instead of `titleIconSrc`. */
+  titleIcon?: React.ReactNode;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
   subtitle?: React.ReactNode;
@@ -55,6 +57,7 @@ export default function TileWorkspaceSurface({
   closeLabel = "Close tile",
   title,
   titleIconSrc,
+  titleIcon,
   focusKey,
   subtitle,
   building,
@@ -147,13 +150,17 @@ export default function TileWorkspaceSurface({
             tabIndex={-1}
             ref={heading}
           >
-            {titleIconSrc && (
+            {titleIconSrc ? (
               <img
                 className="tileWorkspaceTitleIcon"
                 src={titleIconSrc}
                 alt=""
               />
-            )}
+            ) : titleIcon ? (
+              <span className="tileWorkspaceTitleIcon" aria-hidden="true">
+                {titleIcon}
+              </span>
+            ) : null}
             {title}
           </Typography>
           {subtitle && (

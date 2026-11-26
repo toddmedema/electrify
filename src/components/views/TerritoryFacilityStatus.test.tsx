@@ -36,7 +36,11 @@ function decorativeChild(element: Element, selector: string) {
   return element.querySelector(selector);
 }
 
-function show(game: GameType, tileId: TerritoryTileId) {
+function show(
+  game: GameType,
+  tileId: TerritoryTileId,
+  layers?: Record<string, unknown>,
+) {
   const store = configureStore({
     reducer: { game: gameReducer, ui: uiReducer },
     preloadedState: { game },
@@ -45,7 +49,9 @@ function show(game: GameType, tileId: TerritoryTileId) {
   render(
     <Provider store={store}>
       <GameToolMemoryContext.Provider
-        value={new Map([["network.tile", tileId]])}
+        value={
+          new Map([["network.tile", tileId], ...Object.entries(layers ?? {})])
+        }
       >
         <TerritoryNetwork
           game={game}
@@ -83,7 +89,9 @@ it.each([
     const { game, facility } = ready();
     facility.paused = paused;
     facility.yearsToBuildLeft = years;
-    const { target, badge } = show(game, facility.tileId!);
+    const { target, badge } = show(game, facility.tileId!, {
+      "network.showStatusLayer": true,
+    });
     expect(target).toHaveAccessibleDescription(expect.stringContaining(label));
     expect(target).not.toHaveAttribute("title");
     expect(badge()).toHaveAttribute("data-facility-status", kind);
@@ -110,7 +118,9 @@ it("reports staged retrofit output rather than an outage in the inspector", () =
     startsMinute: game.date.minute,
     completesMinute: game.date.minute + 100,
   };
-  const { target, badge } = show(game, facility.tileId!);
+  const { target, badge } = show(game, facility.tileId!, {
+    "network.showStatusLayer": true,
+  });
   expect(badge()).toHaveAttribute("data-facility-status", "producing");
   expect(target).toHaveAccessibleDescription(
     expect.stringContaining("Generating; retrofit in progress"),
@@ -220,21 +230,22 @@ it("toggles map names and the construction badge independently", () => {
   const city = screen.getByRole("button", {
     name: "Inspect Valley Electric territory · Winooski",
   });
+  // The status layer starts off; names start on.
+  expect(badge()).toBeNull();
   expect(within(city).getByText("Winooski")).toBeVisible();
   expect(within(city).getByText("Valley Electric")).toBeVisible();
-  expect(badge()).toHaveAttribute("data-facility-status", "construction");
   fireEvent.click(screen.getByRole("button", { name: "Map layers" }));
   const toggle = screen.getByRole("checkbox", { name: "Facility status" });
+  expect(toggle).not.toBeChecked();
   fireEvent.click(toggle);
-  expect(within(city).getByText("Winooski")).toBeVisible();
-  expect(within(city).getByText("Valley Electric")).toBeVisible();
+  expect(badge()).toHaveAttribute("data-facility-status", "construction");
   const names = screen.getByRole("checkbox", { name: "Names" });
   fireEvent.click(names);
   expect(within(city).queryByText("Winooski")).not.toBeInTheDocument();
   expect(within(city).queryByText("Valley Electric")).not.toBeInTheDocument();
-  expect(badge()).toBeNull();
+  expect(badge()).toHaveAttribute("data-facility-status", "construction");
   fireEvent.click(toggle);
-  expect(decorativeChild(badge()!, ".facilityMapStatusArtwork")).not.toBeNull();
+  expect(badge()).toBeNull();
   expect(within(city).queryByText("Winooski")).not.toBeInTheDocument();
   expect(within(city).queryByText("Valley Electric")).not.toBeInTheDocument();
   fireEvent.click(names);

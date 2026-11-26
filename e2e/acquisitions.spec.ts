@@ -2017,7 +2017,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
 
   await target.hover();
   const tooltip = network.getByRole("tooltip");
-  await expect(tooltip).toHaveText("Forest · Unconnected");
+  await expect(tooltip).toHaveText("Forest");
   await expect(target).not.toHaveAttribute("title", /.+/);
 
   await target.click({ button: "right" });

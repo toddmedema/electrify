@@ -21,7 +21,6 @@ import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { getSunriseSunset } from "../../helpers/DateTime";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
-import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
 import { readMapWeather } from "../base/territory-3d/MapWeather";
 import WeatherAtmosphere from "../base/territory-3d/WeatherAtmosphere";
@@ -182,10 +181,6 @@ export default function TerritoryHexMap({
     RendererState | "failed"
   >(webGLAvailable ? "loading" : "unavailable");
   const threeDReady = rendererState === "ready";
-  const picker = React.useRef<ScenePicker>();
-  const setPicker = React.useCallback((value: ScenePicker | undefined) => {
-    picker.current = value;
-  }, []);
   const motion = useFacilityMapMotion(game.speed);
   const weather = React.useMemo(() => readMapWeather(game), [game]);
   const viewport = React.useRef<HTMLDivElement>(null);
@@ -198,7 +193,7 @@ export default function TerritoryHexMap({
   const [buyMode, setBuyMode] = React.useState(false);
   const [showStatusLayer, setShowStatusLayer] = useToolState(
     "network.showStatusLayer",
-    true,
+    false,
   );
   const [showNames, setShowNames] = useToolState("network.showNames", true);
   const topology = useStableArray(
@@ -863,28 +858,12 @@ export default function TerritoryHexMap({
     else if (key === inspected) onDeselect?.();
     else inspectTile(tile, fromPointer);
   };
-  const pointerTile = (event: {
-    target: EventTarget;
-    clientX: number;
-    clientY: number;
-  }) => {
+  // Hover and selection follow the hex grid's own hit areas, so terrain relief
+  // and facility models never steal a tile from the hex under the pointer.
+  const pointerTile = (event: { target: EventTarget }) => {
     const element = event.target instanceof Element ? event.target : undefined;
-    const ground = element?.closest<HTMLButtonElement>("[data-map-target]");
-    if (
-      !threeDReady ||
-      element?.closest(".territoryTilePrice, .territoryUtilityLabel strong")
-    )
-      return ground?.dataset.mapTarget as TerritoryMapTileKey | undefined;
-    const rect = viewport.current?.getBoundingClientRect();
-    const hit =
-      rect &&
-      picker.current?.({
-        x: event.clientX - rect.left - rect.width / 2,
-        y: event.clientY - rect.top - rect.height / 2,
-      });
-    return hit === undefined
-      ? (ground?.dataset.mapTarget as TerritoryMapTileKey | undefined)
-      : hit;
+    return element?.closest<HTMLButtonElement>("[data-map-target]")?.dataset
+      .mapTarget as TerritoryMapTileKey | undefined;
   };
   const showTooltip = React.useCallback(
     (anchor?: NonNullable<typeof tooltipAnchor.current>) => {
@@ -1091,8 +1070,8 @@ export default function TerritoryHexMap({
           cancelCameraShift();
           clearHover();
           const id = middle ? undefined : pointerTile(event);
-          if (middle || id === null) event.preventDefault();
-          rememberActivation(id ?? undefined);
+          if (middle) event.preventDefault();
+          rememberActivation(id);
           const { pointerId, pointerType, clientX, clientY } = event;
           pointers.current.set(
             pointerId,
@@ -1242,7 +1221,7 @@ export default function TerritoryHexMap({
           }
           if (event.detail === 0) return;
           const id = pointerTile(event);
-          if (id === null || activation.current?.tileKey !== id) {
+          if (activation.current?.tileKey !== id) {
             activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
@@ -1288,7 +1267,6 @@ export default function TerritoryHexMap({
                   weather,
                 }}
                 onState={setRendererState}
-                onPicker={setPicker}
               />
             </React.Suspense>
           </MapSceneBoundary>
@@ -1367,11 +1345,7 @@ export default function TerritoryHexMap({
                 tileConnectionLabel(view.connection, game.date.minute),
               disaster?.condition,
               disaster?.facilityImpact,
-              view.owned
-                ? undefined
-                : view.ownerKey
-                  ? view.ownerName
-                  : "Unconnected",
+              view.owned || !view.ownerKey ? undefined : view.ownerName,
               hover.reason,
             ]
               .filter(Boolean)

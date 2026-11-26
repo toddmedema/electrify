@@ -287,7 +287,7 @@ export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
     .click();
   const catalogue = map.locator(".tileWorkspaceSurface");
   await expect(
-    catalogue.getByRole("heading", { name: "Plan a project", exact: true }),
+    catalogue.getByRole("heading", { name: "Build", exact: true }),
   ).toBeVisible();
   return catalogue;
 }

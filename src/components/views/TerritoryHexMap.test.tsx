@@ -32,7 +32,6 @@ import {
 import TerritoryHexMap from "./TerritoryHexMap";
 import { hexCenter } from "../base/TerritoryHexGeometry";
 import * as HexGeometry from "../base/TerritoryHexGeometry";
-import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import {
   projectCatalogue,
@@ -43,7 +42,6 @@ import {
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { formatPurchasePrice } from "../../helpers/Format";
 
-const mockPick = jest.fn();
 let mockSceneError = false;
 let mockSceneGate: Promise<void> | undefined;
 let mockSetRendererState: (state: RendererState) => void;
@@ -53,17 +51,13 @@ jest.mock("../base/territory-3d/TerritoryScene3D", () => {
     __esModule: true,
     default: function MockScene({
       onState,
-      onPicker,
     }: {
       onState: (state: RendererState) => void;
-      onPicker: (picker: ScenePicker | undefined) => void;
     }) {
       React.useEffect(() => {
         mockSetRendererState = onState;
-        onPicker(mockPick);
         onState("ready");
-        return () => onPicker(undefined);
-      }, [onPicker, onState]);
+      }, [onState]);
       if (mockSceneError) throw new Error("3D chunk unavailable");
       if (mockSceneGate) throw mockSceneGate;
       return <div data-testid="map-scene" />;
@@ -111,7 +105,6 @@ beforeEach(() => {
 afterEach(() => {
   registerMultiplayerRuntime(undefined);
   jest.restoreAllMocks();
-  mockPick.mockReset();
   mockSceneError = false;
 });
 
@@ -294,7 +287,7 @@ it("explains and colors physical building eligibility without guessing from terr
     "var(--interactive-blue)",
   );
   expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
-    /Unconnected/,
+    "Plains",
   );
 });
 
@@ -526,7 +519,7 @@ it("describes unconnected land and peer claims without repeating local ownership
     /^Plains/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    /Unconnected/,
+    "Forest",
   );
   act(() => {
     map.store.dispatch(
@@ -544,7 +537,7 @@ it("describes unconnected land and peer claims without repeating local ownership
     / · Birch Utility/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    /Unconnected/,
+    "Forest",
   );
 });
 
@@ -553,7 +546,7 @@ it("refreshes a stationary pointer tooltip after a peer claims its tile", async 
   const tile = map.target("green-uplands:site-2");
   fireEvent.pointerMove(tile, { pointerId: 1, clientX: 100, clientY: 100 });
   await waitFor(() =>
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/Unconnected/),
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Plains"),
   );
   act(() => {
     map.store.dispatch(
@@ -567,9 +560,8 @@ it("refreshes a stationary pointer tooltip after a peer claims its tile", async 
       }),
     );
   });
-  expect(tile).toHaveAccessibleDescription(/ · Birch Utility/);
+  expect(tile).toHaveAccessibleDescription("Plains · Birch Utility");
   expect(screen.getByRole("tooltip")).toHaveTextContent(/ · Birch Utility/);
-  expect(screen.getByRole("tooltip")).not.toHaveTextContent(/Unconnected/);
 });
 
 it("shows the tile status tooltip on keyboard focus and dismisses it on blur", () => {
@@ -577,7 +569,7 @@ it("shows the tile status tooltip on keyboard focus and dismisses it on blur", (
   const tile = map.target("green-uplands:site-2");
   act(() => tile.focus());
   expect(tile).toHaveFocus();
-  expect(screen.getByRole("tooltip")).toHaveTextContent(/Unconnected/);
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Plains");
   expect(tile).toHaveAccessibleDescription(
     screen.getByRole("tooltip").textContent!,
   );
@@ -1084,7 +1076,7 @@ it("announces loading before the scene draws and clears the notice when ready", 
   }
 });
 
-it("activates and hovers the picked elevated model while keyboard and explicit price labels keep their own targets", async () => {
+it("hovers and activates the hex under the pointer while keyboard and explicit price labels keep their own targets", async () => {
   const restore = enable3D();
   try {
     const map = show();
@@ -1092,24 +1084,21 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
     const facility = territoryTileViews(map.store.getState().game).find(
       (view) => view.operatingFacility,
     )!;
-    mockPick.mockReturnValue(facility.tile.id);
     map.buyMode();
     const ground = map.candidates()[0],
       model = map.target(facility.tile.id);
-    mockPick.mockClear();
-    fireEvent.pointerMove(ground, { pointerId: 1, clientX: 90, clientY: 90 });
-    fireEvent.pointerMove(ground, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(model, { pointerId: 1, clientX: 90, clientY: 90 });
+    fireEvent.pointerMove(model, { pointerId: 1, clientX: 100, clientY: 100 });
     await waitFor(() =>
       expect(model).toHaveAttribute("data-model-hovered", "true"),
     );
-    expect(mockPick).toHaveBeenCalledTimes(1);
     expect(hoverColor(model)).toBe("var(--blackout-red)");
     expect(ground).not.toHaveAttribute("data-model-hovered");
     expect(screen.getByRole("tooltip")).toHaveTextContent(
       facility.facility!.name,
     );
-    expect(ground).not.toHaveAttribute("title");
-    tap(ground);
+    expect(model).not.toHaveAttribute("title");
+    tap(model);
     expect(map.onSelect).toHaveBeenLastCalledWith(facility.tile.id, true);
     expect(
       map.store.getState().game.territoryNetwork!.tilePurchases,
@@ -1150,37 +1139,13 @@ it("activates and hovers the picked elevated model while keyboard and explicit p
   }
 });
 
-it("ignores presses outside the painted map even if the terrain draws before release", async () => {
-  const restore = enable3D();
-  try {
-    const map = show();
-    await screen.findByTestId("map-scene");
-    const tile = map.target("champlain:site-13");
-
-    mockPick.mockReturnValue(null);
-    tap(tile);
-    expect(map.onSelect).not.toHaveBeenCalled();
-
-    fireEvent.pointerDown(tile, { pointerId: 1, clientX: 100, clientY: 100 });
-    mockPick.mockReturnValue(undefined);
-    fireEvent.pointerUp(tile, { pointerId: 1, clientX: 100, clientY: 100 });
-    fireEvent.click(tile, { detail: 1 });
-    expect(map.onSelect).not.toHaveBeenCalled();
-
-    tap(tile);
-    expect(map.onSelect).toHaveBeenLastCalledWith(idOf(tile), true);
-  } finally {
-    restore();
-  }
-});
-
 function changeMockRendererState(state: RendererState) {
   // The renderer callback updates React outside a DOM event.
   // eslint-disable-next-line testing-library/no-unnecessary-act
   act(() => mockSetRendererState(state));
 }
 
-it("requires a tile press before buying when the 3D picker recovers during a gesture", async () => {
+it("requires a tile press before buying when the renderer recovers during a gesture", async () => {
   const restore = enable3D();
   try {
     const map = show();
@@ -1188,7 +1153,6 @@ it("requires a tile press before buying when the 3D picker recovers during a ges
     map.buyMode();
     const candidate = map.candidates()[0];
     const id = idOf(candidate);
-    mockPick.mockReturnValue(id);
     const gesture = { pointerId: 1, clientX: 100, clientY: 100 };
 
     changeMockRendererState("lost");
@@ -1205,18 +1169,19 @@ it("requires a tile press before buying when the 3D picker recovers during a ges
   }
 });
 
-it("binds a retargeted model gesture to the quote shown at pointer down", async () => {
+it("binds a gesture to the quote shown at pointer down", async () => {
   const restore = enable3D();
   try {
     const map = show(),
       host = fakeHost();
     await screen.findByTestId("map-scene");
     map.buyMode();
-    const candidate = map.candidates()[0],
-      id = idOf(candidate),
-      ground = map.target("champlain:city");
-    mockPick.mockReturnValue(id);
-    fireEvent.pointerDown(ground, { pointerId: 1, clientX: 100, clientY: 100 });
+    const candidate = map.candidates()[0];
+    fireEvent.pointerDown(candidate, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
     const before = map.store.getState().game;
     act(() => {
       map.store.dispatch(
@@ -1232,8 +1197,12 @@ it("binds a retargeted model gesture to the quote shown at pointer down", async 
         }),
       );
     });
-    fireEvent.pointerUp(ground, { pointerId: 1, clientX: 100, clientY: 100 });
-    fireEvent.click(ground, { detail: 1 });
+    fireEvent.pointerUp(candidate, {
+      pointerId: 1,
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.click(candidate, { detail: 1 });
     expect(host.submit).not.toHaveBeenCalled();
     expect(
       screen.getByRole("status", { name: "Connection result" }),
@@ -1262,26 +1231,24 @@ it("offers a reload and keeps keyboard inspection available when the lazy scene 
   }
 });
 
-it("opens the actions for the picked model on right-click and for the focused tile from the keyboard", async () => {
+it("opens the actions for the hovered tile on right-click and for the focused tile from the keyboard", async () => {
   const restore = enable3D();
   try {
     const map = show();
     await screen.findByTestId("map-scene");
-    const tile = map.target("champlain:city");
-    const picked = territoryTileViews(map.store.getState().game).find(
-      ({ operatingFacility }) => operatingFacility,
-    )!.tile.id;
-    mockPick.mockReturnValue(picked);
+    const site = map.target("champlain:site-0"),
+      city = map.target("champlain:city");
 
-    expect(fireEvent.contextMenu(tile, { clientX: 100, clientY: 120 })).toBe(
+    expect(fireEvent.contextMenu(site, { clientX: 100, clientY: 120 })).toBe(
       false,
     );
     expect(map.onTileMenu).toHaveBeenLastCalledWith({
-      key: picked,
+      key: "champlain:site-0",
       left: 100,
       top: 120,
     });
-    expect(fireEvent.keyDown(tile, { key: "F10", shiftKey: true })).toBe(false);
+    expect(site).toHaveFocus();
+    expect(fireEvent.keyDown(city, { key: "F10", shiftKey: true })).toBe(false);
     expect(map.onTileMenu).toHaveBeenLastCalledWith(
       expect.objectContaining({ key: "champlain:city" }),
     );
