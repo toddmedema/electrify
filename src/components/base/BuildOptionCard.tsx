@@ -50,8 +50,10 @@ export interface BuildOptionCardProps {
    * told whether the disclosure is open, so costly content can wait for it.
    */
   details?: React.ReactNode | ((expanded: boolean) => React.ReactNode);
-  /** Expanded, read-only technology preview; purchase dialogs are not mounted. */
+  /** Read-only technology preview; purchase dialogs are not mounted. */
   preview?: boolean;
+  previewSummary?: React.ReactNode;
+  comparisonCaption?: string;
   /** Beside the details toggle, such as Compare on a narrow layout */
   footerActions?: React.ReactNode;
   /** The review dialog */
@@ -67,12 +69,13 @@ export default function BuildOptionCard(
   props: BuildOptionCardProps,
 ): React.JSX.Element {
   const [disclosed, setExpanded] = React.useState(false);
-  const expanded = !!props.preview || disclosed;
+  const expanded = disclosed;
   const { name, sizeAction, context, metrics, details } = props;
   const titleComponent = props.preview ? "h2" : props.titleComponent;
   const detailContent =
     typeof details === "function" ? details(expanded) : details;
   const warningId = React.useId();
+  const detailsId = React.useId();
   // A disabled Review says why through the visible shortfall rather than staying silent.
   const describedBy =
     props.review?.disabled && props.warning ? warningId : undefined;
@@ -179,17 +182,37 @@ export default function BuildOptionCard(
               {props.warning}
             </Typography>
           )}
-          {!props.preview && (
+          {props.preview ? (
+            <>
+              {props.comparisonCaption && (
+                <Typography
+                  className="buildComparisonCaption"
+                  variant="caption"
+                  component="p"
+                >
+                  {props.comparisonCaption}
+                </Typography>
+              )}
+              {props.previewSummary}
+            </>
+          ) : (
             <Box className="buildOptionMetrics">{metrics}</Box>
           )}
-          {((details && !props.preview) || props.footerActions) && (
+          {(details || props.footerActions) && (
             <Box className="buildOptionFooter">
-              {details && !props.preview && (
+              {details && (
                 <Button
                   color="primary"
                   className="expand-details"
                   size="small"
-                  aria-label={`${expanded ? "Hide" : "Show"} ${name} details`}
+                  aria-label={
+                    props.preview
+                      ? undefined
+                      : `${expanded ? "Hide" : "Show"} ${name} details`
+                  }
+                  aria-controls={
+                    expanded && props.preview ? detailsId : undefined
+                  }
                   aria-expanded={expanded}
                   endIcon={expanded ? <ChevronUpGlyph /> : <ChevronDownGlyph />}
                   onClick={(event) => {
@@ -197,7 +220,11 @@ export default function BuildOptionCard(
                     setExpanded(!expanded);
                   }}
                 >
-                  {expanded ? "Hide details" : "Show details"}
+                  {props.preview
+                    ? "Advanced"
+                    : expanded
+                      ? "Hide details"
+                      : "Show details"}
                 </Button>
               )}
               {props.footerActions}
@@ -205,7 +232,7 @@ export default function BuildOptionCard(
           )}
           {details &&
             (props.preview ? (
-              detailContent
+              expanded && <div id={detailsId}>{detailContent}</div>
             ) : (
               <Collapse in={expanded} timeout="auto" unmountOnExit>
                 {detailContent}

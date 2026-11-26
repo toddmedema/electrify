@@ -39,6 +39,10 @@ import { GeneratorBuildItem } from "../views/BuildGenerators";
 import { StorageBuildItem } from "../views/BuildStorage";
 import { signature } from "./DeferredProjection";
 import { useBuildForecast } from "./BuildForecast";
+import {
+  compareBuildPreview,
+  typicalCapacityFactor,
+} from "./BuildPreviewComparison";
 import { useToolState } from "./GameToolMemory";
 import "./DesktopBuildRail.scss";
 
@@ -87,6 +91,7 @@ function railSites(game: GameType, options: FacilityShoppingType[]) {
       .map((facility) => {
         const selection = selectProject(facility);
         let minimumDue = Infinity;
+        let minimumConstructionDue = Infinity;
         // Within one terrain, the cheapest legal connection also has the cheapest project.
         const pricedSites = new Set<string>();
         for (const tile of candidates) {
@@ -96,13 +101,17 @@ function railSites(game: GameType, options: FacilityShoppingType[]) {
           const quote = projectSiteQuote(game, selection, tile.id, connections);
           if (!quote.facility) continue;
           pricedSites.add(siteType);
+          const downpayment = quote.facility.buildCost * DOWNPAYMENT_PERCENT;
           minimumDue = Math.min(
             minimumDue,
-            quote.connection?.price ??
-              quote.facility.buildCost * DOWNPAYMENT_PERCENT,
+            quote.connection?.price ?? downpayment,
+          );
+          minimumConstructionDue = Math.min(
+            minimumConstructionDue,
+            quote.connectionCost + downpayment,
           );
         }
-        return [facility.name, minimumDue] as const;
+        return [facility.name, { minimumDue, minimumConstructionDue }] as const;
       }),
   );
 }
@@ -169,7 +178,7 @@ export default function DesktopBuildRail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pricingKey, generatorSize, storageSize, forecast],
   );
-  const minimumDue = React.useMemo(
+  const sites = React.useMemo(
     () => railSites(game, options),
     // Cash changes every tick. Site eligibility and prices use the planning inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -179,7 +188,7 @@ export default function DesktopBuildRail({
   const canChoose = (facility: FacilityShoppingType) =>
     !busy &&
     (project?.name === facility.name ||
-      (minimumDue.get(facility.name) ?? Infinity) <= cash);
+      (sites.get(facility.name)?.minimumDue ?? Infinity) <= cash);
   const clearTimer = React.useCallback(() => {
     if (dismissTimer.current !== undefined) clearTimeout(dismissTimer.current);
   }, []);
@@ -323,23 +332,28 @@ export default function DesktopBuildRail({
     if (!selected) return;
     const due =
       size === requested
-        ? minimumDue.get(selected.name)
-        : railSites(game, [selected]).get(selected.name);
+        ? sites.get(selected.name)?.minimumDue
+        : railSites(game, [selected]).get(selected.name)?.minimumDue;
     if ((due ?? Infinity) <= cash) {
       dismiss();
       onProject(selectProject(selected));
     }
   };
   const option = options.find((item) => item.name === previewName);
-  const quote = React.useMemo(
-    () =>
-      option && siteId
-        ? projectSiteQuote(game, selectProject(option), siteId)
-        : undefined,
-    // The same planning inputs own the inspected-site quote.
+  const hasPreview = !!option;
+  const siteQuotes = React.useMemo(() => {
+    if (!hasPreview || !siteId) return undefined;
+    const connections = tilePurchaseQuotes(game);
+    return new Map(
+      options.map((item) => [
+        item.name,
+        projectSiteQuote(game, selectProject(item), siteId, connections),
+      ]),
+    );
+    // The same planning inputs own the inspected-site quotes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pricingKey, option, siteId],
-  );
+  }, [pricingKey, options, hasPreview, siteId]);
+  const quote = option && siteQuotes?.get(option.name);
   const inspectedTile = siteId ? getTerritoryTile(siteId, game) : undefined;
   const ownedSite =
     inspectedTile && ownsTerritoryTile(game, inspectedTile)
@@ -361,6 +375,59 @@ export default function DesktopBuildRail({
   const previewSiteIssue = quote?.facility
     ? undefined
     : (unavailableSiteReason ?? quote?.reason);
+  const previewComparison = React.useMemo(() => {
+    if (!facility || (siteId && !quote?.facility)) return undefined;
+    const sameTypeAndSize = (item: FacilityShoppingType) =>
+      isStorage(facility)
+        ? isStorage(item) && item.peakWh === facility.peakWh
+        : !isStorage(item) && item.peakW === facility.peakW;
+    const peers = options.filter(sameTypeAndSize).flatMap((item) => {
+      if (siteQuotes) {
+        const peerQuote = siteQuotes.get(item.name);
+        return peerQuote?.facility &&
+          peerQuote.connectionCost +
+            peerQuote.facility.buildCost * DOWNPAYMENT_PERCENT <=
+            cash
+          ? [peerQuote.facility]
+          : [];
+      }
+      return (sites.get(item.name)?.minimumConstructionDue ?? Infinity) <= cash
+        ? [item]
+        : [];
+    });
+    if (peers.length < 2) return undefined;
+    const markers = compareBuildPreview(
+      facility,
+      peers,
+      !forecast,
+      (generator) =>
+        typicalCapacityFactor(
+          generator,
+          generator.fuel === "Hydro"
+            ? expectedMonthlyOutputShape(generator, forecast?.timeline ?? [], {
+                game,
+                tileId: siteId,
+              })
+            : undefined,
+        ),
+    );
+    return {
+      caption: `Compared with typical buildable ${isStorage(facility) ? "storage" : "generators"}${siteId ? " at this site" : ""}`,
+      markers,
+    };
+    // As with the quotes, planning inputs own the forecast comparison.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pricingKey,
+    facility,
+    options,
+    siteQuotes,
+    siteId,
+    cash,
+    sites,
+    forecast,
+    quote,
+  ]);
   const sizeControl = (storage: boolean) => {
     const category = storage ? "storage" : "generator";
     const label = storage ? "Energy" : "Power";
@@ -458,8 +525,7 @@ export default function DesktopBuildRail({
             <h3>{storage ? "Storage" : "Generators"}</h3>
             {options
               .filter(
-                (item) =>
-                  isStorage(item) === storage && minimumDue.has(item.name),
+                (item) => isStorage(item) === storage && sites.has(item.name),
               )
               .map((item) => (
                 <div
@@ -477,7 +543,7 @@ export default function DesktopBuildRail({
                     title={
                       busy || canChoose(item)
                         ? item.name
-                        : minimumDue.get(item.name) === Infinity
+                        : sites.get(item.name)?.minimumDue === Infinity
                           ? `${item.name} · No available sites at this size`
                           : `${item.name} · Insufficient cash to start construction`
                     }
@@ -555,6 +621,7 @@ export default function DesktopBuildRail({
       )}
       {facility && (
         <section
+          key={facility.name}
           className="desktopBuildPreview"
           data-escape-overlay="true"
           aria-label={`${facility.name} technology preview`}
@@ -570,6 +637,7 @@ export default function DesktopBuildRail({
                 <StorageBuildItem
                   preview
                   previewSiteIssue={previewSiteIssue}
+                  previewComparison={previewComparison}
                   game={game}
                   cash={cash}
                   interestRate={game.interestRate}
@@ -587,6 +655,7 @@ export default function DesktopBuildRail({
                 <GeneratorBuildItem
                   preview
                   previewSiteIssue={previewSiteIssue}
+                  previewComparison={previewComparison}
                   game={game}
                   generator={facility}
                   date={game.date}
