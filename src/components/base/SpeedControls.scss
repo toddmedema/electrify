@@ -81,7 +81,7 @@
 
       @media (hover: hover) and (pointer: fine) {
         &:hover:not([data-thumb="true"]) {
-          background-color: var(--interactive-tint);
+          background-color: var(--bg-selected);
         }
       }
 

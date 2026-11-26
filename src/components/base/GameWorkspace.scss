@@ -161,7 +161,7 @@
     @media (hover: hover) and (pointer: fine) {
       &:hover {
         color: var(--interactive-blue);
-        background: var(--interactive-tint);
+        background: var(--bg-selected);
       }
     }
     &.gameDockActionOpen {
