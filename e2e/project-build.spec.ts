@@ -173,8 +173,14 @@ for (const theme of ["light", "dark"] as const) {
     await expect(connect).toBeInViewport();
     await connect.click();
     await expect(
-      surface.getByText(/Connection under construction/),
+      surface
+        .getByRole("alert")
+        .filter({ hasText: "Constructing transmission lines" }),
     ).toBeVisible();
+    await expect(
+      surface.getByRole("button", { name: "Build here", exact: true }),
+    ).toBeDisabled();
+    await expect(surface.locator(".constructionProgress")).toBeVisible();
     const badge = network.locator(
       '[data-status-tile="green-uplands:site-1"][data-connection-status="construction"]',
     );

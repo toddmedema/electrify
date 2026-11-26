@@ -25,8 +25,16 @@ export default function MapPanelSlide({
     !!layout &&
     layout.effectiveWidth < SIDE_TOOL_MIN_WIDTH;
   const node = React.useRef<HTMLDivElement>(null);
+  const wasPresent = React.useRef(present);
   React.useLayoutEffect(() => {
-    node.current?.toggleAttribute("inert", present === false);
+    const wrapper = node.current;
+    wrapper?.toggleAttribute("inert", present === false);
+    // Reopening during the slide reuses the mounted panel and its heading.
+    if (present && wasPresent.current === false)
+      wrapper
+        ?.querySelector<HTMLElement>(".gameToolTitle")
+        ?.focus({ preventScroll: true });
+    wasPresent.current = present;
   }, [present]);
   return (
     <CSSTransition

@@ -12,10 +12,7 @@ import {
   landTransferredCustomers,
 } from "../../helpers/Territories";
 import { utilityOffer } from "../../helpers/Expansion";
-import { MINUTES_PER_MONTH } from "../../helpers/DateTime";
-import ConstructionProgressBar, {
-  constructionStatus,
-} from "../base/ConstructionProgress";
+import TileConnectionBuildStatus from "../base/TileConnectionBuildStatus";
 import { currentTick } from "../../helpers/GameSelectors";
 import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import {
@@ -48,7 +45,6 @@ import { windOutputByTerrain } from "../../helpers/ExpectedOutput";
 import {
   formatConnectionDuration,
   tileConnectionStatus,
-  tileConnectionProgress,
 } from "../../helpers/TerritoryConnections";
 import { terrainModifiers } from "../../helpers/TerrainModifiers";
 import { customerMarketSizeAt } from "../../helpers/Customers";
@@ -277,17 +273,6 @@ function TileNetwork(props: Props) {
     tileHasConstructionTechnology(tile)
       ? view.connection
       : undefined;
-  const connectionProgress = buildConnection
-    ? tileConnectionProgress(buildConnection, game.date.minute)
-    : 0;
-  const connectionConstruction = buildConnection
-    ? constructionStatus(
-        connectionProgress,
-        (buildConnection.connectionMinute - game.date.minute) /
-          MINUTES_PER_MONTH /
-          12,
-      )
-    : undefined;
   const showSiteCatalogue = building && !desktopRail && siteCatalogue;
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
   const closeSiteCatalogue = React.useCallback(
@@ -712,28 +697,13 @@ function TileNetwork(props: Props) {
             </>
           ) : (
             <>
-              {buildConnection && connectionConstruction ? (
+              {buildConnection ? (
                 <div className="tilePurchaseSummary">
-                  <div className="tileConnectionBuild">
-                    <Button variant="contained" disabled>
-                      Build here
-                    </Button>
-                    <Typography component="p" variant="body2">
-                      {game.date.minute >= buildConnection.towerMinute
-                        ? "Waiting for upstream connection"
-                        : "Constructing transmission lines"}
-                      {" · "}
-                      {connectionConstruction.detail}
-                      <span className="srOnly">
-                        {" · "}
-                        {Math.floor(connectionProgress * 100)}% complete
-                      </span>
-                    </Typography>
-                    <ConstructionProgressBar
-                      builtFraction={connectionProgress}
-                      paused={game.speed === "PAUSED"}
-                    />
-                  </div>
+                  <TileConnectionBuildStatus
+                    connection={buildConnection}
+                    minute={game.date.minute}
+                    paused={game.speed === "PAUSED"}
+                  />
                 </div>
               ) : (
                 view.connection && (

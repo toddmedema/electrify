@@ -141,6 +141,7 @@ test("mobile map tools leave even gutters around the live terrain", async ({
   page,
 }, info) => {
   test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const { canvas } = await startPausedMap(page);
   const dock = page.locator("#navfooter");
   const stage = page.locator(".gameStage");
@@ -232,9 +233,34 @@ test("mobile map tools slide in and out and share the Build header", async ({
   expect(await positions()).toBe('["up","down"]');
 
   const build = await openMapProjectCatalogue(page);
+  await expect(
+    build.getByRole("tab", { name: "Generators", exact: true }),
+  ).toBeVisible();
   expect(await headerStyle(build.locator(":scope > header"))).toEqual(
     expectedHeader,
   );
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const buildTrigger = dock.getByRole("button", { name: "Build", exact: true });
+  // Reopen on the first frame of the exit so the same panel is still mounted.
+  await buildTrigger.evaluate(async (button) => {
+    const project = document.getElementById("tool-BUILD_GENERATORS")!;
+    await new Promise<void>((resolve) => {
+      const wrapper = project.parentElement!;
+      wrapper.addEventListener(
+        "transitionstart",
+        () => {
+          button.click();
+          resolve();
+        },
+        { once: true },
+      );
+      button.click();
+    });
+  });
+  await expect(
+    build.getByRole("heading", { name: "Build", exact: true }),
+  ).toBeFocused();
 });
 
 for (const theme of ["light", "dark"] as const) {

@@ -716,7 +716,7 @@ it.each([undefined, 1280])(
       );
     });
     expect(
-      await within(surface()).findByText(/Connection under construction/),
+      await within(surface()).findByText(/Constructing transmission lines/),
     ).toBeVisible();
     expect(
       within(surface()).queryByRole("button", { name: "Cash" }),
@@ -1004,7 +1004,7 @@ it("retains the inspected site while a desktop connection is being built", async
   await openProjectPlanner(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(surface()).toHaveTextContent(/Constructing transmission lines/);
   expect(
     within(surface()).queryByRole("button", { name: "Cash" }),
   ).not.toBeInTheDocument();

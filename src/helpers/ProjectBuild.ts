@@ -125,7 +125,11 @@ export function projectSiteQuote(
       reason: "No sites available",
     };
   const pending = pendingTileConnections(game).get(tileId);
-  if (pending) return { reason: tileConnectionStatus(pending, game) };
+  if (pending)
+    return {
+      pendingConnection: pending,
+      reason: tileConnectionStatus(pending, game),
+    };
   const owned = ownsTerritoryTile(game, tile);
   const connection = owned ? undefined : connections.get(tileId);
   if (!owned && !connection)

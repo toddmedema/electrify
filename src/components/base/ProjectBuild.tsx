@@ -28,6 +28,7 @@ import { useMoney } from "./CurrencyContext";
 import { useTerritoryTilePurchases } from "./TerritoryTilePurchases";
 import ConceptIcon from "./ConceptIcon";
 import { MapProjectPanel } from "./MapPanelWindow";
+import TileConnectionBuildStatus from "./TileConnectionBuildStatus";
 import BuildFacilities from "../views/BuildFacilities";
 import "./ProjectBuild.scss";
 
@@ -220,8 +221,16 @@ export default function ProjectBuild({
                 with Connect.
               </Alert>
             )}
-            {candidate && !ready && (
-              <Alert severity="info">{quote?.reason}</Alert>
+            {quote?.pendingConnection ? (
+              <TileConnectionBuildStatus
+                connection={quote.pendingConnection}
+                announce
+                minute={game.date.minute}
+                paused={game.speed === "PAUSED"}
+              />
+            ) : (
+              candidate &&
+              !ready && <Alert severity="info">{quote?.reason}</Alert>
             )}
             {ready && connection && (
               <dl className="projectFacts">
