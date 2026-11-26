@@ -21,9 +21,7 @@ for (const theme of ["light", "dark"]) {
       .getByRole("group", { name: "game speed" })
       .getByRole("button", { name: "pause", exact: true })
       .click();
-    await expect(
-      page.getByText("Starting your mission…", { exact: true }),
-    ).toBeHidden();
+    await expect(page.getByText("Loading", { exact: true })).toBeHidden();
 
     const rows = pane.locator(".facilityRow");
     const row = rows.first();

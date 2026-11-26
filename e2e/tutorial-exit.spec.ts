@@ -7,7 +7,7 @@ async function reachStartTimeStep(page: Page) {
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Tap 1× to start time")).toBeVisible();
+  await expect(page.getByText("Select slow speed to start time")).toBeVisible();
 }
 
 // Regression test. Entering Mission 1's capstone rebuilt the scenario, which reloaded the game

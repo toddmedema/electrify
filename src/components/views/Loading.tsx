@@ -88,7 +88,7 @@ export default class Loading extends React.PureComponent<Props, LoadingState> {
             {/* One message for the whole load: a fast local load otherwise flashes past each
                 stage and reads as several loading screens. */}
             <Typography className="missionLoadingStatus" role="status">
-              Starting your mission…
+              Loading
             </Typography>
           </>
         )}

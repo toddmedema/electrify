@@ -318,17 +318,15 @@ describe("GameAppBar", () => {
 
   it("labels the frame-aligned speeds and offers ULTRA only on desktop-sized screens", () => {
     const { unmount } = renderAppBar();
-    expect(
-      screen.getByRole("button", { name: "fast speed" }),
-    ).toHaveTextContent("12×");
+    const fast = screen.getByRole("button", { name: "fast speed" });
+    expect(fast).toHaveAttribute("title", "fast speed (12×)");
     expect(screen.queryByRole("button", { name: "ultra speed" })).toBeNull();
     unmount();
 
     mockDesktop = true;
     renderAppBar();
-    expect(
-      screen.getByRole("button", { name: "ultra speed" }),
-    ).toHaveTextContent("24×");
+    const ultra = screen.getByRole("button", { name: "ultra speed" });
+    expect(ultra).toHaveAttribute("title", "ultra speed (24×)");
   });
 
   it("drops ULTRA to FAST once the screen is no longer desktop-sized", () => {

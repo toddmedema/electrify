@@ -10,6 +10,17 @@
   color: var(--font-color-primary);
   outline-offset: -4px;
   pointer-events: none;
+
+  h3 {
+    width: fit-content;
+    margin: 4px auto;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-raised);
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+  }
 }
 .desktopBuildRail > .desktopBuildSizing {
   flex: 0 0 auto;
@@ -47,16 +58,6 @@
   pointer-events: auto;
   section + section {
     margin-top: 8px;
-  }
-  h3 {
-    width: fit-content;
-    margin: 4px auto;
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    background: var(--bg-raised);
-    text-align: center;
-    font-size: 11px;
-    font-weight: 600;
   }
 }
 .desktopBuildTechnology {

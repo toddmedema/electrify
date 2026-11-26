@@ -49,6 +49,42 @@ test("an independent local copy preserves compact save data and resumes paused",
   expect(restored.monthlyHistory).toEqual(exported.game.monthlyHistory);
 });
 
+test("a saved game visibly collapses after delete confirmation closes", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await startGame(page);
+  await openSavedGames(page);
+  const [original] = await readSaveRecords(page);
+  const copyId = await copySavedGame(page, original.metadata.id);
+  const row = page.locator(`[data-save-id="${copyId}"]`);
+  await row.getByRole("button", { name: /^Actions for/ }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Delete saved game?" });
+  await row.evaluate((element) => {
+    const collapse = element.closest(".MuiCollapse-root")!;
+    const expandedHeight = collapse.getBoundingClientRect().height;
+    const observe = () => {
+      if (!collapse.isConnected) return;
+      const height = collapse.getBoundingClientRect().height;
+      if (height > 0 && height < expandedHeight) {
+        document.body.dataset.saveCollapse = document.querySelector(
+          "#delete-save-title",
+        )
+          ? "obscured"
+          : "visible";
+      } else requestAnimationFrame(observe);
+    };
+    requestAnimationFrame(observe);
+  });
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(row).toHaveCount(0);
+  // A real intermediate height must be visible after the modal exits.
+  expect(await page.locator("body").getAttribute("data-save-collapse")).toBe(
+    "visible",
+  );
+});
+
 for (const theme of ["light", "dark"]) {
   test(`save management preserves independent copies and fits in ${theme}`, async ({
     page,

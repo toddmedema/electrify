@@ -2333,9 +2333,14 @@ $pane_header_height: 48px;
 }
 
 .generatorComparisonChoices {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  container-type: inline-size;
+}
+
+.generatorComparisonChoice {
+  box-sizing: border-box;
+  width: calc((100cqw - 24px) / 3);
+  margin-inline-end: 8px;
 }
 
 .generatorComparisonRemove.MuiIconButton-root {
@@ -2352,7 +2357,7 @@ $pane_header_height: 48px;
     overflow-x: auto;
   }
   .generatorComparisonChoice {
-    flex: 0 0 200px;
+    width: 200px;
   }
   .generatorComparisonChoice .MuiTypography-caption:last-child {
     display: none;
@@ -3555,6 +3560,8 @@ $pane_header_height: 48px;
     }
 
     .MuiAccordionSummary-root {
+      // Match the collapsed row in both states so opening an entry moves only its content.
+      min-height: 3rem;
       padding: 0 $space-4;
 
       // While a long entry scrolls, its title pins below the group header (32px =
@@ -3580,14 +3587,12 @@ $pane_header_height: 48px;
       }
     }
 
-    // A divider under the title while expanded: it gives the pinned bar a bottom edge, and
-    // collapsed entries keep their single card border instead of doubling it
-    &.Mui-expanded .MuiAccordionSummary-root {
-      border-bottom: 1px solid var(--border-subtle);
+    .MuiAccordionSummary-content {
+      margin-block: 0.75rem;
     }
 
     .MuiAccordionDetails-root {
-      padding: 0 $space-4 $space-4;
+      padding: $space-4;
     }
 
     // A citation list, not prose: each line is one assumption and the link that backs it
@@ -5751,11 +5756,6 @@ $homeSmokeCycle: 5.6s;
     font-variant-numeric: tabular-nums;
   }
 }
-// The first paragraph's margin used to be the gap under an open entry's title divider, so
-// entries that open on a table or legend started flush against it. The gap lives here now.
-#manual .manual-entry .MuiAccordionDetails-root {
-  padding-top: $space-4;
-}
 @media (pointer: coarse) {
   .manual-link-text {
     min-height: 44px;
@@ -6278,7 +6278,7 @@ $homeSmokeCycle: 5.6s;
 .screenCatalog > .cardList,
 .screenCatalog > .constructionHeader,
 .screenCatalog > .MuiToolbar-root,
-.screenCatalog > .generatorComparison {
+.screenCatalog > .generatorComparisonSlot {
   width: 100%;
   max-width: 1040px;
   margin-left: auto;
@@ -8297,22 +8297,23 @@ img[src$="/transmission.svg"] {
     flex: 1 1 auto;
     display: flex;
     flex-wrap: wrap;
-    gap: $space-1 $space-2;
+    row-gap: $space-1;
     margin: 0;
     padding: 0;
     list-style: none;
 
-    li {
+    .coopBrowsePlayer {
       display: inline-flex;
       align-items: center;
       gap: $space-1;
       padding: $space-1 $space-2;
+      margin-inline-end: $space-2;
       border: 1px solid var(--border-tile);
       border-radius: var(--radius-sm);
       font-size: var(--font-size-caption);
     }
 
-    li:has(.coopBrowseKickTarget) {
+    .coopBrowsePlayer:has(.coopBrowseKickTarget) {
       padding: 0;
     }
   }

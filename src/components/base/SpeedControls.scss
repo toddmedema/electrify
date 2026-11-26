@@ -179,8 +179,9 @@
     .speedToggles.MuiToggleButtonGroup-root {
       &::before,
       > .MuiToggleButtonGroup-grouped.MuiToggleButton-root,
-      > .MuiToggleButton-root
-        :is(.speedLabel, .multiplayerSpeedLabel, .MuiSvgIcon-root) {
+      // The root and its painted paths must take the label ink on the same frame.
+      > .MuiToggleButton-root :is(.speedLabel, .multiplayerSpeedLabel),
+      > .MuiToggleButton-root :is(.speedLabel, .multiplayerSpeedLabel) :is(svg, path) {
         transition: none;
       }
     }

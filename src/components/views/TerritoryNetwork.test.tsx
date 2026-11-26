@@ -24,9 +24,13 @@ import {
   territoryTilePowerLimit,
 } from "../../helpers/TerritoryTiles";
 import {
+  territoryMapTileKey as mockTerritoryMapTileKey,
   territoryTileViews,
+  type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
+import * as territoryMapState from "../../helpers/TerritoryMapState";
+import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   formatCount,
@@ -86,10 +90,12 @@ jest.mock("./TerritoryHexMap", () => ({
   __esModule: true,
   default: (props: {
     views: readonly TerritoryTileView[];
-    selected?: TerritoryTileId;
-    onSelect: (id: TerritoryTileId, activate?: boolean) => void;
+    selected?: TerritoryMapTileKey;
+    onSelect: (key: TerritoryMapTileKey, activate?: boolean) => void;
+    projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
+    onProjectDrop?: (key: TerritoryMapTileKey) => void;
     onTileMenu: (anchor: {
-      key: TerritoryTileId;
+      key: TerritoryMapTileKey;
       top: number;
       left: number;
     }) => void;
@@ -99,24 +105,33 @@ jest.mock("./TerritoryHexMap", () => ({
       {props.views
         .filter(
           ({ tile, owned, connectable }) =>
-            owned || tile.city || connectable || tile.id === props.selected,
+            owned ||
+            tile.city ||
+            connectable ||
+            mockTerritoryMapTileKey(tile) === props.selected,
         )
-        .map(({ tile }) => (
-          <button
-            className="territoryTileTarget"
-            tabIndex={props.selected === tile.id ? 0 : -1}
-            key={tile.id}
-            aria-pressed={props.selected === tile.id}
-            aria-label={`Inspect ${tile.id}`}
-            onFocus={() => props.onSelect(tile.id)}
-            onClick={() => props.onSelect(tile.id, true)}
-            onContextMenu={() =>
-              props.onTileMenu({ key: tile.id, top: 100, left: 100 })
-            }
-          >
-            {tile.terrain}
-          </button>
-        ))}
+        .map(({ tile }) => {
+          const key = mockTerritoryMapTileKey(tile);
+          return (
+            <button
+              className="territoryTileTarget"
+              tabIndex={props.selected === key ? 0 : -1}
+              key={key}
+              aria-pressed={props.selected === key}
+              aria-label={`Inspect ${key}`}
+              onFocus={() => props.onSelect(key)}
+              onClick={() => props.onSelect(key, true)}
+              onDrop={() => {
+                if (props.projectSites?.has(key)) props.onProjectDrop?.(key);
+              }}
+              onContextMenu={() =>
+                props.onTileMenu({ key, top: 100, left: 100 })
+              }
+            >
+              {tile.terrain}
+            </button>
+          );
+        })}
     </div>
   ),
 }));
@@ -760,6 +775,62 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
   await openProjectPlanner(wind);
   expect(wind).toHaveAttribute("aria-pressed", "true");
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
+  expect(currentTick(store.getState().game)!.cash).toBe(1e9);
+});
+
+it("only reviews a dragged project at the position resolved by its quote", async () => {
+  const game = ready();
+  const local = {
+    id: "champlain:legacy-100",
+    territoryId: "champlain",
+    q: 20,
+    r: -20,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 40e6,
+  } as const;
+  const peer = { ...local, q: 21 };
+  game.territoryNetwork!.legacyTiles!.push(local);
+  game.multiplayer = {
+    seat: "host",
+    legacyTiles: [{ tile: peer, seat: "guest", name: "Neighbor" }],
+  };
+  // The fixed board currently disallows connecting retained aliases. Exercise
+  // the drop boundary with stale eligibility and the real company-local quote.
+  const views = territoryTileViews(game).map((view) =>
+    view.tile === peer ? { ...view, connectable: true } : view,
+  );
+  const stub = jest
+    .spyOn(territoryMapState, "territoryTileViews")
+    .mockReturnValueOnce(views);
+  const { store } = show(game, 1280);
+  stub.mockRestore();
+  const wind = screen.getByRole("button", { name: "Choose sites for Wind" });
+  const peerSite = screen.getByRole("button", {
+    name: "Inspect retained:21:-20",
+  });
+  const localSite = screen.getByRole("button", {
+    name: "Inspect retained:20:-20",
+  });
+  const dataTransfer = { setData: jest.fn() };
+  expect(wind).toHaveAttribute("draggable", "true");
+
+  fireEvent.dragStart(wind, { dataTransfer });
+  fireEvent.drop(peerSite);
+  await act(async () => Promise.resolve());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(localSite).toHaveAttribute("aria-pressed", "false");
+  fireEvent.dragEnd(wind);
+
+  fireEvent.dragStart(wind, { dataTransfer });
+  fireEvent.drop(localSite);
+  await act(async () => Promise.resolve());
+  expect(localSite).toHaveAttribute("aria-pressed", "true");
+  expect(within(surface()).getByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(store.getState().game.facilities).toEqual(game.facilities);
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toEqual(
+    game.territoryNetwork!.tilePurchases,
+  );
   expect(currentTick(store.getState().game)!.cash).toBe(1e9);
 });
 

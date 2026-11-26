@@ -433,6 +433,60 @@ test("V2 joins immediately by invite and lets the host remove a guest", async ({
   expect(campaign.errors).toEqual([]);
 });
 
+test("focus skips a guest who is still exiting after a quick second kick", async ({
+  browser,
+}) => {
+  const campaign = new V2Campaign(browser);
+  const host = await campaign.addPlayer();
+  await host.emulateMedia({ reducedMotion: "no-preference" });
+  const invite = await campaign.create(host);
+  for (const name of ["WindyWren", "HydroHal"]) {
+    const guest = await campaign.addPlayer();
+    await campaign.requestJoin(guest, invite);
+    await campaign.waitForGuest(host, guest);
+    await expect(
+      host.getByRole("button", { name: `Kick ${name}`, exact: true }),
+    ).toBeVisible();
+  }
+  const first = host.getByRole("button", {
+    name: "Kick WindyWren",
+    exact: true,
+  });
+  const second = host.getByRole("button", {
+    name: "Kick HydroHal",
+    exact: true,
+  });
+  const copyCode = host.getByRole("button", { name: "Copy code", exact: true });
+  const handoff = await first.evaluateHandle((button) => {
+    const row = button.closest("li")!;
+    const roster = row.parentElement!;
+    const next = [...roster.querySelectorAll("button")].find(
+      (candidate) => candidate !== button,
+    )!;
+    const state = { reachedNext: false, firstStillExiting: false };
+    const observer = new MutationObserver(() => {
+      if (!row.inert) return;
+      state.reachedNext = document.activeElement === next;
+      state.firstStillExiting = row.isConnected;
+      // Activate the focused control inside the real exit window, even under
+      // a busy renderer. HTMLElement.click uses the keyboard click path.
+      next.click();
+      observer.disconnect();
+    });
+    observer.observe(row, { attributeFilter: ["inert"] });
+    return state;
+  });
+  await first.press("Enter");
+  await expect(second).toHaveCount(0);
+  await expect(copyCode).toBeFocused();
+  expect(await handoff.jsonValue()).toEqual({
+    reachedNext: true,
+    firstStillExiting: true,
+  });
+  await handoff.dispose();
+  expect(campaign.errors).toEqual([]);
+});
+
 for (const count of [2, 4]) {
   test(
     `V2 ${count} players share time and interties while building on their own grids`,

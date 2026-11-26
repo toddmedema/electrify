@@ -1,5 +1,7 @@
 import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "./RemovalCollapse";
 import { Button, Typography } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -51,9 +53,11 @@ function PlayerState({
 function RosterPlayer({
   player,
   canKick,
+  onKick,
 }: {
   player: CoopSelectionType["players"][number];
   canKick: boolean;
+  onKick: (id: string, trigger: HTMLButtonElement) => void;
 }): React.JSX.Element {
   const [armed, setArmed] = React.useState(false);
   // Set only by a hover or a previous tap. Focus and the tap's own mouseenter
@@ -80,13 +84,13 @@ function RosterPlayer({
   );
   if (!canKick)
     return (
-      <li>
+      <div className="coopBrowsePlayer">
         {identity}
         <PlayerState player={player} />
-      </li>
+      </div>
     );
   return (
-    <li>
+    <div className="coopBrowsePlayer">
       <button
         type="button"
         className="coopBrowseKickTarget"
@@ -123,7 +127,7 @@ function RosterPlayer({
             confirmGesture.current ||
             (prompted.current && !wasTouch)
           ) {
-            coopControls()?.kick?.(player.id);
+            onKick(player.id, event.currentTarget);
             return;
           }
           reveal();
@@ -136,7 +140,7 @@ function RosterPlayer({
           <PlayerState player={player} />
         )}
       </button>
-    </li>
+    </div>
   );
 }
 
@@ -153,6 +157,7 @@ export default function CoopBrowseBar({
   /** Show the host's multiplayer saves as an alternative to choosing a new game. */
   offerSaves?: boolean;
 }): React.JSX.Element | null {
+  const kicked = React.useRef<string>();
   if (!coop) return null;
   const guests = coop.players.filter((player) => !player.host);
   const ready = guests.filter((player) => player.ready).length;
@@ -199,20 +204,54 @@ export default function CoopBrowseBar({
               </span>
             )}
           </div>
-          <ul className="coopBrowseRoster" aria-label="Players">
+          <TransitionGroup
+            component="ul"
+            className="coopBrowseRoster"
+            aria-label="Players"
+            childFactory={(
+              child: React.ReactElement<
+                React.ComponentProps<typeof RemovalCollapse>
+              >,
+            ) =>
+              React.cloneElement(child, {
+                animate: child.props.id === kicked.current,
+              })
+            }
+          >
             {coop.players.map((player) => (
-              <RosterPlayer
+              <RemovalCollapse
+                orientation="horizontal"
+                component="li"
                 key={player.id}
-                player={player}
-                canKick={
-                  host &&
-                  !coop.starting &&
-                  !player.host &&
-                  !!coopControls()?.kick
-                }
-              />
+                id={player.id}
+              >
+                <RosterPlayer
+                  player={player}
+                  canKick={
+                    host &&
+                    !coop.starting &&
+                    !player.host &&
+                    !!coopControls()?.kick
+                  }
+                  onKick={(id, trigger) => {
+                    kicked.current = id;
+                    const actions = trigger
+                      .closest(".coopBarColumn")
+                      ?.querySelectorAll<HTMLButtonElement>(
+                        ".coopBrowseKickTarget, .coopBrowseActions button",
+                      );
+                    Array.from(actions ?? [])
+                      .find(
+                        (button) =>
+                          button !== trigger && !button.closest("[inert]"),
+                      )
+                      ?.focus();
+                    coopControls()?.kick?.(id);
+                  }}
+                />
+              </RemovalCollapse>
             ))}
-          </ul>
+          </TransitionGroup>
           {!coop.starting && host && coop.inviteCode && (
             <div className="coopBrowseActions">
               <CoopInviteCode

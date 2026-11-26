@@ -34,31 +34,44 @@ async function expectContinuousBorder(button: Locator) {
   ).toEqual([true, true]);
 }
 
+// Pause uses a filled path. The speed chevrons are drawn with a stroke and no fill.
+async function speedGlyphPaint(button: Locator): Promise<"fill" | "stroke"> {
+  return (await button.getAttribute("aria-label")) === "pause"
+    ? "fill"
+    : "stroke";
+}
+
 /** The speed control marks its selection with a thumb under the pressed segment, not a border. */
 async function expectThumbUnder(button: Locator, blue: string) {
   await expect(button).toHaveAttribute("aria-pressed", "true");
   await button.scrollIntoViewIfNeeded();
   // The thumb glides and the label's colour eases in behind it, so read until both settle.
   await expect(async () => {
-    const thumb = await button.evaluate((element) => {
-      const group = element.closest(".speedToggles")!;
-      const style = getComputedStyle(group, "::before");
-      const box = element.getBoundingClientRect();
-      const centre =
-        group.getBoundingClientRect().left +
-        parseFloat(style.left) +
-        new DOMMatrix(style.transform).m41 +
-        parseFloat(style.width) / 2;
-      return {
-        background: style.backgroundColor,
-        label: getComputedStyle(element.querySelector("svg") ?? element).color,
-        offCentre: Math.abs(centre - (box.left + box.width / 2)),
-        // The thumb sits beneath the segment, so the label is what a tap lands on.
-        labelOnTop: element.contains(
-          document.elementFromPoint(box.left + box.width / 2, box.top + 8),
-        ),
-      };
-    });
+    const thumb = await button.evaluate(
+      (element, property) => {
+        const group = element.closest(".speedToggles")!;
+        const style = getComputedStyle(group, "::before");
+        const box = element.getBoundingClientRect();
+        const centre =
+          group.getBoundingClientRect().left +
+          parseFloat(style.left) +
+          new DOMMatrix(style.transform).m41 +
+          parseFloat(style.width) / 2;
+        const glyph = element.querySelector(".speedLabel svg path");
+        return {
+          background: style.backgroundColor,
+          label: glyph
+            ? getComputedStyle(glyph)[property]
+            : getComputedStyle(element).color,
+          offCentre: Math.abs(centre - (box.left + box.width / 2)),
+          // The thumb sits beneath the segment, so the label is what a tap lands on.
+          labelOnTop: element.contains(
+            document.elementFromPoint(box.left + box.width / 2, box.top + 8),
+          ),
+        };
+      },
+      await speedGlyphPaint(button),
+    );
     expect(thumb.background, "the thumb uses the logo blue").toBe(blue);
     expect(
       thumb.offCentre,
@@ -78,22 +91,25 @@ async function expectHeldSpeedContrast(button: Locator) {
   await button.hover();
   await page.mouse.down();
   try {
-    const paint = await button.evaluate((element) => {
-      const group = element.parentElement!;
-      const glyph = element.querySelector("svg");
-      const style = getComputedStyle(element);
-      return {
-        active: element.matches(":active"),
-        ink: glyph ? getComputedStyle(glyph).fill : style.color,
-        floor: glyph ? 3 : 4.5,
-        surface: style.backgroundColor,
-        underlay: getComputedStyle(
-          group,
-          element.getAttribute("data-thumb") === "true" ? "::before" : null,
-        ).backgroundColor,
-        opacity: Number(style.opacity),
-      };
-    });
+    const paint = await button.evaluate(
+      (element, property) => {
+        const group = element.parentElement!;
+        const glyph = element.querySelector(".speedLabel svg path");
+        const style = getComputedStyle(element);
+        return {
+          active: element.matches(":active"),
+          ink: glyph ? getComputedStyle(glyph)[property] : style.color,
+          floor: glyph ? 3 : 4.5,
+          surface: style.backgroundColor,
+          underlay: getComputedStyle(
+            group,
+            element.getAttribute("data-thumb") === "true" ? "::before" : null,
+          ).backgroundColor,
+          opacity: Number(style.opacity),
+        };
+      },
+      await speedGlyphPaint(button),
+    );
     expect(paint.active).toBe(true);
     expect
       .soft(
@@ -302,31 +318,34 @@ async function clickAndCheckFirstSpeedFrame(
 ) {
   // Arm the observer before the real click. A Playwright round trip after the
   // click can miss the first frame and read the settled foreground instead.
-  const capture = await button.evaluateHandle((element) => {
-    const label = element.querySelector(".speedLabel")!;
-    const glyph = label.querySelector("svg");
-    const sample = () => ({
-      button: getComputedStyle(element).color,
-      label: getComputedStyle(label).color,
-      fill: glyph ? getComputedStyle(glyph).fill : null,
-      thumb: getComputedStyle(element.parentElement!, "::before")
-        .backgroundColor,
-      track: getComputedStyle(element.parentElement!).backgroundColor,
-    });
-    const frames = new Promise<ReturnType<typeof sample>[]>((resolve) => {
-      const observer = new MutationObserver(() => {
-        if (element.getAttribute("data-thumb") !== "true") return;
-        observer.disconnect();
-        const selected = sample();
-        requestAnimationFrame(() => resolve([selected, sample()]));
+  const capture = await button.evaluateHandle(
+    (element, property) => {
+      const label = element.querySelector(".speedLabel")!;
+      const glyph = label.querySelector("svg path");
+      const sample = () => ({
+        button: getComputedStyle(element).color,
+        label: getComputedStyle(label).color,
+        glyphInk: glyph ? getComputedStyle(glyph)[property] : null,
+        thumb: getComputedStyle(element.parentElement!, "::before")
+          .backgroundColor,
+        track: getComputedStyle(element.parentElement!).backgroundColor,
       });
-      observer.observe(element, {
-        attributes: true,
-        attributeFilter: ["data-thumb"],
+      const frames = new Promise<ReturnType<typeof sample>[]>((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (element.getAttribute("data-thumb") !== "true") return;
+          observer.disconnect();
+          const selected = sample();
+          requestAnimationFrame(() => resolve([selected, sample()]));
+        });
+        observer.observe(element, {
+          attributes: true,
+          attributeFilter: ["data-thumb"],
+        });
       });
-    });
-    return { frames };
-  });
+      return { frames };
+    },
+    await speedGlyphPaint(button),
+  );
   try {
     await button.click();
     const frames = await capture.evaluate(({ frames }) => frames);
@@ -335,14 +354,18 @@ async function clickAndCheckFirstSpeedFrame(
       expect.soft(paint.thumb, phase).toBe(palette.highlight);
       expect.soft(paint.button, phase).toBe(palette.highlightText);
       expect.soft(paint.label, phase).toBe(palette.highlightText);
-      if (paint.fill !== null)
-        expect.soft(paint.fill, phase).toBe(palette.highlightText);
+      if (paint.glyphInk !== null)
+        expect.soft(paint.glyphInk, phase).toBe(palette.highlightText);
       expect
         .soft(
-          contrastRatio(paint.fill ?? paint.label, paint.thumb, paint.track),
+          contrastRatio(
+            paint.glyphInk ?? paint.label,
+            paint.thumb,
+            paint.track,
+          ),
           phase,
         )
-        .toBeGreaterThanOrEqual(paint.fill === null ? 4.5 : 3);
+        .toBeGreaterThanOrEqual(paint.glyphInk === null ? 4.5 : 3);
     }
   } finally {
     await capture.dispose();
@@ -354,19 +377,22 @@ async function expectSpeedPaint(
   palette: Awaited<ReturnType<typeof systemPalette>>,
   state: "selected" | "rest" | "hover" | "focus",
 ) {
-  const paint = await button.evaluate((element) => {
-    const group = element.parentElement!;
-    const glyph = element.querySelector("svg");
-    const style = getComputedStyle(element);
-    return {
-      ink: glyph ? getComputedStyle(glyph).fill : style.color,
-      floor: glyph ? 3 : 4.5,
-      segment: style.backgroundColor,
-      track: getComputedStyle(group).backgroundColor,
-      thumb: getComputedStyle(group, "::before").backgroundColor,
-      outline: style.outlineColor,
-    };
-  });
+  const paint = await button.evaluate(
+    (element, property) => {
+      const group = element.parentElement!;
+      const glyph = element.querySelector(".speedLabel svg path");
+      const style = getComputedStyle(element);
+      return {
+        ink: glyph ? getComputedStyle(glyph)[property] : style.color,
+        floor: glyph ? 3 : 4.5,
+        segment: style.backgroundColor,
+        track: getComputedStyle(group).backgroundColor,
+        thumb: getComputedStyle(group, "::before").backgroundColor,
+        outline: style.outlineColor,
+      };
+    },
+    await speedGlyphPaint(button),
+  );
   const selected = state === "selected";
   const background = selected ? paint.thumb : paint.segment;
   expect

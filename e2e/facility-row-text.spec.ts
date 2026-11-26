@@ -95,9 +95,7 @@ for (const theme of ["light", "dark"]) {
       pane,
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-    await expect(
-      page.getByText("Starting your mission…", { exact: true }),
-    ).toBeHidden();
+    await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     const hydro = pane.locator('.facilityRow[data-fuel="Hydro"]');
     const subtitle = hydro.locator(".MuiListItemText-secondary");
     await expect(subtitle).not.toContainText("running");

@@ -25,9 +25,7 @@ test("capture marketing scene", async ({ page }, info) => {
   }, scene);
   await page.goto(`/?scenario=${scene.scenario}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect(
-    page.getByText("Starting your mission…", { exact: true }),
-  ).toBeHidden();
+  await expect(page.getByText("Loading", { exact: true })).toBeHidden();
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
