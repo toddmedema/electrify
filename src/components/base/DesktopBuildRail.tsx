@@ -517,10 +517,7 @@ export default function DesktopBuildRail({
             }
           >
             {storage && (
-              <>
-                <hr />
-                <div className="desktopBuildSizing">{sizeControl(true)}</div>
-              </>
+              <div className="desktopBuildSizing">{sizeControl(true)}</div>
             )}
             <h3>{storage ? "Storage" : "Generators"}</h3>
             {options

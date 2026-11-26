@@ -126,7 +126,7 @@ it("shows concise term results and requires an explicit handover", async () => {
     within(screen.getByRole("list", { name: "Next term goals" })).getAllByRole(
       "listitem",
     ),
-  ).toHaveLength(2);
+  ).toHaveLength(1);
   expect(
     screen.getByRole("list", { name: "Next term goals" }),
   ).not.toHaveTextContent("Retain");

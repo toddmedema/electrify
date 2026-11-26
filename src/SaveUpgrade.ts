@@ -1,7 +1,10 @@
 import {
+  migrateSingleOfficialGoal,
   migrateValleyObjectiveProgress,
   type ValleyObjectiveRules,
 } from "./helpers/ObjectiveRules";
+import { isLegacyCampaignScenario } from "./data/LegacyCampaign";
+import { EXPANSION_SCENARIO_ID } from "./data/UtilityExpansion";
 import {
   legacyTerritoryTiles,
   assignTerritoryTiles,
@@ -444,6 +447,30 @@ const migrations: readonly Migration[] = [
         utilityExpansion: { ...game.utilityExpansion, sellerFleet: "authored" },
       },
     };
+  },
+  // 27 -> 28: keep verified evidence for the remaining goal in continuing official runs.
+  (save) => {
+    if (!object(save.game)) return null;
+    const game = save.game;
+    if (
+      typeof game.scenarioId !== "number" ||
+      (game.scenarioId !== EXPANSION_SCENARIO_ID &&
+        !isLegacyCampaignScenario(game.scenarioId)) ||
+      game.objectiveProgress === undefined
+    )
+      return save;
+    if (!object(game.objectiveProgress) || !Array.isArray(game.monthlyHistory))
+      return null;
+    try {
+      const objectiveProgress = migrateSingleOfficialGoal(
+        game as unknown as GameType,
+      );
+      return objectiveProgress
+        ? { ...save, game: { ...game, objectiveProgress } }
+        : null;
+    } catch {
+      return null;
+    }
   },
 ];
 

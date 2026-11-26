@@ -12,6 +12,11 @@ export const UTILITY_EXPANSION_OBJECTIVES: CompiledRuleObjective[] = [
     deadlineMonth: 119,
     required: true,
   },
+];
+
+// Rules published before Valley adopted a single objective.
+export const VALLEY_TWO_GOAL_OBJECTIVES: CompiledRuleObjective[] = [
+  ...UTILITY_EXPANSION_OBJECTIVES,
   {
     id: "retain-customers",
     label: "Retain 90% of your expanded customer base",

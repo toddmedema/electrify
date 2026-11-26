@@ -88,6 +88,7 @@ it.each([
   (paused, years, kind, label) => {
     const { game, facility } = ready();
     facility.paused = paused;
+    facility.yearsToBuild = 1;
     facility.yearsToBuildLeft = years;
     const { target, badge } = show(game, facility.tileId!, {
       "network.showStatusLayer": true,
@@ -99,6 +100,16 @@ it.each([
     expect(
       decorativeChild(badge()!, ":scope > .facilityMapStatusArtwork"),
     ).toHaveAttribute("aria-hidden", "true");
+    const arc = decorativeChild(badge()!, 'circle[pathLength="1"]');
+    expect(arc?.getAttribute("stroke-dasharray")).toBe(
+      years ? "0.75 1" : undefined,
+    );
+    expect(arc?.getAttribute("transform")).toBe(
+      years ? "rotate(-90)" : undefined,
+    );
+    expect(target).toHaveAccessibleDescription(
+      expect.stringContaining(years ? `${label} · 75% complete` : label),
+    );
     fireEvent.click(target);
     expect(
       within(screen.getByRole("dialog")).getByText(new RegExp(`^${label} ·`)),

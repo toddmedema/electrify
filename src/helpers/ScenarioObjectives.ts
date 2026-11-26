@@ -206,6 +206,26 @@ export function createObjectiveProgress(
   return { ...plain, checksum: progressChecksum(plain) };
 }
 
+/** Rebind verified observations for a surviving objective to its revised scenario rules. */
+export function keepObjectiveEvidence(
+  progress: ObjectiveProgress,
+  objective: CompiledRuleObjective,
+  context: ObjectiveContext,
+): ObjectiveProgress | null {
+  const entry = progress.entries.find(({ id }) => id === objective.id);
+  if (!entry) return null;
+  const digest = entry.observations.reduce(
+    nextEvidenceDigest,
+    initialEvidenceDigest(objective, context, progress.retentionBaseline),
+  );
+  const plain = {
+    ...progress,
+    rulesDigest: context.rulesDigest,
+    entries: [{ ...entry, digest }],
+  };
+  return { ...plain, checksum: progressChecksum(plain) };
+}
+
 /** A finished deadline keeps the customers admitted before that deadline, even after a merger. */
 function retentionBaselineFor(
   objective: CompiledRuleObjective & { metric: "customerRetention" },

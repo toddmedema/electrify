@@ -314,7 +314,7 @@ it.each(SCENARIOS)("omits the supply plan from $name details", (scenario) => {
   }
 });
 
-it("shows the two Across the Valley goals in scenario details", () => {
+it("shows the acquisition deadline in scenario details", () => {
   const game = createGame({ scenarioId: 116 });
   renderDetails(game);
   const goals = screen.getByRole("region", { name: "Goals" });
@@ -322,13 +322,10 @@ it("shows the two Across the Valley goals in scenario details", () => {
     within(goals).getByText("Acquire 3 utilities", { exact: true }),
   ).toBeInTheDocument();
   expect(
-    within(goals).getByText("Retain customers", { exact: true }),
-  ).toBeInTheDocument();
-  expect(
     within(goals).getByText("Acquire 3 utilities · Dec 2014", {
       exact: true,
     }),
   ).toBeInTheDocument();
-  expect(goals).toHaveTextContent("Keep ≥90% of customer baseline by Dec 2024");
+  expect(goals).not.toHaveTextContent("customer baseline");
   expect(goals).not.toHaveTextContent(/retire|original oil/i);
 });
