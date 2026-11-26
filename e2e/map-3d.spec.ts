@@ -244,6 +244,8 @@ test("mobile map tools slide in and out and share the Build header", async ({
   const buildTrigger = dock.getByRole("button", { name: "Build", exact: true });
   // Reopen on the first frame of the exit so the same panel is still mounted.
   await buildTrigger.evaluate(async (button) => {
+    if (!(button instanceof HTMLButtonElement))
+      throw new Error("Expected the Build dock button");
     const project = document.getElementById("tool-BUILD_GENERATORS")!;
     await new Promise<void>((resolve) => {
       const wrapper = project.parentElement!;
