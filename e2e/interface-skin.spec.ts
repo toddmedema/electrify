@@ -157,6 +157,27 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
+test("clock speed buttons show one, two, three and four chevrons", async ({
+  page,
+}, info) => {
+  if (info.project.name === "desktop-chromium")
+    await page.setViewportSize({ width: 1360, height: 800 });
+  const hasUltraSpeed = page.viewportSize()!.width >= 1300;
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const speeds = page.getByRole("group", { name: "game speed", exact: true });
+  for (const [name, count] of [
+    ["slow speed", 1],
+    ["normal speed", 2],
+    ["fast speed", 3],
+    ["ultra speed", 4],
+  ] as const) {
+    const button = speeds.getByRole("button", { name, exact: true });
+    if (!hasUltraSpeed && count === 4) await expect(button).toHaveCount(0);
+    else await expect(button.locator("svg path")).toHaveCount(count);
+  }
+});
+
 test("Continue centers the loading plug and respects reduced motion", async ({
   page,
 }, info) => {
