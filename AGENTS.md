@@ -128,10 +128,10 @@ See [docs/run-compatibility.md](docs/run-compatibility.md) for why the hash is i
   the description; choose views that clearly show the change, including both desktop and mobile when
   responsive behavior is relevant.
 - Review screenshots before uploading: exclude sensitive or user-specific data, transient errors,
-  debug UI, and unrelated windows. Keep them in a temporary location and upload with `gh pr create
-  --attach`, `gh pr edit --attach`, or `gh pr comment --attach`; remove the files after a successful
-  upload. Non-UI changes do not need screenshots; if you cannot capture or upload, say so in the PR
-  description and tell the user.
+  debug UI, and unrelated windows. Keep them in a temporary location and use GitHub CLI 2.99 or
+  newer to upload them with `gh pr create --attach`, `gh pr edit --attach`, or
+  `gh pr comment --attach`. Remove the files after a successful upload. Non-UI changes do not need
+  screenshots. If you cannot capture or upload, say so in the PR description and tell the user.
 
 ## Repository map
 
