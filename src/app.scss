@@ -1130,7 +1130,7 @@ $topbar_height: 56px;
   max-height: 40%;
   overflow: auto;
   box-sizing: border-box;
-  background: var(--bg-raised);
+  background: var(--bg-primary);
   border-top: 1px solid var(--border-subtle);
   color: var(--font-color-primary);
   p {
@@ -1144,6 +1144,8 @@ $topbar_height: 56px;
   gap: 8px;
   .MuiButton-root {
     min-height: 44px;
+    font-size: 1.1875rem;
+    font-weight: 700;
   }
 }
 

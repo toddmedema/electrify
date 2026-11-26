@@ -28,11 +28,15 @@ export function contrastRatio(
   foreground: string,
   background: string,
   underlay?: string,
+  opacity = 1,
 ): number {
-  const surface = colorChannels(background);
+  const base = underlay ? colorChannels(underlay) : [255, 255, 255];
+  const surface = composite(colorChannels(background), base);
+  const ink = composite(colorChannels(foreground), surface);
+  // CSS opacity blends the whole segment, including its ink, onto the track or thumb.
   return rgbContrast(
-    colorChannels(foreground),
-    underlay ? composite(surface, colorChannels(underlay)) : surface,
+    composite([...ink, opacity], base),
+    composite([...surface, opacity], base),
   );
 }
 

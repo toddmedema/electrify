@@ -73,6 +73,41 @@ async function expectThumbUnder(button: Locator, blue: string) {
   }).toPass({ timeout: 10000 });
 }
 
+async function expectHeldSpeedContrast(button: Locator) {
+  const page = button.page();
+  await button.hover();
+  await page.mouse.down();
+  try {
+    const paint = await button.evaluate((element) => {
+      const group = element.parentElement!;
+      const glyph = element.querySelector("svg");
+      const style = getComputedStyle(element);
+      return {
+        active: element.matches(":active"),
+        ink: glyph ? getComputedStyle(glyph).fill : style.color,
+        floor: glyph ? 3 : 4.5,
+        surface: style.backgroundColor,
+        underlay: getComputedStyle(
+          group,
+          element.getAttribute("data-thumb") === "true" ? "::before" : null,
+        ).backgroundColor,
+        opacity: Number(style.opacity),
+      };
+    });
+    expect(paint.active).toBe(true);
+    expect
+      .soft(
+        contrastRatio(paint.ink, paint.surface, paint.underlay, paint.opacity),
+        `held ${await button.getAttribute("aria-label")}`,
+      )
+      .toBeGreaterThanOrEqual(paint.floor);
+  } finally {
+    // Release outside so sampling the held control doesn't change the game speed.
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+  }
+}
+
 async function expectGlyphContrast(
   button: Locator,
   supportsHover: boolean,
@@ -169,6 +204,10 @@ for (const theme of ["light", "dark"]) {
         });
         await expect(pause).toHaveAttribute("aria-pressed", "false");
         await expectGlyphContrast(pause, supportsHover, blue);
+        if (supportsHover) {
+          await expectHeldSpeedContrast(button);
+          await expectHeldSpeedContrast(pause);
+        }
       }
     }
     await page.mouse.move(0, 0);
@@ -341,6 +380,8 @@ for (const app of ["light", "dark"] as const) {
         await page.mouse.move(0, 0);
         await expectSpeedPaint(other, palette, "rest");
         if (palette.hover) {
+          await expectHeldSpeedContrast(selected);
+          await expectHeldSpeedContrast(other);
           await other.hover();
           await expectSpeedPaint(other, palette, "hover");
           await page.mouse.move(0, 0);

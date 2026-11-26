@@ -75,9 +75,10 @@
         background-color: transparent;
       }
 
-      // Pressed: the label dims a little, in place of Material's ripple.
-      &:active {
-        opacity: 0.72;
+      // Depress the label without dimming its ink or moving the hit target.
+      &:active :is(.speedLabel, .multiplayerSpeedLabel) {
+        display: inline-flex;
+        translate: 0 1px;
       }
 
       @media (hover: hover) and (pointer: fine) {
