@@ -63,6 +63,10 @@ for (const theme of ["light", "dark"] as const) {
   }, testInfo) => {
     const network = await start(page, theme);
     const before = (await readSavedGame(page))!;
+    await expect(network.locator(".territoryFacilityStatusLayer")).toHaveCount(
+      0,
+    );
+    await showMapFacilityStatus(network);
     await expect(
       network.getByRole("button", { name: "Build", exact: true }),
     ).toHaveCount(0);
@@ -171,6 +175,10 @@ for (const theme of ["light", "dark"] as const) {
     const connect = surface.getByRole("button", { name: /^Connect ·/ });
     await expect(connect).toBeEnabled();
     await expect(connect).toBeInViewport();
+    const badge = network.locator(
+      '[data-status-tile="green-uplands:site-1"][data-connection-status="construction"]',
+    );
+    await expect(badge).toHaveCount(0);
     await connect.click();
     await expect(
       surface
@@ -181,11 +189,6 @@ for (const theme of ["light", "dark"] as const) {
       surface.getByRole("button", { name: "Build here", exact: true }),
     ).toBeDisabled();
     await expect(surface.locator(".constructionProgress")).toBeVisible();
-    const badge = network.locator(
-      '[data-status-tile="green-uplands:site-1"][data-connection-status="construction"]',
-    );
-    await expect(badge).toHaveCount(0);
-    await showMapFacilityStatus(network);
     await expect(badge).toBeVisible();
     await expect(badge.locator("circle[pathLength]")).toHaveAttribute(
       "stroke-dasharray",
