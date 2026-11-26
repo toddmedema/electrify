@@ -7,6 +7,7 @@ import {
   returnToTerritoryMap,
   selectTerritoryMapTile,
   setMapProjectCapacity,
+  showMapFacilityStatus,
   waitForTileConnection,
 } from "./layout";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
@@ -107,7 +108,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(ownedQuote.facility).toBeDefined();
     if (!ownedQuote.facility)
       throw new Error("Owned site has no project quote");
-    await expect(owned.locator(".territoryTilePrice")).toContainText(
+    await expect(owned.locator(".territoryTilePrice b")).toHaveText(
       formatPurchasePrice(projectSiteCapitalCost(ownedQuote)),
     );
     await expect(owned).toHaveAccessibleName(/Already connected/);
@@ -174,6 +175,16 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       surface.getByText(/Connection under construction/),
     ).toBeVisible();
+    const badge = network.locator(
+      '[data-status-tile="green-uplands:site-1"][data-connection-status="construction"]',
+    );
+    await expect(badge).toHaveCount(0);
+    await showMapFacilityStatus(network);
+    await expect(badge).toBeVisible();
+    await expect(badge.locator("circle[pathLength]")).toHaveAttribute(
+      "stroke-dasharray",
+      "0 1",
+    );
     const wireCount = () =>
       network.locator("canvas.territory3DCanvas").evaluate(
         (canvas: MapCanvas) =>
@@ -195,6 +206,7 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`connection-construction-${theme}.png`),
     });
     await waitForTileConnection(page, "green-uplands:site-1");
+    await expect(badge).toHaveCount(0);
     await expect.poll(wireCount).toBeGreaterThan(0);
     const confirm = surface.getByRole("button", { name: "Loan", exact: true });
     await expect(confirm).toBeEnabled();

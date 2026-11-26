@@ -165,6 +165,78 @@ test("mobile map tools leave even gutters around the live terrain", async ({
   }
 });
 
+test("mobile map tools slide in and out and share the Build header", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await startPausedMap(page);
+  const dock = page.locator("#navfooter");
+  const programs = dock.getByRole("button", { name: "Programs", exact: true });
+  const panel = page.getByRole("region", { name: "Programs", exact: true });
+  // Listen before opening so the assertion is independent of Playwright's click timing.
+  await page.evaluate(() => {
+    document.body.dataset.panelPositions = "[]";
+    document.addEventListener("transitionstart", (event) => {
+      if (
+        event.propertyName !== "transform" ||
+        !(event.target instanceof HTMLElement)
+      )
+        return;
+      if (!event.target.querySelector("#tool-PROGRAMS")) return;
+      const slide = event.target
+        .getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        );
+      const destination = (slide?.effect as KeyframeEffect | undefined)
+        ?.getKeyframes()
+        .at(-1)?.transform;
+      if (typeof destination !== "string") return;
+      const positions = JSON.parse(document.body.dataset.panelPositions!);
+      const y = new DOMMatrix(destination).m42;
+      document.body.dataset.panelPositions = JSON.stringify([
+        ...positions,
+        y > 0 ? "down" : "up",
+      ]);
+    });
+  });
+  const positions = () =>
+    page.locator("body").getAttribute("data-panel-positions");
+  await programs.click();
+  await expect.poll(positions).toBe('["up"]');
+  const programsHeader = panel.locator(":scope > header");
+  const headerStyle = (header: Locator) =>
+    header.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        element.className,
+        style.height,
+        style.backgroundColor,
+        style.padding,
+      ];
+    });
+  const expectedHeader = await headerStyle(programsHeader);
+  await programs.click();
+  await expect(panel).toHaveCount(0);
+  await expect(programs).toBeFocused();
+  await expect.poll(positions).toBe('["up","down"]');
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await programs.click();
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "Close Programs" }).click();
+  await expect(page.locator("#tool-PROGRAMS")).toHaveCount(0);
+  expect(await positions()).toBe('["up","down"]');
+
+  const build = await openMapProjectCatalogue(page);
+  expect(await headerStyle(build.locator(":scope > header"))).toEqual(
+    expectedHeader,
+  );
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`renders real 3D and recovers a lost context · ${theme}`, async ({
     page,
@@ -901,13 +973,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
     const total = formatPurchasePrice(projectSiteCapitalCost(quote));
-    await expect(ownedMarker.locator("b")).toHaveText(`(${total})`);
+    await expect(ownedMarker.locator("b")).toHaveText(total);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost (${total}) · Already connected`,
+      `Total project cost ${total} · Already connected`,
     );
     await map.getByRole("button", { name: "Rapid connection mode" }).focus();
     await expect(map.getByRole("tooltip")).toHaveCount(0);
@@ -916,7 +988,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost (${total}) · Already connected`,
+      `Total project cost ${total} · Already connected`,
     );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {

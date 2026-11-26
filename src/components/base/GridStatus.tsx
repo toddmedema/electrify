@@ -124,7 +124,7 @@ export default function GridStatus({
   const future = shortfallTime
     ? `Short at ${shortfallTime}`
     : riskMonth
-      ? `Supply risk: ${riskMonth}`
+      ? `Shortage: ${riskMonth}`
       : undefined;
   const forecastMessage =
     ahead && shortfallTime

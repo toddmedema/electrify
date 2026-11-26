@@ -14,7 +14,7 @@ import {
 import {
   formatConnectionDuration,
   tileConnectionLabel,
-  type TileConnection,
+  tileConnectionProgress,
 } from "../../helpers/TerritoryConnections";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
@@ -76,15 +76,6 @@ const PAN_OVERSCAN = HEX_WIDTH / 4;
 const MIN_TILE_TARGET_HEIGHT = 44;
 const CAMERA_SHIFT_MS = 180;
 
-function tileConnectionProgress(
-  { startedMinute, connectionMinute }: TileConnection,
-  minute: number,
-): number {
-  const duration = connectionMinute - startedMinute;
-  return duration > 0
-    ? Math.max(0, Math.min(1, (minute - startedMinute) / duration))
-    : 1;
-}
 const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
   Residential: "homes",
   Commercial: "shops",
@@ -1365,7 +1356,7 @@ export default function TerritoryHexMap({
                 ? formatTerrainPercent(outputFactor)
                 : undefined;
             const projectLabel = projectSite
-              ? `Total project cost (${projectPrice}) · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
+              ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
             const growth = tile.city && cityGrowth.get(tile.territoryId);
             const terrainAndStatus = [
@@ -1446,7 +1437,7 @@ export default function TerritoryHexMap({
                   showingProjectSites
                     ? `Inspect ${territoryTileLabel(tile)} · ${projectLabel ?? "unavailable for this project"}`
                     : quote
-                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} (${money(quote.price)}) · ${tilePurchaseBenefitLabel(quote)} · ${formatConnectionDuration(quote.buildMonths)}${unaffordable ? "; not enough available cash" : ""}`
+                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} · ${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)} · ${formatConnectionDuration(quote.buildMonths)}${unaffordable ? "; not enough available cash" : ""}`
                       : label
                 }
                 aria-pressed={key === activeSelected}
@@ -1545,7 +1536,7 @@ export default function TerritoryHexMap({
                     aria-hidden="true"
                     data-tooltip={projectLabel}
                   >
-                    <b>{`(${projectPrice})`}</b>
+                    <b>{projectPrice}</b>
                     {outputModifier && (
                       <span
                         className="territoryTileProduction"
@@ -1564,7 +1555,7 @@ export default function TerritoryHexMap({
                 )}
                 {quote && !projectPlanning && (
                   <span className="territoryTilePrice" aria-hidden="true">
-                    <b>{pending ? "Connecting…" : `(${money(quote.price)})`}</b>
+                    <b>{pending ? "Connecting…" : money(quote.price)}</b>
                     {quote.benefit !== "general" && (
                       <span>{tilePurchaseBenefitLabel(quote)}</span>
                     )}

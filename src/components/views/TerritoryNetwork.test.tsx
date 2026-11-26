@@ -474,10 +474,12 @@ it("starts construction on exactly the inspected tile and keeps building locked"
   expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
   expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
-  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(surface()).toHaveTextContent(
+    `Constructing transmission lines · ${quote.buildMonths} ${quote.buildMonths === 1 ? "month" : "months"} left`,
+  );
   expect(
-    within(surface()).queryByRole("button", { name: "Build here" }),
-  ).not.toBeInTheDocument();
+    within(surface()).getByRole("button", { name: "Build here" }),
+  ).toBeDisabled();
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });

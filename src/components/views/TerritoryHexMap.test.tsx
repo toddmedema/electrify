@@ -379,15 +379,15 @@ it("shows full terrain-specific capital costs on owned and unconnected project m
     for (const [id, quote] of sites) {
       const target = map.target(id);
       const price = formatPurchasePrice(projectSiteCapitalCost(quote));
-      const title = `Total project cost (${price}) · ${quote.owned ? "Already connected" : "Connection included"}`;
+      const title = `Total project cost ${price} · ${quote.owned ? "Already connected" : "Connection included"}`;
       expect(target).toHaveAccessibleName(expect.stringContaining(title));
       act(() => target.focus());
       expect(screen.getByRole("tooltip")).toHaveTextContent(title);
       act(() => target.blur());
       expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-      const marker = within(target).getByText(`(${price})`, { exact: true });
+      const marker = within(target).getByText(price, { exact: true });
       expect(marker).toHaveTextContent(price);
-      expect(marker).not.toHaveTextContent("($0)");
+      expect(marker).not.toHaveTextContent("$0");
       fireEvent.pointerMove(marker, {
         pointerId: 1,
         clientX: 100,
@@ -1108,7 +1108,7 @@ it("hovers and activates the hex under the pointer while keyboard and explicit p
     fireEvent.pointerLeave(map.viewport);
     expect(model).not.toHaveAttribute("data-model-hovered");
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-    const price = within(ground).getByText(/^\(\$/);
+    const price = within(ground).getByText(/^\$/);
     fireEvent.pointerMove(price, { pointerId: 1, clientX: 100, clientY: 100 });
     await waitFor(() =>
       expect(ground).toHaveAttribute("data-model-hovered", "true"),

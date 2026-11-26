@@ -27,7 +27,7 @@ import { useBuildForecast } from "./BuildForecast";
 import { useMoney } from "./CurrencyContext";
 import { useTerritoryTilePurchases } from "./TerritoryTilePurchases";
 import ConceptIcon from "./ConceptIcon";
-import TileWorkspaceSurface from "./TileWorkspaceSurface";
+import { MapProjectPanel } from "./MapPanelWindow";
 import BuildFacilities from "../views/BuildFacilities";
 import "./ProjectBuild.scss";
 
@@ -188,17 +188,10 @@ export default function ProjectBuild({
   const loanLeads =
     !!payment && payment.cash.remaining < 0 && payment.loan.remaining >= 0;
   return (
-    <TileWorkspaceSurface
-      id="tool-BUILD_GENERATORS"
-      closeLabel="Close project"
-      building={catalogue}
+    <MapProjectPanel
+      catalogue={catalogue}
       title={catalogue ? "Build" : title}
-      titleIcon={
-        (catalogue || !project) && <ConceptIcon concept="build" decorative />
-      }
       focusKey={`${catalogue}:${candidate ?? "sites"}`}
-      projectCandidate={!catalogue}
-      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={() => {
         if (!lock.current) onClose();
       }}
@@ -387,6 +380,6 @@ export default function ProjectBuild({
           )}
         </div>
       )}
-    </TileWorkspaceSurface>
+    </MapProjectPanel>
   );
 }
