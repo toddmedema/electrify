@@ -114,21 +114,18 @@ export function compareBuildPreview(
     }
     const direction = value < median ? "lower" : "higher";
     const preference = preferences[metric];
+    if (preference !== "neutral") {
+      comparison[metric] =
+        preference === direction
+          ? { tone: "good", text: "Better" }
+          : { tone: "bad", text: "Worse" };
+      continue;
+    }
+    const [lower, higher] =
+      metric === "duration" ? ["Shorter", "Longer"] : ["Lower", "Higher"];
     comparison[metric] = {
-      tone:
-        preference === "neutral"
-          ? "neutral"
-          : preference === direction
-            ? "good"
-            : "bad",
-      text:
-        metric === "buildTime" || metric === "duration"
-          ? direction === "lower"
-            ? "Shorter"
-            : "Longer"
-          : direction === "lower"
-            ? "Lower"
-            : "Higher",
+      tone: "neutral",
+      text: direction === "lower" ? lower : higher,
     };
   }
   return comparison;

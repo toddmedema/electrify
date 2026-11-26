@@ -384,8 +384,11 @@ for (const theme of ["light", "dark"] as const) {
     await expect(
       storage
         .getByRole("row", { name: /^Round-trip efficiency/ })
-        .getByText(/Higher/),
+        .getByText("Better"),
     ).toHaveAttribute("data-tone", "good");
+    await expect(
+      storage.getByRole("row", { name: /^Build cost/ }).getByText("Worse"),
+    ).toHaveAttribute("data-tone", "bad");
     const advanced = battery.getByRole("button", { name: "Advanced" });
     await expect(advanced).toHaveAttribute("aria-expanded", "false");
     await reviewScreenshot(battery, {

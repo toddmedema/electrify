@@ -152,7 +152,7 @@
 
     .buildComparisonCaption {
       margin: 0 16px 4px;
-      color: var(--font-color-secondary);
+      color: var(--font-color-faded);
     }
 
     .buildComparisonMarker {
@@ -162,7 +162,7 @@
       text-align: end;
       white-space: nowrap;
       font-size: 0.75rem;
-      color: var(--font-color-secondary);
+      color: var(--font-color-faded);
 
       &[data-tone="good"] {
         color: var(--delta-good);

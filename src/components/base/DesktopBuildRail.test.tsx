@@ -245,7 +245,7 @@ it("compares available storage and leaves the power and duration tradeoff neutra
   expect(
     within(
       preview.getByRole("row", { name: /^Round-trip efficiency/ }),
-    ).getByText(/Higher/),
+    ).getByText("Better"),
   ).toHaveAttribute("data-tone", "good");
   expect(
     within(
