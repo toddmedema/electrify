@@ -15,6 +15,7 @@ import {
 } from "../../../helpers/TerritoryMapState";
 import { combustibleTile } from "../../../helpers/TerritoryWildfire";
 import {
+  facilityConstructionStage,
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
@@ -26,6 +27,7 @@ import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
 import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
 import { rotorAngle } from "./RotorPose";
+import { surfaceHeight } from "./SurfaceHeight";
 import { HEX_WIDTH } from "../TerritoryHexGeometry";
 import type {
   FacilityConstructionStage,
@@ -60,6 +62,7 @@ interface TileScene {
   terrain: MapInstance;
   model?: MapModel;
   construction?: { stage: FacilityConstructionStage; model: MapModel };
+  gridJunction?: MapInstance;
   structure?: MapInstance;
   hail?: MapInstance;
 }
@@ -235,25 +238,52 @@ function offlineRetrofitModel(model: MapModel): MapModel {
   return value;
 }
 
-const constructionStages = [0, 1, 2, 3] as const;
-function constructionStage(
-  facility: TerritoryTileView["facility"],
-): FacilityConstructionStage | undefined {
-  if (!facility || !(facility.yearsToBuildLeft > 0)) return undefined;
-  const total = facility.yearsToBuild;
-  if (total === undefined || !Number.isFinite(total) || total <= 0) return 0;
-  const completed = Math.max(0, 1 - facility.yearsToBuildLeft / total);
-  return constructionStages[
-    Math.min(
-      constructionStages.length - 1,
-      Math.floor(completed * constructionStages.length),
-    )
-  ];
+// A low junction at the front corner keeps the existing grid continuous while the
+// site's own switchgear is absent. The center of the tile belongs to the project.
+const gridJunctionOffset: Vec3 = [0.3, 0, 0.35];
+const gridJunctionTerminals: readonly Vec3[] = [
+  [-0.026, 0.078, 0],
+  [0.026, 0.078, 0],
+];
+const gridJunctionMesh = new MeshBuilder()
+  .box([0, -0.009, 0], [0.084, 0.05, 0.048], PALETTE.rock)
+  .box([0, 0.033, 0], [0.077, 0.034, 0.042], PALETTE.steelShade);
+for (const [x, y, z] of gridJunctionTerminals)
+  gridJunctionMesh.cylinder([x, 0.05, z], 0.01, 0.008, y - 0.05, PALETTE.cream);
+const gridJunctionModel: MapModel = {
+  key: "structure:construction-grid-junction",
+  parts: [{ mesh: gridJunctionMesh.build(), castsShadow: true }],
+  terminals: gridJunctionTerminals,
+  footprint: 0.1,
+  height: 0.078,
+};
+
+function gridJunction(
+  terrain: MapInstance,
+  tileKey: TerritoryMapTileKey,
+): MapInstance {
+  const [x, , z] = gridJunctionOffset;
+  // Trees and farm props must not lift the junction above the terrain.
+  const y = surfaceHeight(
+    terrain.model,
+    x,
+    z,
+    terrain.model.supportY === undefined,
+  );
+  return {
+    id: `grid-junction:${tileKey}`,
+    position: add(terrain.position, [x, y, z]),
+    fog: terrain.fog,
+    active: false,
+    model: gridJunctionModel,
+  };
 }
 
 /** Static wire geometry changes with topology/terminals, never with every power tick. */
 export class SceneBuilder {
   private wireKey?: string;
+  private wires?: readonly HexWire[];
+  private overheadWireTiles = new Set<string>();
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
   private terrainAt = new Map<string, TerrainType>();
@@ -281,7 +311,15 @@ export class SceneBuilder {
     }
     const models = new Map<string, MapModel>();
     const positions = new Map<string, Vec3>();
-    const disconnected = new Set<string>();
+    if (wires !== this.wires) {
+      this.wires = wires;
+      this.overheadWireTiles.clear();
+      for (const wire of wires)
+        if (wire.kind === "overhead") {
+          this.overheadWireTiles.add(wire.from);
+          this.overheadWireTiles.add(wire.to);
+        }
+    }
     const byId = new Map<string, TerritoryTileView>(
       views.map((view) => [territoryMapTileKey(view.tile), view]),
     );
@@ -382,7 +420,7 @@ export class SceneBuilder {
       positions.set(tileKey, position);
       instances.push(cell.terrain);
       if (!model) continue;
-      const stage = size ? constructionStage(view.facility) : undefined;
+      const stage = size ? facilityConstructionStage(view.facility) : undefined;
       if (
         stage === undefined &&
         kind === "solar-hail-damaged" &&
@@ -424,11 +462,15 @@ export class SceneBuilder {
         motionKey = view.operatingFacility
           ? `${runKey}:facility:${view.operatingFacility.id}`
           : undefined;
-      // Use the real staged connection only once switchgear has been fitted.
-      if (stage === undefined) models.set(tileKey, model);
-      else if (displayedModel.terminals.length)
-        models.set(tileKey, displayedModel);
-      else disconnected.add(tileKey);
+      // Commissioning and the completed plant share the same fitted terminals.
+      if (stage === undefined || displayedModel.terminals.length)
+        models.set(tileKey, model);
+      else if (this.overheadWireTiles.has(tileKey)) {
+        cell.gridJunction ??= gridJunction(cell.terrain, tileKey);
+        instances.push(cell.gridJunction);
+        positions.set(tileKey, cell.gridJunction.position);
+        models.set(tileKey, cell.gridJunction.model);
+      }
       const waterLevel = tile.city
         ? undefined
         : reservoirFill(view.operatingFacility);
@@ -453,13 +495,10 @@ export class SceneBuilder {
     }
     for (const id of this.cells.keys())
       if (!byId.has(id)) this.cells.delete(id);
-    const visibleWires = wires.filter(
-      ({ from, to }) => !disconnected.has(from) && !disconnected.has(to),
-    );
-    const key = visibleWires
+    const key = wires
       .map(
         (wire) =>
-          `${wire.id}:${wire.kind}:${models.get(wire.from)?.key}:${models.get(wire.to)?.key}:${byId.get(wire.from)?.visibilityDistance}:${byId.get(wire.to)?.visibilityDistance}`,
+          `${wire.id}:${wire.kind}:${models.get(wire.from)?.key}:${models.get(wire.to)?.key}:${positions.get(wire.from)?.[1]}:${positions.get(wire.to)?.[1]}:${byId.get(wire.from)?.visibilityDistance}:${byId.get(wire.to)?.visibilityDistance}`,
       )
       .join("|");
     if (key !== this.wireKey) {
@@ -471,7 +510,7 @@ export class SceneBuilder {
         new MeshBuilder(),
       ];
       const connections: MapWireConnection[][] = [[], [], [], []];
-      for (const wire of visibleWires) {
+      for (const wire of wires) {
         const from = positions.get(wire.from),
           to = positions.get(wire.to);
         if (!from || !to) continue;

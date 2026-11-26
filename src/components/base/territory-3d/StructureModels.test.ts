@@ -74,17 +74,13 @@ it.each(constructionVariants)(
       expect(world.every((point) => point.every(Number.isFinite))).toBe(true);
       expect(world.length / 3).toBeLessThan(1500);
       expect(model.footprint).toBeLessThan(1);
-      if (stage < 3) {
-        expect(model.terminals).toHaveLength(0);
-      } else {
-        expect(model.terminals).toEqual(finished.terminals);
-        for (const [x, y, z] of model.terminals)
-          expect(
-            world.some(
-              ([px, py, pz]) => Math.hypot(x - px, y - py, z - pz) < 0.000001,
-            ),
-          ).toBe(true);
-      }
+      expect(model.terminals).toEqual(stage === 3 ? finished.terminals : []);
+      for (const [x, y, z] of model.terminals)
+        expect(
+          world.some(
+            ([px, py, pz]) => Math.hypot(x - px, y - py, z - pz) < 0.000001,
+          ),
+        ).toBe(true);
       return model;
     });
     const geometry = [...sequence, finished].map(({ parts }) =>

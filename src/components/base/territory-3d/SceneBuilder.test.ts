@@ -480,7 +480,7 @@ test("construction changes only at milestones, including after a jump or resume"
   expect(build(0.7)[1].model.key).toBe("test-structure:construction:1");
 });
 
-test("routes conductors to fitted switchgear once a new plant reaches commissioning", () => {
+test("keeps the existing grid connected while a new plant fits its own switchgear", () => {
   const target = view();
   const peer: TerritoryTileView = {
     ...target,
@@ -501,7 +501,11 @@ test("routes conductors to fitted switchgear once a new plant reaches commission
     terrain: getTerrainModel,
     structure: getStructureModel,
   });
-  const build = (yearsToBuildLeft: number, yearsToBuild?: number) => {
+  const build = (
+    yearsToBuildLeft: number,
+    yearsToBuild?: number,
+    links = wires,
+  ) => {
     const scene = builder.build(
       [
         {
@@ -511,32 +515,59 @@ test("routes conductors to fitted switchgear once a new plant reaches commission
         neighbor,
       ],
       tiles,
-      wires,
+      links,
       0,
       "run",
     );
     return {
       plant: scene.find(({ id }) => id === `structure:${target.tile.id}`)!,
-      links: scene.flatMap(({ model }) => model.connections ?? []),
+      junction: scene.find(
+        ({ id }) => id === `grid-junction:${target.tile.id}`,
+      ),
+      wire: scene.find(({ id }) => id === "wires:0")!,
     };
   };
   const legacy = build(0.1);
   expect(legacy.plant.model).toBe(getStructureModel("solar", [], "small", 0));
-  expect(legacy.links).toHaveLength(0);
   const installing = build(0.5, 1);
   expect(installing.plant.model).toBe(
     getStructureModel("solar", [], "small", 2),
   );
-  expect(installing.links).toHaveLength(0);
+  expect(installing.junction).toBe(legacy.junction);
+  expect(installing.wire).toBe(legacy.wire);
+  const existingLink = installing.wire.model.connections![0];
+  const { model: junction, position } = installing.junction!;
+  expect(
+    junction.terminals.map(([x, y, z]) => [
+      x + position[0],
+      y + position[1],
+      z + position[2],
+    ]),
+  ).toContainEqual(existingLink.start);
+
   const commissioning = build(0.24, 1);
-  const [link] = commissioning.links;
-  expect(link.from).toBe(target.tile.id);
-  expect(commissioning.plant.model.terminals).toContainEqual(link.start);
+  expect(commissioning.junction).toBeUndefined();
+  const installedLink = commissioning.wire.model.connections![0];
+  expect(installedLink.from).toBe(target.tile.id);
+  expect(commissioning.plant.model.terminals).toContainEqual(
+    installedLink.start,
+  );
   expect(commissioning.plant).toMatchObject({
     active: false,
     producing: false,
   });
-  expect(build(0, 1).links).toEqual(commissioning.links);
+  expect(build(0, 1).wire).toBe(commissioning.wire);
+
+  const buried = build(
+    0.5,
+    1,
+    wires.map((wire) => ({ ...wire, kind: "submerged" })),
+  );
+  expect(buried.junction).toBeUndefined();
+  expect(buried.wire.model.connections![0]).toMatchObject({
+    kind: "submerged",
+    start: [0, 0.006, 0],
+  });
 });
 
 const pickFrame = {
