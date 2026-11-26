@@ -60,6 +60,7 @@ export interface TerrainModelOptions {
   adjacentEdges?: number;
 }
 export type FacilitySize = "small" | "medium" | "large";
+export type FacilityConstructionStage = 0 | 1 | 2 | 3;
 export type StructureKind =
   | "city-small"
   | "city-medium"

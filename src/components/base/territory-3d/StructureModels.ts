@@ -3,6 +3,7 @@ import type { CityGrowthSector } from "../../../helpers/CityDemand";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE as P, rgb } from "./Palette";
 import type {
+  FacilityConstructionStage,
   FacilitySize,
   MapMesh,
   MapModel,
@@ -2139,7 +2140,7 @@ function isCityKind(kind: StructureKind): kind is CityStructureKind {
 
 const facilityFactories: Record<
   FacilityStructureKind,
-  (size: FacilitySize) => MapModel
+  (size: FacilitySize, stage?: FacilityConstructionStage) => MapModel
 > = {
   solar: (size) => solar(false, size),
   "solar-hail-damaged": (size) => solar(true, size),
@@ -2164,26 +2165,31 @@ export function getStructureModel(
   kind: StructureKind,
   growth: readonly CityGrowthSector[] = [],
   size: FacilitySize = "medium",
+  stage?: FacilityConstructionStage,
 ): MapModel {
   const isCity = isCityKind(kind);
   const facility = !isCity && kind !== "tower";
-  const key =
+  const variant =
     facility && size !== "medium"
       ? `${kind}:${size}`
       : isCity && growth.length
         ? `${kind}:${growth.join("-").toLowerCase()}`
         : kind;
+  const key =
+    facility && stage !== undefined
+      ? `${variant}:construction:${stage}`
+      : variant;
   const cached = models.get(key);
   if (cached) return cached;
   const result = isCity
     ? city(citySizes[kind], growth, key)
     : kind === "tower"
       ? tower()
-      : facilityFactories[kind](size);
+      : facilityFactories[kind](size, stage);
   const keyed =
-    facility && size !== "medium"
-      ? { ...result, key: `structure:${key}` }
-      : result;
+    result.key === `structure:${key}`
+      ? result
+      : { ...result, key: `structure:${key}` };
   models.set(key, keyed);
   return keyed;
 }
