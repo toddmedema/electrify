@@ -2563,14 +2563,16 @@ $pane_header_height: 48px;
     min-height: 40px;
     max-width: 100%;
     padding-inline: 8px;
-    border: 0;
+    border: 1px solid var(--interactive-blue);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
-    color: var(--interactive-blue);
     font: inherit;
     font-size: var(--font-size-caption);
     cursor: pointer;
 
+    &:not(:disabled) {
+      color: var(--font-color-primary);
+    }
     &:hover {
       background: var(--interactive-tint);
     }
@@ -3915,8 +3917,7 @@ $pane_header_height: 48px;
 
       &.Mui-selected {
         border-color: $interactive_blue !important;
-        // The stronger blue keeps the small label above 4.5:1 on the selected tint.
-        color: var(--interactive-blue);
+        color: var(--font-color-primary);
         font-weight: 600;
       }
     }
@@ -9005,7 +9006,7 @@ option {
       gap: 8px;
       width: fit-content;
       padding: 0 8px;
-      color: var(--interactive-blue);
+      color: var(--font-color-primary);
       font-size: var(--font-size-body2);
       font-weight: var(--font-weight-emphasis);
       cursor: pointer;
@@ -9015,6 +9016,7 @@ option {
         display: none;
       }
       &::after {
+        color: var(--interactive-blue);
         content: "+";
       }
       &:hover {
@@ -9210,7 +9212,8 @@ option {
     align-items: center;
     min-height: 44px;
     color: var(--interactive-blue);
-    font-size: 0.8125rem;
+    font-size: 1.1875rem;
+    font-weight: 700;
   }
 }
 

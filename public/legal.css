@@ -9,6 +9,8 @@
      ========================================================================== */
   --brand: #0084f8;
   --brand-hover: #1565c0;
+  --brand-label: #08131c;
+  --brand-hover-label: #ffffff;
   --brand-wash: rgba(0, 132, 248, 0.1);
   --page: #f2f7fb;
   --surface: #ffffff;
@@ -26,6 +28,7 @@
   :root {
     --brand: #629be1;
     --brand-hover: #b8ddfa;
+    --brand-hover-label: var(--brand-label);
     --brand-wash: rgba(100, 181, 246, 0.13);
     --page: #0d141a;
     --surface: #172028;
@@ -71,6 +74,12 @@ a {
   color: var(--brand);
   text-decoration-thickness: 0.08em;
   text-underline-offset: 0.18em;
+}
+
+/* Keep logo-blue text large enough to read on light surfaces. */
+:where(a:not([class], .topnav a, .impact-list a, .scenario-theme-nav a)) {
+  font-size: max(1em, 1.1875rem);
+  font-weight: 700;
 }
 
 a:hover {
@@ -154,28 +163,22 @@ a:hover {
   text-decoration: none;
 }
 
-.topnav a:hover,
-.topnav a[aria-current="page"] {
+.topnav a:not(.topnav__play):is(:hover, [aria-current="page"]) {
   background: var(--brand-wash);
-  color: var(--brand);
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--brand);
 }
 
 .topnav .topnav__play {
   margin-left: 0.35rem;
   background: var(--brand);
-  color: #ffffff;
+  color: var(--brand-label);
 }
 
 .topnav .topnav__play:hover {
   background: var(--brand-hover);
-  color: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  .topnav .topnav__play,
-  .topnav .topnav__play:hover {
-    color: #08131c;
-  }
+  color: var(--brand-hover-label);
 }
 
 .hero {
@@ -213,7 +216,7 @@ a:hover {
 
 .eyebrow {
   margin: 0 0 0.8rem;
-  color: var(--brand);
+  color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -279,20 +282,14 @@ a:hover {
 .button--primary {
   border-color: var(--brand);
   background: var(--brand);
-  color: #ffffff;
+  color: var(--brand-label);
+  transition-property: transform, border-color;
 }
 
 .button--primary:hover {
   border-color: var(--brand-hover);
   background: var(--brand-hover);
-  color: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  .button--primary,
-  .button--primary:hover {
-    color: #08131c;
-  }
+  color: var(--brand-hover-label);
 }
 
 .page-content {

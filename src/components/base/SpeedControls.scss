@@ -62,7 +62,7 @@
       border-radius: var(--radius-pill);
       background: transparent;
       background-clip: content-box;
-      color: var(--interactive-blue);
+      color: var(--font-color-primary);
       font-size: var(--font-size-caption);
       font-variant-numeric: tabular-nums;
       font-weight: 500;
@@ -86,19 +86,23 @@
       }
 
       .MuiSvgIcon-root {
+        color: var(--interactive-blue);
         font-size: 1.125rem; // 18px: a pause glyph that sits inside a 32px thumb, not against it
       }
 
       // Under the thumb: the label takes the thumb's ink and a little more weight, which
       // together with the thumb's position carries "running here" without colour alone.
       &[data-thumb="true"] {
-        color: var(--interactive-contrast);
+        color: #0a0a0a;
         font-weight: 600;
+
+        .MuiSvgIcon-root {
+          color: inherit;
+        }
       }
 
       &.Mui-selected:not([data-thumb="true"]) {
         background-color: transparent;
-        color: var(--interactive-blue);
         font-weight: 600;
       }
     }

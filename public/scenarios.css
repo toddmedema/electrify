@@ -94,7 +94,7 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  font-size: 0.9375rem;
+  font-size: 1.1875rem;
   font-weight: 700;
 }
 
@@ -207,7 +207,7 @@
 
 .scenario-decision-number {
   padding-top: 2px;
-  color: var(--brand);
+  color: var(--text-muted);
   font-size: 0.875rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
@@ -319,9 +319,13 @@
   display: inline-flex;
   gap: 8px;
   margin-top: 16px;
-  color: var(--brand);
+  color: var(--text);
   font-size: 0.8125rem;
   font-weight: 700;
+}
+
+.scenario-entry__more [aria-hidden="true"] {
+  color: var(--brand);
 }
 
 .scenario-entry--compact .scenario-entry__link {

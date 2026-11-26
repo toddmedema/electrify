@@ -1,4 +1,4 @@
-import { Locator } from "@playwright/test";
+import { expect, Locator } from "@playwright/test";
 
 /** Measure rendered text/icon color against its nearest painted surface. */
 export async function foregroundContrast(locator: Locator): Promise<number> {
@@ -54,4 +54,18 @@ export function contrastRatio(foreground: string, background: string): number {
     (a, b) => b - a,
   );
   return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** WCAG 1.4.3 uses a 3:1 floor for at least 14pt bold or 18pt regular. */
+export async function expectReadableText(locator: Locator): Promise<void> {
+  const floor = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const size = parseFloat(style.fontSize);
+    const bold = Number(style.fontWeight) >= 700;
+    return size >= 24 || (bold && size >= (14 * 96) / 72) ? 3 : 4.5;
+  });
+  expect(
+    await foregroundContrast(locator),
+    `contrast of ${(await locator.textContent())?.trim()}`,
+  ).toBeGreaterThanOrEqual(floor);
 }

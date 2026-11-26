@@ -219,7 +219,6 @@
     b {
       font-size: 13px;
       line-height: 18px;
-      color: var(--interactive-blue);
     }
   }
   &:hover .territoryTilePrice,
@@ -229,7 +228,6 @@
   &[data-unaffordable="true"] .territoryTilePrice {
     border-color: var(--border-subtle);
     b {
-      color: var(--font-color-primary);
       font-weight: var(--font-weight-regular);
     }
   }

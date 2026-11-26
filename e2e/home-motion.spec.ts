@@ -1,4 +1,4 @@
-import { foregroundContrast } from "./contrast";
+import { expectReadableText, foregroundContrast } from "./contrast";
 import { expect, test } from "./fixtures";
 
 test("reduced motion keeps the home decoration still and actions usable", async ({
@@ -83,6 +83,9 @@ for (const theme of ["light", "dark"] as const) {
         theme === "light" ? 3.5 : 4.5,
       );
     }
+    for (const link of await explore.getByRole("link").all()) {
+      await expectReadableText(link);
+    }
     // Tab from the preceding link so coarse-pointer projects use keyboard focus styling.
     await explore
       .getByRole("link", { name: "Compare simulators" })
@@ -96,6 +99,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(await foregroundContrast(about)).toBeGreaterThanOrEqual(
       theme === "light" ? 3.5 : 4.5,
     );
+    await expectReadableText(about);
     await explore.getByRole("link", { name: "For teachers" }).click();
     await expect(page).toHaveURL(/classroom\.html$/);
   });
