@@ -178,7 +178,9 @@
   @media (prefers-reduced-motion: reduce) {
     .speedToggles.MuiToggleButtonGroup-root {
       &::before,
-      > .MuiToggleButtonGroup-grouped.MuiToggleButton-root {
+      > .MuiToggleButtonGroup-grouped.MuiToggleButton-root,
+      > .MuiToggleButton-root
+        :is(.speedLabel, .multiplayerSpeedLabel, .MuiSvgIcon-root) {
         transition: none;
       }
     }

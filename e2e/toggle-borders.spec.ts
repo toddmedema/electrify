@@ -296,6 +296,59 @@ async function systemPalette(group: Locator) {
   });
 }
 
+async function clickAndCheckFirstSpeedFrame(
+  button: Locator,
+  palette: Awaited<ReturnType<typeof systemPalette>>,
+) {
+  // Arm the observer before the real click. A Playwright round trip after the
+  // click can miss the first frame and read the settled foreground instead.
+  const capture = await button.evaluateHandle((element) => {
+    const label = element.querySelector(".speedLabel")!;
+    const glyph = label.querySelector("svg");
+    const sample = () => ({
+      button: getComputedStyle(element).color,
+      label: getComputedStyle(label).color,
+      fill: glyph ? getComputedStyle(glyph).fill : null,
+      thumb: getComputedStyle(element.parentElement!, "::before")
+        .backgroundColor,
+      track: getComputedStyle(element.parentElement!).backgroundColor,
+    });
+    const frames = new Promise<ReturnType<typeof sample>[]>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (element.getAttribute("data-thumb") !== "true") return;
+        observer.disconnect();
+        const selected = sample();
+        requestAnimationFrame(() => resolve([selected, sample()]));
+      });
+      observer.observe(element, {
+        attributes: true,
+        attributeFilter: ["data-thumb"],
+      });
+    });
+    return { frames };
+  });
+  try {
+    await button.click();
+    const frames = await capture.evaluate(({ frames }) => frames);
+    for (const [index, paint] of frames.entries()) {
+      const phase = index === 0 ? "selection" : "first frame";
+      expect.soft(paint.thumb, phase).toBe(palette.highlight);
+      expect.soft(paint.button, phase).toBe(palette.highlightText);
+      expect.soft(paint.label, phase).toBe(palette.highlightText);
+      if (paint.fill !== null)
+        expect.soft(paint.fill, phase).toBe(palette.highlightText);
+      expect
+        .soft(
+          contrastRatio(paint.fill ?? paint.label, paint.thumb, paint.track),
+          phase,
+        )
+        .toBeGreaterThanOrEqual(paint.fill === null ? 4.5 : 3);
+    }
+  } finally {
+    await capture.dispose();
+  }
+}
+
 async function expectSpeedPaint(
   button: Locator,
   palette: Awaited<ReturnType<typeof systemPalette>>,
@@ -372,7 +425,7 @@ for (const app of ["light", "dark"] as const) {
         [slow, pause],
         [pause, slow],
       ]) {
-        await selected.click();
+        await clickAndCheckFirstSpeedFrame(selected, palette);
         await expect(selected).toHaveAttribute("data-thumb", "true");
         await expect(other).toHaveAttribute("aria-pressed", "false");
         // A pointer click leaves the selected control hovered on desktop.
