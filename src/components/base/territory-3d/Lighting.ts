@@ -39,11 +39,12 @@ export function mapLighting(input: LightingInput): MapLighting {
     daylight = input.daylight === "polar-day" ? 1 : 0;
   }
   // A continuous, mirrored night arc is a stylized moon, not lunar ephemeris.
-  // The key stays above the receiver; its shadow fades away at either horizon.
+  // The key stays above the receiver and on the camera-facing (+Z) side of
+  // the board, where the solar panels tilt. Shadows fade at either horizon.
   const direction: Vec3 = [
     horizontal * 0.88,
     Math.max(0.12, Math.abs(altitude)),
-    -0.38,
+    0.38,
   ];
   const length = Math.hypot(...direction);
   const cloud = smooth(((input.cloud ?? 0) - 0.24) / 0.76);

@@ -36,6 +36,41 @@ export const speedSelectionLabel = (speed: SpeedType) =>
   speed === "PAUSED"
     ? "Paused"
     : `${Math.round(TICK_MS.SLOW / TICK_MS[speed])}×`;
+const SPEED_CHEVRONS = {
+  SLOW: 1,
+  NORMAL: 2,
+  FAST: 3,
+  ULTRA: 4,
+} as const;
+
+function SpeedChevrons({ speed }: { speed: Exclude<SpeedType, "PAUSED"> }) {
+  const count = SPEED_CHEVRONS[speed];
+  const pitch = count === 4 ? 5 : 6;
+  const depth = count === 4 ? 4 : 5;
+  const width = depth + (count - 1) * pitch + 2;
+  return (
+    <svg
+      width={width}
+      height="16"
+      viewBox={`0 0 ${width} 16`}
+      aria-hidden="true"
+      focusable="false"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <path
+          key={index}
+          d={`M ${1 + index * pitch} 3 l ${depth} 5 l -${depth} 5`}
+        />
+      ))}
+    </svg>
+  );
+}
+
 const SPEED_ARIA_LABELS: Record<SpeedType, string> = {
   PAUSED: "pause",
   SLOW: "slow speed",
@@ -178,7 +213,11 @@ function speedOptions(
               aria-label={SPEED_ARIA_LABELS[option]}
               aria-describedby={descriptionId}
               title={
-                multiplayer ? playersAtSpeed(multiplayer, option) : description
+                multiplayer
+                  ? playersAtSpeed(multiplayer, option)
+                  : option === "PAUSED"
+                    ? "Pause"
+                    : `${SPEED_ARIA_LABELS[option]} (${speedSelectionLabel(option)})`
               }
               // The button the thumb sits under, so its label can take the thumb's ink.
               data-thumb={option === thumbSpeed ? "true" : undefined}
@@ -220,7 +259,7 @@ function speedOptions(
                 {option === "PAUSED" ? (
                   <PauseIcon fontSize="small" />
                 ) : (
-                  speedSelectionLabel(option)
+                  <SpeedChevrons speed={option} />
                 )}
               </span>
             </ToggleButton>

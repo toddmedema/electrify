@@ -25,9 +25,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(
-      page.getByText("Starting your mission…", { exact: true }),
-    ).toBeHidden();
+    await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     await page.evaluate(() => document.fonts.ready);
     expect(
       await page.evaluate(() => document.fonts.check("600 15px Inter")),
@@ -179,10 +177,9 @@ test("Continue centers the loading plug and respects reduced motion", async ({
   try {
     await page.goto("/");
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    const status = page.getByText("Starting your mission…", { exact: true });
+    const status = page.getByText("Loading", { exact: true });
     await expect(status).toHaveRole("status");
     const art = page.locator(".missionLoadingArt");
-    const plug = art.locator(".missionLoadingPlug");
     await expect(art).toBeVisible();
     await expect(art).toHaveAttribute("aria-hidden", "true");
     const box = (await art.boundingBox())!;
@@ -193,9 +190,10 @@ test("Continue centers the loading plug and respects reduced motion", async ({
     expect(
       Math.abs(box.y + box.height / 2 - viewport.height / 2),
     ).toBeLessThanOrEqual(1);
-    await expect(plug).toHaveCSS("animation-iteration-count", "infinite");
+    await expect(art).toHaveCSS("animation-name", "missionLoadingSpin");
+    await expect(art).toHaveCSS("animation-iteration-count", "infinite");
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(plug).toHaveCSS("animation-name", "none");
+    await expect(art).toHaveCSS("animation-name", "none");
     await expect(art.locator(".missionLoadingSpark").first()).toHaveCSS(
       "opacity",
       "1",

@@ -33,7 +33,9 @@ test("a real tutorial completion journals First Spark offline and survives relau
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
     await page.getByRole("button", { name: "Next", exact: true }).click();
-    await expect(page.getByText("Tap 1× to start time")).toBeVisible();
+    await expect(
+      page.getByText("Select slow speed to start time"),
+    ).toBeVisible();
     expect((await read()).earned).toEqual([]);
     await page
       .getByRole("button", { name: "normal speed", exact: true })

@@ -109,7 +109,7 @@ for (const theme of ["light", "dark"]) {
     expect(pixels.generation).toBeGreaterThan(0.9);
     await page.mouse.move(0, 0);
     await chart.scrollIntoViewIfNeeded();
-    await expect(page.getByText("Starting your mission…")).toHaveCount(0);
+    await expect(page.getByText("Loading")).toHaveCount(0);
     await expect(
       page.locator('[class*="-exit-active"], [class*="-enter-active"]'),
     ).toHaveCount(0);
@@ -572,7 +572,7 @@ for (const theme of ["light", "dark"]) {
     await page.mouse.move(0, 0);
     await chart.scrollIntoViewIfNeeded();
     await page.evaluate(() => document.fonts.ready);
-    await expect(page.getByText("Starting your mission…")).toHaveCount(0);
+    await expect(page.getByText("Loading")).toHaveCount(0);
     await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
     await reviewScreenshot(chart, {
       path: info.outputPath(`production-${theme}.png`),
@@ -679,7 +679,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await page.mouse.move(0, 0);
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
-  await expect(page.getByText("Starting your mission…")).toHaveCount(0);
+  await expect(page.getByText("Loading")).toHaveCount(0);
   await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
   await reviewScreenshot(chart, {
     path: info.outputPath("production-blackout-dark.png"),

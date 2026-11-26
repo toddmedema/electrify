@@ -11,6 +11,13 @@
   background: var(--bg-raised);
   color: var(--font-color-primary);
   outline-offset: -4px;
+
+  h3 {
+    margin: 4px 0;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+  }
 }
 .desktopBuildRail > .desktopBuildSizing {
   flex: 0 0 auto;
@@ -42,12 +49,6 @@
     margin: 8px 4px 4px;
     border: 0;
     border-top: 1px solid var(--border-subtle);
-  }
-  h3 {
-    margin: 8px 0 4px;
-    text-align: center;
-    font-size: 11px;
-    font-weight: 600;
   }
 }
 .desktopBuildTechnology {

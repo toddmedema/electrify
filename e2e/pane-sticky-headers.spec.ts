@@ -68,7 +68,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       exact: true,
     });
     await expect(close).toBeInViewport();
-    await expect(page.getByText("Starting your mission…")).toBeHidden();
+    await expect(page.getByText("Loading")).toBeHidden();
     if (process.env.PR_SCREENSHOTS) {
       await page.screenshot({
         path: path.join(
@@ -101,7 +101,7 @@ for (const colorScheme of ["light", "dark"] as const) {
       });
     await expect(page.locator("main.base_main")).toHaveCount(1);
     if (process.env.PR_SCREENSHOTS) {
-      await expect(page.getByText("Starting your mission…")).toBeHidden();
+      await expect(page.getByText("Loading")).toBeHidden();
       await page.screenshot({
         path: path.join(
           process.env.PR_SCREENSHOTS,

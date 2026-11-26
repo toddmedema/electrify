@@ -226,7 +226,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: '#speedChangeButtons [aria-label="slow speed"]',
         hideUi: MISSION_ONE_CLOCK,
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to start time",
+        action: "Select slow speed to start time",
         content: <TutorialPrompt text="Demand rises as the city wakes up." />,
       },
       {
@@ -347,7 +347,7 @@ export const SCENARIOS: ScenarioType[] = [
         hideUi: EARLY_MISSION_HIDDEN,
         target: '#speedChangeButtons [aria-label="fast speed"]',
         advanceOn: (s: AppStateType) => s.game.speed === "FAST",
-        action: "Tap 12× to start construction time",
+        action: "Select fast speed to start construction time",
         content: (
           <TutorialPrompt text="Construction only moves while time runs." />
         ),
@@ -606,7 +606,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "INSIGHTS",
         target: '#speedChangeButtons [aria-label="slow speed"]',
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to run the month",
+        action: "Select slow speed to run the month",
         content: (
           <TutorialPrompt text="Watch the numbers change as the month runs." />
         ),
@@ -694,7 +694,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "INSIGHTS",
         target: '#speedChangeButtons [aria-label="slow speed"]',
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to watch customers respond",
+        action: "Select slow speed to watch customers respond",
         content: (
           <TutorialPrompt text="Customers switch gradually; keep supply ahead of their growing demand." />
         ),
@@ -801,7 +801,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#speedChangeButtons",
         advanceOn: (s: AppStateType) =>
           s.game.eventLog.some((event) => event.kind === "BLACKOUT"),
-        action: "Tap 1× to observe the blackout",
+        action: "Select slow speed to observe the blackout",
         content: (
           <TutorialPrompt text="Insights shows the forecast blackout." />
         ),
@@ -971,7 +971,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         target: '#speedChangeButtons [aria-label="slow speed"]',
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to build the line",
+        action: "Select slow speed to build the line",
         content: (
           <TutorialPrompt text="Construction progresses while time runs." />
         ),
@@ -1048,7 +1048,7 @@ export const SCENARIOS: ScenarioType[] = [
         card: "FACILITIES",
         target: '#speedChangeButtons [aria-label="slow speed"]',
         advanceOn: (s: AppStateType) => s.game.speed !== "PAUSED",
-        action: "Tap 1× to observe imports",
+        action: "Select slow speed to observe imports",
         content: (
           <TutorialPrompt text="The connected line can now cover shortages." />
         ),

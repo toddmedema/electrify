@@ -99,7 +99,6 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
             setProject(selection);
             setCatalogue(false);
           }}
-          onChangeProject={() => setCatalogue(true)}
           onClose={close}
           onBusy={() => undefined}
         />
@@ -307,7 +306,7 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(0);
 });
 
-it("explains a project with no compatible sites and keeps Change project available", () => {
+it("explains a project with no compatible sites", () => {
   const { choose, store, game } = show(false, undefined, 0);
   choose();
   expect(
@@ -316,10 +315,6 @@ it("explains a project with no compatible sites and keeps Change project availab
   expect(
     screen.queryByText("Choose a highlighted site."),
   ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Change project" }));
-  expect(
-    screen.getByRole("slider", { name: "Generator capacity" }),
-  ).toBeVisible();
   expect(currentTick(store.getState().game)!.cash).toBe(
     currentTick(game)!.cash,
   );

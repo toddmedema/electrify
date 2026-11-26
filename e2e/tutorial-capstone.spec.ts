@@ -81,7 +81,7 @@ async function completeMission(
     page.locator('[data-fuel="Coal"] .facilityDetails'),
   ).toBeVisible();
   await page.locator("#chartSupplyDemand").click();
-  await expect(page.getByText("Tap 1× to start time")).toBeVisible();
+  await expect(page.getByText("Select slow speed to start time")).toBeVisible();
   await expect(page.locator("#speedChangeButtons")).toBeVisible();
 
   if (testInfo.project.name.startsWith("mobile-")) {

@@ -13,6 +13,7 @@ it("follows simulated day/night and keeps the stylized moon cool", () => {
   expect(noon.color[0]).toBeGreaterThan(noon.color[2]);
   expect(night.color[2]).toBeGreaterThan(night.color[0]);
   expect(noon.ambient).toBeGreaterThan(night.ambient);
+  expect(noon.direction[2]).toBeGreaterThan(0);
   expect(mapLighting({ ...day, minute: 480 }).direction[0]).toBeGreaterThan(0);
   expect(mapLighting({ ...day, minute: 960 }).direction[0]).toBeLessThan(0);
   expect(mapLighting(day)).toEqual(noon);

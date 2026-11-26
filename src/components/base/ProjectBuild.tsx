@@ -38,7 +38,6 @@ export default function ProjectBuild({
   compatibleSites,
   catalogue,
   onProject,
-  onChangeProject,
   onUpdateProject,
   onClose,
   onBusy,
@@ -49,7 +48,6 @@ export default function ProjectBuild({
   compatibleSites: number;
   catalogue: boolean;
   onProject: (project: ProjectSelection) => void;
-  onChangeProject: () => void;
   /** Update options without discarding the chosen geographic site. */
   onUpdateProject?: (project: ProjectSelection) => void;
   onClose: () => void;
@@ -213,33 +211,14 @@ export default function ProjectBuild({
       ) : (
         <div className="projectCandidateContent">
           <div className="projectCandidateScroll">
-            <div className="projectCandidateHeader">
-              {ready && (
-                <p className="projectLocation">
-                  {territoryTileLabel(ready.tile)} ·{" "}
-                  {territoryMapLabel(ready.tile.territoryId)}
-                </p>
-              )}
-              <Button
-                size="small"
-                disabled={!!progress}
-                onClick={() => {
-                  if (!lock.current) onChangeProject();
-                }}
-              >
-                Change project
-              </Button>
-            </div>
+            {ready && (
+              <p className="projectLocation">
+                {territoryTileLabel(ready.tile)} ·{" "}
+                {territoryMapLabel(ready.tile.territoryId)}
+              </p>
+            )}
             {!candidate && compatibleSites > 0 && (
-              <>
-                <p>Choose a highlighted site.</p>
-                <p className="projectSiteLegend">
-                  <span>Connected · total project cost</span>
-                  <span>
-                    Connection required · total project and connection cost
-                  </span>
-                </p>
-              </>
+              <p>Choose a highlighted site.</p>
             )}
             {!candidate && compatibleSites === 0 && (
               <Alert severity="info">
