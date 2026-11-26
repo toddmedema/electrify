@@ -19,8 +19,8 @@ Guidance for UI work in Electrify, referenced from [AGENTS.md](../AGENTS.md#inte
   these to heavy shadows, ornamental decoration, or unnecessary nested cards.
 - Reflow by priority instead of shrinking the desktop composition: on phones, show one primary
   pane, abbreviate or collapse secondary controls, allow appropriate rails to scroll, and stack
-  actions before they crowd. Keep charts and critical status legible; design for a minimum viewport
-  width of 360 px, the narrowest common modern smartphone, and don't add short forms or layouts
-  just for narrower widths.
+  actions before they crowd or overflow. Keep charts and critical status legible. Design for a
+  minimum viewport width of 360 px and reserve short forms and alternate layouts for widths in
+  that supported range.
 - Never make color or an icon the only carrier of meaning: pair symbols and state colors with text,
   and distinguish chart series with direct labels, patterns, or line styles as well as color.

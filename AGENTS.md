@@ -11,67 +11,71 @@ guide; do not add a `CLAUDE.md`. If your tooling does not format on save, run
 - Use Node 26 (`node --version`; put it on `PATH` if needed). Install exactly the lockfile with
   `npm ci` in a new checkout or when the lockfile changes; reuse that install while it still
   matches.
-- Reserve the checkout before editing with `npm run task -- claim` (pass an ID or set
-  `ELECTRIFY_TASK_ID`); if another task owns it, use an isolated worktree. Release with
-  `npm run task -- release` when finished; see [development coordination](docs/development-workflow.md)
-  for recovery.
+- Reserve the checkout before editing with `npm run task -- claim`. If no task ID is supplied by
+  your environment, set `ELECTRIFY_TASK_ID` or pass the same ID to both claim and release. Use an
+  isolated worktree if another task owns the checkout. Release it with `npm run task -- release`
+  when finished. See [development coordination](docs/development-workflow.md) for recovery.
 - In a fresh worktree, run `npm run check:assets` before tests, builds or browser QA; if it finds
   Git LFS pointers, try `git lfs checkout`, then `git lfs pull`. For missing files, stage
   intentional deletions or renames; otherwise restore them.
 - `npm run check` runs eight gates: types (including `e2e/`), lint, formatting, native unit tests,
-  CI tooling, the covered Jest suite, the long simulation suites (`npm run test:sim`), and a short
-  simulation CLI run. It checks assets first and continues after gate failures. CI also runs the
-  Firestore rules tests (`npm run test:rules`, which needs Java 21); run them yourself when you
-  change `firebase/firestore.rules`.
+  CI tooling, covered Jest tests, long simulations of every scenario (`npm run test:sim`), and a
+  simulation CLI smoke run. It checks assets first, prints results as each gate finishes, and
+  continues after failures. CI also runs the Firestore rules tests (`npm run test:rules`, which
+  needs Java 21). Run them yourself when you change `firebase/firestore.rules`.
 - Before pushing, run the local checks that cover the changed behavior and its callers (broaden
   for shared simulation, save, co-op, build or workflow changes); record the commands and results
   in the PR. Run `npm run check:prepush` on the commit you will push to catch stale site pages and
   metadata. Hosted CI runs the complete suite on the pushed revision; `npm run check:ci` (fifteen
   gates) is available for broad local verification or reproducing CI failures.
-- After a failed check, rerun only the failed gates with the printed command (e.g.
-  `npm run check -- --steps lint,tests`); keep earlier passing results only while their inputs are
-  unchanged. `npm run check:ci -- --resume` reruns failed or invalidated gates and verifies reused
-  evidence ([development coordination](docs/development-workflow.md#resume-verified-validation)). A
-  partial check is never evidence that all gates ran.
+- After fixing a failed gate, use its printed retry command, such as
+  `npm run check -- --steps lint,tests`. Keep earlier passes only while their inputs are unchanged.
+  `npm run check:ci -- --resume` accounts for all fifteen gates, reruns failed or invalidated gates,
+  and verifies reused evidence. A partial check is never evidence that all gates ran. See the
+  [resume rules](docs/development-workflow.md#resume-verified-validation).
 - For prose-only Markdown changes, review the text and run `git diff --check`; app tests, builds
   and simulations are unnecessary. Changes to scripts, configuration or executable examples need
   the relevant checks.
-- Local checks cap Jest workers at four (override with `ELECTRIFY_CHECK_WORKERS` only for a
-  measured need) and queue heavy work across local worktrees; do not pause a running test process
-  to make room.
+- Local checks default to at most four Jest workers. Override with `ELECTRIFY_CHECK_WORKERS`
+  only for a measured need. Heavy suites run serially, and the simulation CLI runs in process.
+  Heavy work queues across worktrees. Let running tests finish.
 - `npm run fix` applies every mechanical fix (`lint:fix`, `format`); review its diff. It does not
   fix types or tests.
-- Iterate on one Jest suite with `npm run test:once -- <name>`; plain `npm test` is interactive
-  watch mode and never exits in a non-interactive shell. Coverage thresholds apply only to
-  `test:ci`, which skips `*.sim.test.tsx` — name long simulation suites that way and run them with
-  `test:sim`.
+- Iterate on one Jest suite with `npm run test:once -- <name>`. Plain `npm test` runs in
+  interactive watch mode and never exits in a non-interactive shell. Name long simulations
+  `*.sim.test.tsx` when they are outside the coverage requirement. `test:ci` skips them, and
+  `test:sim` runs them without instrumentation.
 - Iterate on game economics with `npm run sim -- --scenario <id>`; see `src/testing/README.md` for
   simulation flags and traps.
-- Performance work starts from `docs/perf-plan.md`: `npm run perf:bench` gates tick and rollover
-  cost, `npm run perf:bundle` gates gzip bytes after a build, and GoldenOutputs pins every
-  scenario's output; rebaseline with `npm run perf:rebaseline`, last, and explain the move in the
-  PR. Append `?perf=1` to a dev URL for the frame-budget overlay.
+- Start performance work from [the performance plan](docs/perf-plan.md). `npm run perf:bench`
+  reports tick and rollover times and gates same-process ratios. `npm run perf:bundle` gates gzip
+  bytes after a build. `src/testing/GoldenOutputs.sim.test.tsx` pins every scenario's output.
+  Rebaseline with `npm run perf:rebaseline` last and explain the move in the PR. Append `?perf=1`
+  to a dev URL for the frame-budget overlay.
 - Build with `npm run build`. For UI flow or layout changes, search affected `e2e/` specs for the
-  old controls and reuse the helpers in `e2e/layout.ts`; run changed specs with
-  `ELECTRIFY_E2E_ALL_SPECS=1 npm run test:e2e -- <spec> --project=desktop-chromium
-  --project=mobile-390px` (add `--project=mobile-360px` for minimum-width layout changes). New
-  assertions must be reached, even when an earlier failure also occurs on the base branch.
-- `check:ci` runs the production browser selection in `e2e/ci.playwright.config.ts`;
-  `test:e2e:ci -- <spec>` selects only cases already in that matrix. To test an arbitrary spec
-  against production, run `test:e2e` with `ELECTRIFY_E2E_ALL_SPECS=1` and `E2E_BASE_URL` pointing
-  at your hosted web build. Local `check:ci` keeps artifacts in `.tmp/check-builds/`.
-- Local npm browser/check commands reserve and print an unused `E2E_PORT`; set it explicitly to
-  keep a specific port across invocations. Preserve other tasks' servers except for the verified
-  merged-PR cleanup below.
-- Agents may stop preview servers and free port reservations for PRs freshly verified as merged,
-  after verifying the matching checkout/head and exact process tree with no later unmerged work.
-  Prefer graceful shutdown; remove stale reservations only after proving their owner and process
-  group are gone. Never touch unrelated or unmerged work, or a lease another task has acquired.
-- Keep local validation windowless: use `npm run check` and headless Chromium through
-  `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus; leave it
-  to CI unless the user explicitly requests `npm run test:desktop -- --headed`. Do not add
-  `--headed`, `--debug`, or `--ui`, set `PWDEBUG`, or launch `desktop:start` during routine local
-  validation. `test:desktop:native` is a windowless Node unit suite and remains part of `check`.
+  old controls and reuse the helpers in `e2e/layout.ts`. Run changed specs with
+  `ELECTRIFY_E2E_ALL_SPECS=1 npm run test:e2e -- <spec> --project=desktop-chromium --project=mobile-390px`.
+  Add `--project=mobile-360px` for minimum-width layout changes. New assertions must be reached,
+  even when an earlier failure also occurs on the base branch.
+- `check:ci` uses `e2e/ci.playwright.config.ts` and `e2e/browser-projects.ts`.
+  `npm run check:ci -- --steps browser --resume` also verifies the web-build prerequisite.
+  `npm run test:e2e:ci -- <spec>` selects only cases in the CI matrix. For other specs against
+  production, run `test:e2e` with `ELECTRIFY_E2E_ALL_SPECS=1` and `E2E_BASE_URL` pointing at
+  your hosted web build. Local `check:ci` writes to `.tmp/check-builds/web` and
+  `.tmp/check-builds/desktop`. Standalone `build` and `desktop:build` default to `build/`.
+- Local npm browser/check commands reserve and print an unused `E2E_PORT`. Set it explicitly for
+  a stable port across runs. An occupied or reserved port fails before tests. Verify which
+  checkout an existing server is serving before using it.
+- After freshly verifying a PR is merged, agents may stop its preview servers or obsolete
+  validation and free their validation or port reservations. Verify the matching checkout and
+  head, the exact process tree, and the absence of later unmerged work. Prefer graceful shutdown
+  and normal reservation cleanup. Remove stale reservations only after proving the owner and
+  process group are gone. Leave other tasks' servers, work, and leases alone.
+- Keep local validation windowless with `npm run check` and headless Chromium through
+  `npm run test:e2e`. The Electron UI suite opens native windows and takes keyboard focus. Run
+  `npm run test:desktop -- --headed` locally only if the user explicitly requests a native-window
+  test. During routine local validation, avoid `--headed`, `--debug`, `--ui`, `PWDEBUG`, and
+  `desktop:start`. `test:desktop:native` is a windowless Node unit suite and remains part of `check`.
 
 ## Verification design
 
@@ -87,9 +91,8 @@ Every turn re-reads the whole conversation, so many small turns and large images
 - Batch independent lookups: several `rg -n` or `sed -n` calls in one command, or parallel tool
   calls, instead of one lookup per turn.
 - Prefer DOM text, computed styles and test assertions to screenshots. When you need an image, use
-  `npm run shot` (see `--help`) instead of a throwaway Playwright script: headless, device-scale-1
-  PNGs, `--clip <selector>` captures just the component; it photographs the dev server that
-  `npm start` is running in this checkout.
+  `npm run shot` (see `npm run shot -- --help`). It captures headless, device-scale-1 PNGs from
+  this checkout's `npm start` server by default. Use `--clip <selector>` to capture one component.
 - Look at each image once; do not reopen unchanged screenshots after later edits.
 - For any task that uses subagents, follow the [multi-agent-work skill](.agents/skills/multi-agent-work/SKILL.md):
   give subagents focused checks and let the integrating agent own validation of the combined change.
@@ -97,17 +100,18 @@ Every turn re-reads the whole conversation, so many small turns and large images
 ## Run compatibility manifest
 
 `src/data/RunCompatibility.json` is a generated, git-ignored identity of the game reducer's
-runtime dependency graph and shipped data. The npm entry points for `start`, `build`, `test*`,
-`sim`, and `typecheck` regenerate it automatically, so never commit or merge it; run
-`npm run compatibility:generate` by hand only if your editor complains that the file is missing.
-See [docs/run-compatibility.md](docs/run-compatibility.md) for why the hash is intentionally broad.
+runtime dependency graph and shipped data. Type-only, comment, and formatting changes leave
+official-run compatibility intact. Co-op also uses a broad source/data/lockfile identity. The npm
+entry points for `start`, `build`, `test*`, `sim`, and `typecheck` regenerate the manifest. Never
+commit or merge it. Run `npm run compatibility:generate` by hand only if your editor needs the
+missing file. See [run compatibility](docs/run-compatibility.md) for scope.
 
 ## Pull requests
 
 - After required local checks pass, create or update the PR and report remote CI's current status;
   monitor it to completion only when asked to monitor, merge, or deliver green CI.
-- When CI fails, run `npm run ci:failures` (or `-- <pr>`): it lists the failed jobs, gates, tests
-  and assertion excerpts plus the local command that reproduces each. Reproduce the failure, fix
+- When CI fails, run `npm run ci:failures` or `npm run ci:failures -- <pr>` for failed jobs,
+  gates, tests, assertion excerpts, and local reproduction commands. Reproduce the failure, fix
   the cause, rerun the matching gate, push, and report status. Never weaken a test, raise a ceiling
   or rebaseline just to get green; when a change intentionally moves a ceiling, explain the move in
   the PR.
@@ -159,8 +163,8 @@ See [docs/run-compatibility.md](docs/run-compatibility.md) for why the hash is i
   to `src/testing/Invariants.tsx`; do not duplicate game formulas in the simulator.
 - Background reading, loaded only when relevant: `docs/demand-model.md`,
   `docs/facilities-economics.md`, `docs/construction-emissions.md`, `docs/hydro-sites.md`,
-  `docs/intertie-trends.md`, `docs/intertie-balance.md`, `docs/interface-design.md`,
-  `docs/run-compatibility.md`, and `src/testing/SCENARIO_CHOICE_BALANCE.md`.
+  `docs/intertie-trends.md`, `docs/intertie-balance.md`, `docs/run-compatibility.md`, and
+  `src/testing/SCENARIO_CHOICE_BALANCE.md`.
 - Several files are large: `app.scss`, `reducers/Game.tsx`, `views/Insights.tsx`,
   `data/WorldEvents.tsx`, `data/TransmissionProfiles.ts`, `data/Scenarios.tsx`, and `Types.tsx`.
   Search them for the symbol you need and read that range instead of loading the whole file.
@@ -180,10 +184,9 @@ See [docs/run-compatibility.md](docs/run-compatibility.md) for why the hash is i
 
 ## Interface design
 
-For UI work, follow the [interface design guidance](docs/interface-design.md): one dominant action
-per screen, 4 px spacing rhythm and minimum control heights, semantic palette roles, separate
-light/dark contrast systems, hierarchy over decoration, priority-based reflow to a 360 px minimum,
-and no color-only meaning.
+Before UI work, read and follow the [interface design guidance](docs/interface-design.md). It
+covers action hierarchy, spacing and control heights, palette and contrast, reflow down to 360 px,
+and accessible labels for controls and charts.
 
 ## Task guidance skills
 
