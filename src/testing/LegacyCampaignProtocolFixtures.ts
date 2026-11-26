@@ -44,7 +44,7 @@ export function firstCompany(): GameType {
 }
 
 /** Fabricated public month facts isolate the protocol; the final month uses real ticks. */
-export function closingCompany(firstMonthCustomers = 100): GameType {
+export function closingCompany(firstProfitableMonthRevenueBonus = 0): GameType {
   const game = firstCompany();
   const row = summarizeTimeline(game.timeline, 1882);
   for (let month = 0; month < 239; month++) {
@@ -53,10 +53,15 @@ export function closingCompany(firstMonthCustomers = 100): GameType {
       ...row,
       year: 1882 + Math.floor(month / 12),
       month: (month % 12) + 1,
-      customers: month === 0 ? firstMonthCustomers : 100,
+      customers: 100,
       cash: 1e9,
-      // Protocol evidence only: real economic feasibility is exercised by the sim suite.
-      revenue: row.expensesFuel + row.expensesOM + row.expensesInterest + 1e6,
+      // Month 48 supplies First Light's first-profitable-year evidence.
+      revenue:
+        row.expensesFuel +
+        row.expensesOM +
+        row.expensesInterest +
+        1e6 +
+        (month === 47 ? firstProfitableMonthRevenueBonus : 0),
     };
     game.monthlyHistory.unshift(closed);
     recordGameObjectiveMonth(game, closed);
