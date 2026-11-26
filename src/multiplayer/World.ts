@@ -1196,8 +1196,19 @@ function validGrid(
   peers?: TerritoryPurchaseContext,
 ) {
   const g = world.grids[i];
+  const outcome = world.outcomes[world.seats[i].id];
+  const ending = g.multiplayer?.ending;
+  if (
+    ending !== undefined &&
+    (!outcome ||
+      ending?.outcome !== outcome.outcome ||
+      ending.title !== outcome.title ||
+      ending.month !== outcome.month ||
+      ending.reason !== outcome.reason)
+  )
+    return false;
   let objectiveProgress = g.objectiveProgress;
-  if (world.outcomes[world.seats[i].id]) {
+  if (outcome) {
     try {
       if (hasArchivedValleyGoals(g)) {
         // Validate the frozen evidence under its own rules before checking the rest
@@ -1454,6 +1465,12 @@ export function hydrateWorld(value: unknown): World {
     )
       throw new Error(INVALID_GRIDS);
   }
+  // Some checkpoints record retirement only in the world's seat outcomes.
+  result.grids.forEach((grid) => {
+    const multiplayer = grid.multiplayer!;
+    const outcome = result.outcomes[multiplayer.seat];
+    if (outcome) multiplayer.ending = outcome;
+  });
   restoreCommitments(world, result);
   return result;
 }
@@ -1861,10 +1878,9 @@ function upgradeTerritoryWorld(value: unknown): unknown {
     const migrated = upgraded.game as GameType;
     const seat = result.seats?.[i];
     const ending = seat && result.outcomes?.[seat.id];
-    if (ending && hasArchivedValleyGoals(grid) && migrated.multiplayer) {
+    if (ending && hasArchivedValleyGoals(grid)) {
       // A retired company keeps the goals that produced its recorded outcome.
       migrated.objectiveProgress = grid.objectiveProgress;
-      migrated.multiplayer.ending = ending;
     }
     result.grids[i] = migrated;
   }

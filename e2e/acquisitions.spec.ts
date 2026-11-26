@@ -734,7 +734,6 @@ for (const theme of ["light", "dark"] as const) {
       await touch.detach();
     }
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0);
-    await showMapFacilityStatus(network);
 
     // Restore a deterministic midpoint so the map can show a partially drawn ring.
     await editSavedGame(page, ({ game }) => {
@@ -746,6 +745,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await returnToTerritoryMap(page);
+    await showMapFacilityStatus(network);
 
     const states = [
       [getTerritoryTile(hydro.tileId, built)!, "producing", "Generating"],

@@ -416,14 +416,17 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
         JSON.stringify(checkpointWorld(restored)),
       );
       const resumed = restoreWorld(current, "round-trip");
+      const missingGridEnding = cloneDeep(current);
+      delete missingGridEnding.grids[0].multiplayer!.ending;
+      const recovered = restoreWorld(missingGridEnding, "recovered");
 
       expect(saved).toEqual(before);
-      for (const world of [restored, resumed]) {
+      expect(missingGridEnding.grids[0].multiplayer!.ending).toBeUndefined();
+      for (const world of [restored, resumed, recovered]) {
         const [retired, active] = world.grids;
         expect(retired.objectiveProgress).toEqual(
           saved.grids[0].objectiveProgress,
         );
-        expect(retired.multiplayer?.ending).toEqual(ending);
         expect(active.objectiveProgress).toEqual(
           played.grids[1].objectiveProgress,
         );
@@ -439,6 +442,7 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
         expect(
           verdicts?.find(({ id }) => id === "acquire-neighbor"),
         ).toMatchObject({ target, observed: 1, status });
+        expect(retired.multiplayer?.ending).toEqual(ending);
         send(world, activeSeat.id, { kind: "speed", speed: "NORMAL" });
         stepWorld(world);
         expect(retired.date.minute).toBe(saved.grids[0].date.minute);
@@ -447,10 +451,18 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
         );
       }
       expect(resumed.grids).toEqual(restored.grids);
+      expect(recovered.grids).toEqual(restored.grids);
 
-      const damaged = cloneDeep(current);
+      const damaged = cloneDeep(missingGridEnding);
       damaged.grids[0].objectiveProgress!.checksum = unknownDigest;
       expect(() => restoreWorld(damaged, "damaged")).toThrow(/invalid grids/);
+      for (const source of [saved, current]) {
+        const conflicting = cloneDeep(source);
+        conflicting.grids[0].multiplayer!.ending = { ...ending, month: 2 };
+        expect(() => restoreWorld(conflicting, "conflicting")).toThrow(
+          /invalid grids/,
+        );
+      }
       delete current.outcomes[retiredSeat.id];
       expect(() => restoreWorld(current, "unretired")).toThrow(/invalid grids/);
     },
