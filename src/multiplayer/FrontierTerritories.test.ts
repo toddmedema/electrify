@@ -387,31 +387,74 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
     }
   });
 
-  it("keeps archived goals for a retired company in a schema 27 Valley match", () => {
-    const saved = checkpoint("preview", 23);
-    saved.gameSchema = 27;
-    saved.rules =
-      "coop-2-1a95347433b292b1c39f0acd04a8d123c411a599ee4d43c03bf2f4aed2753fd7";
-    for (const grid of saved.grids)
-      grid.utilityExpansion!.sellerFleet = "authored";
-    saved.outcomes[saved.seats[0].id] = {
-      outcome: "bankrupt",
-      title: "Bankrupt!",
-      month: 1,
-    };
-    const restored = restoreWorld(saved, "schema27");
-    const resumed = restoreWorld(checkpointWorld(restored), "round-trip");
-    const [retired, active] = resumed.grids;
-    expect(retired.objectiveProgress).toEqual(saved.grids[0].objectiveProgress);
-    expect(active.objectiveProgress?.entries.map(({ id }) => id)).toEqual([
-      "acquire-neighbor",
-    ]);
-    expect(
-      roomView(resumed, resumed.seats[1].id)
-        .game?.multiplayer?.results?.[0].objectiveResults?.map(({ id }) => id)
-        .sort(),
-    ).toEqual(["acquire-neighbor", "retain-customers"]);
-  });
+  const unknownDigest = `sha256-${"0".repeat(64)}`;
+
+  it.each([
+    [22, "master", 1, "completed"],
+    [22, "preview", 3, "inProgress"],
+    [27, "preview", 3, "inProgress"],
+  ] as const)(
+    "keeps archived progress and verdicts for a retired company on schema %i with %s evidence",
+    (schema, lineage, target, status) => {
+      const saved = checkpoint(lineage, schema);
+      if (schema === 27) {
+        saved.rules =
+          "coop-2-1a95347433b292b1c39f0acd04a8d123c411a599ee4d43c03bf2f4aed2753fd7";
+        for (const grid of saved.grids)
+          grid.utilityExpansion!.sellerFleet = "authored";
+      }
+      const [retiredSeat, activeSeat] = saved.seats;
+      const ending = {
+        outcome: "bankrupt",
+        title: "Bankrupt!",
+        month: 1,
+      } as const;
+      saved.outcomes[retiredSeat.id] = ending;
+      const before = cloneDeep(saved);
+      const restored = restoreWorld(saved, "restored");
+      const current: World = JSON.parse(
+        JSON.stringify(checkpointWorld(restored)),
+      );
+      const resumed = restoreWorld(current, "round-trip");
+
+      expect(saved).toEqual(before);
+      for (const world of [restored, resumed]) {
+        const [retired, active] = world.grids;
+        expect(retired.objectiveProgress).toEqual(
+          saved.grids[0].objectiveProgress,
+        );
+        expect(retired.multiplayer?.ending).toEqual(ending);
+        expect(active.objectiveProgress).toEqual(
+          played.grids[1].objectiveProgress,
+        );
+        expect(active.multiplayer?.ending).toBeUndefined();
+        const results = roomView(world, activeSeat.id).game?.multiplayer
+          ?.results;
+        expect(results).toHaveLength(1);
+        expect(results?.[0]).toMatchObject({ id: retiredSeat.id, ...ending });
+        const verdicts = results?.[0].objectiveResults;
+        expect(verdicts?.map(({ id }) => id)).toEqual(
+          saved.grids[0].objectiveProgress?.entries.map(({ id }) => id),
+        );
+        expect(
+          verdicts?.find(({ id }) => id === "acquire-neighbor"),
+        ).toMatchObject({ target, observed: 1, status });
+        send(world, activeSeat.id, { kind: "speed", speed: "NORMAL" });
+        stepWorld(world);
+        expect(retired.date.minute).toBe(saved.grids[0].date.minute);
+        expect(world.grids[1].date.minute).toBeGreaterThan(
+          saved.grids[1].date.minute,
+        );
+      }
+      expect(resumed.grids).toEqual(restored.grids);
+
+      const damaged = cloneDeep(current);
+      damaged.grids[0].objectiveProgress!.checksum = unknownDigest;
+      expect(() => restoreWorld(damaged, "damaged")).toThrow(/invalid grids/);
+      delete current.outcomes[retiredSeat.id];
+      expect(() => restoreWorld(current, "unretired")).toThrow(/invalid grids/);
+    },
+  );
 
   function recomputeChecksum(progress: ObjectiveProgress) {
     const {
@@ -433,8 +476,6 @@ describe("schema 22 and 23 Valley checkpoint lineages", () => {
       })),
     });
   }
-
-  const unknownDigest = `sha256-${"0".repeat(64)}`;
 
   it("rejects preview evidence with a changed rules digest even if its checksum matches", () => {
     const saved = checkpoint("preview");

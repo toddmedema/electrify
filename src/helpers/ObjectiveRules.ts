@@ -596,16 +596,34 @@ export function gameObjectiveProgress(
   );
 }
 
+function archivedValleyGoals(game: GameType) {
+  const digest = game.objectiveProgress?.rulesDigest;
+  if (game.scenarioId !== EXPANSION_SCENARIO_ID || !digest) return undefined;
+  const scenario = getScenario(EXPANSION_SCENARIO_ID)!;
+  return [
+    VALLEY_TWO_GOAL_OBJECTIVES,
+    RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+  ].find(
+    (goals) =>
+      objectiveContextForDefinitions(game, scenario, goals).rulesDigest ===
+      digest,
+  );
+}
+
 export function hasArchivedValleyGoals(game: GameType): boolean {
-  if (game.scenarioId !== EXPANSION_SCENARIO_ID || !game.objectiveProgress)
-    return false;
+  return !!archivedValleyGoals(game);
+}
+
+/** A recorded company outcome retains evidence under the rules in force when it ended. */
+export function validArchivedValleyGoals(game: GameType): boolean {
+  const goals = archivedValleyGoals(game);
   return (
-    game.objectiveProgress.rulesDigest ===
-    objectiveContextForDefinitions(
+    !!goals &&
+    validGameObjectiveProgressForDefinitions(
       game,
       getScenario(EXPANSION_SCENARIO_ID)!,
-      VALLEY_TWO_GOAL_OBJECTIVES,
-    ).rulesDigest
+      goals,
+    )
   );
 }
 
@@ -613,9 +631,8 @@ export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return [];
   const objectives =
-    game.multiplayer?.ending && hasArchivedValleyGoals(game)
-      ? VALLEY_TWO_GOAL_OBJECTIVES
-      : scenarioObjectiveDefinitions(scenario, game);
+    (game.multiplayer?.ending ? archivedValleyGoals(game) : undefined) ??
+    scenarioObjectiveDefinitions(scenario, game);
   if (!objectives.length) return [];
   return gameResultsForDefinitions(
     game,

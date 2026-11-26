@@ -53,7 +53,7 @@ import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
 import {
   gameObjectiveResults,
   hasArchivedValleyGoals,
-  migrateSingleOfficialGoal,
+  validArchivedValleyGoals,
 } from "../helpers/ObjectiveRules";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import { pendingTileConnections } from "../helpers/TerritoryConnections";
@@ -1200,9 +1200,10 @@ function validGrid(
   if (world.outcomes[world.seats[i].id]) {
     try {
       if (hasArchivedValleyGoals(g)) {
-        const migrated = migrateSingleOfficialGoal(g);
-        if (!migrated) return false;
-        objectiveProgress = migrated;
+        // Validate the frozen evidence under its own rules before checking the rest
+        // of the grid as a standalone save under current rules.
+        if (!validArchivedValleyGoals(g)) return false;
+        objectiveProgress = undefined;
       }
     } catch {
       return false;
