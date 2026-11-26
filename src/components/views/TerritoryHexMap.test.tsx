@@ -287,7 +287,7 @@ it("explains and colors physical building eligibility without guessing from terr
     "var(--interactive-blue)",
   );
   expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
-    "Plains",
+    "Plains · Unconnected",
   );
 });
 
@@ -516,10 +516,10 @@ it("describes unconnected land and peer claims without repeating local ownership
   map.buyMode();
   tap(map.target("green-uplands:site-0"));
   expect(map.target("green-uplands:site-0")).toHaveAccessibleDescription(
-    /^Plains/,
+    /^Plains(?!.*Unconnected)/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    "Forest",
+    "Forest · Unconnected",
   );
   act(() => {
     map.store.dispatch(
@@ -537,16 +537,18 @@ it("describes unconnected land and peer claims without repeating local ownership
     / · Birch Utility/,
   );
   expect(map.target("green-uplands:site-1")).toHaveAccessibleDescription(
-    "Forest",
+    "Forest · Unconnected",
   );
 });
 
-it("refreshes a stationary pointer tooltip after a peer claims its tile", async () => {
+it("refreshes a stationary fallback tooltip after a peer claims its tile", async () => {
   const map = show();
   const tile = map.target("green-uplands:site-2");
   fireEvent.pointerMove(tile, { pointerId: 1, clientX: 100, clientY: 100 });
   await waitFor(() =>
-    expect(screen.getByRole("tooltip")).toHaveTextContent("Plains"),
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "Plains · Unconnected",
+    ),
   );
   act(() => {
     map.store.dispatch(
@@ -569,7 +571,7 @@ it("shows the tile status tooltip on keyboard focus and dismisses it on blur", (
   const tile = map.target("green-uplands:site-2");
   act(() => tile.focus());
   expect(tile).toHaveFocus();
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Plains");
+  expect(screen.getByRole("tooltip")).toHaveTextContent("Plains · Unconnected");
   expect(tile).toHaveAccessibleDescription(
     screen.getByRole("tooltip").textContent!,
   );

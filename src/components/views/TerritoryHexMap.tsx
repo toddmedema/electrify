@@ -69,6 +69,7 @@ const RENDERER_MESSAGES = {
   failed: "The 3D map couldn’t load.",
 };
 const PAN_OVERSCAN = HEX_WIDTH / 4;
+const MIN_TILE_TARGET_HEIGHT = 44;
 const CAMERA_SHIFT_MS = 180;
 const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
   Residential: "homes",
@@ -583,9 +584,11 @@ export default function TerritoryHexMap({
       const box = element.getBoundingClientRect();
       const x = box.left + box.width / 2;
       const y = box.top + box.height / 2;
+      // Limit zoom at the camera so the projected hexes stay large enough to tap.
+      const minZoom = MIN_TILE_TARGET_HEIGHT / (HEX_HEIGHT * baseScale);
       // Keep the same point on the ground under the pointer or pinch midpoint.
       setCamera((point) => {
-        const zoom = Math.max(0.5, Math.min(2, point.zoom * factor));
+        const zoom = Math.max(minZoom, Math.min(2, point.zoom * factor));
         const oldScale = baseScale * point.zoom;
         const newScale = baseScale * zoom;
         return {
@@ -1087,23 +1090,13 @@ export default function TerritoryHexMap({
             pointer.current = undefined;
             return;
           }
-          suppressClick.current = id === null;
+          suppressClick.current = false;
           pointer.current = {
             id: event.pointerId,
             x: event.clientX,
             y: event.clientY,
             dragging: false,
           };
-          const ground =
-            event.target instanceof Element
-              ? event.target.closest<HTMLElement>("[data-map-target]")
-              : null;
-          if (id && ground?.dataset.mapTarget !== id) {
-            event.preventDefault();
-            stage.current
-              ?.querySelector<HTMLButtonElement>(`[data-map-target="${id}"]`)
-              ?.focus({ preventScroll: true });
-          }
         }}
         onAuxClick={(event) => {
           if (event.button === 1) event.preventDefault();
@@ -1335,7 +1328,7 @@ export default function TerritoryHexMap({
               ? `Total project cost (${projectPrice}) · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
             const growth = tile.city && cityGrowth.get(tile.territoryId);
-            const tileLabel = [
+            const terrainAndStatus = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
               growth &&
                 `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
@@ -1346,13 +1339,25 @@ export default function TerritoryHexMap({
               disaster?.condition,
               disaster?.facilityImpact,
               view.owned || !view.ownerKey ? undefined : view.ownerName,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const unconnected =
+              !view.owned && !view.ownerKey ? "Unconnected" : undefined;
+            const tileDescription = [
+              terrainAndStatus,
+              unconnected,
               hover.reason,
             ]
               .filter(Boolean)
               .join(" · ");
+            const tileTooltip =
+              threeDReady && unconnected
+                ? [terrainAndStatus, hover.reason].filter(Boolean).join(" · ")
+                : tileDescription;
             // The city is already named in the button label.
             const descriptionId =
-              utility && tileLabel === cityLabel
+              utility && tileDescription === cityLabel
                 ? undefined
                 : `${mapId}-${key}-status`;
             return (
@@ -1379,7 +1384,7 @@ export default function TerritoryHexMap({
                 }
                 data-purchasable={!!quote}
                 data-unaffordable={unaffordable}
-                data-tooltip={tileLabel}
+                data-tooltip={tileTooltip}
                 aria-busy={pending || undefined}
                 className={`territoryTileTarget${showName ? " territoryUtilityLabel" : ""}`}
                 style={
@@ -1525,7 +1530,7 @@ export default function TerritoryHexMap({
                 )}
                 {descriptionId && (
                   <span className="srOnly" id={descriptionId}>
-                    {tileLabel}
+                    {tileDescription}
                   </span>
                 )}
               </button>

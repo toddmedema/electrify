@@ -10,11 +10,7 @@ import { MapRenderer } from "./Renderer";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
 import TerritoryCanvas3D from "./TerritoryCanvas3D";
-import type {
-  RendererHandle,
-  RendererLoader,
-  RendererState,
-} from "./TerritoryCanvas3D";
+import type { RendererLoader, RendererState } from "./TerritoryCanvas3D";
 import { mapLighting } from "./Lighting";
 import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
 import type { MapFrame } from "./Types";
@@ -117,10 +113,6 @@ export default function TerritoryScene3D({
   );
   const lightingTransitionMs =
     speed === "SLOW" || speed === "NORMAL" ? TICK_MS[speed] : undefined;
-  const renderer = React.useRef<RendererHandle>();
-  const setRenderer = React.useCallback((value: RendererHandle | undefined) => {
-    renderer.current = value;
-  }, []);
   return (
     <TerritoryCanvas3D
       instances={instances}
@@ -128,7 +120,6 @@ export default function TerritoryScene3D({
       runKey={runKey}
       loadRenderer={loadRenderer}
       onState={onState}
-      onRenderer={setRenderer}
     />
   );
 }

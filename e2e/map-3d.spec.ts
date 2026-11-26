@@ -15,6 +15,7 @@ import { reviewScreenshot } from "./review-screenshot";
 import { getBuildFacilityQuote } from "../src/data/Facilities";
 import gameReducer, { buildFacility } from "../src/reducers/Game";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
+import { HEX_HEIGHT } from "../src/components/base/TerritoryHexGeometry";
 import { SceneBuilder } from "../src/components/base/territory-3d/SceneBuilder";
 import { getStructureModel } from "../src/components/base/territory-3d/StructureModels";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
@@ -383,7 +384,7 @@ test("desktop wheel zoom keeps the pointer anchored in every rendered frame", as
     [-180, Math.exp(0.3)],
     [180, 1],
     [-2000, 2],
-    [2000, 0.5],
+    [2000, 44 / HEX_HEIGHT / scale],
   ]) {
     await page.mouse.wheel(0, delta);
     await expect
@@ -412,6 +413,49 @@ test("desktop wheel zoom keeps the pointer anchored in every rendered frame", as
       "terrain drift in CSS pixels",
     ).toBeLessThan(1);
   }
+});
+
+test("minimum zoom keeps clicks aligned to the painted hex boundary", async ({
+  page,
+  isMobile,
+}) => {
+  const { map, canvas } = await startPausedMap(page);
+  await readyDiagnostics(canvas);
+  const viewport = map.getByRole("region", { name: "Territory map" });
+  const before = await readTerritoryMapCamera(viewport);
+  const city = viewport.locator('[data-map-target="champlain:city"]');
+  const neighbor = viewport.locator('[data-map-target="champlain:site-2"]');
+  await city.locator(".territoryTileHitArea").hover();
+  await page.mouse.wheel(0, 2000);
+  await expect
+    .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+    .toBeLessThan(before.scale * 0.7);
+
+  // Neighboring center points meet halfway across their shared slanted edge.
+  const a = (await city.boundingBox())!;
+  const b = (await neighbor.boundingBox())!;
+  const edge = {
+    x: (a.x + a.width / 2 + b.x + b.width / 2) / 2,
+    y: (a.y + a.height / 2 + b.y + b.height / 2) / 2,
+  };
+  const neighborPoint = { x: edge.x, y: edge.y - 1 };
+  const cityPoint = { x: edge.x, y: edge.y + 1 };
+  const hits = await page.evaluate(
+    (points) =>
+      points.map(({ x, y }) =>
+        document
+          .elementFromPoint(x, y)
+          ?.closest("[data-map-target]")
+          ?.getAttribute("data-map-target"),
+      ),
+    [neighborPoint, cityPoint],
+  );
+  expect(hits).toEqual(["champlain:site-2", "champlain:city"]);
+
+  if (isMobile) await page.touchscreen.tap(neighborPoint.x, neighborPoint.y);
+  else await page.mouse.click(neighborPoint.x, neighborPoint.y);
+  await expect(neighbor).toHaveAttribute("aria-pressed", "true");
+  await expect(city).toHaveAttribute("aria-pressed", "false");
 });
 
 test("pinch zooms the 3D map without magnifying the page", async ({
