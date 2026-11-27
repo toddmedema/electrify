@@ -249,7 +249,12 @@ export default function MapWorkspace({
   }, [active, floating, focusHeading]);
   React.useEffect(() => {
     if (retainFocus.current) retainFocus.current = false;
-    else if (destination) focusHeading(destination);
+    else if (destination) {
+      // Evidence links and category tabs may already have focused a control in this panel.
+      const panel = workspace.current?.querySelector(`#tool-${destination}`);
+      if (panel && !panel.contains(document.activeElement))
+        focusHeading(destination);
+    }
   }, [card, destination, focusHeading]);
   React.useEffect(() => {
     const escape = (event: KeyboardEvent) => {

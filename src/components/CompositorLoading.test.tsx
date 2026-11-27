@@ -26,7 +26,7 @@ jest.mock("./views/SavedGames", () => ({
   __esModule: true,
   default: () => <p>Saved games list</p>,
 }));
-jest.mock("./base/GameWorkspace", () => () => {
+jest.mock("./base/MapWorkspace", () => () => {
   const [clicks, setClicks] = jest
     .requireActual<typeof import("react")>("react")
     .useState(0);
