@@ -50,6 +50,23 @@ import {
   VIEW_INTERVAL_MS,
 } from "./Timing";
 
+/** React and the chart commit work in microtasks after the synchronous store update. Return
+ * view credit in the next task so its round trip includes that work. A message also runs in
+ * hidden windows where an animation frame can stop and timers can be throttled. */
+function afterViewUpdate(acknowledge: () => void) {
+  if (typeof MessageChannel === "undefined") {
+    setTimeout(acknowledge, 0);
+    return;
+  }
+  const { port1, port2 } = new MessageChannel();
+  port1.onmessage = () => {
+    port1.close();
+    port2.close();
+    acknowledge();
+  };
+  port2.postMessage(null);
+}
+
 function validPendingCampaign(value: unknown): value is PendingCampaign {
   if (!value || typeof value !== "object") return false;
   const campaign = value as PendingCampaign;
@@ -784,9 +801,15 @@ export class MultiplayerSession {
                   view.disconnected = [...this.replicaDisconnected];
                   this.acceptView(view);
                 }
-                worker.postMessage({
-                  kind: "views-applied",
-                } satisfies ReplicaRequest);
+                afterViewUpdate(() => {
+                  if (
+                    generation === this.replicaGeneration &&
+                    this.replica === worker
+                  )
+                    worker.postMessage({
+                      kind: "views-applied",
+                    } satisfies ReplicaRequest);
+                });
               } else if (data.kind === "progress") {
                 if (!this.replicationStream(data)) return;
                 const { matchId, epoch, applied, verified } = data;
@@ -1618,10 +1641,10 @@ export class MultiplayerSession {
               connected: [...this.state.lobby.connected],
             });
         }
-        // Subscribers apply the host grid synchronously. Only then may the worker clone
-        // another bundle; small clock/liveness messages remain independent of this credit.
-        if (current() && this.worker === worker)
-          this.post({ kind: "views-applied" });
+        afterViewUpdate(() => {
+          if (current() && this.worker === worker)
+            this.post({ kind: "views-applied" });
+        });
       };
       this.worker.onerror = () => {
         if (!current() || this.worker !== worker) return;

@@ -12,7 +12,9 @@ or reconnect. Baselines and durable save checkpoints contain complete worlds for
 recovery and persistence purposes.
 
 Local view publication suppresses unchanged state and coalesces changes before cloning a grid.
-Ordinary updates are bounded to 5 Hz; command and readiness changes use a 100 ms publication bound.
+Ordinary updates are bounded to 5 Hz. If an online renderer takes most of that interval to apply
+a grid, the worker leaves time for input before sending the next ordinary update. Command and
+readiness changes retain their 100 ms publication bound.
 Bootstrap and recovery force an immediate local view. One outstanding view waits for renderer
 credit before another is delivered. Command receipts, pending commands and errors remain part of
 the session flow.

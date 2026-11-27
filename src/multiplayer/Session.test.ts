@@ -235,6 +235,8 @@ function fixture(
         payload: { kind: "baseline", ...baseline },
       });
       await flushReplica();
+      jest.advanceTimersByTime(0);
+      await flushReplica();
     },
     project: async (current: RoomView) => {
       if (replicaIdentity !== `${current.matchId}/${current.epoch}`) {
@@ -1142,10 +1144,11 @@ test("worker keepalives relay only to connected guests without replacing the hos
   f.session.dispose();
 });
 
-test("worker view credit follows synchronous host consumption and cannot outlive its session", async () => {
+test("worker view credit follows the renderer task and cannot outlive its session", async () => {
   const f = fixture(true);
   await f.session.initialize();
   await f.session.start({ spec: COOP_TEST_SPEC });
+  jest.advanceTimersByTime(0);
   f.posts.length = 0;
   const consumed = jest.fn(() => {
     expect(f.posts).not.toContainEqual({ kind: "views-applied" });
@@ -1171,6 +1174,8 @@ test("worker view credit follows synchronous host consumption and cannot outlive
         (request.payload as { kind: string }).kind === "view",
     ),
   ).toBe(false);
+  expect(f.posts).not.toContainEqual({ kind: "views-applied" });
+  jest.advanceTimersByTime(0);
   expect(f.posts).toEqual([
     { kind: "replica-peers", connected: [guest] },
     { kind: "views-applied" },
@@ -1179,8 +1184,26 @@ test("worker view credit follows synchronous host consumption and cannot outlive
   f.posts.length = 0;
   f.session.subscribe(() => f.session.dispose());
   publish();
+  jest.advanceTimersByTime(0);
   expect(f.worker.terminate).toHaveBeenCalled();
   expect(f.posts).toEqual([]);
+});
+
+test("a guest releases view credit after applying the grid and discards credit queued before disposal", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  await f.project(view({ revision: 1 }));
+  const credit = { kind: "views-applied" };
+  expect(f.session.getSnapshot().view?.revision).toBe(1);
+  expect(f.replicaPosts).not.toContainEqual(credit);
+  jest.advanceTimersByTime(0);
+  expect(f.replicaPosts).toContainEqual(credit);
+  f.replicaPosts.length = 0;
+  await f.project(view({ revision: 2 }));
+  expect(f.session.getSnapshot().view?.revision).toBe(2);
+  f.session.dispose();
+  jest.advanceTimersByTime(0);
+  expect(f.replicaPosts).not.toContainEqual(credit);
 });
 
 test.each(["command", "disconnect"])(
