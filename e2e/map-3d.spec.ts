@@ -89,7 +89,7 @@ async function readyDiagnostics(canvas: Locator, scene = false) {
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`city windows follow the served share and stand out at night in ${theme}`, async ({
+  test(`city windows fill from the bottom as service returns at night in ${theme}`, async ({
     page,
   }, info) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -155,6 +155,7 @@ for (const theme of ["light", "dark"] as const) {
           const [owned, neighbor] = cities.map(
             ({ left, top, right, bottom }) => {
               let warm = 0;
+              let sumY = 0;
               for (let y = top; y < bottom; y++) {
                 for (let x = left; x < right; x++) {
                   const i = (y * width + x) * 4;
@@ -162,10 +163,13 @@ for (const theme of ["light", "dark"] as const) {
                     g = pixels[i + 1],
                     b = pixels[i + 2];
                   // Bright amber panes remain distinct even through the neighbor's fog.
-                  if (r > 120 && r - g > 12 && g - b > 25) warm++;
+                  if (r > 120 && r - g > 12 && g - b > 25) {
+                    warm++;
+                    sumY += y;
+                  }
                 }
               }
-              return warm;
+              return { warm, sumY };
             },
           );
           // Read the WebGL backdrop separately from the overlaid weather illustration.
@@ -175,8 +179,9 @@ for (const theme of ["light", "dark"] as const) {
           ) as Float32Array;
           const backdrop = red + green + blue;
           return {
-            owned,
-            neighbor,
+            owned: owned.warm,
+            ownedMeanY: owned.warm ? owned.sumY / owned.warm : 0,
+            neighbor: neighbor.warm,
             backdrop,
             brightness: brightness / (width * height),
           };
@@ -205,6 +210,8 @@ for (const theme of ["light", "dark"] as const) {
       (partial.owned - dark.owned) / (restored.owned - dark.owned);
     expect(proportion).toBeGreaterThan(0.25);
     expect(proportion).toBeLessThan(0.75);
+    // Higher floors light up on recovery, pulling the center of the glow up.
+    expect(partial.ownedMeanY).toBeGreaterThan(restored.ownedMeanY);
     expect(dark.neighbor).toBeGreaterThan(0);
     expect(partial.neighbor).toBe(dark.neighbor);
     expect(restored.neighbor).toBe(dark.neighbor);

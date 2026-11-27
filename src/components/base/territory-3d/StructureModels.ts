@@ -54,7 +54,8 @@ function effect(
   return { mesh, position, motion, hideWhenInactive: true, castsShadow: false };
 }
 
-type AddCityWindow = (a: Vec3, b: Vec3, c: Vec3, d: Vec3) => void;
+type CityPane = [Vec3, Vec3, Vec3, Vec3];
+type AddCityWindow = (...corners: CityPane) => void;
 
 function cityWindows(
   window: AddCityWindow,
@@ -212,13 +213,9 @@ function city(
   key: string,
 ): MapModel {
   const body = new MeshBuilder();
-  const glazing = new MeshBuilder();
-  let pane = 0;
-  const window: AddCityWindow = (a, b, c, d) => {
-    // The city-window material reads the red channel as a stable threshold.
-    // A golden-ratio step spreads partial lighting across the skyline.
-    const threshold = (pane++ * 0.61803398875) % 1;
-    glazing.quad(a, b, c, d, [threshold, 0, 0]);
+  const panes: CityPane[] = [];
+  const window: AddCityWindow = (...corners) => {
+    panes.push(corners);
   };
   // A shared street and pocket park tie the three skylines into one city family.
   body
@@ -257,12 +254,10 @@ function city(
     townhouse(body, window, 0.24, 0.16, P.forest);
   }
   // Each sector has a separate lot. Adding a block never moves an existing building or terminal.
-  const firstGrowthPane = pane;
   if (growth.includes("Residential")) {
     body.box([-0.334, 0.018, 0.025], [0.136, 0.036, 0.147], P.steel);
     townhouse(body, window, -0.334, 0.025, P.forest);
   }
-  pane = firstGrowthPane + 4; // Reserve the townhouse's panes until it is built.
   if (growth.includes("Commercial")) {
     const shopX = 0.356,
       shopZ = 0.091;
@@ -270,8 +265,15 @@ function city(
     cityBlock(body, window, shopX, shopZ, 0.094, 0.104, 2, P.timber);
     body.box([shopX, 0.104, shopZ + 0.057], [0.094, 0.025, 0.022], P.forest);
   }
-  pane = firstGrowthPane + 12; // Reserve the two-story commercial block as well.
   if (growth.includes("Industrial")) workshop(body, window, 0.198, 0.297);
+
+  // Rank the actual panes across the skyline so lit windows fill from street level up.
+  const glazing = new MeshBuilder();
+  panes.sort(([a], [b]) => a[1] - b[1]);
+  panes.forEach(([a, b, c, d], i) => {
+    // The city-window shader reads the red channel as the pane's service threshold.
+    glazing.quad(a, b, c, d, [(i + 0.5) / panes.length, 0, 0]);
+  });
   return model(key, body, switchgear(body, 0.27), [
     { mesh: glazing.build(), material: "city-window", castsShadow: false },
   ]);

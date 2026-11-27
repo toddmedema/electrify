@@ -74,10 +74,8 @@ void main() {
   vStyle = aStyle;
   vMaterial = aMaterial;
   if (aMaterial.z == ${CITY_WINDOW_MATERIAL}.0) {
-    // Offset the same cached pane thresholds for each city's world position.
-    float threshold = fract(aColor.r + dot(aTransform[3].xz, vec2(0.271, 0.367)));
     float service = mix(1.0, uCityService, aMaterial.x);
-    vMaterial.x = 1.0 - step(service, threshold);
+    vMaterial.x = step(aColor.r, service);
   }
 }`;
 const FRAGMENT = `#version 300 es

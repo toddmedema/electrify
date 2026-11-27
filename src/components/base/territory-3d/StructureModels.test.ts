@@ -380,6 +380,37 @@ it("grows one mixed city family through denser windows and a taller skyline", ()
   }
 });
 
+it.each(["small", "medium", "large"] as const)(
+  "lights the %s city from its lowest panes upward",
+  (size) => {
+    for (const growth of [
+      [],
+      ["Residential", "Commercial", "Industrial"],
+    ] as const) {
+      const city = getStructureModel(`city-${size}`, growth);
+      const { positions, colors } = city.parts.find(
+        ({ material }) => material === "city-window",
+      )!.mesh;
+      const panes = [];
+      // Each pane is two triangles with three coordinates per vertex.
+      for (let i = 0; i < positions.length; i += 18)
+        panes.push({ height: positions[i + 1], threshold: colors[i] });
+      panes.sort((a, b) => a.threshold - b.threshold);
+
+      for (let i = 1; i < panes.length; i++)
+        expect(panes[i].height).toBeGreaterThanOrEqual(panes[i - 1].height);
+      expect(panes[0].threshold).toBeGreaterThan(0);
+      expect(panes[panes.length - 1].threshold).toBeLessThan(1);
+      for (const service of [0.25, 0.5, 0.75]) {
+        const lit = panes.filter(
+          ({ threshold }) => threshold <= service,
+        ).length;
+        expect(Math.abs(lit - service * panes.length)).toBeLessThanOrEqual(0.5);
+      }
+    }
+  },
+);
+
 it.each(["wind", "offshore-wind"] as const)(
   "gives %s a thick root, broad inner chord and swept, tapered airfoil sections",
   (kind) => {
