@@ -182,7 +182,7 @@ for (const theme of ["light", "dark"] as const) {
     await connect.click();
     await expect(
       surface
-        .getByRole("alert")
+        .getByRole("status")
         .filter({ hasText: "Constructing transmission lines" }),
     ).toBeVisible();
     await expect(

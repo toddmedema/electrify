@@ -998,13 +998,22 @@ it("retains the inspected site while a desktop connection is being built", async
   inspect(site.id);
   fireEvent.click(within(surface()).getByRole("button", { name: /Connect/ }));
   expect(ownsTerritoryTile(store.getState().game, site.id)).toBe(true);
+  const inspector = within(surface());
   expect(
-    within(surface()).queryByRole("tab", { name: "Generators" }),
+    inspector.getByText(/Constructing transmission lines/),
+  ).not.toHaveAttribute("role");
+  expect(
+    inspector.getByRole("button", { name: "Build here" }),
+  ).toHaveAccessibleDescription(/Constructing transmission lines.*0% complete/);
+  expect(
+    inspector.queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
   await openProjectPlanner(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(surface()).toHaveTextContent(/Constructing transmission lines/);
+  expect(within(surface()).getByRole("status")).toHaveTextContent(
+    /Constructing transmission lines/,
+  );
   expect(
     within(surface()).queryByRole("button", { name: "Cash" }),
   ).not.toBeInTheDocument();

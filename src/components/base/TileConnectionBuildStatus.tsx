@@ -37,7 +37,7 @@ export default function TileConnectionBuildStatus({
         id={status}
         component="p"
         variant="body2"
-        role={announce ? "alert" : undefined}
+        role={announce ? "status" : undefined}
       >
         {minute >= connection.towerMinute
           ? "Waiting for upstream connection"
