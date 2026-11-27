@@ -71,6 +71,23 @@ it("uses the drawn water direction and keeps local references distinct from fall
   ).toBe("Example City model grid");
 });
 
+it("uses researched utility names for the selected starting year", () => {
+  const nameAt = (id: string, year: number) =>
+    getRegionalGeography(cities[id], year, 999, customerSources).utility;
+  expect(nameAt("London", 1980)).toBe("London Electricity Board");
+  expect(nameAt("London", 2005)).toBe("EDF Energy Networks");
+  expect(nameAt("London", 2010)).toBe("UK Power Networks");
+  expect(nameAt("Vienna", 2025)).toBe("Vienna model grid");
+  expect(nameAt("Vienna", 2026)).toMatch(/^Wiener Netze/);
+});
+
+it("uses the city label for an imported Havana without a local utility reference", () => {
+  const location = { ...cities.Havana, region: "constructor" };
+  expect(
+    getRegionalGeography(location, 2026, 999, customerSources).utility,
+  ).toBe("Havana model grid");
+});
+
 it("keeps every selectable city's center and renders it without a customer-source download", () => {
   for (const location of Object.values(cities)) {
     const geography = getRegionalGeography(location, 2026, 999);

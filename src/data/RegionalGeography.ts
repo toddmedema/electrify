@@ -1,9 +1,6 @@
 import type { LocationType, TerrainType } from "../Types";
 import { cos } from "../helpers/Libm";
-import {
-  getDataCenterCustomerProfile,
-  type DataCenterCustomerSources,
-} from "./DataCenterCustomers";
+import type { DataCenterCustomerSources } from "./DataCenterCustomers";
 import { territoryCoordinateHash } from "./Territories";
 import waterAtlas from "./RegionalWater.json";
 
@@ -153,6 +150,16 @@ const RESEARCHED_REGIONS: Readonly<Partial<Record<string, ResearchedRegion>>> =
       ],
       treeCover: "wooded",
     },
+    London: {
+      city: "London",
+      utility: [
+        [2010, "UK Power Networks"],
+        [2003, "EDF Energy Networks"],
+        [1999, "24seven Utility Services"],
+        [1990, "London Electricity"],
+        [1948, "London Electricity Board"],
+      ],
+    },
     LA: {
       city: "Los Angeles",
       utility: [[1937, "Los Angeles Department of Water and Power"]],
@@ -214,6 +221,9 @@ const RESEARCHED_REGIONS: Readonly<Partial<Record<string, ResearchedRegion>>> =
       treeCover: "wooded",
     },
   };
+
+// The customer research checked undated utility references in 2026.
+const CUSTOMER_RESEARCH_YEAR = 2026;
 const WATER_TERRAIN = { o: "ocean", l: "lake", r: "river" } as const;
 const waterEntries: Readonly<
   Partial<Record<string, readonly (string | number)[]>>
@@ -275,13 +285,12 @@ export function getRegionalGeography(
   const city =
     region?.city ?? (location.name.split(",")[0].trim() || location.name);
   const reference =
-    sources && sameLocation
-      ? getDataCenterCustomerProfile(location, sources)
+    !region && sources && sameLocation && Object.hasOwn(sources, location.id)
+      ? sources[location.id]
       : undefined;
   const sourcedUtility =
-    reference?.basis === "local-utility" &&
-    !region &&
-    (reference.sourceYear === undefined || startingYear >= reference.sourceYear)
+    reference &&
+    startingYear >= (reference.sourceYear ?? CUSTOMER_RESEARCH_YEAR)
       ? reference.serviceArea
       : undefined;
   // Load Shedding models Eskom's generation system at regional scale.
