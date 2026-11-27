@@ -6,12 +6,15 @@ import { test } from "./advance-world";
 import { crossplayFixture } from "./crossplay-fixture";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { reviewScreenshot } from "./review-screenshot";
-import { openPane } from "./layout";
+import { openPane, selectTerritoryMapTile } from "./layout";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { RoomView } from "../src/multiplayer/Types";
 import type { GameType } from "../src/Types";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
-import { multiplayerBorderConnection } from "../src/helpers/MultiplayerTerritory";
+import {
+  multiplayerBorderConnection,
+  multiplayerTerritoryTiles,
+} from "../src/helpers/MultiplayerTerritory";
 import { claimToPeerBorder, territorialMap } from "./territorial-multiplayer";
 
 const companies = ["SolarSam", "WindyWren", "HydroHal", "VoltVera"];
@@ -493,8 +496,20 @@ for (const count of [2, 3, 4]) {
       await expect(clock(host)).toHaveAccessibleDescription(
         /SolarSam \(you\) selected 24×/,
       );
-      const before = (await captureState(buyer)).facilities!;
-      await buyer.locator(".button-buildFacility").click();
+      const buyerGame = (await projection(buyer))!.game!;
+      const before = buyerGame.facilities.length;
+      const site = multiplayerTerritoryTiles(buyerGame).find(
+        (tile) =>
+          buyerGame.multiplayer!.territorial!.startingTileIds.includes(
+            tile.id,
+          ) &&
+          !tile.city &&
+          !buyerGame.facilities.some(({ tileId }) => tileId === tile.id),
+      )!;
+      await selectTerritoryMapTile(buyer, site, territorialMap(buyer));
+      await buyer
+        .getByRole("button", { name: "Build here", exact: true })
+        .click();
       await buyer
         .getByRole("button", { name: "Review purchase of Wind", exact: true })
         .click();
@@ -504,12 +519,13 @@ for (const count of [2, 3, 4]) {
       await expect
         .poll(async () => (await captureState(buyer)).facilities)
         .toBe(before + 1);
+      expect(
+        (await projection(buyer))!.game!.facilities.find(
+          ({ tileId }) => tileId === site.id,
+        )?.name,
+      ).toBe("Wind");
       for (const page of campaign.players)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
-      if (buyer.viewportSize()!.width >= 1024)
-        await buyer
-          .getByRole("button", { name: "Close Build", exact: true })
-          .click();
       await selectSpeed(host, "pause");
       await selectSpeed(buyer, "normal speed");
       for (const page of campaign.players)
@@ -558,6 +574,9 @@ test(
     expect(
       multiplayerBorderConnection(originalHost, originalGuest),
     ).toBeUndefined();
+    await expect(
+      territorialMap(host).locator(".territoryMapViewport"),
+    ).toHaveAttribute("data-renderer", "ready");
     if (!compact)
       await reviewScreenshot(host, {
         path: info.outputPath("territorial-desktop.png"),

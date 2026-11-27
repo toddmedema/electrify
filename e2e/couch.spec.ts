@@ -865,9 +865,7 @@ test("TV couch intertie construction requires approval from both company owners"
   await expect(p2Cash).toBeEnabled();
   await couch.input({ "202": ["confirm"] });
   await expect(p2Cash).toHaveCount(0);
-  await expect(
-    p2.getByText("Construction underway", { exact: true }),
-  ).toBeVisible();
+  await expect(p2.getByText(/^Construction underway/)).toBeVisible();
 
   await couch.input({ "202": ["menu"] });
   await page
