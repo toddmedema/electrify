@@ -140,6 +140,7 @@ const actorClosed = (actor: Page | Frame) =>
 interface CouchCapabilities {
   steamOnline?: boolean;
   steamInputAvailable?: boolean;
+  reduceSeatMotion?: boolean;
 }
 
 export function createCouchFixture(
@@ -618,7 +619,11 @@ export async function createCouchFixture(
               const frame = await handle?.contentFrame();
               if (!frame) throw new Error("Could not create the seat document");
               seatPage = frame;
-            } else seatPage = await context.newPage();
+            } else {
+              seatPage = await context.newPage();
+              if (options?.reduceSeatMotion)
+                await seatPage.emulateMedia({ reducedMotion: "reduce" });
+            }
             const currentGeneration =
               native?.manager.seats.get(seat.id)?.generation ?? ++generation;
             seats.set(seat.id, {

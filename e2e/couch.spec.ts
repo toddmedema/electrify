@@ -546,6 +546,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   );
   const couch = await createCouchFixture(context, page, {
     nativeBindings: true,
+    // Separate pages need the same emulated motion preference as the shell.
+    reduceSeatMotion: true,
   });
   await startCouch(page, couch);
   const p1 = couch.seats.get("local-p1")!.page;
