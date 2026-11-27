@@ -9,6 +9,7 @@ import { getDateFromMinute } from "./DateTime";
 import { getBuildFacilityQuote } from "../data/Facilities";
 import { getInflationIndex } from "../data/Economy";
 import { getHydroSite, validHydroCapacity } from "../data/HydroSites";
+import { multiplayerTerritoryTile } from "./MultiplayerTerritory";
 import {
   isStorage,
   type ExpandFacilityAction,
@@ -182,11 +183,12 @@ export function facilityExpansionQuote(
   const small = quoteAt(Math.min(currentSize, 1e6));
   if (!small)
     return unavailable("This technology is unavailable for expansion.");
-  const tile =
-    hasTerritoryNetwork(game) && facility.tileId
+  const tile = game.multiplayer?.territorial
+    ? multiplayerTerritoryTile(game, facility.tileId)
+    : hasTerritoryNetwork(game) && facility.tileId
       ? getTerritoryTile(facility.tileId, game)
       : undefined;
-  if (hasTerritoryNetwork(game) && !tile)
+  if ((game.multiplayer?.territorial || hasTerritoryNetwork(game)) && !tile)
     return unavailable("This plant has no expandable building tile.");
   const wattsPerSize = isStorage(small) ? small.peakW / small.peakWh : 1;
   const maxSize = Math.min(

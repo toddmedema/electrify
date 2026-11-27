@@ -60,6 +60,15 @@ export default defineConfig({
         viewport: { width: 390, height: 844 },
       },
     },
+    {
+      name: "mobile-360px",
+      grep: /@territorial/,
+      use: {
+        isMobile: true,
+        hasTouch: true,
+        viewport: { width: 360, height: 780 },
+      },
+    },
   ],
   use: {
     launchOptions:

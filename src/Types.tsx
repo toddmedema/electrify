@@ -642,7 +642,7 @@ interface SharedOperatingType
   };
   startingAssetId?: string;
   territoryId?: TerritoryId;
-  /** Exactly one developed map cell; absent outside the territory scenario. */
+  /** Exactly one developed map cell in games with physical placement. */
   tileId?: TerritoryTileId;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
@@ -1595,6 +1595,7 @@ export interface GameType {
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    territorial?: import("./helpers/MultiplayerTerritory").TerritorialState;
     /** Shared finite land claim, projected by the host from all company receipts. */
     landOwner?: { seat: string; name: string };
     landOwners?: Partial<
@@ -1658,6 +1659,12 @@ export interface GameType {
       upgradeRequestedBy?: string;
       /** This player asked for the pending upgrade and waits on the other owner. */
       upgradeRequestedBySelf?: boolean;
+      upgradeProposalRevision?: number;
+      border?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
+      endpoints?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
+      connectionRequestedBy?: string;
+      connectionRequestedBySelf?: boolean;
+      connectionProposalRevision?: number;
       /** This neighbor's run ended, so its link no longer carries power. */
       retired?: boolean;
     }[];

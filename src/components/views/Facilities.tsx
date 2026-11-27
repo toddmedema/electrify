@@ -1,6 +1,8 @@
 import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import TerritoryNetwork from "./TerritoryNetwork";
 import RegionalGridMap from "./RegionalGridMap";
+import MultiplayerTerritoryMap from "./MultiplayerTerritoryMap";
+import TerritorialAgreements from "./TerritorialAgreements";
 import PowerAgreements from "../base/PowerAgreements";
 import {
   INHERITED_CONNECTIONS,
@@ -835,7 +837,8 @@ export interface DispatchProps extends FacilityCapacityUpgradeActions {
 export interface Props extends StateProps, DispatchProps {
   paneId?: string;
   territoryView?: MapWorkspaceView;
-  onTerritoryView?: (view: MapWorkspaceView) => void;
+  agreementPeer?: string;
+  onTerritoryView?: (view: MapWorkspaceView, peer?: string) => void;
 }
 
 interface SelectionState {
@@ -1198,6 +1201,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       nextProps.game.speed !== this.props.game.speed ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.territoryView !== this.props.territoryView ||
+      nextProps.agreementPeer !== this.props.agreementPeer ||
+      nextProps.game.multiplayer?.territorial?.claims.length !==
+        this.props.game.multiplayer?.territorial?.claims.length ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
@@ -1216,7 +1222,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       this.props.selectedFacilityId !== null &&
       (this.props.territoryView === "FACILITIES" ||
         (this.props.territoryView === undefined &&
-          hasTerritoryNetwork(this.props.game)))
+          (hasTerritoryNetwork(this.props.game) ||
+            !!this.props.game.multiplayer?.territorial)))
     )
       this.props.onTerritoryView?.("FLEET");
     this.resolveEvidence();
@@ -1251,7 +1258,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     if (
       this.props.territoryView
         ? this.props.territoryView !== "FLEET"
-        : hasTerritoryNetwork(this.props.game)
+        : hasTerritoryNetwork(this.props.game) ||
+          !!this.props.game.multiplayer?.territorial
     )
       return;
     if (request.target === "interties") {
@@ -1340,8 +1348,10 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
     const territoryNetwork = hasTerritoryNetwork(game);
+    const territorial = !!game.multiplayer?.territorial;
     const territoryView =
-      this.props.territoryView ?? (territoryNetwork ? "FACILITIES" : "FLEET");
+      this.props.territoryView ??
+      (territorial || territoryNetwork ? "FACILITIES" : "FLEET");
     const showFleet = territoryView === "FLEET";
     const facilityActions = {
       onSell: this.sellFacility,
@@ -1352,10 +1362,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       onCancelExpansion: this.props.onCancelExpansion,
       onCancelRetrofit: this.props.onCancelRetrofit,
     };
-    const intertiesAvailable = !!(
-      game.transmission &&
-      (game.multiplayer || corridorsForLocation(game.location).length)
-    );
+    const intertiesAvailable =
+      !territorial &&
+      !!(
+        game.transmission &&
+        (game.multiplayer || corridorsForLocation(game.location).length)
+      );
     const activeStoryEvents = game.worldEvents.active.filter(
       (event) =>
         game.date.minute >= event.startsMinute &&
@@ -1370,7 +1382,28 @@ export default class Facilities extends React.Component<Props, SelectionState> {
         id={this.props.paneId ?? "facilitiesPane"}
       >
         <>
-          {!showFleet && (
+          {territorial && territoryView === "FACILITIES" && (
+            <div className="territoryWorkspace">
+              <MultiplayerTerritoryMap
+                game={game}
+                onAgreements={(peer) =>
+                  this.props.onTerritoryView?.("AGREEMENTS", peer)
+                }
+                facilityActions={facilityActions}
+              />
+            </div>
+          )}
+          {territorial && territoryView === "AGREEMENTS" && (
+            <div className="scrollable territoryWorkspace">
+              <TerritorialAgreements
+                game={game}
+                selectedPeer={this.props.agreementPeer}
+                onBuyingRule={onBuyingRule}
+                onSellingRule={onSellingRule}
+              />
+            </div>
+          )}
+          {!territorial && !showFleet && (
             <div className="scrollable territoryWorkspace">
               {territoryView === "FACILITIES" ? (
                 territoryNetwork ? (

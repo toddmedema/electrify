@@ -404,6 +404,9 @@
   .territoryMapLayerToggle {
     right: max(12px, env(safe-area-inset-right));
   }
+}
+
+:is(.regionalMapWorkspace, .multiplayerTerritoryMap) {
   .tileWorkspaceSurface.tileWorkspaceInspector .tileWorkspaceHeading {
     display: flex;
     align-items: flex-start;

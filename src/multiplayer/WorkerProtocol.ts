@@ -8,6 +8,12 @@ import type {
   Seat,
   World,
 } from "./Types";
+
+/** Product launches use territorial rules. Checkpoint restores supply their saved spec. */
+export function newMatchSpec(spec: MatchSpec): MatchSpec {
+  return { ...spec, territorialVersion: 1 };
+}
+
 /** Couch play projects every seat locally; online play projects only the host's company. */
 type WorkerMode =
   | { local: true; hostSeat?: never }

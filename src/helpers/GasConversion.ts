@@ -7,6 +7,7 @@ import { FacilityOperatingType, GameType, isStorage } from "../Types";
 // Game-design assumptions: retain the turbine and nameplate capacity, add the steam side for
 // half the price of a new CC, and take six months offline. This is not a site engineering quote.
 export const GAS_CONVERSION_MINUTES = 6 * MINUTES_PER_MONTH;
+export const GAS_CONVERSION_FIRST_YEAR = 1990;
 
 export function gasConversionQuote(
   facility: FacilityOperatingType,
@@ -19,7 +20,7 @@ export function gasConversionQuote(
     facility.yearsToBuildLeft > 0 ||
     facility.upgradeInProgress ||
     facility.expansionInProgress ||
-    game.date.year < 1990 ||
+    game.date.year < GAS_CONVERSION_FIRST_YEAR ||
     facility.lifespanYears - facilityAgeYears(facility, game.date.minute) <= 0.5
   )
     return undefined;
