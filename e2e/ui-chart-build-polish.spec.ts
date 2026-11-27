@@ -655,12 +655,17 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
+    const reviewBattery = page.getByRole("button", {
+      name: "Review purchase of Lithium Battery",
+      exact: true,
+    });
     await build
-      .getByRole("button", {
-        name: "Review purchase of Lithium Battery",
-        exact: true,
-      })
+      .getByRole("listitem")
+      .filter({ has: reviewBattery })
+      .getByRole("button", { name: "Use max size", exact: true })
       .click();
+    await expect(reviewBattery).toBeEnabled();
+    await reviewBattery.click();
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })
