@@ -38,7 +38,8 @@ import { useBuildForecast } from "./BuildForecast";
 import { useMoney } from "./CurrencyContext";
 import { useTerritoryTilePurchases } from "./TerritoryTilePurchases";
 import ConceptIcon from "./ConceptIcon";
-import TileWorkspaceSurface from "./TileWorkspaceSurface";
+import { MapProjectPanel } from "./MapPanelWindow";
+import TileConnectionBuildStatus from "./TileConnectionBuildStatus";
 import BuildFacilities from "../views/BuildFacilities";
 import "./ProjectBuild.scss";
 
@@ -185,17 +186,10 @@ export default function ProjectBuild({
   const combinedMethod = paymentMethod ?? (loanLeads ? "loan" : "cash");
   const combinedPayment = payment?.[combinedMethod];
   return (
-    <TileWorkspaceSurface
-      id="tool-BUILD_GENERATORS"
-      closeLabel="Close project"
-      building={catalogue}
+    <MapProjectPanel
+      catalogue={catalogue}
       title={catalogue ? "Build" : title}
-      titleIcon={
-        (catalogue || !project) && <ConceptIcon concept="build" decorative />
-      }
       focusKey={`${catalogue}:${candidate ?? "sites"}`}
-      projectCandidate={!catalogue}
-      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={() => {
         if (!lock.current) onClose();
       }}
@@ -224,8 +218,16 @@ export default function ProjectBuild({
                 with Connect.
               </Alert>
             )}
-            {candidate && !ready && (
-              <Alert severity="info">{quote?.reason}</Alert>
+            {quote?.pendingConnection ? (
+              <TileConnectionBuildStatus
+                connection={quote.pendingConnection}
+                announce
+                minute={game.date.minute}
+                paused={game.speed === "PAUSED"}
+              />
+            ) : (
+              candidate &&
+              !ready && <Alert severity="info">{quote?.reason}</Alert>
             )}
             {ready && payment && (
               <>
@@ -437,6 +439,6 @@ export default function ProjectBuild({
           )}
         </div>
       )}
-    </TileWorkspaceSurface>
+    </MapProjectPanel>
   );
 }

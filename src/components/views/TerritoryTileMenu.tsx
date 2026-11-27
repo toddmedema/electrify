@@ -108,7 +108,7 @@ export default function TerritoryTileMenu({
       });
     }
     tileActions.push({
-      label: `${canPlan ? "Connect only" : "Connect"} (${formatPurchasePrice(quote.price)})`,
+      label: `${canPlan ? "Connect only" : "Connect"} ${formatPurchasePrice(quote.price)}`,
       detail:
         quote.price > availableCash
           ? `${formatMoneyConcise(quote.price - availableCash)} more cash needed.`

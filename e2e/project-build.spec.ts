@@ -7,6 +7,7 @@ import {
   returnToTerritoryMap,
   selectTerritoryMapTile,
   setMapProjectCapacity,
+  showMapFacilityStatus,
   waitForTileConnection,
 } from "./layout";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
@@ -63,6 +64,10 @@ for (const theme of ["light", "dark"] as const) {
   }, testInfo) => {
     const network = await start(page, theme);
     const before = (await readSavedGame(page))!;
+    await expect(network.locator(".territoryFacilityStatusLayer")).toHaveCount(
+      0,
+    );
+    await showMapFacilityStatus(network);
     await expect(
       network.getByRole("button", { name: "Build", exact: true }),
     ).toHaveCount(0);
@@ -108,7 +113,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(ownedQuote.facility).toBeDefined();
     if (!ownedQuote.facility)
       throw new Error("Owned site has no project quote");
-    await expect(owned.locator(".territoryTilePrice")).toContainText(
+    await expect(owned.locator(".territoryTilePrice b")).toHaveText(
       formatPurchasePrice(projectSiteCapitalCost(ownedQuote)),
     );
     await expect(owned).toHaveAccessibleName(/Already connected/);
@@ -186,6 +191,10 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(network, {
       path: testInfo.outputPath(`project-candidate-${theme}.png`),
     });
+    const badge = network.locator(
+      '[data-status-tile="green-uplands:site-1"][data-connection-status="construction"]',
+    );
+    await expect(badge).toHaveCount(0);
     const review = projectReview(before, connectionQuote, true);
     const loan = surface.getByRole("radio", { name: "Loan", exact: true });
     await expect(loan).toBeInViewport();
@@ -194,8 +203,21 @@ for (const theme of ["light", "dark"] as const) {
       `Connect & build · ${formatPurchasePrice(review.required)}`,
     );
     await confirm.click();
-    await expect(surface).toContainText(/Connection under construction/);
-    await expect(surface).toContainText(/Under construction · .* left/);
+    const inspector = page.locator(".tileWorkspaceInspector").filter({
+      has: page.getByRole("heading", { name: /^Wind/ }),
+    });
+    await expect(inspector.getByRole("status")).toContainText(
+      "Constructing transmission lines",
+    );
+    await expect(inspector).toContainText(/Under construction · .* left/);
+    await expect(
+      inspector.locator(".constructionProgress").first(),
+    ).toBeVisible();
+    await expect(badge).toBeVisible();
+    await expect(badge.locator("circle[pathLength]")).toHaveAttribute(
+      "stroke-dasharray",
+      "0 1",
+    );
     const wireCount = () =>
       network.locator("canvas.territory3DCanvas").evaluate(
         (canvas: MapCanvas) =>
@@ -234,8 +256,9 @@ for (const theme of ["light", "dark"] as const) {
       path: testInfo.outputPath(`project-construction-${theme}.png`),
     });
     await waitForTileConnection(page, "green-uplands:site-1");
+    await expect(badge).toHaveCount(0);
     await expect.poll(wireCount).toBeGreaterThan(0);
-    await expect(surface).toContainText(/Under construction · .* left/);
+    await expect(inspector).toContainText(/Under construction · .* left/);
   });
 }
 
