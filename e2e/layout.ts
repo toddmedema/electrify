@@ -256,8 +256,9 @@ export async function readTerritoryMapCamera(viewport: Locator) {
 export async function selectTerritoryMapTile(
   page: Page,
   tile: { id: string; q: number; r: number },
+  map?: Locator,
 ): Promise<Locator> {
-  const map = await returnToTerritoryMap(page);
+  map ??= await returnToTerritoryMap(page);
   const target = map.locator(`[data-map-target="${tile.id}"]`);
   const viewport = map.locator(".territoryMapViewport");
   const point = hexCenter(tile);

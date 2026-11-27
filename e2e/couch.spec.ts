@@ -15,8 +15,9 @@ import {
   MINUTES_PER_MONTH,
 } from "../src/helpers/DateTime";
 import { peerCorridorId } from "../src/data/Multiplayer";
-import { createCouchFixture } from "./couch-fixture";
+import { createCouchFixture, readCouchRoomView } from "./couch-fixture";
 import type { CouchFixture } from "./couch-fixture";
+import { claimToPeerBorder } from "./territorial-multiplayer";
 
 test("TV Play with friends keeps couch play available when online play is disconnected", async ({
   context,
@@ -821,33 +822,35 @@ test("TV couch intertie construction requires approval from both company owners"
   await startCouch(page, couch);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
-  await expect.poll(() => couch.checkpoint()?.edges.length).toBe(1);
-  const originalCapacity = couch.checkpoint()!.edges[0].capacityW;
-  const inspectP2 = p1.getByRole("button", { name: /^Inspect P2 Utility,/ });
-  const inspectP1 = p2.getByRole("button", { name: /^Inspect P1 Utility,/ });
-  await inspectP2.click();
+  const readP1 = () => readCouchRoomView(p1).then((view) => view!.game!);
+  await expect
+    .poll(
+      async () =>
+        (await readCouchRoomView(p1))?.game?.multiplayer?.territorial
+          ?.seatCount,
+    )
+    .toBe(2);
+  await claimToPeerBorder(p1, "local-p2", readP1);
+  for (const seat of [p1, p2])
+    await seat.getByRole("button", { name: "Agreements", exact: true }).click();
   await p1
-    .getByRole("button", { name: "Review upgrade of P2 Utility" })
+    .getByRole("button", { name: "Review connection with P2 Utility" })
     .click();
   const p1Cash = p1
     .getByRole("dialog")
-    .getByRole("button", { name: "Pay cash" });
+    .getByRole("button", { name: "Propose connection" });
   await p1Cash.focus();
   await couch.input({ "101": ["confirm"] });
   await expect(p1Cash).toHaveCount(0);
-  const waitingForP2 = p1.getByText(
-    /Waiting for P2 Utility to approve their half/,
-  );
+  const waitingForP2 = p1.getByText(/P2 Utility must approve/);
   await expect(waitingForP2).toBeVisible();
 
-  await inspectP1.click();
-  await expect(p2.getByText(/P1 Utility requested this upgrade/)).toBeVisible();
   await p2
-    .getByRole("button", { name: "Review upgrade of P1 Utility" })
+    .getByRole("button", { name: "Review connection from P1 Utility" })
     .click();
   const p2Cash = p2
     .getByRole("dialog")
-    .getByRole("button", { name: "Pay cash" });
+    .getByRole("button", { name: "Accept connection" });
   const p1Normal = speedControls(p1).getByRole("button", {
     name: "normal speed",
     exact: true,
@@ -862,9 +865,9 @@ test("TV couch intertie construction requires approval from both company owners"
   await expect(p2Cash).toBeEnabled();
   await couch.input({ "202": ["confirm"] });
   await expect(p2Cash).toHaveCount(0);
-  await expect(p2.getByText(/P1 Utility requested this upgrade/)).toHaveCount(
-    0,
-  );
+  await expect(
+    p2.getByText("Construction underway", { exact: true }),
+  ).toBeVisible();
 
   await couch.input({ "202": ["menu"] });
   await page
@@ -875,16 +878,14 @@ test("TV couch intertie construction requires approval from both company owners"
   await expect.poll(() => couch.seats.size).toBe(0);
   const complete = couch.checkpoint()!;
   const edge = complete.edges[0];
-  expect(edge.approval).toBeUndefined();
+  expect(complete.spec.territorialVersion).toBe(1);
+  expect(edge).toMatchObject({ ratingW: 0, flowW: 0 });
   const lines = complete.grids.map(({ transmission }) =>
     transmission!.lines.find(
       (line) => line.corridorId === peerCorridorId(edge.id),
     ),
   );
-  expect(lines.map((line) => line?.upgrade?.targetCapacityW)).toEqual([
-    originalCapacity * 1.5,
-    originalCapacity * 1.5,
-  ]);
+  for (const line of lines) expect(line?.yearsToBuildLeft).toBeGreaterThan(0);
 });
 
 for (const withP2 of [false, true]) {
@@ -1154,11 +1155,13 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   const p1Color = await verifySeatPalette(p1, "local-p1", "fast speed");
   const p2Color = await verifySeatPalette(p2, "local-p2", "normal speed");
   expect(p1Color).not.toBe(p2Color);
+  for (const seat of [p1, p2])
+    await seat.getByRole("button", { name: "Agreements", exact: true }).click();
   const peerInP1 = p1
-    .getByRole("button", { name: /^Inspect P2 Utility,/ })
+    .locator('[data-peer-id="local-p2"]')
     .getByText("P2 Utility", { exact: true });
   const peerInP2 = p2
-    .getByRole("button", { name: /^Inspect P1 Utility,/ })
+    .locator('[data-peer-id="local-p1"]')
     .getByText("P1 Utility", { exact: true });
   await expect(peerInP1).toHaveAttribute("data-couch-player", "local-p2");
   await expect(peerInP1).toHaveCSS("color", p2Color);
@@ -1313,6 +1316,7 @@ test("TV couch player toolbars match named warning captions after a plant pause"
   const couch = await createCouchFixture(context, page, { embedded: true });
   await startCouch(page, couch);
   const seat = couch.seats.get("local-p1")!.page;
+  await seat.getByRole("button", { name: "Fleet", exact: true }).click();
   await seat.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await seat.getByRole("button", { name: "Pause Coal", exact: true }).click();
   // Pausing changes the forecast immediately. The current operating sample still
@@ -1472,6 +1476,7 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
       "data-interface-scale",
       "1.25",
     );
+    await seat.getByRole("button", { name: "Fleet", exact: true }).click();
     const dailyChart = seat.locator(".facilitySupplyChart .accessibleChart");
     await expect(dailyChart).toBeVisible();
     const allocation = await dailyChart.evaluate((chart) => {

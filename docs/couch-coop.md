@@ -4,9 +4,11 @@ Choose **Play with friends → Local Co-op** in the desktop game to play with tw
 controllers. Steam Input and installed controller bindings are required. Local
 play works in Steam Offline Mode.
 
-Each controller explicitly joins a company. P1 chooses an existing co-op scenario
-or custom game; both players confirm that selection. The campaign roster then
-stays fixed. An assigned controller controls only its company's document. The
+Each controller explicitly joins a company. P1 sets up a custom game and both
+players confirm the selection. New campaigns share a territorial 3D map, with
+separate headquarters, adjacent land claims and jointly funded border interties.
+The campaign roster stays fixed. An assigned controller controls only its
+company's document. The
 shared bar shows the calendar and year progress, with the upcoming event and
 months left on the right. Each player selects a speed in their pane, and the
 slowest selection sets the pace. Each seat has a fixed color for the company
