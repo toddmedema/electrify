@@ -129,7 +129,7 @@ async function expectGlyphContrast(
   supportsHover: boolean,
   expectedFill?: string,
 ) {
-  const glyph = button.locator("svg").first();
+  const glyph = button.locator("svg path").first();
   const label = await button.getAttribute("aria-label");
   const settle = () =>
     button.evaluate(async (element) => {
