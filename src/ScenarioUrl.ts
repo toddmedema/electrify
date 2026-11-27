@@ -22,19 +22,10 @@ export function campaignSetupUrl(
   location: LocationParts = window.location,
 ): string {
   const params = new URLSearchParams(location.search);
-  for (const key of ["scenario", "challenge", "customEvent", "dataCenters"])
+  for (const key of ["scenario", "challenge", "dataCenters"])
     params.delete(key);
   params.set("campaign", "legacy");
   return `${location.pathname}?${params.toString()}`;
-}
-
-/** Opens custom setup with one supported scenario event selected. */
-export function customEventFromSearch(search: string): number | undefined {
-  const rawId = new URLSearchParams(search).get("customEvent");
-  if (rawId === null || !/^\d+$/.test(rawId)) return undefined;
-  return SCENARIOS.find(
-    (scenario) => scenario.id === Number(rawId) && !scenario.tutorialSteps,
-  )?.id;
 }
 
 /** Resolves a public challenge details link without letting tutorial ids bypass the mission flow. */
@@ -57,7 +48,6 @@ export function scenarioDetailsUrl(
 ): string {
   const params = new URLSearchParams(location.search);
   params.delete("challenge");
-  params.delete("customEvent");
   params.delete("dataCenters");
   if (params.get("campaign") === "legacy") params.delete("campaign");
   params.set("scenario", String(scenarioId));
@@ -71,7 +61,6 @@ export function scenarioListUrl(
   const params = new URLSearchParams(location.search);
   params.delete("scenario");
   params.delete("challenge");
-  params.delete("customEvent");
   params.delete("dataCenters");
   if (params.get("campaign") === "legacy") params.delete("campaign");
   const search = params.toString();

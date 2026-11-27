@@ -1,10 +1,6 @@
 import { ScenarioType } from "../Types";
-import { HYDRO_SITES } from "../data/HydroSites";
 import { getStartingFacilityAge } from "../data/StartingFacilityAges";
-import {
-  forecastCustomGameTimeline,
-  summarizeYearOneOutlook,
-} from "./CustomGameForecast";
+import { forecastCustomGameTimeline } from "./CustomGameForecast";
 import {
   createDataCenterScenario,
   DATA_CENTER_DIFFICULTY,
@@ -12,10 +8,9 @@ import {
   withoutDataCenterGrowth,
 } from "./DataCenterScenario";
 import { DataCenterSetupRequest } from "./DataCenterSetup";
+import { sizeStartingFleet } from "./StartingFleetSizing";
 
 export const DATA_CENTER_RESERVE_LABEL = "Modeled balancing reserve";
-/** A model allowance, not a claim about a utility's contracted reserve margin. */
-export const DATA_CENTER_SUPPLY_MARGIN = 0.05;
 
 const forecast = (scenario: ScenarioType) =>
   forecastCustomGameTimeline(
@@ -81,39 +76,17 @@ export function calibrateDataCenterScenario({
 
   // Find the smallest supplied opening portfolio in the real weather/dispatch
   // model. Calibrate only background demand; never absorb the selected new campus.
-  const baseFacilities = [...scenario.facilities];
-  const sized = (factor: number): ScenarioType => ({
-    ...withoutDataCenterGrowth(scenario),
-    startingDemandScale:
-      scenario.startingDemandScale! * (1 + DATA_CENTER_SUPPLY_MARGIN),
-    facilities: baseFacilities.map((facility) => ({
-      ...facility,
-      peakW: Math.max(
-        1,
-        Math.min(
-          Math.ceil((facility.peakW || 0) * factor),
-          facility.hydroSiteId
-            ? HYDRO_SITES[facility.hydroSiteId].maxPeakW
-            : Infinity,
-        ),
-      ),
-    })),
-  });
-  let low = 0;
-  let high = 1;
-  let candidate = sized(high);
-  for (let attempt = 0; attempt < 8; attempt++) {
-    const outlook = summarizeYearOneOutlook(forecast(candidate));
-    if (outlook.worstShortfallW === 0) break;
-    low = high;
-    high *= 2;
-    if (attempt === 3) {
+  scenario = {
+    ...scenario,
+    facilities: sizeStartingFleet(
+      withoutDataCenterGrowth(scenario),
+      forecast,
       // Physical hydro sites and regional imports cannot always be represented.
       // Make the missing firm supply explicit rather than inventing local hydro.
-      baseFacilities.push({
+      (shortfallW) => ({
         name: "Natural Gas CC",
         fuel: "Natural Gas",
-        peakW: Math.ceil(outlook.worstShortfallW),
+        peakW: Math.ceil(shortfallW),
         label: DATA_CENTER_RESERVE_LABEL,
         initialAgeYears: getStartingFacilityAge(
           location,
@@ -121,25 +94,9 @@ export function calibrateDataCenterScenario({
           startingYear,
           "Natural Gas CC",
         ).ageYears,
-      });
-      low = 0;
-    }
-    candidate = sized(high);
-  }
-  if (summarizeYearOneOutlook(forecast(candidate)).worstShortfallW > 0) {
-    throw new Error(
-      "We couldn't prepare a reliable starting grid for this location.",
-    );
-  }
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const mid = (low + high) / 2;
-    const trial = sized(mid);
-    if (summarizeYearOneOutlook(forecast(trial)).worstShortfallW === 0) {
-      high = mid;
-      candidate = trial;
-    } else low = mid;
-  }
-  scenario = { ...scenario, facilities: candidate.facilities };
+      }),
+    ),
+  };
   const timeline = forecast(withoutDataCenterGrowth(scenario));
   // Leave a full opening budget after the worst projected first-year drawdown.
   const lowestCash = Math.min(

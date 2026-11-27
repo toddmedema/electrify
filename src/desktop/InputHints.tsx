@@ -30,13 +30,16 @@ const menuHint = (): Hint => [
   window.electrifyCouch ? "Game menu" : "Pause / back",
 ];
 function contextualHints(target: Element | null, gameplay: boolean): Hint[] {
-  if (
-    target?.matches(
-      'input[type="range"],[role="slider"],select,[role="combobox"]:not(input)',
-    )
-  )
+  if (target?.matches('input[type="range"],[role="slider"],select'))
     return [
       ["left", "Adjust value"],
+      ["down", "Next control"],
+      ["back", "Back"],
+    ];
+  // A custom dropdown has no value to nudge: Left and Right leave it, and Confirm opens its list.
+  if (target?.matches('[role="combobox"]:not(input)'))
+    return [
+      ["confirm", "Open list"],
       ["down", "Next control"],
       ["back", "Back"],
     ];

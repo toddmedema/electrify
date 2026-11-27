@@ -22,10 +22,6 @@ import {
 } from "../helpers/DateTime";
 import { selectProjection } from "../helpers/Projection";
 import { compileOfficialArcEvents } from "../helpers/ScenarioRuleArcs";
-import {
-  customEventContext,
-  prepareCustomScenario,
-} from "../helpers/CustomScenarioEvents";
 import { captureRuleReportObservation } from "../helpers/ScenarioRuleRuntime";
 import { scenarioRules, scenarioRulesIdentity } from "../helpers/ScenarioRules";
 import { validScenarioRuleState } from "../helpers/ScenarioRuleValidation";
@@ -187,7 +183,7 @@ test.each(DIFFICULTY_IDS)(
 );
 
 test.each(DIFFICULTY_IDS)(
-  "the same plain definitions compile %s official, community and raw custom imports",
+  "the same plain definitions compile %s official and community imports",
   (difficulty) => {
     for (const seed of [1, 12345]) {
       const official = scenarioRules(getScenario(113), { difficulty, seed })!;
@@ -215,33 +211,6 @@ test.each(DIFFICULTY_IDS)(
         expect(event.effects).toEqual(phase.effects);
         expect(event.source.scenarioId).toBe(113);
       }
-    }
-    const custom = prepareCustomScenario({
-      ...DEFAULT_CUSTOM_SCENARIO,
-      startingYear: 2050,
-      durationMonths: 84,
-      eventScenarioIds: [113],
-    });
-    const game = createGame({
-      scenarioId: 999,
-      scenario: custom,
-      difficulty,
-      seed: 12345,
-    });
-    const official = createGame({ scenarioId: 113, difficulty, seed: 12345 });
-    const expected = phasesAtOnset(context(official), official);
-    for (const phase of expected) {
-      const result = resolveStoryAtDate({
-        ...context(game),
-        date: getDateFromMinute(phase.startsMinute, game.startingYear),
-        customEvents: customEventContext(game.customScenario),
-      });
-      expect(
-        result.occurrences.find(
-          (event) =>
-            event.key.split(":").at(-1) === phase.key.split(":").at(-1),
-        )?.effects,
-      ).toEqual(phase.effects);
     }
   },
 );

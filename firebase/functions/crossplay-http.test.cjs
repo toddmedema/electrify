@@ -461,6 +461,63 @@ test("same-device renewal preserves a seat, and a fenced device cannot renew bac
   assert.notEqual(acquired.body.authority.epoch, room.authority.epoch);
 });
 
+test("only the host of a finished match can reopen its saved campaign for another game", async () => {
+  const ctx = setup();
+  const host = await ctx.login("host");
+  const guest = await ctx.login("guest");
+  const room = await ctx.create(host);
+  const { lobby } = await ctx.joinPlayer(room, guest);
+  const roomId = lobby.lobbyId;
+  const ids = lobby.members.map(({ id }) => id);
+  const lock = (token) =>
+    ctx.call("room/lock", { roomId, ids, requiredIds: ids }, { token });
+  assert.equal((await lock(host)).status, 200);
+  // Before anything is saved the lobby simply reopens, as it always did.
+  assert.equal(
+    (await ctx.call("room/unlock", { roomId }, { token: host })).status,
+    200,
+  );
+  assert.equal((await lock(host)).status, 200);
+  assert.equal(
+    (await ctx.call("save/publish", { roomId }, { token: host })).status,
+    200,
+  );
+  // A saved campaign belongs to its original players until its host says the match is finished.
+  const refused = await ctx.call("room/unlock", { roomId }, { token: host });
+  assert.equal(refused.status, 409);
+  assert.deepEqual(refused.body, { error: "roster_locked" });
+  for (const body of [{ finished: false }, { finished: "yes" }, { extra: 1 }])
+    assert.equal(
+      (await ctx.call("room/unlock", { roomId, ...body }, { token: host }))
+        .status,
+      400,
+    );
+  assert.equal(
+    (
+      await ctx.call(
+        "room/unlock",
+        { roomId, finished: true },
+        { token: guest },
+      )
+    ).status,
+    403,
+  );
+  const reopened = await ctx.call(
+    "room/unlock",
+    { roomId, finished: true },
+    { token: host },
+  );
+  assert.equal(reopened.status, 200);
+  assert.equal(reopened.body.authority.locked, false);
+  assert.ok(!reopened.body.authority.head);
+  // The same players start again: a new roster lock and a fresh first checkpoint.
+  assert.equal((await lock(host)).status, 200);
+  assert.equal(
+    (await ctx.call("save/publish", { roomId }, { token: host })).status,
+    200,
+  );
+});
+
 test("only an original player can upgrade an expired saved campaign to the deployed build", async () => {
   const current = `coop-2-${"b".repeat(64)}`;
   const ctx = setup({ campaignRules: { current, published: { [RULES]: 27 } } });

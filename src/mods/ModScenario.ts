@@ -26,9 +26,9 @@ import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import {
-  prepareCustomScenario,
+  prepareOfficialArcScenario,
   validOfficialArcScenario,
-} from "../helpers/CustomScenarioEvents";
+} from "../helpers/CustomSetup";
 import {
   compileScenarioRules,
   RuleCompilationError,
@@ -210,7 +210,7 @@ function resolveModSetup(input: unknown) {
   }
   if (!validOfficialArcScenario(scenario))
     throw new Error("Unsupported scenario year or events.");
-  const prepared = prepareCustomScenario(scenario);
+  const prepared = prepareOfficialArcScenario(scenario);
   const durationMonths = overrides.durationMonths ?? prepared.durationMonths;
   const resolved: ScenarioType = {
     ...prepared,

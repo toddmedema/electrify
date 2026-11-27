@@ -450,6 +450,7 @@ worker.onmessage = async ({ data: request }: MessageEvent<WorkerRequest>) => {
   if (request.kind === "views-applied") {
     if (viewPending) {
       viewPending = false;
+      if (!local) publication.consumed(performance.now());
       // A fault can stop the tick loop while its final safety view is waiting for consumption.
       requestViews();
     }

@@ -53,6 +53,18 @@ describe("DifficultyPicker", () => {
     expect(screen.queryByText("VP")).not.toBeInTheDocument();
   });
 
+  it("keeps the reliability rule out of the compact select", () => {
+    render(
+      <DifficultyPicker
+        variant="select"
+        showDescription
+        value="Manager"
+        onChange={() => undefined}
+      />,
+    );
+    expect(screen.queryByText(/Serving less than/)).not.toBeInTheDocument();
+  });
+
   it("exposes each selectable option by its visible difficulty label", () => {
     const onChange = jest.fn();
     render(
@@ -119,7 +131,7 @@ it("keeps a locked select option from changing difficulty and explains its requi
   const expert = screen.getByRole("option", { name: "Expert, locked" });
   expect(expert).toHaveTextContent("on Hard to unlock Expert");
   expect(expert).toHaveAccessibleDescription(
-    "Complete an official non-tutorial scenario on Hard to unlock Expert.",
+    "Complete an official scenario on Hard to unlock Expert.",
   );
   fireEvent.click(expert);
   expect(onChange).not.toHaveBeenCalled();

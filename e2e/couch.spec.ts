@@ -111,27 +111,21 @@ async function startCouch<Actor extends Page | Frame>(
   await expect(
     page.getByRole("heading", { name: "Custom setup" }),
   ).toBeVisible();
-  // Couch specs play the Carbon Fee world: a coal plant, the rising-fee
-  // forecast, and a 144-month term. Duration has to drop to 10 years before
-  // the event is selected, because that arc then extends the game to 12 years.
+  // Couch specs play a ten-year game on a small grid of their own: one gas plant plus a larger
+  // coal plant, so that pausing a plant creates the future shortfall these specs assert. The
+  // grid it opens with is sized to local demand, so wait for it, then replace it.
   const duration = page.getByRole("combobox", {
     name: "Duration",
     exact: true,
   });
   await duration.click();
   await page.getByRole("option", { name: "10 years", exact: true }).click();
-  const events = page.getByRole("combobox", {
-    name: "Scenario events",
-    exact: true,
-  });
-  await events.click();
-  await page.getByRole("option", { name: "Carbon Fee", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(duration).toContainText("12 years");
+  await expect(duration).toContainText("10 years");
   // Start with a controlled two-plant fleet so pausing Coal creates a shortfall.
   const starterPlants = page
     .locator(".startingFacility")
     .getByRole("button", { name: /^Remove / });
+  await expect(starterPlants.first()).toBeVisible({ timeout: 30000 });
   for (
     let remaining = await starterPlants.count();
     remaining > 0;
@@ -443,7 +437,6 @@ async function expectSharedCaptionSize(
         );
         const fonts = await Promise.all([
           renderedFontSize(page.locator(".couchCalendar .gameStatusValue")),
-          renderedFontSize(page.locator(".missionRiskText")),
           renderedFontSize(page.locator(".missionSummaryMonths > span")),
         ]);
         return Math.max(
@@ -451,7 +444,7 @@ async function expectSharedCaptionSize(
         );
       },
       {
-        message: "shared date/event/months matches physical reserve-label font",
+        message: "shared date/months matches physical reserve-label font",
       },
     )
     .toBeLessThan(0.5);
@@ -1125,25 +1118,14 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   await expect(band.getByRole("group", { name: "Shared clock" })).toHaveCount(
     0,
   );
-  const event = band.getByRole("button", {
-    name: /^Upcoming: Carbon fee rising/,
-  });
   const term = band.getByRole("button", {
-    name: "144 months left",
+    name: "120 months left",
     exact: true,
   });
-  await expect(event).toBeVisible();
   await expect(term).toBeVisible();
-  const eventBox = (await event.boundingBox())!;
   const termBox = (await term.boundingBox())!;
-  expect(eventBox.x).toBeGreaterThan(width / 2);
-  expect(termBox.x - eventBox.x - eventBox.width).toBeLessThan(24);
-  const eventIcon = (await event.locator(".statusIcon svg").boundingBox())!;
-  const eventFontSize = await renderedFontSize(
-    event.locator(".missionRiskText"),
-  );
-  expect(eventIcon.height).toBeCloseTo(eventFontSize, 0);
-  expect(eventIcon.width).toBeCloseTo(eventFontSize, 0);
+  expect(termBox.x).toBeGreaterThan(width / 2);
+  expect(termBox.x + termBox.width).toBeLessThanOrEqual(width);
 
   const verifySeatPalette = async (
     seat: Frame,
@@ -1403,9 +1385,6 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   ).toHaveCount(0);
   await expect(page.locator("#yearProgressBar")).toHaveCount(1);
   await expect(page.locator(".missionSummary")).toBeVisible();
-  await expect(page.locator(".missionRiskText")).toContainText(
-    "Carbon fee rising",
-  );
   await expect(page.getByRole("button", { name: /months left$/ })).toHaveCount(
     1,
   );

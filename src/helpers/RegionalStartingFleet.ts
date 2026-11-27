@@ -172,6 +172,29 @@ function managedStartingGenerators(
   ];
 }
 
+/** Fit forecast-sized plants back into the regional inventory and the shared lobby limit. */
+export function allocateCalibratedFleet(
+  facilities: readonly ScenarioFacilityType[],
+  location: LocationType,
+  startingYear: number,
+): ScenarioFacilityType[] {
+  const groups = new Map<string, StartingGenerator>();
+  for (const facility of facilities) {
+    const { name, fuel, peakW, hydroSiteId } = facility;
+    if (!name || !fuel || !peakW)
+      throw new Error("Incomplete starting generator");
+    const key = hydroSiteId ?? name;
+    const existing = groups.get(key);
+    if (existing) existing.peakW += peakW;
+    else groups.set(key, { ...facility, name, fuel, peakW });
+  }
+  return managedStartingGenerators(
+    [...groups.values()],
+    location,
+    startingYear,
+  );
+}
+
 function startingHydroFleet(
   location: LocationType,
   capacityW: number,

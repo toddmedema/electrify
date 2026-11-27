@@ -285,6 +285,7 @@ export class MapRenderer {
   private clock = new FacilityMotionClock();
   private wildfire = new WildfireParticles();
   private raf: number | undefined;
+  private animationFence: WebGLSync | null = null;
   private state: State = "unavailable";
   private disposed = false;
   private readyPending = false;
@@ -618,6 +619,21 @@ export class MapRenderer {
     if (!this.isVisible() || this.disposed || this.state !== "ready") return;
     const started = performance.now();
     try {
+      const gl = this.gl!;
+      // Repaint changed game or camera inputs on this frame. For decorative motion
+      // alone, leave the GPU time to finish the last scene and composite the UI.
+      if (this.animationFence) {
+        if (
+          this.frame === this.paintedFrame &&
+          this.instances === this.sceneInstances &&
+          gl.clientWaitSync(this.animationFence, 0, 0) === gl.TIMEOUT_EXPIRED
+        ) {
+          this.schedule();
+          return;
+        }
+        gl.deleteSync(this.animationFence);
+        this.animationFence = null;
+      }
       this.storageAllocated = false;
       // Camera and simulation updates can arrive before the same paint. Only
       // prepare the scene that will actually be submitted, including on reveal.
@@ -633,8 +649,16 @@ export class MapRenderer {
         this.readyPending = false;
         this.setState("ready");
       }
-      if (moving || (allowed && this.wildfire.count) || this.lightingTransition)
+      if (
+        moving ||
+        (allowed && this.wildfire.count) ||
+        this.lightingTransition
+      ) {
+        this.animationFence =
+          gl.fenceSync?.(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) ?? null;
+        if (this.animationFence) gl.flush();
         this.schedule();
+      }
     } catch (_error) {
       this.fail();
     }
@@ -1138,6 +1162,9 @@ export class MapRenderer {
 
   private releaseResources(deleteGpu: boolean): void {
     this.wildfire.release(this.gl, deleteGpu);
+    if (deleteGpu && this.animationFence)
+      this.gl?.deleteSync(this.animationFence);
+    this.animationFence = null;
     if (deleteGpu) {
       for (const mesh of this.meshes.values()) this.deleteMesh(mesh);
       if (this.program) this.gl?.deleteProgram(this.program);

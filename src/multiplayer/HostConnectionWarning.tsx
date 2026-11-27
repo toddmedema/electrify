@@ -117,9 +117,9 @@ export default function HostConnectionWarning({
         </Typography>
         <Typography id="multiplayer-interruption-description">
           {endReason === "checkpoint"
-            ? "Open Play with friends → Multiplayer saves to continue from the last confirmed save."
+            ? "Host a game from Play with friends, then choose Load multiplayer save to continue from the last confirmed save."
             : endReason === "roomUnavailable"
-              ? "The multiplayer room is no longer available. Check Play with friends → Multiplayer saves in the main menu."
+              ? "The multiplayer room is no longer available. Host a game from Play with friends, then choose Load multiplayer save."
               : syncing
                 ? "The game will continue once it has the latest state from the host."
                 : "Reconnect to continue this session."}
@@ -130,7 +130,7 @@ export default function HostConnectionWarning({
             <>
               {" Leaving now won't create a new save. Progress may be lost."}
               {
-                " Check Play with friends → Multiplayer saves from the main menu."
+                " Host a game from Play with friends, then choose Load multiplayer save."
               }
             </>
           )}

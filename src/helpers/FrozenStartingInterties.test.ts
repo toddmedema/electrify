@@ -18,10 +18,7 @@ import {
   frozenWildfireStartingIntertieAccess,
   validFrozenStartingIntertieAccess,
 } from "./FrozenStartingInterties";
-import {
-  validCustomEventIds,
-  validOfficialArcIds,
-} from "./CustomScenarioEvents";
+import { validOfficialArcIds } from "./CustomSetup";
 
 const pack = (): ModPackage =>
   modPackage({
@@ -109,9 +106,8 @@ test("forged frozen allocation, source, location and starting assets fail even w
   expect(validFrozenStartingIntertieAccess(reordered)).toBe(true);
 });
 
-test("current111 is an official arc while ordinary Custom Game excludes it", () => {
+test("current111 is an official arc a community package can select", () => {
   expect(validOfficialArcIds([111])).toBe(true);
-  expect(validCustomEventIds([111])).toBe(false);
 });
 
 test("removing both researched starting facts cannot enable generic500MW access after rehash", () => {

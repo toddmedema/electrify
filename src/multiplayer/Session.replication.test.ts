@@ -21,6 +21,9 @@ Object.assign(globalThis, { TextEncoder, crypto: webcrypto });
 const { parse, stringify } = require("../../electron/coop-codec.cjs");
 const flush = async () => {
   for (let n = 0; n < 30; n++) await Promise.resolve();
+  // Deliver the renderer's next-task view credit, then let the replica process it.
+  jest.advanceTimersByTime(0);
+  for (let n = 0; n < 30; n++) await Promise.resolve();
 };
 beforeAll(() => loadSimData("SF"));
 beforeEach(() => jest.useFakeTimers());

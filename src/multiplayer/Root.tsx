@@ -1,5 +1,3 @@
-import { achievementJournal } from "../achievements/Journal";
-import { unlockedDifficulty } from "../achievements/DifficultyUnlocks";
 import {
   lazy,
   Suspense,
@@ -144,10 +142,7 @@ export default function MultiplayerRoot() {
         store.dispatch(navigate("CUSTOM_GAME"));
         return;
       }
-      const selection = hostSelection(
-        store.getState(),
-        unlockedDifficulty(achievementJournal.getSnapshot().progress),
-      );
+      const selection = hostSelection(store.getState());
       if (selection && !next.starting) session.publishBrowse(selection);
     } else if (browse?.phase === "browsing") {
       // A guest follows the host's screen, scenario and difficulty.
@@ -180,6 +175,28 @@ export default function MultiplayerRoot() {
     },
     [session],
   );
+
+  const [finishing, setFinishing] = useState(false);
+  /**
+   * Ends a finished match for the whole lobby. The host's players stay connected in the lobby,
+   * whether the next game is the same one or a new one; a failure leaves them choosing a game.
+   */
+  const finishMatch = (transition: () => Promise<unknown>, failure: string) => {
+    setFinishing(true);
+    void transition()
+      .catch((error) => {
+        store.dispatch(
+          dialogOpen({
+            open: true,
+            title: "Multiplayer save",
+            message: crossplayFailure(error, failure),
+            closeText: "OK",
+          }),
+        );
+        if (!session.getSnapshot().view) startChoosing();
+      })
+      .finally(() => setFinishing(false));
+  };
 
   const returnFromInterruption = async () => {
     if (!session.canLeaveInterruption()) return;
@@ -334,7 +351,6 @@ export default function MultiplayerRoot() {
     const stop = session.subscribe(sync);
     const stopCoop = session.subscribe(syncCoop);
     const stopStore = store.subscribe(syncCoop);
-    const stopProgress = achievementJournal.subscribe(syncCoop);
     registerCoopControls({
       start: (spec) => {
         if (
@@ -343,10 +359,7 @@ export default function MultiplayerRoot() {
           spec.customScenario.mod
         )
           return;
-        const selection = hostSelection(
-          store.getState(),
-          unlockedDifficulty(achievementJournal.getSnapshot().progress),
-        );
+        const selection = hostSelection(store.getState());
         if (selection)
           session.publishBrowse({ ...selection, phase: "playing" });
         void session.start({ spec }).catch((error) => {
@@ -446,7 +459,6 @@ export default function MultiplayerRoot() {
       window.removeEventListener("hashchange", acceptWebInvite);
       stopCoop();
       stopStore();
-      stopProgress();
       registerLobbyOpener(undefined);
       registerCoopControls(undefined);
       registerMultiplayerRuntime(undefined);
@@ -604,7 +616,6 @@ export default function MultiplayerRoot() {
           onJoined={discardInvite}
           onDiscardInvite={discardInvite}
           onHosted={startChoosing}
-          onOpenSaves={() => setSavesOpen(true)}
           onChooseNew={() => {
             session.cancelCampaign();
             startChoosing();
@@ -646,25 +657,19 @@ export default function MultiplayerRoot() {
           hostName={coop?.hostName ?? "The host"}
           selfId={state.lobby.selfId}
           onWatch={() => setWatching(endingKey)}
-          online={session.onlineCampaigns}
-          onBackToLobby={() => {
-            const transition = session.onlineCampaigns
-              ? session.leave({ skipSave: false }).then(() => setOpen(true))
-              : session.backToLobby().then(startChoosing);
-            void transition.catch((error) => {
-              store.dispatch(
-                dialogOpen({
-                  open: true,
-                  title: "Multiplayer save",
-                  message: crossplayFailure(
-                    error,
-                    "The multiplayer save did not finish.",
-                  ),
-                  closeText: "OK",
-                }),
-              );
-            });
-          }}
+          working={finishing}
+          onRestart={() =>
+            finishMatch(
+              () => session.restart(),
+              "The game could not be restarted.",
+            )
+          }
+          onReturnToLobby={() =>
+            finishMatch(
+              () => session.backToLobby().then(startChoosing),
+              "The multiplayer save did not finish.",
+            )
+          }
           onLeave={() => leaveLobby(true)}
         />
       )}

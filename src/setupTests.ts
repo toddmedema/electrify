@@ -70,6 +70,15 @@ jest.mock("./helpers/CustomGameForecastClient", () => ({
   }),
 }));
 
+jest.mock("./helpers/CustomGameFleetClient", () => ({
+  createCustomGameFleetWorker: () => ({
+    onmessage: null,
+    onerror: null,
+    postMessage: () => undefined,
+    terminate: () => undefined,
+  }),
+}));
+
 jest.mock("./helpers/DataCenterSetupClient", () => ({
   createDataCenterSetupWorker: () => ({
     onmessage: null,

@@ -182,8 +182,8 @@ test("Steam Offline Mode disables online play and keeps Local Co-op available", 
   expect(screen.getByRole("button", { name: "Host a game" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Join" })).toBeDisabled();
   expect(
-    screen.getByRole("button", { name: "Multiplayer saves" }),
-  ).toBeDisabled();
+    screen.queryByRole("button", { name: "Multiplayer saves" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Local Co-op" })).toBeEnabled();
   expect(join).not.toHaveBeenCalled();
 });
@@ -277,7 +277,7 @@ test("an unavailable guest room offers only the main menu and makes no save prom
     name: "Multiplayer session ended",
   });
   expect(dialog).toHaveAccessibleDescription(
-    "The multiplayer room is no longer available. Check Play with friends → Multiplayer saves in the main menu.",
+    "The multiplayer room is no longer available. Host a game from Play with friends, then choose Load multiplayer save.",
   );
   expect(screen.getAllByRole("button")).toHaveLength(1);
   expect(

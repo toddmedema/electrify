@@ -6,7 +6,6 @@ import {
 import { availableTerritorySpecialSites } from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
 import { multiplayerHydroAvailability } from "../helpers/MultiplayerTerritory";
-import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { FACILITY_FUELS } from "./FacilityFuels";
 import { gasHeatRate } from "./GasPlantVintages";
 import {
@@ -345,7 +344,6 @@ export function GENERATORS(
     ),
     seed: state.seed,
     scenarioId: state.scenarioId,
-    customEvents: customEventContext(state.customScenario),
     difficulty: state.difficulty,
     location: state.location,
     snapshot: storySnapshot,

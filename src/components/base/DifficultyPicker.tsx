@@ -34,7 +34,8 @@ export interface DifficultyPickerProps {
   onChange: (difficulty: DifficultyType) => void;
   // A row of buttons for a screen built around the choice, or a compact select for a settings table
   variant: "toggle" | "select";
-  // The chosen difficulty's reliability rule; toggle controls also describe the economic effects.
+  // Toggle controls describe each difficulty's economic effects and its reliability rule; the
+  // compact select leaves them to its options' tooltips.
   showDescription?: boolean;
   id?: string;
   /** Shows the choice someone else is making, such as a co-op host's difficulty. */
@@ -150,11 +151,6 @@ export default function DifficultyPicker({
           ))}
         </Select>
         {lockHint}
-        {showDescription && (
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            {reliabilityRuleText(value, scenario)}
-          </Typography>
-        )}
       </>
     );
   }

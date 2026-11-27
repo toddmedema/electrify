@@ -2,7 +2,7 @@
 import fs from "fs";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { LEGACY_CAMPAIGN_ID } from "../data/LegacyCampaign";
-import { prepareCustomScenario } from "../helpers/CustomScenarioEvents";
+import { prepareCustomSetup } from "../helpers/CustomSetup";
 import { computeOutlook } from "../components/base/OutlookForecast";
 import { forecastWorkerSnapshot } from "../components/base/ForecastWorkerSnapshot";
 import { fullBuildForecast } from "./BuildForecastComparison";
@@ -32,14 +32,13 @@ const fixtures = [
     },
   },
   {
-    name: "Custom SF offshore, separate watershed and composed arcs",
+    name: "Custom SF offshore and separate watershed",
     create: () =>
       createGame({
         scenarioId: 999,
-        scenario: prepareCustomScenario({
+        scenario: prepareCustomSetup({
           ...DEFAULT_CUSTOM_SCENARIO,
           startingYear: 2030,
-          eventScenarioIds: [108, 107, 111],
         }),
         seed: 29,
       }),
