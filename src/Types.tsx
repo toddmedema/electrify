@@ -1659,6 +1659,7 @@ export interface GameType {
       endpoints?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
       connectionRequestedBy?: string;
       connectionRequestedBySelf?: boolean;
+      connectionProposalRevision?: number;
       /** This neighbor's run ended, so its link no longer carries power. */
       retired?: boolean;
     }[];

@@ -173,7 +173,10 @@ export function validTerritorialCrossing(
       !active ||
       (proposal.seat !== edge.a && proposal.seat !== edge.b) ||
       typeof proposal.financed !== "boolean" ||
-      Object.keys(proposal).length !== 3
+      !Number.isSafeInteger(proposal.revision) ||
+      proposal.revision < 1 ||
+      proposal.revision > world.revision ||
+      Object.keys(proposal).length !== 4
     )
       return false;
   }

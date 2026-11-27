@@ -50,6 +50,7 @@ import {
 import type { FacilityShoppingType, GameType, TerritoryTileId } from "../Types";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
+import type { ConnectionOrder } from "./Types";
 
 /** Real game action names, so renaming a reducer action fails type-checking here. */
 type GameActionName = keyof typeof gameSlice.actions | keyof typeof GameActions;
@@ -89,19 +90,44 @@ const dispatchPosition =
 
 /** Co-op players can only build or upgrade their links to each other. */
 const peerLine: Validator = (game, payload) => {
-  const target = payload as { corridorId?: string; financed?: boolean };
-  return hasTerritoryNetwork(game) ||
+  const target = payload as ConnectionOrder | null;
+  if (
+    hasTerritoryNetwork(game) ||
     !target ||
     !game.multiplayer?.peers?.some(
       (p) => p.corridor.id === target.corridorId,
     ) ||
     typeof target.financed !== "boolean"
-    ? { error: "Choose another player's intertie" }
-    : game.multiplayer?.territorial
-      ? {
-          payload: { corridorId: target.corridorId, financed: target.financed },
-        }
-      : { payload };
+  )
+    return { error: "Choose another player's intertie" };
+  if (!game.multiplayer.territorial) return { payload };
+
+  const { corridorId, financed, intent } = target;
+  if (
+    intent === "propose" &&
+    typeof target.border?.here === "string" &&
+    typeof target.border?.there === "string"
+  ) {
+    const { here, there } = target.border;
+    return {
+      payload: { corridorId, financed, intent, border: { here, there } },
+    };
+  }
+  if (
+    (intent === "accept" || intent === "withdraw") &&
+    Number.isSafeInteger(target.proposalRevision) &&
+    target.proposalRevision > 0
+  ) {
+    return {
+      payload: {
+        corridorId,
+        financed,
+        intent,
+        proposalRevision: target.proposalRevision,
+      },
+    };
+  }
+  return { error: "Review the current connection before continuing" };
 };
 
 /** Existing outside assets belong to one company; shared links still require both owners. */

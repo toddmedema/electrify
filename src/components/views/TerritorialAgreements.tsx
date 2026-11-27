@@ -8,6 +8,7 @@ import { formatBuildMonths, formatWatts } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import { intertieUpgradeQuote } from "../../helpers/Transmission";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
+import type { ConnectionDecision } from "../../multiplayer/Types";
 import { useMoney } from "../base/CurrencyContext";
 import PurchaseReviewDialog from "../base/PurchaseReviewDialog";
 import {
@@ -56,7 +57,7 @@ export default function TerritorialAgreements({
 }
 
 function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
-  const [review, setReview] = React.useState(false);
+  const [review, setReview] = React.useState<"upgrade" | ConnectionDecision>();
   const [busy, setBusy] = React.useState(false);
   const [notice, setNotice] = React.useState<string>();
   const title = React.useId();
@@ -84,8 +85,9 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
   const canReview =
     !ceased && !connecting && (line ? !!upgrade : !!peer.border);
   const action = line ? "upgrade" : "connection";
-  const reviewVerb = request ? "Accept" : "Propose";
-  const reviewLabel = `${reviewVerb} ${action}`;
+  const accepting =
+    review === "upgrade" ? !!request : review?.intent === "accept";
+  const reviewLabel = `${accepting ? "Accept" : "Propose"} ${action}`;
   const status = ceased
     ? "retired"
     : line
@@ -101,14 +103,27 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
   const flow = line?.currentFlowW ?? 0;
   const costIndex = getCostTableIndex(game.date, game.startingYear, game.seed);
 
-  async function submit(financed: boolean): Promise<string | undefined> {
+  function openReview() {
+    if (line) setReview("upgrade");
+    else if (peer.connectionProposalRevision !== undefined)
+      setReview({
+        intent: "accept",
+        proposalRevision: peer.connectionProposalRevision,
+      });
+    else if (peer.border) setReview({ intent: "propose", border: peer.border });
+  }
+
+  async function submit(
+    financed: boolean,
+    decision?: ConnectionDecision,
+  ): Promise<string | undefined> {
     const runtime = multiplayerRuntime();
     if (!runtime) return "The shared game is unavailable.";
     try {
       await runtime.submit({
         kind: "action",
-        name: line ? "upgradeTransmissionLine" : "buildTransmissionLine",
-        payload: { corridorId: corridor.id, financed },
+        name: decision ? "buildTransmissionLine" : "upgradeTransmissionLine",
+        payload: { corridorId: corridor.id, financed, ...decision },
       });
     } catch (error) {
       return error instanceof Error
@@ -117,9 +132,17 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
     }
   }
   async function withdraw() {
-    if (busy) return;
+    const proposalRevision = line ? undefined : peer.connectionProposalRevision;
+    if (busy || (!line && proposalRevision === undefined)) return;
     setBusy(true);
-    setNotice(await submit(false));
+    setNotice(
+      await submit(
+        false,
+        proposalRevision === undefined
+          ? undefined
+          : { intent: "withdraw", proposalRevision },
+      ),
+    );
     setBusy(false);
   }
   function statusLabel() {
@@ -175,7 +198,7 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
               ? `Review ${action} from ${peer.name}`
               : `Review ${action} with ${peer.name}`
           }
-          onClick={() => setReview(true)}
+          onClick={openReview}
         >
           {request ? `Review proposed ${action}` : `Review ${action}`}
         </Button>
@@ -185,45 +208,51 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
           {notice}
         </Typography>
       )}
-      {review && canReview && !requestedHere && (
-        <PurchaseReviewDialog
-          open
-          title={`${reviewLabel} ${line ? "with" : "to"} ${peer.name}?`}
-          cash={cash}
-          buildCost={upgrade?.buildCost ?? corridor.buildCost}
-          interestRate={game.interestRate}
-          refinancedBalance={line?.loanAmountLeft}
-          upkeepPerMonth={
-            ((upgrade?.annualOperatingCost ?? corridor.annualOperatingCost) *
-              costIndex) /
-            12
-          }
-          onlineInMonths={Math.round(
-            (upgrade?.yearsToBuild ?? corridor.yearsToBuild) * 12,
-          )}
-          cashButtonLabel={reviewLabel}
-          extraFacts={[
-            {
-              concept: "supply",
-              label: "Design capacity",
-              value: formatWatts(
-                upgrade?.targetCapacityW ?? corridor.capacityW,
-              ),
-            },
-          ]}
-          preface={
-            <Typography variant="body2" sx={{ px: 2, pb: 1 }}>
-              Each company pays for its half when both companies approve.
-            </Typography>
-          }
-          onClose={() => setReview(false)}
-          onPurchase={async (financed) => {
-            const error = await submit(financed);
-            if (error) return error;
-            setReview(false);
-          }}
-        />
-      )}
+      {review &&
+        (review === "upgrade") === !!line &&
+        canReview &&
+        !requestedHere && (
+          <PurchaseReviewDialog
+            open
+            title={`${reviewLabel} ${line ? "with" : "to"} ${peer.name}?`}
+            cash={cash}
+            buildCost={upgrade?.buildCost ?? corridor.buildCost}
+            interestRate={game.interestRate}
+            refinancedBalance={line?.loanAmountLeft}
+            upkeepPerMonth={
+              ((upgrade?.annualOperatingCost ?? corridor.annualOperatingCost) *
+                costIndex) /
+              12
+            }
+            onlineInMonths={Math.round(
+              (upgrade?.yearsToBuild ?? corridor.yearsToBuild) * 12,
+            )}
+            cashButtonLabel={reviewLabel}
+            extraFacts={[
+              {
+                concept: "supply",
+                label: "Design capacity",
+                value: formatWatts(
+                  upgrade?.targetCapacityW ?? corridor.capacityW,
+                ),
+              },
+            ]}
+            preface={
+              <Typography variant="body2" sx={{ px: 2, pb: 1 }}>
+                Each company pays for its half when both companies approve.
+              </Typography>
+            }
+            onClose={() => setReview(undefined)}
+            onPurchase={async (financed) => {
+              const error = await submit(
+                financed,
+                review === "upgrade" ? undefined : review,
+              );
+              if (error) return error;
+              setReview(undefined);
+            }}
+          />
+        )}
     </section>
   );
 }

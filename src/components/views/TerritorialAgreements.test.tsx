@@ -16,6 +16,16 @@ beforeAll(() => {
 });
 afterEach(() => registerMultiplayerRuntime(undefined));
 
+const view = (game: GameType) => (
+  <Provider store={store}>
+    <TerritorialAgreements
+      game={game}
+      onBuyingRule={jest.fn()}
+      onSellingRule={jest.fn()}
+    />
+  </Provider>
+);
+
 it("requires a shared border and keeps a rejected connection proposal open for review", async () => {
   const original = opening.multiplayer!.peers![0];
   const multiplayer = { ...opening.multiplayer!, peers: [original] };
@@ -24,15 +34,6 @@ it("requires a shared border and keeps a rejected connection proposal open for r
     multiplayer,
     transmission: { ...opening.transmission!, lines: [] },
   };
-  const view = (game: GameType) => (
-    <Provider store={store}>
-      <TerritorialAgreements
-        game={game}
-        onBuyingRule={jest.fn()}
-        onSellingRule={jest.fn()}
-      />
-    </Provider>
-  );
   const { rerender } = render(view(game));
   const label = `Review connection with ${original.name}`;
   expect(
@@ -74,6 +75,65 @@ it("requires a shared border and keeps a rejected connection proposal open for r
   expect(submit).toHaveBeenCalledWith({
     kind: "action",
     name: "buildTransmissionLine",
-    payload: { corridorId: original.corridor.id, financed: false },
+    payload: {
+      corridorId: original.corridor.id,
+      financed: false,
+      intent: "propose",
+      border: { here: "frontier:1:0", there: "frontier:2:0" },
+    },
+  });
+});
+
+it("submits the proposal opened for review after the host withdraws and replaces it", async () => {
+  const original = opening.multiplayer!.peers![0];
+  const game = (revision?: number): GameType => ({
+    ...opening,
+    transmission: { ...opening.transmission!, lines: [] },
+    multiplayer: {
+      ...opening.multiplayer!,
+      peers: [
+        {
+          ...original,
+          border: { here: "frontier:1:0", there: "frontier:2:0" },
+          connectionRequestedBy:
+            revision === undefined ? undefined : original.name,
+          connectionProposalRevision: revision,
+        },
+      ],
+    },
+  });
+  const error =
+    "This connection proposal changed. Review the current connection.";
+  const submit = jest.fn().mockRejectedValue(new Error(error));
+  registerMultiplayerRuntime({
+    command: jest.fn(),
+    submit,
+    activity: jest.fn(),
+    leave: jest.fn(),
+  });
+  const { rerender } = render(view(game(10)));
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: `Review connection from ${original.name}`,
+    }),
+  );
+  rerender(view(game()));
+  const review = screen.getByRole("dialog", {
+    name: `Accept connection to ${original.name}?`,
+  });
+  rerender(view(game(11)));
+  fireEvent.click(
+    within(review).getByRole("button", { name: "Accept connection" }),
+  );
+  expect(await within(review).findByText(error)).toBeVisible();
+  expect(submit).toHaveBeenCalledWith({
+    kind: "action",
+    name: "buildTransmissionLine",
+    payload: {
+      corridorId: original.corridor.id,
+      financed: false,
+      intent: "accept",
+      proposalRevision: 10,
+    },
   });
 });

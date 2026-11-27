@@ -260,31 +260,94 @@ test("construction is booked on an owned vacant tile only and exact placements s
   expect(() => hydrateWorld(forged)).toThrow(/invalid grids/i);
 });
 
+test("a withdrawn or replaced proposal cannot be accepted from an older room view", () => {
+  const world = create();
+  for (const tile of expansionPath(world)) claim(world, "0", tile);
+  const corridorId = peerCorridorId(world.edges[0].id);
+  const border = roomView(world, "0").game!.multiplayer!.peers![0].border;
+  const submit = (seat: string, decision: object) =>
+    action(world, seat, "buildTransmissionLine", {
+      corridorId,
+      financed: false,
+      ...decision,
+    });
+  const propose = { intent: "propose", border };
+  expect(submit("0", propose)).toBeUndefined();
+  const firstRevision = world.revision;
+  const staleAcceptance = { intent: "accept", proposalRevision: firstRevision };
+  expect(
+    submit("0", { intent: "withdraw", proposalRevision: firstRevision }),
+  ).toBeUndefined();
+
+  expect(submit("1", staleAcceptance)).toMatch(/proposal changed/i);
+  expect(world.edges[0].proposal).toBeUndefined();
+
+  expect(submit("0", propose)).toBeUndefined();
+  const secondRevision = world.revision;
+  expect(submit("1", staleAcceptance)).toMatch(/proposal changed/i);
+  expect(world.edges[0].proposal?.revision).toBe(secondRevision);
+  expect(world.grids.every((grid) => !grid.transmission!.lines.length)).toBe(
+    true,
+  );
+  const forged = save(world);
+  forged.edges[0].proposal!.revision = forged.revision + 1;
+  expect(() => hydrateWorld(forged)).toThrow(/invalid grids/i);
+  expect(
+    submit("1", { intent: "accept", proposalRevision: secondRevision }),
+  ).toBeUndefined();
+});
+
 test("two bordering owners co-sign atomically, restore the crossing and trade only when it opens", () => {
   let world = create(3);
   const edge = world.edges[0];
   const corridorId = peerCorridorId(edge.id);
-  const order = { corridorId, financed: false };
+  const propose = { corridorId, financed: false, intent: "propose" };
   const path = expansionPath(world);
   expect(path.length).toBeGreaterThan(0);
-  expect(action(world, "0", "buildTransmissionLine", order)).toMatch(/border/);
+  expect(
+    action(world, "0", "buildTransmissionLine", {
+      ...propose,
+      border: { here: "frontier:0:0", there: "frontier:1:0" },
+    }),
+  ).toMatch(/border/);
   for (const tile of path) claim(world, "0", tile);
-  expect(action(world, "2", "buildTransmissionLine", order)).toBeDefined();
-  expect(action(world, "0", "buildTransmissionLine", order)).toBeUndefined();
+  const border = roomView(world, "0").game!.multiplayer!.peers![0].border!;
+  expect(
+    action(world, "2", "buildTransmissionLine", { ...propose, border }),
+  ).toBeDefined();
+  expect(
+    action(world, "0", "buildTransmissionLine", {
+      ...propose,
+      border: { here: border.there, there: border.here },
+    }),
+  ).toMatch(/border crossing changed/);
+  expect(
+    action(world, "0", "buildTransmissionLine", { ...propose, border }),
+  ).toBeUndefined();
   expect(roomView(world, "1").game!.multiplayer!.peers![0]).toMatchObject({
     connectionRequestedBy: "Player 0",
+    connectionProposalRevision: world.revision,
     connected: false,
   });
   expect(
     world.grids.every((grid) => grid.transmission!.lines.length === 0),
   ).toBe(true);
+  const accept = {
+    corridorId,
+    financed: false,
+    intent: "accept",
+    proposalRevision: world.revision,
+  };
   const resumedSeats = coopSeats(3, "new");
   world = restoreWorld(save(world), "resumed", resumedSeats);
   const resumed = world.edges[0];
-  expect(resumed.proposal?.seat).toBe("new0");
+  expect(resumed.proposal).toMatchObject({
+    seat: "new0",
+    revision: accept.proposalRevision,
+  });
   const cash = world.grids.map((grid) => currentTick(grid)!.cash);
   currentTick(world.grids[1])!.cash = 0;
-  expect(action(world, "new1", "buildTransmissionLine", order)).toMatch(
+  expect(action(world, "new1", "buildTransmissionLine", accept)).toMatch(
     /both companies/i,
   );
   expect(currentTick(world.grids[0])!.cash).toBe(cash[0]);
@@ -292,7 +355,9 @@ test("two bordering owners co-sign atomically, restore the crossing and trade on
     world.grids.every((grid) => grid.transmission!.lines.length === 0),
   ).toBe(true);
   currentTick(world.grids[1])!.cash = cash[1];
-  expect(action(world, "new1", "buildTransmissionLine", order)).toBeUndefined();
+  expect(
+    action(world, "new1", "buildTransmissionLine", accept),
+  ).toBeUndefined();
   for (const [i, grid] of world.grids.slice(0, 2).entries()) {
     expect(grid.transmission!.lines[0].yearsToBuildLeft).toBeGreaterThan(0);
     expect(currentTick(grid)!.cash).toBe(

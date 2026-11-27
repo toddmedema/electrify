@@ -98,6 +98,7 @@ import type {
   BorderConnection,
   Edge,
   CommandEnvelope,
+  ConnectionOrder,
   MatchSpec,
   RoomView,
   Seat,
@@ -558,11 +559,7 @@ function applyCommandOnce(
       validation.payload = { tileId: quote.tileId, quoteKey: quote.quoteKey };
     }
     if (name === "buildTransmissionLine" && world.spec.territorialVersion === 1)
-      return coSignBuild(
-        world,
-        sender,
-        validation.payload as { corridorId: string; financed: boolean },
-      );
+      return coSignBuild(world, sender, validation.payload as ConnectionOrder);
     if (
       name === "upgradeTransmissionLine" &&
       isPeerCorridorId(
@@ -637,7 +634,7 @@ function applyCommandOnce(
 function coSignBuild(
   world: World,
   sender: string,
-  target: { corridorId: string; financed: boolean },
+  target: ConnectionOrder,
 ): string | undefined {
   const edge = world.edges.find(
     (e) => peerCorridorId(e.id) === target.corridorId,
@@ -651,7 +648,15 @@ function coSignBuild(
   )!;
   if (!isActive(world, partner.id))
     return `${partner.name}'s company has retired`;
-  if (edge.proposal?.seat === sender) {
+  const proposal = edge.proposal;
+  if (
+    target.intent === "propose"
+      ? !!proposal
+      : proposal?.revision !== target.proposalRevision
+  )
+    return "This connection proposal changed. Review the current connection.";
+  if (target.intent === "withdraw") {
+    if (proposal?.seat !== sender) return "Only the proposer can withdraw";
     delete edge.proposal;
     delete edge.crossing;
     return;
@@ -660,9 +665,15 @@ function coSignBuild(
     world.seats.findIndex((entry) => entry.id === seat),
   );
   const [a, b] = owners.map((index) => world.grids[index]);
-  const crossing = edge.crossing ?? multiplayerBorderConnection(a, b);
-  if (!crossing) return "Expand until your territories share a border";
-  if (!edge.proposal) {
+  if (target.intent === "propose") {
+    const crossing = multiplayerBorderConnection(a, b);
+    if (!crossing) return "Expand until your territories share a border";
+    const border = crossingForSeat(crossing, edge, sender);
+    if (
+      target.border.here !== border.here ||
+      target.border.there !== border.there
+    )
+      return "This border crossing changed. Review the current connection.";
     const own = sender === edge.a ? a : b;
     const peer = own.multiplayer!.peers!.find(
       (entry) => entry.id === partner.id,
@@ -679,10 +690,12 @@ function coSignBuild(
       seat: sender,
       financed: target.financed,
       minute: own.date.minute,
+      revision: world.revision,
     };
     return;
   }
-  const proposal = edge.proposal;
+  if (!proposal || proposal.seat === sender)
+    return "Only the other company can accept this proposal";
   const built = owners.map((index) => {
     const grid = world.grids[index];
     selectWeatherLocation(grid.location.id);
@@ -1142,6 +1155,7 @@ function buildRoomView(
             (seat) => seat.id === edge.proposal?.seat,
           )?.name,
           connectionRequestedBySelf: edge.proposal.seat === seatId,
+          connectionProposalRevision: edge.proposal.revision,
         }),
         upgradeRequestedBy: world.seats.find(
           (seat) => seat.id === edge.approval,
