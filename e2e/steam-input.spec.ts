@@ -1123,10 +1123,26 @@ test("controller advances the first tutorial through inspection, chart and clock
     page.locator('[data-map-facility="Coal"][data-owned="true"]'),
   );
   await input(page, "confirm");
-  await select(page, page.getByRole("button", { name: "Fleet", exact: true }));
-  await input(page, "confirm");
+  const inspector = page.getByRole("dialog", { name: "Coal", exact: true });
+  await expect(inspector).toBeVisible();
+  await expect(hud.locator(".tutorialHudAction")).toHaveText("Open Fleet");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await input(page, "back");
+  await expect(inspector).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Gameplay",
+  );
+  await input(page, "nextPane");
+  await expect(hud.locator(".tutorialHudAction")).toHaveText(
+    "Select the supply and demand chart",
+  );
   const chart = page.locator('#chartSupplyDemand [role="img"]');
-  await select(page, chart);
+  await input(page, "nextChart");
+  await expect(chart).toBeFocused();
   await input(page, "confirm");
   await expect(hud).toContainText(
     "Watch how the grid changes as the city wakes up.",

@@ -4,6 +4,7 @@ import {
   waitForGameplayLoop,
 } from "./music-audit";
 import { expect, Page, test } from "./fixtures";
+import { tutorialCoal } from "./tutorial-fixture";
 import { writeFile } from "node:fs/promises";
 
 // Let the real audio clock run before the first gesture in headless Chromium.
@@ -290,6 +291,7 @@ test("first tutorial keeps its sources through the real native song boundary", a
   const playback = await expectContinuousMusic(page, before);
   for (const stem of playback.active)
     expect(stem.position).toBeGreaterThan(durations[0] + 0.3);
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expectContinuousMusic(page, before);
+  await tutorialCoal(page).click();
+  await expect(page.locator(".tutorialHudAction")).toHaveText("Open Fleet");
+  await expectContinuousMusic(page, playback);
 });

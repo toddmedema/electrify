@@ -23,6 +23,15 @@ const complete = (page: Page) =>
     timeout: 35000,
   });
 
+async function setTutorialRate(page: Page, value: string) {
+  const rate = page.getByRole("slider", {
+    name: "The rate you charge for electricity generation",
+    exact: true,
+  });
+  await rate.fill(value);
+  await expect(rate).toHaveValue(value);
+}
+
 async function startMission(page: Page, id: number) {
   await startTutorialMission(
     page,
@@ -109,7 +118,10 @@ test("Mission 3 · move Coal above storage and cover the daily peak with a batte
   await next(page, "Start final challenge");
   await goal(page, "Cover peak demand with storage");
   await buildTutorialProject(page, "Lithium Battery", true, "19");
-  await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  const ultra = page.getByRole("button", { name: "ultra speed", exact: true });
+  if (await ultra.isVisible()) await ultra.click();
+  else
+    await page.getByRole("button", { name: "fast speed", exact: true }).click();
   await complete(page);
 });
 
@@ -121,9 +133,7 @@ test("Mission 4 · use Insights and Programs to earn profit", async ({
   await goal(page, "Compare revenue and costs");
   await next(page);
   await action(page, "Programs");
-  await page.locator("#rateSlider input").focus();
-  for (let i = 0; i < 30; i++)
-    await page.locator("#rateSlider input").press("ArrowRight");
+  await setTutorialRate(page, "0.06");
   await next(page);
   await goal(page, "Finish the month with a profit");
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
@@ -135,9 +145,7 @@ test("Mission 5 · use Programs and Insights to attract customers", async ({
 }) => {
   await startMission(page, 3);
   await action(page, "Programs");
-  await page.locator("#rateSlider input").focus();
-  for (let i = 0; i < 10; i++)
-    await page.locator("#rateSlider input").press("ArrowLeft");
+  await setTutorialRate(page, "0.06");
   await next(page);
   await goal(page, "Find customer growth in Insights");
   await expect(page.locator("#chartInsightsCustomers")).toBeVisible();
