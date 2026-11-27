@@ -725,6 +725,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   }
   await expect(build).toHaveCount(0);
 
+  await openControllerFleet(page);
   // Confirm lifts a reorder handle; directions must move the row rather than leave it.
   const rows = page.locator(".facilities:visible .facilityRow");
   const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
@@ -787,14 +788,17 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
       animations: "disabled",
     });
   }
-  // Programs → Insights → Events → Scenario → Fleet closes every retained side pane.
+  // Programs → Insights → Events → Scenario → map closes every retained side pane.
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
-  await input(page, "nextChart");
-  const chart = page.locator(
-    '.accessibleChart > [role="img"][tabindex="0"]:focus',
+  await input(page, "nextPane");
+  const charts = page.locator(
+    '#facilitiesPane .accessibleChart > [role="img"][tabindex="0"]',
   );
+  await expect(charts.first()).toBeVisible();
+  await input(page, "nextChart");
+  const chart = charts.and(page.locator(":focus"));
   await expect(chart).toBeFocused();
   await input(page, "confirm");
   await expect(chart.locator("..").getByRole("status")).not.toBeEmpty();
@@ -1812,6 +1816,18 @@ test("TV maximum custom setup gives location and select values enough room", asy
   await captureTvPage(page, info, "custom-fields");
 });
 
+async function openControllerFleet(page: Page) {
+  const fleet = page.locator("#facilitiesPane");
+  if (!(await fleet.isVisible())) {
+    await select(
+      page,
+      page.getByRole("button", { name: "Fleet", exact: true }),
+    );
+    await input(page, "confirm");
+  }
+  await expect(fleet).toBeVisible();
+}
+
 async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
   test.skip(
     !testInfo.project.name.startsWith("tv-"),
@@ -1932,6 +1948,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(
       page.getByRole("button", { name: "Build", exact: true }),
     ).toBeFocused();
+    await openControllerFleet(page);
     await capture("fleet");
     const inspect = page.getByRole("button", {
       name: "Inspect Coal",

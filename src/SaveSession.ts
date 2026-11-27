@@ -1157,7 +1157,10 @@ export function startSaveSessions(store: AppStore): () => void {
     const leases = [
       preparing?.lease,
       prepared?.lease,
+      // Once a transition suspends the writer, a late renewal could recreate its
+      // released lease with the token the next Continue will no longer use.
       currentSession?.created &&
+      !currentSession.suspended &&
       (!currentSession.terminal || currentSession.failure)
         ? currentSession.lease
         : undefined,

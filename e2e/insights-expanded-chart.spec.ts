@@ -23,6 +23,21 @@ async function expectChartAxesInView(dialog: Locator) {
   }
 }
 
+function measureButtons(scope: Locator) {
+  return scope.getByRole("button").evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const { x, y, width, height } = button.getBoundingClientRect();
+      return {
+        x,
+        y,
+        width,
+        height,
+        overflow: button.scrollWidth - button.clientWidth,
+      };
+    }),
+  );
+}
+
 async function expectMobileFuelLegend(
   container: Locator,
   page: Page,
@@ -43,17 +58,14 @@ async function expectMobileFuelLegend(
       }),
     )
     .toEqual([3, 3]);
-  for (const button of await legend.getByRole("button").all()) {
-    const bounds = (await button.boundingBox())!;
-    const minimumHeight = await page.evaluate(() =>
-      matchMedia("(pointer: coarse)").matches ? 44 : 40,
-    );
-    expect(bounds.height).toBeGreaterThanOrEqual(minimumHeight);
-    expect(
-      await button.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1);
+  const minimumHeight = await page.evaluate(() =>
+    matchMedia("(pointer: coarse)").matches ? 44 : 40,
+  );
+  const buttons = await measureButtons(legend);
+  expect(buttons).toHaveLength(6);
+  for (const { height, overflow } of buttons) {
+    expect(height).toBeGreaterThanOrEqual(minimumHeight);
+    expect(overflow).toBeLessThanOrEqual(1);
   }
 }
 
@@ -78,14 +90,11 @@ async function expectSelectableFuelKey(
   const minimumHeight = await page.evaluate(() =>
     matchMedia("(pointer: coarse)").matches ? 44 : 40,
   );
-  for (const button of await key.getByRole("button").all()) {
-    const bounds = (await button.boundingBox())!;
-    expect(bounds.height).toBeGreaterThanOrEqual(minimumHeight);
-    expect(
-      await button.evaluate(
-        (element) => element.scrollWidth - element.clientWidth,
-      ),
-    ).toBeLessThanOrEqual(1);
+  const buttons = await measureButtons(key);
+  expect(buttons.length).toBeGreaterThan(0);
+  for (const { height, overflow } of buttons) {
+    expect(height).toBeGreaterThanOrEqual(minimumHeight);
+    expect(overflow).toBeLessThanOrEqual(1);
   }
   expect(
     await key.evaluate((element) => element.scrollWidth - element.clientWidth),
@@ -486,15 +495,16 @@ for (const theme of ["light", "dark"] as const) {
     const date = (await navigation
       .getByLabel(/^Displayed date range:/)
       .boundingBox())!;
-    for (const button of await navigation.getByRole("button").all()) {
-      const box = (await button.boundingBox())!;
+    const size = (await navigation.boundingBox())!.width <= 700 ? 44 : 40;
+    const navigationButtons = await measureButtons(navigation);
+    expect(navigationButtons.length).toBeGreaterThan(0);
+    for (const { y, width, height } of navigationButtons) {
       expect(
-        Math.abs(box.y + box.height / 2 - date.y - date.height / 2),
+        Math.abs(y + height / 2 - date.y - date.height / 2),
         "date range and navigation buttons share one row",
       ).toBeLessThanOrEqual(1);
-      const size = (await navigation.boundingBox())!.width <= 700 ? 44 : 40;
-      expect(box.width).toBe(size);
-      expect(box.height).toBe(size);
+      expect(width).toBe(size);
+      expect(height).toBe(size);
     }
     const expanded = dialog.locator(".uplot");
     await expect(expanded).toBeVisible();
@@ -525,12 +535,13 @@ for (const theme of ["light", "dark"] as const) {
       /Biomass.*Coal.*Natural Gas.*Oil.*Uranium/,
     );
     await capture("fuel-all-expanded");
-    for (const control of await dialog.getByRole("button").all()) {
-      const box = (await control.boundingBox())!;
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(
-        page.viewportSize()!.width + 1,
-      );
+    const dialogButtons = await measureButtons(dialog);
+    expect(dialogButtons.length).toBeGreaterThan(0);
+    for (const { x, width, height } of dialogButtons) {
+      expect(width).toBeGreaterThan(0);
+      expect(height).toBeGreaterThan(0);
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x + width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
     }
     expect(
       await dialog.evaluate(

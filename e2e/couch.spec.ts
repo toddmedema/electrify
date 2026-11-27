@@ -84,6 +84,7 @@ test("TV couch setup explains missing Steam Input through the normal entry", asy
 async function startCouch<Actor extends Page | Frame>(
   page: Page,
   couch: CouchFixture<Actor>,
+  seed?: number,
 ) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
@@ -121,6 +122,10 @@ async function startCouch<Actor extends Page | Frame>(
   await duration.click();
   await page.getByRole("option", { name: "10 years", exact: true }).click();
   await expect(duration).toContainText("10 years");
+  if (seed !== undefined)
+    await page
+      .getByRole("textbox", { name: "Seed", exact: true })
+      .fill(String(seed));
   // Start with a controlled two-plant fleet so pausing Coal creates a shortfall.
   const starterPlants = page
     .locator(".startingFacility")
@@ -547,7 +552,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   const couch = await createCouchFixture(context, page, {
     nativeBindings: true,
   });
-  await startCouch(page, couch);
+  // The second Solar review needs another owned site with room for 50 MW.
+  await startCouch(page, couch, 4242);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
   for (const seat of [p1, p2]) {
@@ -622,6 +628,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expectSharedMenu(page, gameMenu);
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
   await expect(clock(p2)).toHaveAttribute("data-active-speed", "PAUSED");
+  const forecast = p2.locator(".insights:visible .uplot").first();
+  await expect(forecast).toBeVisible();
   await expect(
     page.getByRole("complementary", {
       name: "Controller controls",
@@ -686,7 +694,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expect(
     p1.getByRole("region", { name: "Insights", exact: true }),
   ).toHaveCount(0);
-  await expect(p2.locator(".insights:visible .uplot").first()).toBeVisible();
+  await expect(forecast).toBeVisible();
   // A purchase review remains usable while the partner's real forecast/chart is open.
   await couch.input({ "101": ["build"] });
   await sizeSolar(build1);
