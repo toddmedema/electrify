@@ -6,7 +6,15 @@ import {
 } from "./music-audit";
 
 test.use({
-  launchOptions: { args: ["--autoplay-policy=user-gesture-required"] },
+  launchOptions: async ({ launchOptions }, use) => {
+    await use({
+      ...launchOptions,
+      args: [
+        ...(launchOptions.args ?? []),
+        "--autoplay-policy=user-gesture-required",
+      ],
+    });
+  },
 });
 // The native focus test waits for the real 29-second intro before checking loop positions.
 test.setTimeout(120000);

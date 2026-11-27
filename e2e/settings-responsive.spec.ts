@@ -15,7 +15,12 @@ test("settings footer fits one row and the version opens cache reset in both the
   const version = footer.getByRole("button", {
     name: /^\d{2}[a-z]{3,4}\d{2}-\d{4}$/,
   });
-  const response = await page.request.get("/package.json");
+  const response = await page.request.get("/package.json", { maxRedirects: 0 });
+  const status = response.status();
+  expect(
+    status >= 300 && status < 400,
+    `Unexpected /package.json redirect (${status})`,
+  ).toBe(false);
   const metadata = response
     .headers()
     ["content-type"]?.includes("application/json")

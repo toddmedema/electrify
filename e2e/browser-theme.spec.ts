@@ -9,7 +9,8 @@ test("installed shell has a dark fallback without dark-scheme support", async ({
   const manifestUrl = await page
     .locator('link[rel="manifest"]')
     .evaluate((link) => (link as HTMLLinkElement).href);
-  const response = await request.get(manifestUrl);
+  expect(new URL(manifestUrl).origin).toBe(new URL(page.url()).origin);
+  const response = await request.get(manifestUrl, { maxRedirects: 0 });
   expect(response.ok()).toBe(true);
   const manifest = await response.json();
   // Android may use only these base fields for its installed shell, even when the
