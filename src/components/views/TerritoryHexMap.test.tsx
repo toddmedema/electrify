@@ -16,6 +16,11 @@ import { createGame } from "../../testing/Simulator";
 import reducer, { delta } from "../../reducers/Game";
 import { acquireTile } from "../../reducers/GameActions";
 import { currentTick } from "../../helpers/GameSelectors";
+import {
+  LEGACY_GENERATIONS,
+  LEGACY_GENERATION_MONTHS,
+} from "../../data/LegacyCampaign";
+import { regionalMapViews } from "../../helpers/RegionalMap";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { tilePurchaseQuote } from "../../helpers/Territories";
 import {
@@ -24,7 +29,7 @@ import {
 } from "../../helpers/TerritoryMapState";
 import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
-import type { TerritoryTileId } from "../../Types";
+import type { GameType, TerritoryTileId } from "../../Types";
 import { TICK_MINUTES } from "../../Constants";
 import type { MapFrame } from "../base/territory-3d/Types";
 import {
@@ -117,6 +122,68 @@ afterEach(() => {
   registerMultiplayerRuntime(undefined);
   jest.restoreAllMocks();
   mockSceneError = false;
+});
+
+it("widens the Legacy map at every handover and restores the same view on a cold load", () => {
+  jest.useFakeTimers();
+  jest.spyOn(document, "hidden", "get").mockReturnValue(false);
+  jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(390);
+  try {
+    const opening = createGame({ scenarioId: 117, seed: 188 });
+    const store = configureStore({ reducer: { game: () => opening } });
+    const surface = (game: GameType) => (
+      <Provider store={store}>
+        <TerritoryHexMap
+          regional
+          game={game}
+          views={regionalMapViews(game)}
+          onSelect={jest.fn()}
+        />
+      </Provider>
+    );
+    const scale = () =>
+      Number(
+        screen.getByRole("region", { name: "Regional map" }).dataset
+          .cameraScale,
+      );
+    const { rerender, unmount } = render(surface(opening));
+    let priorScale = scale();
+    let current = opening;
+    for (const { index, scenarioId } of LEGACY_GENERATIONS.slice(1)) {
+      current = {
+        ...opening,
+        scenarioId,
+        campaign: {
+          ...opening.campaign!,
+          generationIndex: index,
+          termStartMonth: index * LEGACY_GENERATION_MONTHS,
+        },
+      };
+      rerender(surface(current));
+      expect(scale()).toBe(priorScale);
+      act(() => jest.advanceTimersByTime(300));
+      const halfway = scale();
+      expect(halfway).toBeLessThan(priorScale);
+      act(() => jest.advanceTimersByTime(400));
+      const settled = scale();
+      expect(settled).toBeLessThan(halfway);
+      priorScale = settled;
+    }
+    expect(
+      screen.getByRole("button", {
+        name: "Inspect San Francisco on map",
+        exact: true,
+      }),
+    ).toHaveStyle({
+      height: `${HexGeometry.HEX_HEIGHT * priorScale}px`,
+    });
+    expect(HexGeometry.HEX_HEIGHT * priorScale).toBeGreaterThanOrEqual(44);
+    unmount();
+    render(surface(current));
+    expect(scale()).toBe(priorScale);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 function show(

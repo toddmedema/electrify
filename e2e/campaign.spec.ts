@@ -2,7 +2,7 @@ import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import path from "path";
 import "../src/Store";
 import { test, expect } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openPane, readTerritoryMapCamera } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { installLeaderboardFixture } from "./leaderboard-fixture";
 import { editSavedGame, readSavedGame } from "./save-fixture";
@@ -173,7 +173,12 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    const map = page.getByRole("region", { name: "Regional map workspace" });
+    const viewport = map.locator(".territoryMapViewport");
+    const cameraScale = async () =>
+      (await readTerritoryMapCamera(viewport)).scale;
+    await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+    const openingScale = await cameraScale();
     await page
       .getByRole("button", { name: "pause", exact: true })
       .first()
@@ -370,6 +375,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(successor?.customerRate).toBe(closed?.customerRate);
     expect(successor?.dollarsPerkWh).toBe(closed?.dollarsPerkWh);
     expect(successor?.timeline[0].cash).toBe(closed?.timeline[0].cash);
+    await expect.poll(cameraScale).toBeLessThan(openingScale * 0.97);
+    await expect(
+      map.getByRole("button", {
+        name: "Inspect San Francisco on map",
+        exact: true,
+      }),
+    ).toBeInViewport();
 
     // A protocol fixture reaches the longest incoming term. Full campaign balance has separate
     // real-action simulation coverage; this checks goal wrapping, scrolling, and saved previews.
@@ -454,6 +466,12 @@ for (const theme of ["light", "dark"] as const) {
     const finalCompany = await readSavedGame(page);
     expect(finalCompany?.campaign?.generationIndex).toBe(8);
     expect(finalCompany?.objectiveProgress?.completedMonths).toBe(0);
+    await expect.poll(cameraScale).toBeCloseTo(openingScale * 0.64, 5);
+    const finalScale = await cameraScale();
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+    expect(await cameraScale()).toBeCloseTo(finalScale, 5);
   });
 }
 

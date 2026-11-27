@@ -60,6 +60,10 @@ export default function RegionalGridMap({
     setInspected(undefined);
     setSelected(undefined);
   }, []);
+  const generation = game.campaign?.generationIndex;
+  React.useEffect(() => {
+    if (generation !== undefined) close();
+  }, [close, generation]);
   const closeInspection = React.useCallback(() => {
     focusAfterClose.current = inspected;
     close();
