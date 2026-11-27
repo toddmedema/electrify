@@ -89,7 +89,7 @@ export default function TerritoryTileMenu({
     });
   } else if (quote) {
     tileActions.push({
-      label: `Connect (${formatPurchasePrice(quote.price)})`,
+      label: `Connect ${formatPurchasePrice(quote.price)}`,
       detail:
         quote.price > availableCash
           ? `${formatMoneyConcise(quote.price - availableCash)} more cash needed.`

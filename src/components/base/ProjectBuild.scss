@@ -8,6 +8,10 @@
   overflow: auto;
   min-height: 0;
   padding: 0 16px 12px;
+
+  > .tileConnectionBuild {
+    margin-top: 12px;
+  }
 }
 .projectLocation {
   margin: 4px 0;
@@ -63,13 +67,6 @@
   .tileWorkspaceSurface.tileWorkspaceProject {
     max-height: min(55%, calc(100% - var(--game-dock-clearance, 80px) - 176px));
   }
-  .tileWorkspaceProject .tileWorkspaceHeading {
-    padding-block: 4px;
-  }
-  .tileWorkspaceProject .tileWorkspaceHeading h3 {
-    font-size: 16px;
-    line-height: 24px;
-  }
   .tileWorkspaceProject .projectCandidateScroll {
     padding: 0 12px 8px;
   }
@@ -89,9 +86,6 @@
     max-height: calc(100% - var(--game-dock-clearance, 80px) - 8px);
     overflow: auto;
     overscroll-behavior: contain;
-    .tileWorkspaceHeading {
-      padding-block: 4px;
-    }
     .tileWorkspaceBody {
       flex: none;
       overflow: visible;

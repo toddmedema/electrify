@@ -1,4 +1,6 @@
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import MapPanelSlide from "./MapPanelSlide";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { navigate } from "../../reducers/Card";
 import { useControllerInput } from "../../desktop/InputPresentation";
@@ -334,58 +336,61 @@ export default function MapWorkspace({
                     />
                   </div>
                   <div className="gameToolTray" ref={tray}>
-                    {MAP_TOOLS.map((tool, slot) => {
-                      const stackingIndex = windows.indexOf(tool.id);
-                      if (stackingIndex < 0) return null;
-                      const closePanel = () => close(tool.id);
-                      return (
-                        <MapPanelWindow
-                          key={tool.id}
-                          tool={tool.id}
-                          label={tool.label}
-                          icon={tool.icon}
-                          stackingIndex={stackingIndex}
-                          front={tool.id === active}
-                          floating={
-                            floating
-                              ? {
-                                  area,
-                                  slot,
-                                  defaultWidth: presentation.toolWidth,
-                                  scale: presentation.scale,
-                                }
-                              : undefined
-                          }
-                          onRaise={() => raise(tool.id)}
-                          onClose={closePanel}
-                          onBack={
-                            tool.id === "PROGRAMS" ? programBack : undefined
-                          }
-                        >
-                          <GameToolCloseContext.Provider value={closePanel}>
-                            {isMapView(tool.id) && (
-                              <Facilities
-                                territoryView={tool.id}
-                                paneId={
-                                  tool.id === "AGREEMENTS"
-                                    ? "agreementsPane"
-                                    : undefined
-                                }
-                              />
-                            )}
-                            {tool.id === "PROGRAMS" && (
-                              <Programs
-                                onClose={closePanel}
-                                onBackChange={setProgramBack}
-                              />
-                            )}
-                            {tool.id === "INSIGHTS" && <Insights />}
-                            {tool.id === "EVENTS" && <EventLog />}
-                            {tool.id === "SCENARIO" && <ScenarioDetails />}
-                          </GameToolCloseContext.Provider>
-                        </MapPanelWindow>
-                      );
-                    })}
+                    <TransitionGroup component={null}>
+                      {MAP_TOOLS.map((tool, slot) => {
+                        const stackingIndex = windows.indexOf(tool.id);
+                        if (stackingIndex < 0) return null;
+                        const closePanel = () => close(tool.id);
+                        return (
+                          <MapPanelSlide key={tool.id}>
+                            <MapPanelWindow
+                              tool={tool.id}
+                              label={tool.label}
+                              icon={tool.icon}
+                              stackingIndex={stackingIndex}
+                              front={tool.id === active}
+                              floating={
+                                floating
+                                  ? {
+                                      area,
+                                      slot,
+                                      defaultWidth: presentation.toolWidth,
+                                      scale: presentation.scale,
+                                    }
+                                  : undefined
+                              }
+                              onRaise={() => raise(tool.id)}
+                              onClose={closePanel}
+                              onBack={
+                                tool.id === "PROGRAMS" ? programBack : undefined
+                              }
+                            >
+                              <GameToolCloseContext.Provider value={closePanel}>
+                                {isMapView(tool.id) && (
+                                  <Facilities
+                                    territoryView={tool.id}
+                                    paneId={
+                                      tool.id === "AGREEMENTS"
+                                        ? "agreementsPane"
+                                        : undefined
+                                    }
+                                  />
+                                )}
+                                {tool.id === "PROGRAMS" && (
+                                  <Programs
+                                    onClose={closePanel}
+                                    onBackChange={setProgramBack}
+                                  />
+                                )}
+                                {tool.id === "INSIGHTS" && <Insights />}
+                                {tool.id === "EVENTS" && <EventLog />}
+                                {tool.id === "SCENARIO" && <ScenarioDetails />}
+                              </GameToolCloseContext.Provider>
+                            </MapPanelWindow>
+                          </MapPanelSlide>
+                        );
+                      })}
+                    </TransitionGroup>
                   </div>
                 </div>
                 <Navigation

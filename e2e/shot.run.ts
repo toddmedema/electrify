@@ -1,7 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, Page, test } from "./fixtures";
-import { openBuild, openFleet, openPane } from "./layout";
+import {
+  openBuild,
+  openFleet,
+  openMapProjectCatalogue,
+  openPane,
+  returnToTerritoryMap,
+} from "./layout";
 import { readShotRequest, ShotRequest } from "./shot-request";
 
 // Runner for `npm run shot`; see scripts/dev/shot.js. It starts the game and opens panes with
@@ -16,8 +22,14 @@ const TOOL_LABELS = {
 } as const;
 
 async function openView(page: Page, view: ShotRequest["view"]) {
-  if (view === "facilities") await openFleet(page);
-  else if (view === "map") {
+  const territoryWorkspace = page.locator(
+    '.gameWorkspace[data-persistent-map="true"]',
+  );
+  if (view === "facilities") {
+    await expect(page.locator(".gameWorkspace")).toBeVisible();
+    if (await territoryWorkspace.count()) await returnToTerritoryMap(page);
+    else await openFleet(page);
+  } else if (view === "map") {
     const map = page.getByRole("region", {
       name: /^(Regional|Territory) map workspace$/,
     });
@@ -25,8 +37,10 @@ async function openView(page: Page, view: ShotRequest["view"]) {
     await expect(map.or(selectMap).first()).toBeVisible();
     if (!(await map.isVisible())) await selectMap.click();
     await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
-  } else if (view === "build") await openBuild(page);
-  else {
+  } else if (view === "build") {
+    if (await territoryWorkspace.count()) await openMapProjectCatalogue(page);
+    else await openBuild(page);
+  } else {
     const label = TOOL_LABELS[view];
     await openPane(
       page.getByRole("region", { name: label, exact: true }),

@@ -100,7 +100,7 @@ async function range(page: Page) {
     ]);
 }
 for (const theme of ["light", "dark"]) {
-  test(`grid warnings separate current reserve from future supply risk in ${theme} @minimum-phone`, async ({
+  test(`grid warnings separate current reserve from future shortage in ${theme} @minimum-phone`, async ({
     page,
   }, info) => {
     test.skip(!reviewProjects.has(info.project.name));
@@ -135,15 +135,15 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const grid = page.locator(".gridHealth:visible");
     const risk = grid.getByRole("button", {
-      name: /^Current grid status: NOW.*FUTURE Supply risk:/,
+      name: /^Current grid status: NOW.*FUTURE Shortage:/,
     });
     await expect(risk).toBeVisible({ timeout: 30_000 });
     await expect(grid).toHaveClass(/gridHealth-low-reserve/);
-    await expect(risk).toContainText(/NOW.*reserve.*Low.*FUTURE Supply risk:/);
+    await expect(risk).toContainText(/NOW.*reserve.*Low.*FUTURE Shortage:/);
     await expect(
       page
         .locator(".missionRiskButton:visible")
-        .filter({ hasText: "Supply risk:" }),
+        .filter({ hasText: "Shortage:" }),
     ).toHaveCount(0);
     expect(await risk.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
       true,
@@ -161,6 +161,7 @@ for (const theme of ["light", "dark"]) {
       const term = page.getByRole("button", { name: /months left$/ });
       await expectGoalBelowTime(term, "Acquire utilities (0/3)");
       await expectCompactStatusRow(page);
+      expect((await grid.boundingBox())!.x).toBeCloseTo(0, 0);
     }
     expect(
       await page.evaluate(

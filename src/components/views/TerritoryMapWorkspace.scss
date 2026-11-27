@@ -153,6 +153,8 @@
   inset: 50% auto auto 50%;
 }
 .territoryFacilityStatusLayer {
+  // Keep badges above the fallback hex faces and below the city labels.
+  z-index: 1;
   overflow: visible;
   pointer-events: none;
 }
