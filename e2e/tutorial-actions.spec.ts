@@ -57,13 +57,20 @@ for (const mission of missions) {
     ).toHaveCount(Number(desktop && mission.actions.includes("Build")));
 
     for (const [name, key] of [
-      ["Build", "q"],
+      ["Fleet", "q"],
+      ["Fleet", "f"],
+      ["Agreements", "w"],
+      ["Agreements", "a"],
+      ["Events", "e"],
+      ["Programs", "r"],
+      ["Programs", "p"],
+      ["Insights", "t"],
+      ["Insights", "i"],
+      ["Scenario", "y"],
+      ["Scenario", "s"],
+      ["Build", "b"],
       ["Build", "g"],
-      ["Build", "s"],
-      ["Programs", "w"],
-      ["Insights", "e"],
-      ["Events", "r"],
-      ["Scenario", "t"],
+      ["Build", "Shift+s"],
     ]) {
       if (!mission.actions.includes(name)) await page.keyboard.press(key);
     }

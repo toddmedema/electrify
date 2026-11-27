@@ -1,41 +1,22 @@
 import * as React from "react";
-import {
-  GAME_TOOLS,
-  GameNavigationLabel,
-  type GameTool,
-} from "./GameNavigation";
-
+import { GAME_TOOLS, GameNavigationLabel } from "./GameNavigation";
 interface ShortcutType {
   keys: string[];
   description: string;
   tool?: (typeof GAME_TOOLS)[number];
 }
 
-// The single definition of the game's keyboard shortcuts, rendered in both Settings and the
-// Manual. They used to be two hand-maintained copies of the same table, which is exactly the
-// kind of thing that drifts. Keep in sync with keyMap in Compositor.tsx, which is the other
-// half of the contract -- the keys themselves.
-// The action bar's tools take the left-hand letter row in the bar's own order, so the keys read
-// left to right like the buttons do. Navigation shows each in its button's tooltip.
-export const TOOL_SHORTCUTS: Record<GameTool, string[]> = {
-  BUILD_GENERATORS: ["Q", "B"],
-  PROGRAMS: ["W"],
-  INSIGHTS: ["E"],
-  EVENTS: ["R"],
-  SCENARIO: ["T"],
-};
-
 export const SHORTCUTS: ShortcutType[] = [
   { keys: ["`", "space", "0"], description: "Pause" },
   { keys: ["1", "2", "3"], description: "Slow / normal / fast speed" },
   { keys: ["4"], description: "Ultra speed (desktop-sized screens)" },
   ...GAME_TOOLS.map((tool) => ({
-    keys: TOOL_SHORTCUTS[tool.id],
+    keys: tool.keys,
     description: `Open / close ${tool.label}`,
     tool,
   })),
   { keys: ["G"], description: "Build a generator" },
-  { keys: ["S"], description: "Build storage" },
+  { keys: ["Shift+S"], description: "Build storage" },
   {
     keys: ["shift", "1-9"],
     description: "Pause / resume that facility in the fleet",

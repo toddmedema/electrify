@@ -74,7 +74,7 @@ export {
  * on a phone, where there is only ever one pane anyway.
  *
  * Narrower windows stack it in two rows: cash, profit, date and speed above, then the grid readout and
- * the mission. Once the workspace has room for side columns those rows fold into one bar, in the
+ * the mission. On a wide map those rows fold into one bar, in the
  * order a player checks them: cash, profit and date, the grid, the mission (the only part that
  * gives up width), then the speed controls pinned right where they always are.
  */
@@ -189,8 +189,7 @@ export function GameAppBar(props: Props) {
   });
   const wideSpeedControls = useMediaQuery(SIDE_LAYOUT_MEDIA, { noSsr: true });
   const singleRow = workspace
-    ? workspace.layout === "side" &&
-      workspace.effectiveWidth >= SINGLE_ROW_MIN_WIDTH
+    ? workspace.effectiveWidth >= SINGLE_ROW_MIN_WIDTH
     : wideRow;
   const monthlyProfit = React.useMemo(
     () => monthProfit(game.timeline, date.monthsElapsed),

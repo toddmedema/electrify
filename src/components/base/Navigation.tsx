@@ -5,23 +5,10 @@ import HistoryIcon from "@mui/icons-material/History";
 import { useAppSelector } from "../../Store";
 import { CardNameType } from "../../Types";
 import { getScenario } from "../../data/Scenarios";
-import {
-  GAME_TOOLS,
-  MAP_VIEWS,
-  type GameTool,
-  type MapPanelView,
-} from "./GameNavigation";
+import { GAME_TOOLS, type GameTool } from "./GameNavigation";
 import useDockLabels from "./useDockLabels";
-import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { selectTutorialActions } from "../../reducers/Tutorial";
-
-export {
-  GAME_TOOLS,
-  MAP_VIEWS,
-  type GameTool,
-  type MapPanelView,
-} from "./GameNavigation";
 
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
@@ -96,18 +83,15 @@ export const MapEventStatus = React.memo(function MapEventStatus({
   );
 });
 
-/** Expose the same accessible tool actions in card navigation and the pane workspace.
- * Couch docks can hide visible labels without changing names, tutorial restrictions or callbacks. */
+/** Map tool actions, with labels that follow the player's input device and tutorial progress. */
 export default function Navigation({
   openTools,
   onToggle,
-  openMapViews,
-  onToggleMapView,
+  buildDestination,
   showMapBuild,
   showEventStatus = true,
 }: {
-  openMapViews: MapPanelView[];
-  onToggleMapView: (view: MapPanelView) => void;
+  buildDestination?: CardNameType;
   showMapBuild: boolean;
   showEventStatus?: boolean;
   openTools: GameTool[];
@@ -124,16 +108,13 @@ export default function Navigation({
   const tutorialActions = useAppSelector(selectTutorialActions);
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
   const tutorialDock = !!tutorialActions;
-  const mapViews = MAP_VIEWS.filter(
-    (view) => !tutorialActions || tutorialActions.includes(view.id),
-  );
   const tools = GAME_TOOLS.filter(
     (tool) =>
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
       (showMapBuild || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
-  if (!tools.length && !mapViews.length) return null;
+  if (!tools.length) return null;
   return (
     <nav
       id="navfooter"
@@ -142,39 +123,6 @@ export default function Navigation({
       aria-label="Game actions"
       {...dockLabels}
     >
-      {mapViews.map((view) => {
-        const open = openMapViews.includes(view.id);
-        return (
-          <Tooltip
-            key={view.id}
-            title={view.label}
-            placement="top"
-            open={labelId === view.triggerId}
-            disableHoverListener
-            disableFocusListener
-            disableTouchListener
-            disableInteractive
-          >
-            <Button
-              id={view.triggerId}
-              {...buttonLabels}
-              className={`gameDockAction${open ? " gameDockActionOpen" : ""}`}
-              aria-label={view.label}
-              aria-expanded={open}
-              aria-controls={open ? `tool-${view.id}` : undefined}
-              data-game-destination={view.id}
-              onClick={() => onToggleMapView(view.id)}
-            >
-              <Badge>{view.icon}</Badge>
-              {tutorialDock && (
-                <span className="gameDockTutorialLabel" aria-hidden>
-                  {view.label}
-                </span>
-              )}
-            </Button>
-          </Tooltip>
-        );
-      })}
       {tools.map((tool) => {
         const open = openTools.includes(tool.id);
         return (
@@ -183,7 +131,7 @@ export default function Navigation({
             title={
               fromTouch || controllerInput
                 ? tool.label
-                : `${tool.label} (${TOOL_SHORTCUTS[tool.id].join(", ")})`
+                : `${tool.label} (${tool.keys.join(", ")})`
             }
             placement="top"
             open={labelId === tool.triggerId}
@@ -198,7 +146,7 @@ export default function Navigation({
               className={`gameDockAction ${tool.id === "BUILD_GENERATORS" ? "button-buildFacility gameDockBuild" : ""}${open ? " gameDockActionOpen" : ""}`}
               aria-expanded={open}
               aria-label={tool.label}
-              aria-keyshortcuts={TOOL_SHORTCUTS[tool.id].join(" ")}
+              aria-keyshortcuts={tool.keys.join(" ")}
               aria-describedby={
                 tool.id === "EVENTS"
                   ? [
@@ -210,7 +158,9 @@ export default function Navigation({
                   : undefined
               }
               aria-controls={open ? `tool-${tool.id}` : undefined}
-              data-game-destination={tool.id}
+              data-game-destination={
+                tool.id === "BUILD_GENERATORS" ? buildDestination : tool.id
+              }
               onClick={() => onToggle(tool.id)}
             >
               <Badge

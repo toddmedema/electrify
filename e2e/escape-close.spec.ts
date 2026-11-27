@@ -170,7 +170,7 @@ test("Escape matches Back for Manual, Settings, and Saved games", async ({
 
   for (const title of ["Manual", "Settings", "Saved games"]) {
     for (const close of ["Back", "Escape"]) {
-      await page.keyboard.press("r");
+      await page.keyboard.press("e");
       await expect(page.locator("main.base_main")).toHaveCount(1);
       await page.locator(".gameMenuButton").click();
       await page.getByRole("menuitem", { name: title, exact: true }).click();

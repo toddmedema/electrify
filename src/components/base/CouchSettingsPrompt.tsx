@@ -95,13 +95,13 @@ export default function CouchSettingsPrompt() {
         }
       }}
     >
-      <p>Playing from the couch? Try larger controls and a focused layout.</p>
+      <p>Playing from the couch? Try larger controls.</p>
       <div className="couchSettingsPromptActions">
         <Button
           variant="text"
           disableRipple
           onClick={() => {
-            dispatch(change({ interfaceScale: 1.5, workspace: "single" }));
+            dispatch(change({ interfaceScale: 1.5 }));
             close();
           }}
         >

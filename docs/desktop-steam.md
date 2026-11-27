@@ -415,18 +415,16 @@ A wake checkpoint failure uses the existing visible save error and retry path.
 Open **Play with friends → Local Co-op** for [two-player couch co-op](couch-coop.md).
 Both players use Steam Input controllers, including in Steam Offline Mode.
 
-Settings offers one Interface scale for text, charts, icons and controls (100–200%), and
-Workspace: Automatic or Single tool. Automatic uses the available space at the chosen scale;
-Single tool gives the active tool the main area while keeping essential status and navigation
-visible. Advanced display contains independent Screen-edge padding (0%, 2% or 4%) for displays
-that crop their edges. These preferences stay on this device. Display resolution does not
-add an automatic scale factor. Split-screen companies retain their native zoom and
-single-tool workspace without applying scale twice.
+Settings offers one Interface scale for text, charts, icons and controls (100–200%).
+The map fits tools to the available space at the chosen scale. Advanced display contains
+independent Screen-edge padding (0%, 2% or 4%) for displays that crop their edges. These
+preferences stay on this device. Split-screen companies use their native zoom and show one
+map tool at a time.
 
 The first qualifying title-screen launch offers a small bottom prompt in Steam Big Picture,
 with a connected controller, or through a Remote Play TV client. Steam Deck uses the same
 signals. The prompt takes no focus and leaves Play available. Use couch settings applies 150%
-Interface scale and Single tool, retaining Screen-edge padding; Dismiss keeps current choices.
+Interface scale and retains Screen-edge padding. Dismiss keeps current choices.
 The prompt is remembered as soon as it is shown, including across restarts without an answer.
 Detection never changes preferences without acceptance, and signals arriving after leaving the
 title wait until a later title visit.
@@ -441,7 +439,7 @@ Headless controller checks exercise the renderer and native bridge mock. They do
 couch-distance readability, overscan behavior, physical-controller compatibility or Steam binding
 delivery. Before release, test a private build on real 1080p and 4K TVs in both themes:
 
-- Use the bottom prompt and Settings with only a controller. Adjust scale, workspace and padding,
+- Use the bottom prompt and Settings with only a controller. Adjust scale and padding,
   relaunch, and verify device-local persistence and the ability to change each choice independently.
 - Start with no prompt receipt in Big Picture, with a connected but inactive controller, and through
   Remote Play TV. Verify Play retains focus, the notice covers no controls, and the notice stays gone

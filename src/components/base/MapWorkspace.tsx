@@ -8,14 +8,8 @@ import { useControllerInput } from "../../desktop/InputPresentation";
 import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../../WorkspaceLayout";
 import { BuildForecastProvider } from "./BuildForecast";
 import GameAppBar from "./GameAppBar";
-import Navigation, {
-  GAME_TOOLS,
-  MAP_VIEWS,
-  gameToolForCard,
-  GameTool,
-  MapEventStatus,
-  MapPanelView,
-} from "./Navigation";
+import Navigation, { gameToolForCard, MapEventStatus } from "./Navigation";
+import { GAME_TOOLS, type GameTool, type MapPanelView } from "./GameNavigation";
 import { GameToolMemoryContext, useToolFocusMemory } from "./GameToolMemory";
 import MapPanelWindow, { useMapWindowArea } from "./MapPanelWindow";
 import {
@@ -33,12 +27,13 @@ import EventLog from "../views/EventLogContainer";
 import ScenarioDetails from "./ScenarioDetails";
 import "./GameWorkspace.scss";
 
-type MapTool = GameTool | MapPanelView;
-type MapWindow = MapTool | "TILE";
-const isDockTool = (item: MapWindow): item is MapTool => item !== "TILE";
-const MAP_TOOLS = [...MAP_VIEWS, ...GAME_TOOLS];
+type MapWindow = GameTool | "TILE";
+const isDockTool = (item: MapWindow): item is GameTool => item !== "TILE";
+const TERRITORIAL_PANELS = GAME_TOOLS.filter(
+  (tool) => tool.id !== "BUILD_GENERATORS",
+);
 
-const isMapView = (tool: MapTool): tool is MapPanelView =>
+const isMapView = (tool: GameTool): tool is MapPanelView =>
   tool === "FLEET" || tool === "AGREEMENTS";
 
 /** Keep the terrain mounted beneath the open map tools. */
@@ -64,13 +59,9 @@ export default function MapWorkspace({
   }, [building, card.name]);
   const [projectBusy, setProjectBusy] = React.useState(false);
   const requestedProject = territorial && building;
-  const requestedPanel: MapTool | undefined =
-    card.name === "FLEET" || card.name === "AGREEMENTS"
-      ? card.name
-      : requestedProject
-        ? undefined
-        : candidate;
+  const requestedPanel = requestedProject ? undefined : candidate;
   const destination = projectBusy ? undefined : requestedPanel;
+  const panelTools = territorial ? TERRITORIAL_PANELS : GAME_TOOLS;
   const localMemory = React.useRef(new Map<string, unknown>());
   const memory = sharedMemory ?? localMemory.current;
   const workspace = React.useRef<HTMLDivElement>(null);
@@ -79,11 +70,12 @@ export default function MapWorkspace({
   const retainFocus = React.useRef(false);
 
   const [programBack, setProgramBack] = React.useState<() => void>();
-  const presentation = useWorkspaceLayout(workspace, settings);
+  const presentation = useWorkspaceLayout(workspace, settings.interfaceScale);
   const { effectiveWidth } = presentation;
   const desktopMap = effectiveWidth >= SIDE_TOOL_MIN_WIDTH;
   const controllerInput = useControllerInput();
-  const floating = presentation.layout === "side" && !controllerInput;
+  const floating =
+    desktopMap && !controllerInput && window.electrifyCouch?.role !== "seat";
   const tileClose = React.useRef<() => void>();
   const projectClose = React.useRef<() => void>();
   const [projectOpen, setProjectOpen] = React.useState(false);
@@ -97,7 +89,7 @@ export default function MapWorkspace({
   }, []);
   const [stack, setStack] = React.useState<{
     card: typeof card;
-    destination?: MapTool;
+    destination?: GameTool;
     windows: MapWindow[];
     raisedToClose?: boolean;
   }>(() => ({ card, destination, windows: destination ? [destination] : [] }));
@@ -163,7 +155,7 @@ export default function MapWorkspace({
     if (projectBusy && (requestedPanel || requestedProject)) returnToMap();
   }, [projectBusy, requestedPanel, requestedProject, returnToMap]);
   const close = React.useCallback(
-    (tool: MapTool, focusTrigger = true) => {
+    (tool: GameTool, focusTrigger = true) => {
       const remaining = windows.filter((item) => item !== tool);
       setStack({ card, destination, windows: remaining });
       if (!floating || tool === destination) {
@@ -178,7 +170,7 @@ export default function MapWorkspace({
         );
       }
       if (!focusTrigger) return;
-      const trigger = MAP_TOOLS.find((item) => item.id === tool)!.triggerId;
+      const trigger = GAME_TOOLS.find((item) => item.id === tool)!.triggerId;
       document.getElementById(trigger)?.focus({ preventScroll: true });
     },
     [buildCategory, card, destination, dispatch, floating, windows],
@@ -208,7 +200,7 @@ export default function MapWorkspace({
       ?.querySelector<HTMLElement>(`#tool-${item} .gameToolTitle`)
       ?.focus({ preventScroll: true });
   }, []);
-  const toggleTool = (tool: GameTool | MapPanelView) => {
+  const toggleTool = (tool: GameTool) => {
     if (projectBusy) return;
     if (tool === "BUILD_GENERATORS" && projectClose.current) {
       projectClose.current();
@@ -316,7 +308,6 @@ export default function MapWorkspace({
       <GameWorkspaceLayoutContext.Provider
         value={{
           ...presentation,
-          capacity: floating ? MAP_TOOLS.length : 1,
           fleetVisible: openPanels.includes("FLEET"),
         }}
       >
@@ -371,7 +362,7 @@ export default function MapWorkspace({
                 </div>
                 <div className="gameToolTray" ref={tray}>
                   <TransitionGroup component={null}>
-                    {MAP_TOOLS.map((tool, slot) => {
+                    {panelTools.map((tool, slot) => {
                       const stackingIndex = windows.indexOf(tool.id);
                       if (stackingIndex < 0) return null;
                       const closePanel = () => close(tool.id);
@@ -439,10 +430,9 @@ export default function MapWorkspace({
               <Navigation
                 showMapBuild={!territorial || !desktopMap}
                 showEventStatus={!desktopMap}
-                openMapViews={openPanels.filter(isMapView)}
-                onToggleMapView={toggleTool}
+                buildDestination={territorial ? undefined : buildCategory}
                 openTools={[
-                  ...openPanels.filter((tool) => !isMapView(tool)),
+                  ...openPanels,
                   ...(projectOpen ? (["BUILD_GENERATORS"] as const) : []),
                 ]}
                 onToggle={toggleTool}

@@ -52,7 +52,7 @@ function shouldIgnoreShortcut(event: KeyboardEvent): boolean {
   );
 }
 
-/** Only the single-key bindings used by the game, plus Shift for facility slots and help. */
+/** Only the single-key bindings used by the game, plus Shift for facility slots, storage and help. */
 function shortcutKey(event: KeyboardEvent): string {
   const key =
     event.key === " "

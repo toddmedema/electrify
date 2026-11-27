@@ -194,7 +194,7 @@ function show(game = ready(), width?: number, scale = 1) {
             value={
               width
                 ? {
-                    ...workspaceLayout(width, scale, "automatic"),
+                    ...workspaceLayout(width, scale),
                     fleetVisible: true,
                   }
                 : undefined

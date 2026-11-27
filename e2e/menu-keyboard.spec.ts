@@ -228,11 +228,10 @@ test("screen-edge padding persists independently and reaches dialogs at every sc
     exact: true,
   });
   await expect(
-    page.getByRole("button", { name: "Automatic", exact: true }),
-  ).toBeVisible();
+    page.getByRole("group", { name: "Workspace", exact: true }),
+  ).toHaveCount(0);
   await expect(scale).toBeVisible();
   await expect(scale).toHaveValue("1");
-  await page.getByRole("button", { name: "Single tool", exact: true }).click();
   await scale.selectOption("1.5");
   await expect(frame).toHaveCSS("padding-left", `${margin}px`);
   await page

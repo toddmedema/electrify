@@ -106,7 +106,7 @@ it.each(["popover", "menu", "manual"] as const)(
     ).toBe(expected);
     expect(paper).toHaveStyle({ top: expected, left: expected });
     act(() => {
-      store.dispatch(change({ interfaceScale: 2, workspace: "single" }));
+      store.dispatch(change({ interfaceScale: 2 }));
     });
     expect(
       document.documentElement.style.getPropertyValue("--screen-edge-inset"),
