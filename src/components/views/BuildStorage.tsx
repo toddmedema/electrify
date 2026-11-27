@@ -33,6 +33,10 @@ import {
   formatWatts,
 } from "../../helpers/Format";
 import { withTerritoryCatalogueLimits } from "../../helpers/ProjectBuild";
+import {
+  multiplayerBuildAvailability,
+  multiplayerTerritoryTile,
+} from "../../helpers/MultiplayerTerritory";
 import { STORAGE } from "../../data/Facilities";
 import { MANUAL_ENTRY } from "../base/ManualEntries";
 import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
@@ -151,9 +155,9 @@ export function StorageBuildItem(
     : props.territoryAvailability && !props.territoryAvailability.buildable
       ? props.territoryAvailability.reason
       : generalAvailability.secondaryText;
-  const tile = props.tileId
-    ? getTerritoryTile(props.tileId, props.game)
-    : undefined;
+  const tile = props.game?.multiplayer?.territorial
+    ? multiplayerTerritoryTile(props.game, props.tileId)
+    : getTerritoryTile(props.tileId, props.game);
   const offerMaxSize =
     (!tile || tileSupportsFacilityTechnology(tile, storage)) &&
     ((pickingSite && !sizeBuildable && maxSizeWh > 0) ||
@@ -478,7 +482,9 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
   const [rememberedTerritoryId, setTerritoryId] =
     useTerritoryBuildDestination();
   const [rememberedTileId, setTileId] = useTerritoryBuildTile();
-  const tileId = props.lockedTileId ?? rememberedTileId;
+  const territorial = !!game.multiplayer?.territorial;
+  const tileId =
+    props.lockedTileId ?? (territorial ? undefined : rememberedTileId);
   const territoryId =
     (props.lockedTileId
       ? getTerritoryTile(props.lockedTileId, game)?.territoryId
@@ -535,9 +541,11 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
   const territoryAvailabilityByName = new Map(
     storage.map((candidate) => [
       candidate.name,
-      territoryNetwork
-        ? territoryBuildAvailability(game, candidate, territoryId, tileId)
-        : undefined,
+      territorial
+        ? multiplayerBuildAvailability(game, candidate, tileId)
+        : territoryNetwork
+          ? territoryBuildAvailability(game, candidate, territoryId, tileId)
+          : undefined,
     ]),
   );
   const affordability = useBuildAffordabilityKey(
@@ -613,7 +621,7 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
             game={game}
             storage={g}
             territoryId={territoryNetwork ? territoryId : undefined}
-            tileId={territoryNetwork ? tileId : undefined}
+            tileId={territoryNetwork || territorial ? tileId : undefined}
             territoryAvailability={territoryAvailabilityByName.get(g.name)}
             key={g.name}
             cash={cash}
@@ -647,6 +655,13 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
                   g,
                   financed,
                   territoryId,
+                  tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
+                );
+              if (territorial)
+                return props.onBuildStorage(
+                  g,
+                  financed,
+                  undefined,
                   tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
                 );
               return props.onBuildStorage(g, financed);

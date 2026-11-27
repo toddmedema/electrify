@@ -142,8 +142,9 @@ export default function Navigation({
   const opened = openTools ?? [gameToolForCard(cardName)];
   const tutorialActions = useAppSelector(selectTutorialActions);
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
-  const mapWorkspace = useAppSelector((state) =>
-    hasTerritoryNetwork(state.game),
+  const mapWorkspace = useAppSelector(
+    (state) =>
+      !!state.game.multiplayer?.territorial || hasTerritoryNetwork(state.game),
   );
   const tutorialDock = mapWorkspace && !!tutorialActions;
   const mapViews = mapWorkspace
