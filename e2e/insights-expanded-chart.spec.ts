@@ -3,6 +3,9 @@ import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { expect, test, type Locator, type Page } from "./fixtures";
 import { openPane } from "./layout";
 
+const plotHeight = (plot: Locator) =>
+  plot.evaluateAll((plots) => plots[0]?.getBoundingClientRect().height ?? 0);
+
 async function expectChartAxesInView(dialog: Locator) {
   await expect
     .poll(() =>
@@ -475,9 +478,7 @@ for (const theme of ["light", "dark"] as const) {
     let compactHeight = 0;
     await expect
       .poll(async () => {
-        compactHeight = await compact.evaluateAll(
-          (plots) => plots[0]?.getBoundingClientRect().height ?? 0,
-        );
+        compactHeight = await plotHeight(compact);
         return compactHeight;
       })
       .toBeGreaterThan(0);
@@ -558,9 +559,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog.locator(".uplot")).toBeVisible();
     await expectChartAxesInView(dialog);
     await expectMobileFuelLegend(dialog, page);
-    expect(
-      (await dialog.locator(".uplot").boundingBox())!.height,
-    ).toBeGreaterThan(compactHeight);
+    await expect
+      .poll(() => plotHeight(dialog.locator(".uplot")))
+      .toBeGreaterThan(compactHeight);
     const span = () =>
       chart.evaluate(
         (element) =>
