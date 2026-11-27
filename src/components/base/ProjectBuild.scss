@@ -78,6 +78,7 @@
   flex-direction: column;
   overflow: hidden;
   padding: 0;
+  background: var(--bg-raised);
 }
 @media (max-width: 740px) {
   .tileWorkspaceSurface.tileWorkspaceProject {

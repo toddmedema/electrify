@@ -188,6 +188,17 @@ for (const theme of ["light", "dark"] as const) {
         }),
       ).toBe(true);
     }
+    const headerColor = await surface
+      .locator(".gameToolHeader")
+      .evaluate((header) => getComputedStyle(header).backgroundColor);
+    await expect(surface.locator(".tileWorkspaceBody")).toHaveCSS(
+      "background-color",
+      headerColor,
+    );
+    await expect(surface.locator(".projectCandidateActions")).toHaveCSS(
+      "background-color",
+      headerColor,
+    );
     await reviewScreenshot(network, {
       path: testInfo.outputPath(`project-candidate-${theme}.png`),
     });
