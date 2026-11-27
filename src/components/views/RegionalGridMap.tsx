@@ -1,6 +1,8 @@
 import * as React from "react";
-import { Typography } from "@mui/material";
+import { Button, Typography } from "@mui/material";
+import { useAppDispatch } from "../../Store";
 import type { GameType } from "../../Types";
+import { navigate } from "../../reducers/Card";
 import {
   initDataCenterCustomers,
   type DataCenterCustomerSources,
@@ -33,6 +35,7 @@ export default function RegionalGridMap({
   game: GameType;
   facilityActions?: FacilityDetailActions;
 }) {
+  const dispatch = useAppDispatch();
   const map = React.useRef<HTMLElement>(null);
   const [sources, setSources] = React.useState<DataCenterCustomerSources>();
   const [selected, setSelected] = React.useState<TerritoryMapTileKey>();
@@ -112,7 +115,11 @@ export default function RegionalGridMap({
           }
           titleIconSrc={facility && facilityIconSrc(facility)}
           subtitle={
-            tile.city ? `${view.ownerName} · Illustrative grid` : undefined
+            tile.city
+              ? `${view.ownerName} · Illustrative grid`
+              : view.buildSite
+                ? "Connected site"
+                : undefined
           }
           focusKey={`${inspected}:${facility?.id ?? "terrain"}`}
           returnFocusSelector={`[data-map-target="${inspected}"]`}
@@ -131,6 +138,20 @@ export default function RegionalGridMap({
               {facilityOperatingStatus(facility, game.date.minute).label} ·{" "}
               {formatFacilitySize(facility)}
             </Typography>
+          ) : view.buildSite && facilityActions ? (
+            <Button
+              variant="contained"
+              sx={{
+                minHeight: 40,
+                "@media (pointer: coarse)": { minHeight: 44 },
+              }}
+              onClick={() => {
+                close();
+                dispatch(navigate("BUILD_GENERATORS"));
+              }}
+            >
+              Build
+            </Button>
           ) : (
             tick && (
               <div className="tileCityMetrics">

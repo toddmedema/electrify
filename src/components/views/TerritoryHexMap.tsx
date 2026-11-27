@@ -1474,6 +1474,7 @@ export default function TerritoryHexMap({
               growth &&
                 `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
               facility?.name,
+              view.buildSite ? "Connected site" : undefined,
               status?.kind === "unknown" ? undefined : status?.label,
               view.connection &&
                 tileConnectionLabel(view.connection, game.date.minute),
@@ -1533,6 +1534,7 @@ export default function TerritoryHexMap({
                 }
                 data-purchasable={territorial ? !!view.connectable : !!quote}
                 data-build-site={
+                  view.buildSite ||
                   (territorial &&
                     view.owned &&
                     !facility &&

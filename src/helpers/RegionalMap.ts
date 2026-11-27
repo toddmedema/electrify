@@ -27,6 +27,7 @@ import type { TerritoryTileView } from "./TerritoryMapState";
 
 const HOME = { q: 0, r: 0 };
 const CORE_CELLS = regionalHexes(REGIONAL_MAP_RADIUS);
+const MIN_CONNECTED_BUILD_SITES = 2;
 const KM_PER_DEGREE = 111.195;
 const distance = (a: HexCoordinate, b: HexCoordinate) =>
   hexRadius({ q: a.q - b.q, r: a.r - b.r });
@@ -163,8 +164,8 @@ function layoutFor(
   const available = (cell: HexCoordinate) =>
     !placements.has(tileId(cell)) && !reserved.has(tileId(cell));
 
-  const spareLand = () => {
-    if (ordinary.some(available)) return ordinary;
+  const spareLand = (isAvailable = available) => {
+    if (ordinary.some(isAvailable)) return ordinary;
     radius++;
     for (const coordinates of regionalHexes(radius)) {
       if (hexRadius(coordinates) !== radius) continue;
@@ -251,8 +252,8 @@ function layoutFor(
   // The existing renderer uses the developed hex graph to draw suspended and submerged
   // connections. Trace representative paths to the home city without adding dispatch rules.
   const developed = new Set([tileId(HOME)]);
-  for (const id of placements.keys()) {
-    let current = cells.get(id)!;
+  const connectToCity = (cell: Cell) => {
+    let current = cell;
     while (!developed.has(tileId(current))) {
       developed.add(tileId(current));
       const { q, r } = current;
@@ -268,6 +269,24 @@ function layoutFor(
         next.find(land) ??
         next[0];
     }
+  };
+  for (const id of placements.keys()) connectToCity(cells.get(id)!);
+
+  // Keep space for the next projects, even when all current wires end at occupied sites.
+  // Choose the nearest vacant land after placing the fleet to preserve plant positions.
+  const vacant = (cell: Cell) => available(cell) && land(cell);
+  const connectedVacant = (cell: Cell) =>
+    vacant(cell) && developed.has(tileId(cell));
+  const unconnectedVacant = (cell: Cell) =>
+    vacant(cell) && !developed.has(tileId(cell));
+  while (ordinary.filter(connectedVacant).length < MIN_CONNECTED_BUILD_SITES) {
+    const site = firstSite(
+      spareLand(unconnectedVacant),
+      1,
+      unconnectedVacant,
+      HOME,
+    )!;
+    connectToCity(site);
   }
 
   const tiles: RegionalTile[] = [];
@@ -294,6 +313,7 @@ function layoutFor(
   return {
     tiles,
     developed,
+    buildSites: new Set(ordinary.filter(connectedVacant).map(tileId)),
     facilityIds: new Map(
       [...placements].map(([id, facility]) => [id, facility.id]),
     ),
@@ -352,7 +372,7 @@ export function regionalMapViews(
     layouts.set(game.location, cached);
   }
   const {
-    layout: { tiles, developed, facilityIds },
+    layout: { tiles, developed, buildSites, facilityIds },
     utility,
   } = cached;
   const current = new Map(
@@ -372,6 +392,7 @@ export function regionalMapViews(
       developed: owned,
       facility,
       operatingFacility: facility,
+      buildSite: buildSites.has(tile.id),
       reserved: !!facility,
       visibilityDistance: 0,
       disaster: readDisaster(tile, facility),

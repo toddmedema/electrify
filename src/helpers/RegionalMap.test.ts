@@ -11,6 +11,7 @@ import { createDataCenterScenario } from "./DataCenterScenario";
 import { HEX_NEIGHBORS } from "./HexNeighbors";
 import { getScenarioLocation } from "./Locations";
 import { regionalMapViews } from "./RegionalMap";
+import { isGeneralBuildingLand } from "./TerritoryTiles";
 
 const publicData = (file: string): unknown =>
   JSON.parse(
@@ -184,6 +185,57 @@ it("projects real facilities, reserves their cells and connects them to the city
       .map((view) => view.operatingFacility),
   ).toEqual(expect.arrayContaining(game.facilities));
   expect(views.filter((view) => view.connectable)).toHaveLength(0);
+  expectConnectedBuildSites(game);
+});
+
+function expectConnectedBuildSites(game: GameType) {
+  const views = regionalMapViews(game);
+  const city = views.find(({ tile }) => tile.city)!;
+  const developed = new Set(
+    views
+      .filter((view) => view.developed && view.owned && !view.connection)
+      .map(({ tile }) => `${tile.q}:${tile.r}`),
+  );
+  const reachable = new Set([`${city.tile.q}:${city.tile.r}`]);
+  for (const key of reachable) {
+    const [q, r] = key.split(":").map(Number);
+    for (const [dq, dr] of HEX_NEIGHBORS) {
+      const next = `${q + dq}:${r + dr}`;
+      if (developed.has(next)) reachable.add(next);
+    }
+  }
+  const available = views.filter(({ buildSite }) => buildSite);
+  expect(available.length).toBeGreaterThanOrEqual(2);
+  for (const { tile, reserved, operatingFacility } of available) {
+    expect(reachable.has(`${tile.q}:${tile.r}`)).toBe(true);
+    expect(reserved || !!operatingFacility).toBe(false);
+    expect(isGeneralBuildingLand(tile)).toBe(true);
+  }
+}
+
+it("starts every regional map with two vacant connected sites even without a fleet", () => {
+  const game = createGame({ scenarioId: 106, seed: 931 });
+  const empty = { ...game, facilities: [], commissionedHydroSiteIds: [] };
+  for (const location of Object.values(cities))
+    expectConnectedBuildSites({ ...empty, location });
+});
+
+it("keeps two connected sites with a dense fleet or a Data Center start", () => {
+  const scenario = createDataCenterScenario(cities.HNL, 2025, 5_000_000);
+  const game = createGame({ scenarioId: scenario.id, scenario, seed: 931 });
+  expectConnectedBuildSites(game);
+  const existingPlant = game.facilities.find(({ name }) => name === "Solar")!;
+  expectConnectedBuildSites({
+    ...game,
+    facilities: Array.from({ length: 105 }, (_, index) => ({
+      ...existingPlant,
+      id: index + 1,
+    })),
+  });
+});
+
+it("also provides two connected sites in the opening Legacy generation", () => {
+  expectConnectedBuildSites(createGame({ scenarioId: 117, seed: 931 }));
 });
 
 it("keeps all four historical reactors on adjacent, distinct plots north of Kyiv", () => {
