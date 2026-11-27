@@ -72,7 +72,7 @@ for (const theme of ["light", "dark"] as const) {
       });
     }
     await page
-      .getByRole("button", { name: "How interties work", exact: true })
+      .getByRole("button", { name: "How agreements work", exact: true })
       .click();
     const sources = page.locator(".manual-sources a");
     await expect(sources.first()).toBeVisible();

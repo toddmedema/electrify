@@ -187,7 +187,7 @@ test("Mission 7 teaches limited two-way interties without trapping recovery", as
     exchange.getByRole("button", { name: "What is Power exchange?" }),
   ).toBeVisible();
   await expect(
-    exchange.getByText("How interties work", { exact: true }),
+    exchange.getByText("How agreements work", { exact: true }),
   ).toHaveCount(0);
   if (testInfo.project.name.startsWith("mobile-")) {
     const viewport = await page.evaluate(() => ({
