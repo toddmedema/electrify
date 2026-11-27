@@ -431,3 +431,30 @@
     font-weight: 600;
   }
 }
+
+.regionalMapWorkspace {
+  .territoryMapLayerToggle {
+    right: 12px;
+    bottom: max(12px, var(--game-dock-clearance));
+  }
+  .tileWorkspaceSurface.tileWorkspaceInspector .tileWorkspaceHeading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+
+    > .MuiIconButton-root {
+      min-width: 40px;
+      min-height: 40px;
+      margin: -8px -8px 0 0;
+    }
+  }
+  @media (pointer: coarse) {
+    .tileWorkspaceSurface.tileWorkspaceInspector
+      .tileWorkspaceHeading
+      > .MuiIconButton-root {
+      min-width: 44px;
+      min-height: 44px;
+    }
+  }
+}

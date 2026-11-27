@@ -344,6 +344,9 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   await expect(intro).toBeVisible();
   expect(await savedGame(page)).toEqual(before);
   await intro.getByRole("button", { name: "Start tour" }).click();
+  await expect(
+    page.getByRole("region", { name: "Regional map workspace", exact: true }),
+  ).toBeVisible();
   const tour = page.locator("[data-data-center-guide] .tutorialHud");
   const step = async (number: number) => {
     await expect(

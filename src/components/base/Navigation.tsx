@@ -2,6 +2,8 @@ import * as React from "react";
 import { Badge, Button, IconButton, Tooltip } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/Error";
 import HistoryIcon from "@mui/icons-material/History";
+import FactoryIcon from "@mui/icons-material/Factory";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import { useAppSelector, useAppDispatch } from "../../Store";
 import { CardNameType, CardType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
@@ -110,11 +112,17 @@ export default function Navigation({
   destination,
   openMapViews = [],
   onToggleMapView,
+  regionalGridView,
   showMapBuild = false,
   showEventStatus = true,
 }: {
   openMapViews?: MapPanelView[];
   onToggleMapView?: (view: MapPanelView) => void;
+  regionalGridView?: {
+    showingMap: boolean;
+    paneId: string;
+    onToggle: () => void;
+  };
   showMapBuild?: boolean;
   showEventStatus?: boolean;
   openTools?: GameTool[];
@@ -143,7 +151,10 @@ export default function Navigation({
       (!mapWorkspace || showMapBuild || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
-  if (!tools.length) return null;
+  if (!tools.length && !regionalGridView) return null;
+  const openFleet = regionalGridView?.showingMap;
+  const regionalViewLabel = openFleet ? "Fleet" : "Map";
+  const regionalViewTrigger = openFleet ? "fleetNav" : "mapNav";
   return (
     <nav
       id="navfooter"
@@ -151,6 +162,29 @@ export default function Navigation({
       aria-label="Game actions"
       {...dockLabels}
     >
+      {regionalGridView && (
+        <Tooltip
+          title={regionalViewLabel}
+          placement="top"
+          open={labelId === regionalViewTrigger}
+          disableHoverListener
+          disableFocusListener
+          disableTouchListener
+          disableInteractive
+        >
+          <Button
+            id={regionalViewTrigger}
+            {...buttonLabels}
+            className="gameDockAction"
+            aria-label={regionalViewLabel}
+            aria-controls={regionalGridView.paneId}
+            data-game-destination={openFleet ? "FLEET" : "FACILITIES"}
+            onClick={regionalGridView.onToggle}
+          >
+            <Badge>{openFleet ? <FactoryIcon /> : <MapOutlinedIcon />}</Badge>
+          </Button>
+        </Tooltip>
+      )}
       {mapWorkspace &&
         MAP_VIEWS.map((view) => {
           const open = openMapViews.includes(view.id);

@@ -181,9 +181,21 @@ export function TerritoryTilePurchasesProvider({
     </PurchaseContext.Provider>
   );
 }
-export function useTerritoryTilePurchases(): Purchases {
+const purchasesUnavailable: Purchases = {
+  pendingIds: new Set(),
+  pendingCost: 0,
+  availableCash: 0,
+  readAvailableCash: () => 0,
+  message: "",
+  purchase: async () => ({
+    status: "rejected",
+    message: "Connection unavailable.",
+  }),
+};
+
+export function useTerritoryTilePurchases(required = true): Purchases {
   const context = React.useContext(PurchaseContext);
-  if (!context)
+  if (!context && required)
     throw new Error("Tile purchases require their workspace provider");
-  return context;
+  return context ?? purchasesUnavailable;
 }

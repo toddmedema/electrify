@@ -1,5 +1,5 @@
 import * as React from "react";
-import { IconButton } from "@mui/material";
+import { Button, IconButton } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { BuildForecastProvider } from "./BuildForecast";
@@ -12,7 +12,8 @@ import { useAppDispatch, useAppSelector } from "../../Store";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
-import { CardNameType, MapWorkspaceView } from "../../Types";
+import { CardNameType, TutorialStepType } from "../../Types";
+import { getTutorialStep } from "../../data/Scenarios";
 import { useWorkspaceLayout } from "../../WorkspaceLayout";
 import GameAppBar from "./GameAppBar";
 import Navigation, {
@@ -111,15 +112,22 @@ function Workspace({
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card.name);
   const active = gameToolForCard(card);
-  const mapWorkspace = useAppSelector((state) =>
-    hasTerritoryNetwork(state.game),
-  );
-  const [rememberedView, setRememberedView] =
-    React.useState<MapWorkspaceView>("FACILITIES");
+  const lesson = useAppSelector((state) => getTutorialStep(state.game));
+  const primaryPaneId = React.useId();
+  const [previewedLesson, setPreviewedLesson] =
+    React.useState<TutorialStepType>();
+  const [rememberedView, setRememberedView] = React.useState<
+    "FACILITIES" | "FLEET"
+  >("FACILITIES");
   const baseView =
-    card === "FACILITIES" || card === "FLEET" || card === "AGREEMENTS"
-      ? card
-      : rememberedView;
+    card === "FACILITIES" || card === "FLEET" ? card : rememberedView;
+  // Lesson targets live in Fleet. A preview always yields to the next lesson or tool.
+  const showRegionalMap = lesson
+    ? previewedLesson === lesson && !active
+    : baseView === "FACILITIES";
+  React.useEffect(() => {
+    setPreviewedLesson(undefined);
+  }, [lesson, active]);
   React.useEffect(() => {
     setRememberedView(baseView);
   }, [baseView]);
@@ -171,7 +179,7 @@ function Workspace({
           right.length,
           presentation.toolWidth,
           scale,
-          mapWorkspace,
+          !lesson,
         )
       : undefined;
   React.useLayoutEffect(() => {
@@ -216,11 +224,7 @@ function Workspace({
     if (active === tool) {
       retainFocus.current = true;
       const next = remaining[remaining.length - 1];
-      dispatch(
-        navigate(
-          next ? destination(next) : mapWorkspace ? baseView : "FACILITIES",
-        ),
-      );
+      dispatch(navigate(next ? destination(next) : baseView));
     }
     if (!focusTrigger) return;
     document
@@ -264,7 +268,6 @@ function Workspace({
           <BuildForecastProvider>
             <div
               className="gameWorkspace"
-              data-map-workspace={mapWorkspace || undefined}
               data-workspace-layout={layout}
               data-compact-dock={effectiveWidth < 700}
               data-dock-size={
@@ -284,6 +287,20 @@ function Workspace({
               <GameAppBar
                 scenarioOpen={visible.includes("SCENARIO")}
                 onCloseScenario={() => close("SCENARIO", false)}
+                eventStatus={
+                  lesson &&
+                  !active && (
+                    <Button
+                      className="tutorialMapView"
+                      aria-controls={primaryPaneId}
+                      onClick={() =>
+                        setPreviewedLesson(showRegionalMap ? undefined : lesson)
+                      }
+                    >
+                      {showRegionalMap ? "Fleet" : "Map"}
+                    </Button>
+                  )
+                }
               />
               <div
                 className="gameStage"
@@ -304,7 +321,7 @@ function Workspace({
               >
                 <div
                   className="gameFleet"
-                  id={mapWorkspace ? `tool-${baseView}` : undefined}
+                  id={primaryPaneId}
                   data-chart-viewport
                   hidden={!fleetVisible}
                   style={
@@ -314,8 +331,12 @@ function Workspace({
                   }
                 >
                   <Facilities
-                    territoryView={baseView}
-                    onTerritoryView={(view) => dispatch(navigate(view))}
+                    showRegionalMap={showRegionalMap}
+                    tutorialMap={!!lesson}
+                    onTerritoryView={(view) => {
+                      setPreviewedLesson(undefined);
+                      if (!lesson) dispatch(navigate(view));
+                    }}
                   />
                 </div>
                 <div className="gameToolTray">
@@ -413,11 +434,20 @@ function Workspace({
                 </div>
               </div>
               <Navigation
-                openMapViews={baseView === "FACILITIES" ? [] : [baseView]}
-                onToggleMapView={(view) => {
-                  setRemembered([]);
-                  dispatch(navigate(view === baseView ? "FACILITIES" : view));
-                }}
+                regionalGridView={
+                  lesson
+                    ? undefined
+                    : {
+                        showingMap: showRegionalMap,
+                        paneId: primaryPaneId,
+                        onToggle: () => {
+                          setRemembered([]);
+                          dispatch(
+                            navigate(showRegionalMap ? "FLEET" : "FACILITIES"),
+                          );
+                        },
+                      }
+                }
                 openTools={visible}
                 destination={destination}
                 onToggle={(tool) => {
