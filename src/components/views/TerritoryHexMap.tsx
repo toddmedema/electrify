@@ -313,7 +313,10 @@ export default function TerritoryHexMap({
       setBuyMode(false);
       onCloseInspection?.();
       onDeselect?.();
-      buyingControl.current?.focus({ preventScroll: true });
+      const entry =
+        buyingControl.current ??
+        map.querySelector<HTMLButtonElement>(".territoryMapLayerToggle");
+      entry?.focus({ preventScroll: true });
     };
     window.addEventListener("keydown", escape, true);
     return () => window.removeEventListener("keydown", escape, true);
