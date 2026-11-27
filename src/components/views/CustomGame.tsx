@@ -100,7 +100,7 @@ export interface DispatchProps {
   onDelta: (delta: Partial<GameType>) => void;
   onStart: (scenario: ScenarioType) => void;
   /** A co-op host shares each change to the setup, including its preview seed. */
-  onScenarioChange?: (scenario: ScenarioType) => void;
+  onScenarioChange?: (scenario: ScenarioType | undefined) => void;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -297,11 +297,14 @@ export default function CustomGame(props: Props): React.JSX.Element {
   );
   const { onScenarioChange } = props;
   React.useEffect(() => {
-    onScenarioChange?.({
-      ...scenario,
-      seed: scenario.seed ?? previewSeed.current,
-    });
-  }, [scenario, onScenarioChange]);
+    if (guest) return;
+    // A fleet the worker is about to replace cannot be offered to guests for review.
+    onScenarioChange?.(
+      fleetStale
+        ? undefined
+        : { ...scenario, seed: scenario.seed ?? previewSeed.current },
+    );
+  }, [fleetStale, guest, scenario, onScenarioChange]);
   // A guest's setup is whatever the host is showing, seed included, so forecasts match too.
   React.useEffect(() => {
     if (!guest) return;

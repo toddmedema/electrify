@@ -1682,6 +1682,32 @@ test("custom setup waits for the host's settings before offering Ready", async (
   const key = selectionKey(f.session.getSnapshot().browse!);
   await f.session.setReady(key);
   expect(coopSelection(f.session.getSnapshot()).ready).toBe(true);
+
+  // If the host changes the grid, the editor withdraws the old setup while sizing it.
+  sendBrowse(f, browse({ card: "CUSTOM_GAME", revision: 3 }));
+  expect(coopSelection(f.session.getSnapshot())).toMatchObject({
+    receivingScenario: true,
+    ready: false,
+  });
+  await expect(f.session.setReady(key)).rejects.toThrow("Receiving scenario");
+  sendBrowse(
+    f,
+    browse({
+      card: "CUSTOM_GAME",
+      revision: 4,
+      custom: {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        seed: 2468,
+        startingCustomers: 2_000_000,
+      },
+    }),
+  );
+  expect(coopSelection(f.session.getSnapshot())).toMatchObject({
+    receivingScenario: false,
+    ready: false,
+  });
+  await f.session.setReady(selectionKey(f.session.getSnapshot().browse!));
+  expect(coopSelection(f.session.getSnapshot()).ready).toBe(true);
   f.session.dispose();
 });
 

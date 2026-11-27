@@ -38,8 +38,8 @@ export function coopSelection(
   const { lobby, browse, view, busy, library } = session;
   const host = lobby.hostId === lobby.selfId;
   const key = browse ? selectionKey(browse) : "";
-  // A lazy custom editor can mirror its card before it publishes the actual setup.
-  // Guests must wait for those settings rather than mark an empty selection Ready.
+  // The custom editor mirrors its card while it loads or sizes a starting fleet.
+  // Guests can mark Ready once the settled setup arrives.
   const receivingScenario =
     (!!browse?.mod && !session.scenarioSnapshot) ||
     (browse?.card === "CUSTOM_GAME" && !browse.custom);

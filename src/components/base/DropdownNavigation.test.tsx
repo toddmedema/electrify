@@ -1,14 +1,15 @@
 /* eslint-disable testing-library/no-node-access -- Which control focus reached is its place in the document. */
 import { useState } from "react";
-import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   Button,
+  createTheme,
   Dialog,
   DialogActions,
   DialogContent,
   MenuItem,
   TextField,
+  ThemeProvider,
 } from "@mui/material";
 import { createGame } from "../../testing/Simulator";
 import ConstructionBuildHeader from "./ConstructionBuildHeader";
@@ -25,6 +26,7 @@ import TerritoryBuildDestination from "./TerritoryBuildDestination";
 
 let stop: () => void;
 beforeEach(() => {
+  jest.useFakeTimers();
   stop = listenForDropdownKeys();
   jest
     .spyOn(HTMLElement.prototype, "getClientRects")
@@ -62,7 +64,16 @@ beforeEach(() => {
 afterEach(() => {
   stop();
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
+
+const theme = createTheme({
+  components: { MuiButtonBase: { defaultProps: { disableRipple: true } } },
+});
+
+function TestTheme({ children }: { children: React.ReactNode }) {
+  return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
+}
 
 function Dropdowns() {
   const [region, setRegion] = useState("north");
@@ -128,62 +139,70 @@ const readout = (dropdown: HTMLElement) =>
 const orderOf = (from: HTMLElement, to: Element | null) =>
   from.compareDocumentPosition(to!) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : -1;
 
-test("arrows pass over every closed dropdown without opening or changing it", async () => {
-  const user = userEvent.setup();
-  render(<Dropdowns />);
-  const dropdowns = screen.getAllByRole("combobox");
-  expect(dropdowns.length).toBeGreaterThanOrEqual(7);
-  for (const dropdown of dropdowns) {
-    const before = readout(dropdown);
-    dropdown.focus();
-    await user.keyboard("{ArrowDown}");
-    expect(dropdown).not.toHaveFocus();
-    expect(orderOf(dropdown, document.activeElement)).toBe(1);
-    dropdown.focus();
-    await user.keyboard("{ArrowUp}");
-    expect(dropdown).not.toHaveFocus();
-    expect(orderOf(dropdown, document.activeElement)).toBe(-1);
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-    expect(readout(dropdown)).toBe(before);
-  }
-});
+const focus = (control: HTMLElement) => act(() => control.focus());
 
-test("Enter opens a dropdown, choosing closes it onto the dropdown, and the arrows carry on", async () => {
-  const user = userEvent.setup();
-  render(<Dropdowns />);
+const press = (key: string) =>
+  fireEvent.keyDown(document.activeElement!, { key });
+
+// Focus returns as the menu starts to exit. Finish that transition before the next key.
+const finishMenuExit = () => act(() => jest.runOnlyPendingTimers());
+
+test.each(["ArrowDown", "ArrowUp"])(
+  "%s passes over every closed dropdown without opening or changing it",
+  (key) => {
+    render(<Dropdowns />, { wrapper: TestTheme });
+    const dropdowns = screen.getAllByRole("combobox");
+    expect(dropdowns.length).toBeGreaterThanOrEqual(7);
+    for (const dropdown of dropdowns) {
+      const before = readout(dropdown);
+      focus(dropdown);
+      press(key);
+      expect(dropdown).not.toHaveFocus();
+      expect(orderOf(dropdown, document.activeElement)).toBe(
+        key === "ArrowDown" ? 1 : -1,
+      );
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+      expect(readout(dropdown)).toBe(before);
+    }
+  },
+);
+
+test("Enter opens a dropdown, choosing closes it onto the dropdown, and the arrows carry on", () => {
+  render(<Dropdowns />, { wrapper: TestTheme });
   const custom = screen
     .getAllByRole("combobox")
     .filter((dropdown) => !(dropdown instanceof HTMLSelectElement));
   // Difficulty, Region, Build destination, Build tile and Sort.
   expect(custom).toHaveLength(5);
   for (const dropdown of custom) {
-    dropdown.focus();
-    await user.keyboard("{Enter}");
+    focus(dropdown);
+    press("Enter");
     expect(screen.getByRole("listbox")).toBeVisible();
-    await user.keyboard("{ArrowDown}{Enter}");
+    press("ArrowDown");
+    press("Enter");
+    finishMenuExit();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(dropdown).toHaveFocus();
-    await user.keyboard("{ArrowDown}");
+    press("ArrowDown");
     expect(dropdown).not.toHaveFocus();
   }
 });
 
-test("Escape closes an opened dropdown onto the dropdown", async () => {
-  const user = userEvent.setup();
-  render(<Dropdowns />);
+test("Escape closes an opened dropdown onto the dropdown", () => {
+  render(<Dropdowns />, { wrapper: TestTheme });
   for (const dropdown of screen.getAllByRole("combobox")) {
     if (dropdown instanceof HTMLSelectElement) continue;
-    dropdown.focus();
-    await user.keyboard(" ");
+    focus(dropdown);
+    press(" ");
     expect(screen.getByRole("listbox")).toBeVisible();
-    await user.keyboard("{Escape}");
+    press("Escape");
+    finishMenuExit();
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(dropdown).toHaveFocus();
   }
 });
 
-test("a dropdown in a dialog hands arrows to the dialog's own controls", async () => {
-  const user = userEvent.setup();
+test("a dropdown in a dialog hands arrows to the dialog's own controls", () => {
   render(
     <>
       <main className="base_main">
@@ -202,20 +221,24 @@ test("a dropdown in a dialog hands arrows to the dialog's own controls", async (
         </DialogActions>
       </Dialog>
     </>,
+    { wrapper: TestTheme },
   );
   const dialog = screen.getByRole("dialog");
   const region = within(dialog).getByRole("combobox", { name: "Region" });
-  region.focus();
-  await user.keyboard("{ArrowDown}");
+  focus(region);
+  press("ArrowDown");
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
-  region.focus();
-  await user.keyboard("{ArrowUp}");
+  focus(region);
+  press("ArrowUp");
   expect(within(dialog).getByRole("textbox", { name: "Name" })).toHaveFocus();
   expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
-  region.focus();
-  await user.keyboard("{Enter}{ArrowDown}{Enter}");
+  focus(region);
+  press("Enter");
+  press("ArrowDown");
+  press("Enter");
+  finishMenuExit();
   expect(region).toHaveTextContent("South");
   expect(region).toHaveFocus();
-  await user.keyboard("{ArrowDown}");
+  press("ArrowDown");
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
 });

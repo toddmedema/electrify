@@ -93,7 +93,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       if (d.difficulty && !difficultyAllowed(d.difficulty)) return;
       dispatch(uiDelta({ previewDifficulty: d.difficulty }));
     },
-    onScenarioChange: (custom: ScenarioType) => {
+    onScenarioChange: (custom) => {
       const coop = store.getState().ui.coop;
       if (coop?.role === "host")
         dispatch(uiDelta({ coop: { ...coop, custom } }));

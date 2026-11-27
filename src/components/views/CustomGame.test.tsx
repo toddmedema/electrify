@@ -473,6 +473,50 @@ it("sizes a starting grid for the setup it opens with", () => {
   );
 });
 
+it("only shares a custom setup once the starting grid has settled", () => {
+  jest.useFakeTimers();
+  const onScenarioChange = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: 4242 }}
+      coop={{
+        role: "host",
+        hostName: "Ada",
+        players: [],
+        ready: false,
+        starting: false,
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+      onScenarioChange={onScenarioChange}
+    />,
+  );
+
+  expect(onScenarioChange.mock.calls).toEqual([[undefined]]);
+  answerFleet();
+  expect(onScenarioChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ facilities: SIZED.facilities, seed: 4242 }),
+  );
+
+  fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
+    target: { value: 2000000 },
+  });
+  expect(onScenarioChange).toHaveBeenLastCalledWith(undefined);
+  const facilities = [
+    { name: "Coal", fuel: "Coal", peakW: 900_000_000 },
+  ] satisfies ScenarioFacilityType[];
+  answerFleet(facilities);
+  expect(onScenarioChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      facilities,
+      startingCustomers: 2000000,
+      seed: 4242,
+    }),
+  );
+});
+
 it("sizes the grid again when its customers, era or place change", () => {
   jest.useFakeTimers();
   render(
