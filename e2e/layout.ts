@@ -287,9 +287,14 @@ export async function selectTerritoryMapTile(
   return target;
 }
 
-/** Open the map catalogue through its public entry point at the current effective width. */
-export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
-  const map = await returnToTerritoryMap(page);
+/** Open the map catalogue through its public entry point at the current effective width.
+ * Use an already open map when the journey has just reached it.
+ */
+export async function openMapProjectCatalogue(
+  page: Page,
+  openMap?: Locator,
+): Promise<Locator> {
+  const map = openMap ?? (await returnToTerritoryMap(page));
   const rail = map.getByRole("complementary", {
     name: "Build facilities",
     exact: true,

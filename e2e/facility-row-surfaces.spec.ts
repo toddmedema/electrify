@@ -6,7 +6,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }, testInfo) => {
     await startTutorialMission(page, 2, theme);
-    await buildTutorialProject(page, "Lithium Battery", true);
+    await buildTutorialProject(page, "Lithium Battery", { storage: true });
     await page.getByRole("button", { name: "Fleet", exact: true }).click();
     await expect(page.locator(".tutorialHud")).toContainText(
       "Find Pumped Hydro’s charge level",

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, test, type Locator, type Page } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 import {
   buildTutorialProject,
@@ -11,13 +11,14 @@ import { dragCoalAbovePumpedHydro } from "./layout";
 const hud = (page: Page) => page.locator(".tutorialHud");
 const goal = (page: Page, text: string, timeout?: number) =>
   expect(hud(page).locator(".tutorialHudAction")).toHaveText(text, { timeout });
-const next = (page: Page, name = "Next") =>
-  hud(page).getByRole("button", { name, exact: true }).click();
-const action = (page: Page, name: string) =>
+const nextButton = (page: Page, name = "Next") =>
+  hud(page).getByRole("button", { name, exact: true });
+const next = (page: Page, name?: string) => nextButton(page, name).click();
+const gameAction = (page: Page, name: string) =>
   page
     .getByRole("navigation", { name: "Game actions" })
-    .getByRole("button", { name, exact: true })
-    .click();
+    .getByRole("button", { name, exact: true });
+const action = (page: Page, name: string) => gameAction(page, name).click();
 const complete = (page: Page) =>
   expect(page.getByRole("dialog", { name: /Mission complete!/ })).toBeVisible({
     timeout: 35000,
@@ -98,13 +99,23 @@ test("Mission 3 · move Coal above storage and cover the daily peak with a batte
   page,
 }) => {
   await startMission(page, 2);
+  const touch = await page.evaluate(
+    () => matchMedia("(pointer: coarse)").matches,
+  );
+  // Activate desktop controls by keyboard so the paused setup needs fewer renderer frames.
+  const activate = (button: Locator) =>
+    touch ? button.click() : button.press("Enter");
+  const openMap = tutorialMap(page);
   await goal(page, "Build a battery");
-  await buildTutorialProject(page, "Lithium Battery", true);
-  await action(page, "Fleet");
+  await buildTutorialProject(page, "Lithium Battery", {
+    storage: true,
+    openMap,
+  });
+  await activate(gameAction(page, "Fleet"));
   await goal(page, "Find Pumped Hydro’s charge level");
-  await next(page);
+  await activate(nextButton(page));
   await goal(page, "Move Coal above Pumped Hydro");
-  if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
+  if (touch) {
     await dragCoalAbovePumpedHydro(page);
   } else {
     const handle = page.getByRole("button", {
@@ -112,16 +123,20 @@ test("Mission 3 · move Coal above storage and cover the daily peak with a batte
       exact: true,
     });
     await handle.press("Space");
-    await handle.press("ArrowUp");
-    await handle.press("Space");
+    await page.keyboard.press("ArrowUp");
+    await page.keyboard.press("Space");
   }
-  await next(page, "Start final challenge");
+  await activate(nextButton(page, "Start final challenge"));
   await goal(page, "Cover peak demand with storage");
-  await buildTutorialProject(page, "Lithium Battery", true, "19");
-  const ultra = page.getByRole("button", { name: "ultra speed", exact: true });
-  if (await ultra.isVisible()) await ultra.click();
-  else
-    await page.getByRole("button", { name: "fast speed", exact: true }).click();
+  await buildTutorialProject(page, "Lithium Battery", {
+    storage: true,
+    size: "19",
+    openMap,
+  });
+  const fast = page.getByRole("button", { name: "fast speed", exact: true });
+  if (touch) await fast.click();
+  else await page.keyboard.press("3");
+  await expect(fast).toHaveAttribute("aria-pressed", "true");
   await complete(page);
 });
 
@@ -165,7 +180,7 @@ test("Mission 6 · read a shortage forecast and finish a new generator", async (
   await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible();
   await next(page);
   await goal(page, "Order a plant that can finish before August");
-  await buildTutorialProject(page, "Oil", false, "15");
+  await buildTutorialProject(page, "Oil", { size: "15" });
   await goal(page, "Keep the lights on through August");
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
   await goal(page, "Find your plant’s opening in Events", 35000);

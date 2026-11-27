@@ -78,16 +78,19 @@ export async function reachableTutorialTile(page: Page, tiles: Locator) {
   );
 }
 
-async function reviewTutorialProject(
+export async function buildTutorialProject(
   page: Page,
   name: string,
-  storage = false,
-  size?: string,
+  {
+    storage = false,
+    size,
+    openMap,
+  }: { storage?: boolean; size?: string; openMap?: Locator } = {},
 ) {
-  const catalogue = await openMapProjectCatalogue(page);
-  const desktop = await catalogue.evaluate((node) =>
-    node.classList.contains("desktopBuildRail"),
-  );
+  const catalogue = await openMapProjectCatalogue(page, openMap);
+  const desktop = await catalogue
+    .and(page.locator(".desktopBuildRail"))
+    .isVisible();
   if (!desktop && storage) {
     await catalogue.getByRole("tab", { name: "Storage", exact: true }).click();
   }
@@ -95,30 +98,22 @@ async function reviewTutorialProject(
   const choose = catalogue.getByRole("button", {
     name: `${desktop ? "Choose sites" : "Pick site"} for ${desktop && name === "Lithium Battery" ? "Battery" : name}`,
     exact: true,
+    disabled: false,
   });
-  await choose.click();
-  const sites = tutorialMap(page).locator(
-    '[data-project-site="owned"]:visible',
-  );
-  await expect(sites.first()).toBeVisible();
+  if (desktop) await choose.press("Enter");
+  else await choose.click();
+  const map = openMap ?? tutorialMap(page);
+  const sites = map.locator('[data-project-site="owned"]:visible');
   const touch = await page.evaluate(
     () => matchMedia("(pointer: coarse)").matches,
   );
-  if (!touch) {
-    await sites.first().press("Enter");
-    return;
-  }
-  await (await reachableTutorialTile(page, sites)).tap();
-}
-
-export async function buildTutorialProject(
-  page: Page,
-  name: string,
-  storage = false,
-  size?: string,
-) {
-  await reviewTutorialProject(page, name, storage, size);
-  await tutorialMap(page)
-    .getByRole("button", { name: "Loan", exact: true })
-    .click();
+  if (touch) await (await reachableTutorialTile(page, sites)).tap();
+  else await sites.first().press("Enter");
+  const loan = map.getByRole("button", {
+    name: "Loan",
+    exact: true,
+    disabled: false,
+  });
+  if (desktop) await loan.press("Enter");
+  else await loan.click();
 }
