@@ -2,6 +2,15 @@ import { TICK_MINUTES } from "../Constants";
 import { isConventionalHydro } from "../data/HydroSites";
 import { peerCorridorId } from "../data/Multiplayer";
 import {
+  COAL_REPOWER_OPTIONS,
+  validCompletedCoalRepower,
+} from "../helpers/CoalRepower";
+import { getDateFromMinute } from "../helpers/DateTime";
+import {
+  GAS_CONVERSION_FIRST_YEAR,
+  GAS_CONVERSION_MINUTES,
+} from "../helpers/GasConversion";
+import {
   multiplayerClaimQuote,
   multiplayerTerritoryTile,
 } from "../helpers/MultiplayerTerritory";
@@ -9,7 +18,12 @@ import {
   territoryHexDistance,
   tileFitsFacility,
 } from "../helpers/TerritoryTiles";
-import type { GameType, TerritoryTileId } from "../Types";
+import {
+  isStorage,
+  type FacilityOperatingType,
+  type GameType,
+  type TerritoryTileId,
+} from "../Types";
 import type { Edge, World } from "./Types";
 
 const validMinute = (minute: number, limit: number) =>
@@ -17,6 +31,76 @@ const validMinute = (minute: number, limit: number) =>
   minute >= 0 &&
   minute <= limit &&
   minute % TICK_MINUTES === 0;
+
+/** The original plant and upgrades that retain its site may keep its inherited capacity. */
+function retainsOpeningCapacity(
+  game: GameType,
+  facility: FacilityOperatingType,
+  opening: FacilityOperatingType,
+) {
+  if (
+    facility.peakW > opening.peakW ||
+    (facility.peakWh ?? 0) > (opening.peakWh ?? 0) ||
+    facility.hydroSiteId !== opening.hydroSiteId
+  )
+    return false;
+  const sameEquipmentAge =
+    facility.minuteCreated === opening.minuteCreated &&
+    facility.minuteOperational === opening.minuteOperational;
+  if (
+    sameEquipmentAge &&
+    facility.name === opening.name &&
+    facility.fuel === opening.fuel &&
+    facility.gasCycle === opening.gasCycle
+  )
+    return true;
+  if (isStorage(facility) || facility.fuel !== "Natural Gas") return false;
+
+  const combined =
+    facility.name === COAL_REPOWER_OPTIONS.coalToGasCC.name &&
+    facility.gasCycle === "combined";
+  const latestGasConversionStart = game.date.minute - GAS_CONVERSION_MINUTES;
+  const couldConvertPeaker =
+    combined &&
+    latestGasConversionStart >= facility.minuteCreated &&
+    getDateFromMinute(latestGasConversionStart, game.startingYear).year >=
+      GAS_CONVERSION_FIRST_YEAR;
+  if (sameEquipmentAge)
+    return (
+      opening.fuel === "Natural Gas" &&
+      opening.gasCycle === "simple" &&
+      facility.peakW === opening.peakW &&
+      couldConvertPeaker
+    );
+
+  if (
+    opening.fuel !== "Coal" ||
+    facility.minuteCreated !== facility.minuteOperational
+  )
+    return false;
+  // Coal can commission a combined-cycle plant directly or a peaker that can later be converted.
+  const peaker =
+    facility.name === COAL_REPOWER_OPTIONS.coalToGasPeaker.name &&
+    facility.gasCycle === "simple";
+  return (
+    (combined &&
+      validCompletedCoalRepower(
+        game,
+        "coalToGasCC",
+        opening.peakW,
+        facility.minuteCreated,
+        facility.peakW,
+      )) ||
+    ((peaker || couldConvertPeaker) &&
+      validCompletedCoalRepower(
+        game,
+        "coalToGasPeaker",
+        opening.peakW,
+        facility.minuteCreated,
+        facility.peakW,
+      ))
+  );
+}
 
 /** Regenerate the immutable opening, then replay each company's connected claim ledger. */
 export function validTerritorialOwnership(world: World, initial: World) {
@@ -98,22 +182,16 @@ export function validTerritorialOwnership(world: World, initial: World) {
       const acquired = rights.get(tile.id);
       if (acquired === undefined || acquired > facility.minuteCreated)
         return false;
-      const inherited =
-        facility.minuteCreated === 0 &&
-        facility.minuteOperational !== undefined &&
-        facility.minuteOperational <= 0 &&
-        opening.facilities.some(
+      if (
+        (!tileFitsFacility(tile, facility) ||
+          (isConventionalHydro(facility) &&
+            facility.hydroSiteId !== tile.hydroSiteId)) &&
+        !opening.facilities.some(
           (plant) =>
             plant.tileId === tile.id &&
             plant.id === facility.id &&
-            plant.name === facility.name &&
-            plant.hydroSiteId === facility.hydroSiteId,
-        );
-      if (
-        !inherited &&
-        (!tileFitsFacility(tile, facility) ||
-          (isConventionalHydro(facility) &&
-            facility.hydroSiteId !== tile.hydroSiteId))
+            retainsOpeningCapacity(grid, facility, plant),
+        )
       )
         return false;
       occupied.add(tile.id);

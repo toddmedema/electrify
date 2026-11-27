@@ -67,6 +67,20 @@ function repowerDurationMinutes(
   return Math.ceil((months * MINUTES_PER_MONTH) / TICK_MINUTES) * TICK_MINUTES;
 }
 
+function validCoalRepowerVintage(
+  game: RepowerContext,
+  kind: CoalRepowerType,
+  sourceW: number,
+  startsMinute: number,
+  targetPeakW: number,
+) {
+  const date = getDateFromMinute(startsMinute, game.startingYear);
+  return (
+    date.year >= COAL_REPOWER_OPTIONS[kind].firstYear &&
+    targetPeakW === repowerCapacityW(sourceW, { ...game, date }, kind)
+  );
+}
+
 function coalRepowerTarget(
   site: FacilityOperatingType,
   peakW: number,
@@ -103,10 +117,30 @@ export function validCoalRepowerSchedule(
     activeScenario(game)?.tutorialSteps
   )
     return false;
-  const date = getDateFromMinute(startsMinute, game.startingYear);
+  return validCoalRepowerVintage(
+    game,
+    kind,
+    sourceW,
+    startsMinute,
+    targetPeakW,
+  );
+}
+
+/** A commissioned repower retains its completion minute as the new equipment's creation date. */
+export function validCompletedCoalRepower(
+  game: RepowerContext,
+  kind: CoalRepowerType,
+  sourceW: number,
+  completesMinute: number,
+  targetPeakW: number,
+) {
+  const startsMinute =
+    completesMinute - repowerDurationMinutes(kind, game.difficulty);
   return (
-    date.year >= COAL_REPOWER_OPTIONS[kind].firstYear &&
-    targetPeakW === repowerCapacityW(sourceW, { ...game, date }, kind)
+    startsMinute >= 0 &&
+    completesMinute <= game.date.minute &&
+    !activeScenario(game)?.tutorialSteps &&
+    validCoalRepowerVintage(game, kind, sourceW, startsMinute, targetPeakW)
   );
 }
 

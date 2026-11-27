@@ -5,7 +5,7 @@ import {
   TICKS_PER_DAY,
   YEARS_PER_TICK,
 } from "../Constants";
-import type { FrontierTerritoryId } from "../Types";
+import type { FacilityUpgradeType, FrontierTerritoryId } from "../Types";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import { peerCorridorId } from "../data/Multiplayer";
 import { currentTick } from "../helpers/GameSelectors";
@@ -78,6 +78,101 @@ function send(world: World, seat: string, command: Command) {
 function action(world: World, seat: string, name: string, payload: unknown) {
   return send(world, seat, { kind: "action", name, payload });
 }
+
+test.each([
+  ["Natural Gas Peaker", ["combinedCycle"], "Natural Gas CC"],
+  ["Coal", ["coalToGasCC"], "Natural Gas CC"],
+  ["Coal", ["coalToGasPeaker"], "Natural Gas Peaker"],
+  ["Coal", ["coalToGasPeaker", "combinedCycle"], "Natural Gas CC"],
+] as const)(
+  "restores a grandfathered %s after %j at its physical site",
+  (name, upgrades, expectedName) => {
+    const world = createWorld(
+      {
+        ...COOP_TEST_SPEC,
+        territorialVersion: 1,
+        customScenario: {
+          ...COOP_TEST_SPEC.customScenario!,
+          cash: 30e9,
+          facilities: [
+            {
+              name,
+              fuel: name === "Coal" ? "Coal" : "Natural Gas",
+              peakW: name === "Coal" ? 3e9 : 2e9,
+            },
+            { name: "Natural Gas CC", fuel: "Natural Gas", peakW: 2e9 },
+          ],
+        },
+      },
+      coopSeats(2),
+      "inherited-retrofit",
+      "opening",
+    );
+    const seat = world.seats[0].id;
+    const opening = world.grids[0].facilities.find(
+      (plant) => plant.name === name,
+    )!;
+    const plant = () =>
+      world.grids[0].facilities.find(({ id }) => id === opening.id)!;
+    for (const { id } of world.seats)
+      expect(
+        send(world, id, { kind: "speed", speed: "NORMAL" }),
+      ).toBeUndefined();
+    for (const upgrade of upgrades satisfies readonly FacilityUpgradeType[]) {
+      expect(
+        action(world, seat, "retrofitFacility", {
+          facilityId: opening.id,
+          upgrade,
+        }),
+      ).toBeUndefined();
+      const completion = plant().upgradeInProgress!.completesMinute;
+      expect(() => hydrateWorld(save(world))).not.toThrow();
+      while (world.grids[0].date.minute <= completion && !world.paused)
+        stepWorld(world);
+      expect(plant().upgradeInProgress).toBeUndefined();
+    }
+    expect(plant()).toMatchObject({
+      id: opening.id,
+      peakW: upgrades[0] === "coalToGasPeaker" ? 2e9 : opening.peakW,
+      tileId: opening.tileId,
+      name: expectedName,
+    });
+    const restored = restoreWorld(
+      save(world),
+      "restored",
+      coopSeats(2, "new-"),
+    );
+    expect(
+      restored.grids[0].facilities.find(({ id }) => id === opening.id),
+    ).toEqual(plant());
+
+    const tampered = save(world);
+    const savedGrid = tampered.grids[0];
+    const savedPlant = savedGrid.facilities.find(
+      ({ id }) => id === opening.id,
+    )!;
+    savedPlant.peakW += 100e6;
+    expect(() => hydrateWorld(tampered)).toThrow(/invalid grids/i);
+    savedPlant.peakW = plant().peakW;
+    savedPlant.tileId = multiplayerOwnedTileIds(savedGrid).find(
+      (tileId) =>
+        tileId !== savedGrid.multiplayer!.territorial!.homeTileId &&
+        savedGrid.facilities.every((facility) => facility.tileId !== tileId),
+    );
+    expect(savedPlant.tileId).toBeDefined();
+    expect(() => hydrateWorld(tampered)).toThrow(/invalid grids/i);
+    savedPlant.tileId = opening.tileId;
+    savedPlant.id += 100;
+    expect(() => hydrateWorld(tampered)).toThrow(/invalid grids/i);
+    savedPlant.id = opening.id;
+    Object.assign(savedPlant, {
+      name: "Oil",
+      fuel: "Oil",
+      gasCycle: undefined,
+    });
+    expect(() => hydrateWorld(tampered)).toThrow(/invalid grids/i);
+  },
+);
 
 function claim(world: World, seat: string, tileId: FrontierTerritoryId) {
   const quote = multiplayerClaimQuote(roomView(world, seat).game!, tileId);
