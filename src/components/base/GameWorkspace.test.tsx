@@ -145,9 +145,7 @@ it.each([390, 1280])(
 
     await app.user.click(app.action("Fleet"));
     expect(screen.getByRole("region", { name: "Fleet" })).toBeVisible();
-    await app.user.click(
-      screen.getByRole("button", { name: "Build", exact: true }),
-    );
+    await app.user.click(screen.getByRole("button", { name: /^Build$/ }));
     const build = screen.getByRole("region", { name: "Build" });
     await app.user.click(within(build).getByRole("tab", { name: "Storage" }));
     expect(within(build).getByRole("tab", { name: "Storage" })).toHaveAttribute(
