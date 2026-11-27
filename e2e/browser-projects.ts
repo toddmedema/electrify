@@ -146,7 +146,7 @@ const localOnly: Record<string, string[]> = {
     "main-menu",
     "performance-responsive",
     "settings-responsive",
-    "side-panel-performance",
+    "map-window-performance",
     "tutorial-capstone",
   ],
 };

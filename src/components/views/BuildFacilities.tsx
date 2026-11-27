@@ -16,7 +16,11 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { getTutorialStep } from "../../data/Scenarios";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
-import type { TerritoryTileId } from "../../Types";
+import {
+  isStorage,
+  type FacilityShoppingType,
+  type TerritoryTileId,
+} from "../../Types";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
@@ -36,11 +40,13 @@ export default function BuildFacilities({
   onPickSite,
   mapCatalogue = false,
   lockedTileId,
+  railSelection,
 }: {
   category?: string;
   onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
   mapCatalogue?: boolean;
   lockedTileId?: TerritoryTileId;
+  railSelection?: FacilityShoppingType;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const closeTool = React.useContext(GameToolCloseContext);
@@ -62,6 +68,10 @@ export default function BuildFacilities({
     (typeof categories)[number][0]
   >("project.category", "BUILD_GENERATORS");
   const localCategory = !!onPickSite || mapCatalogue;
+  React.useLayoutEffect(() => {
+    const requested = categories.find(([name]) => name === category)?.[0];
+    if (mapCatalogue && requested) setProjectCategory(requested);
+  }, [category, mapCatalogue, setProjectCategory]);
   const active = introductoryChoices
     ? "BUILD_GENERATORS"
     : visibleCategories.find(
@@ -172,12 +182,22 @@ export default function BuildFacilities({
           <BuildGeneratorsContainer
             onPickSite={onPickSite}
             lockedTileId={lockedTileId}
+            railSelection={
+              railSelection && !isStorage(railSelection)
+                ? railSelection
+                : undefined
+            }
           />
         )}
         {active === "BUILD_STORAGE" && (
           <BuildStorageContainer
             onPickSite={onPickSite}
             lockedTileId={lockedTileId}
+            railSelection={
+              railSelection && isStorage(railSelection)
+                ? railSelection
+                : undefined
+            }
           />
         )}
         {active === "BUILD_INTERTIES" && (

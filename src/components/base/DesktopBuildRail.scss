@@ -22,6 +22,22 @@
     font-weight: 600;
   }
 }
+.desktopBuildRail > .desktopBuildOpen.MuiButton-root {
+  min-width: 0;
+  min-height: 40px;
+  margin: 8px 4px 0;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-raised);
+  color: var(--interactive-blue);
+  text-transform: none;
+  pointer-events: auto;
+
+  .MuiButton-startIcon {
+    margin: 0;
+  }
+}
 .desktopBuildRail > .desktopBuildSizing {
   flex: 0 0 auto;
   padding: 8px 4px 0;

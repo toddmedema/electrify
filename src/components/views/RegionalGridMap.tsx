@@ -27,6 +27,7 @@ import {
   findTileControl,
   TileInspectionSurface,
 } from "../base/TileWorkspaceSurface";
+import DesktopBuildRail from "../base/DesktopBuildRail";
 import TerritoryHexMap from "./TerritoryHexMap";
 
 /** The regional map projects the running grid through the shared terrain and plant renderer. */
@@ -38,7 +39,7 @@ export default function RegionalGridMap({
   facilityActions?: FacilityDetailActions;
 }) {
   const map = React.useRef<HTMLElement>(null);
-  const { open, returnToMap, showTile, hideTile, tileWindow } =
+  const { open, returnToMap, showTile, hideTile, tileWindow, buildCatalogue } =
     React.useContext(MapWorkspacePanelContext) ?? {};
   const focusAfterClose = React.useRef<TerritoryMapTileKey>();
   const [sources, setSources] = React.useState<DataCenterCustomerSources>();
@@ -111,6 +112,14 @@ export default function RegionalGridMap({
       className="territoryNetwork regionalMapWorkspace"
       aria-label="Regional map workspace"
     >
+      {buildCatalogue && (
+        <DesktopBuildRail
+          game={game}
+          busy={false}
+          focusRequest={0}
+          catalogue={buildCatalogue}
+        />
+      )}
       <TerritoryHexMap
         regional
         game={game}

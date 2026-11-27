@@ -31,7 +31,7 @@ const RESTORE_FRAMES = 120;
 
 /**
  * Keeps an element's scroll position in the workspace memory, so a tool closed and reopened (or
- * moved between a sheet and a side column) comes back where the player left it. A pane that
+ * moved between a sheet and a floating window) comes back where the player left it. A pane that
  * mounts before its sheet is laid out, or first renders a placeholder, restores once it is tall
  * enough to hold the position, unless the player starts scrolling first.
  */

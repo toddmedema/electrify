@@ -2,6 +2,7 @@ import * as React from "react";
 import { TransitionGroup } from "react-transition-group";
 import MapPanelSlide from "./MapPanelSlide";
 import { useAppDispatch, useAppSelector } from "../../Store";
+import { isStorage, type FacilityShoppingType } from "../../Types";
 import { navigate, tutorialViewedMapTool } from "../../reducers/GameActions";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { useControllerInput } from "../../desktop/InputPresentation";
@@ -56,6 +57,8 @@ export default function MapWorkspace({
   const [agreementPeer, setAgreementPeer] = React.useState<string>();
   const candidate = gameToolForCard(card.name);
   const building = candidate === "BUILD_GENERATORS";
+  const [buildSelection, setBuildSelection] =
+    React.useState<FacilityShoppingType>();
   const [rememberedBuildCategory, setBuildCategory] =
     React.useState<typeof card.name>("BUILD_GENERATORS");
   const buildCategory = building ? card.name : rememberedBuildCategory;
@@ -161,6 +164,7 @@ export default function MapWorkspace({
   }, [projectBusy, requestedPanel, requestedProject, returnToMap]);
   const close = React.useCallback(
     (tool: GameTool, focusTrigger = true) => {
+      if (tool === "BUILD_GENERATORS") setBuildSelection(undefined);
       const remaining = windows.filter((item) => item !== tool);
       setStack({ card, destination, windows: remaining });
       if (!floating || tool === destination) {
@@ -205,20 +209,50 @@ export default function MapWorkspace({
       ?.querySelector<HTMLElement>(`#tool-${item} .gameToolTitle`)
       ?.focus({ preventScroll: true });
   }, []);
-  const toggleTool = (tool: GameTool) => {
-    if (projectBusy) return;
-    if (tool === "BUILD_GENERATORS" && projectClose.current) {
-      projectClose.current();
-      return;
-    }
-    if (openPanels.includes(tool)) {
-      if (floating && tool !== active) {
-        raise(tool);
-        focusHeading(tool);
-      } else close(tool);
-    } else
-      dispatch(navigate(tool === "BUILD_GENERATORS" ? buildCategory : tool));
-  };
+  const toggleTool = React.useCallback(
+    (tool: GameTool) => {
+      if (projectBusy) return;
+      if (tool === "BUILD_GENERATORS") setBuildSelection(undefined);
+      if (tool === "BUILD_GENERATORS" && projectClose.current) {
+        projectClose.current();
+        return;
+      }
+      if (openPanels.includes(tool)) {
+        if (floating && tool !== active) {
+          raise(tool);
+          focusHeading(tool);
+        } else close(tool);
+      } else
+        dispatch(navigate(tool === "BUILD_GENERATORS" ? buildCategory : tool));
+    },
+    [
+      active,
+      buildCategory,
+      close,
+      dispatch,
+      floating,
+      focusHeading,
+      openPanels,
+      projectBusy,
+      raise,
+    ],
+  );
+  const catalogueRail = floating && !territoryNetwork;
+  const openBuild = openPanels.includes("BUILD_GENERATORS") || projectOpen;
+  const openCatalogue = React.useCallback(
+    () => toggleTool("BUILD_GENERATORS"),
+    [toggleTool],
+  );
+  const chooseBuild = React.useCallback(
+    (selection: FacilityShoppingType) => {
+      if (projectBusy) return;
+      setBuildSelection(selection);
+      dispatch(
+        navigate(isStorage(selection) ? "BUILD_STORAGE" : "BUILD_GENERATORS"),
+      );
+    },
+    [dispatch, projectBusy],
+  );
   const showTile = React.useCallback((dismiss: () => void) => {
     tileClose.current = dismiss;
     setStack((current) =>
@@ -294,16 +328,27 @@ export default function MapWorkspace({
           }
         : undefined,
       projectRequested: !projectBusy && requestedProject,
+      buildCategory,
+      buildSelection,
+      buildCatalogue: catalogueRail
+        ? { open: openBuild, onOpen: openCatalogue, onChoose: chooseBuild }
+        : undefined,
       showProject,
       hideProject,
       onProjectBusyChange: setProjectBusy,
     }),
     [
+      buildCategory,
+      buildSelection,
+      catalogueRail,
+      chooseBuild,
       floating,
       hideTile,
       inspectionFront,
       inspectionIndex,
       panelOpen,
+      openBuild,
+      openCatalogue,
       projectBusy,
       raise,
       requestedProject,
@@ -420,7 +465,10 @@ export default function MapWorkspace({
                                     if (!floating) closePanel();
                                   }}
                                 >
-                                  <BuildFacilities category={buildCategory} />
+                                  <BuildFacilities
+                                    category={buildCategory}
+                                    railSelection={buildSelection}
+                                  />
                                 </GameBuildCompleteContext.Provider>
                               )}
                               {tool.id === "PROGRAMS" && (
@@ -442,7 +490,8 @@ export default function MapWorkspace({
               </div>
               <Navigation
                 showMapBuild={
-                  !territoryNetwork || multiplayerTerritory || !desktopMap
+                  !catalogueRail &&
+                  (!territoryNetwork || multiplayerTerritory || !desktopMap)
                 }
                 showEventStatus={!desktopMap}
                 buildDestination={territorial ? undefined : buildCategory}

@@ -1247,7 +1247,7 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   ).toBe(true);
 });
 
-test("controller cycles six right-hand panels around the persistent map", async ({
+test("controller cycles six tools around the persistent map", async ({
   page,
 }) => {
   await page.goto("/?scenario=116");
@@ -1278,7 +1278,7 @@ test("controller cycles six right-hand panels around the persistent map", async 
     const panel = page.getByRole("region", { name, exact: true });
     await expect(panel).toBeVisible();
     await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-    await expect(panel).toHaveAttribute("data-tool-side", "right");
+    await expect(panel).not.toHaveAttribute("data-resizable", "true");
     await expect(map).toBeVisible();
     expect(
       await original!.evaluate(

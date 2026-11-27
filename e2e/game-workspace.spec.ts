@@ -597,7 +597,9 @@ for (const theme of ["light", "dark"] as const) {
     await startGame(page, theme);
     const dock = page.locator("#navfooter");
     await expect(page.locator(".gameToolPanel")).toHaveCount(0);
-    for (const label of ["Build", "Programs", "Insights", "Events"]) {
+    const labels = ["Programs", "Insights", "Events"];
+    if (page.viewportSize()!.width < 1024) labels.push("Build");
+    for (const label of labels) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
       await expect(action).not.toContainText(label);
@@ -690,7 +692,9 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   await startGame(page, "light");
   const dock = page.locator("#navfooter");
   const status = page.locator(".gridHealth");
-  for (const name of ["Build", "Programs", "Insights", "Events"]) {
+  const labels = ["Programs", "Insights", "Events"];
+  if (page.viewportSize()!.width < 1024) labels.push("Build");
+  for (const name of labels) {
     const action = dock.getByRole("button", { name, exact: true });
     await expect(action).toBeVisible();
     await expect(action).not.toContainText(name);

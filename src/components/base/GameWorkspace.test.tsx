@@ -12,19 +12,31 @@ import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
 import MapWorkspace from "./MapWorkspace";
 
 jest.mock("./GameAppBar", () => () => <div>Game status</div>);
-jest.mock(
-  "../views/FacilitiesContainer",
-  () =>
-    ({ territoryView }: { territoryView: string }) => (
-      <label
+jest.mock("../views/FacilitiesContainer", () => {
+  const { useContext } = jest.requireActual("react");
+  const { MapWorkspacePanelContext } = jest.requireActual(
+    "./GameWorkspaceContext",
+  );
+  return function MockFacilities({ territoryView }: { territoryView: string }) {
+    const catalogue = useContext(MapWorkspacePanelContext)?.buildCatalogue;
+    return (
+      <div
         data-testid={territoryView === "FACILITIES" ? "base-view" : undefined}
         data-territory-view={territoryView}
       >
-        Facility notes
-        <input aria-label="Facility notes" defaultValue="" />
-      </label>
-    ),
-);
+        <label>
+          Facility notes
+          <input aria-label="Facility notes" defaultValue="" />
+        </label>
+        {territoryView === "FACILITIES" && catalogue && (
+          <button id="buildNav" onClick={catalogue.onOpen}>
+            Build
+          </button>
+        )}
+      </div>
+    );
+  };
+});
 jest.mock("../views/InsightsContainer", () => () => <div>Insight charts</div>);
 jest.mock("../views/EventLogContainer", () => () => <div>Event history</div>);
 jest.mock("./ScenarioDetails", () => () => <div>Scenario objectives</div>);
@@ -133,7 +145,9 @@ it.each([390, 1280])(
 
     await app.user.click(app.action("Fleet"));
     expect(screen.getByRole("region", { name: "Fleet" })).toBeVisible();
-    await app.user.click(app.action("Build"));
+    await app.user.click(
+      screen.getByRole("button", { name: "Build", exact: true }),
+    );
     const build = screen.getByRole("region", { name: "Build" });
     await app.user.click(within(build).getByRole("tab", { name: "Storage" }));
     expect(within(build).getByRole("tab", { name: "Storage" })).toHaveAttribute(
@@ -152,7 +166,7 @@ it.each([390, 1280])(
 );
 
 it.each([360, SIDE_TOOL_MIN_WIDTH - 1])(
-  "keeps the map mounted beneath exactly one right panel at %ipx",
+  "keeps the map mounted beneath exactly one compact panel at %ipx",
   async (width) => {
     const app = setup(width, {}, true);
     const map = screen.getByTestId("base-view");
@@ -173,7 +187,7 @@ it.each([360, SIDE_TOOL_MIN_WIDTH - 1])(
       await app.user.click(app.action(name));
       const panel = screen.getByRole("region", { name });
       expect(screen.getAllByRole("region")).toHaveLength(1);
-      expect(panel).toHaveAttribute("data-tool-side", "right");
+      expect(panel).toBeVisible();
       expect(map).toBeVisible();
       expect(map).toHaveAttribute("data-territory-view", "FACILITIES");
       expect(notes).toHaveValue("Keep this map position");

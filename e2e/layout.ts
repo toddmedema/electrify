@@ -335,8 +335,8 @@ export async function setMapProjectCapacity(
 }
 
 /**
- * Open the Build tool from the dock, leaving it open when it already is: the dock button
- * toggles, so a second click would close it. Returns the Build region.
+ * Open the Build catalogue from the map rail or compact dock.
+ * Leave it open when the player has already opened it.
  */
 export async function openBuild(page: Page): Promise<Locator> {
   const build = page.getByRole("region", { name: "Build", exact: true });

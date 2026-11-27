@@ -36,6 +36,7 @@ import {
   findTileControl,
   TileInspectionSurface,
 } from "../base/TileWorkspaceSurface";
+import DesktopBuildRail from "../base/DesktopBuildRail";
 import BuildFacilities from "./BuildFacilities";
 import TerritoryHexMap from "./TerritoryHexMap";
 import "./MultiplayerTerritory.scss";
@@ -60,6 +61,9 @@ export default function MultiplayerTerritoryMap({
     tileWindow,
     returnToMap,
     projectRequested,
+    buildCatalogue,
+    buildCategory,
+    buildSelection,
   } = panel ?? {};
   const map = React.useRef<HTMLElement>(null);
   const focusOnMap = React.useRef<TerritoryMapTileKey>();
@@ -203,6 +207,14 @@ export default function MultiplayerTerritoryMap({
       data-tile-inspection={view ? "open" : undefined}
       aria-label="Territorial map workspace"
     >
+      {buildCatalogue && (
+        <DesktopBuildRail
+          game={game}
+          busy={!!pendingTileId || companyEnded}
+          focusRequest={0}
+          catalogue={buildCatalogue}
+        />
+      )}
       <TerritoryHexMap
         regional
         game={game}
@@ -237,7 +249,12 @@ export default function MultiplayerTerritoryMap({
               focusKey={project.site ?? "catalogue"}
               onClose={closeProject}
             >
-              <BuildFacilities mapCatalogue lockedTileId={project.site} />
+              <BuildFacilities
+                mapCatalogue
+                lockedTileId={project.site}
+                category={buildCategory}
+                railSelection={buildSelection}
+              />
             </MapProjectPanel>
           </GameBuildCompleteContext.Provider>
         </GameToolCloseContext.Provider>

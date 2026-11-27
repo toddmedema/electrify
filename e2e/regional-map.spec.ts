@@ -96,6 +96,42 @@ test("regional map presents the city and plants while Fleet and intertie builds 
   await expect(map).toBeVisible();
 });
 
+test("the regional desktop rail selects a capacity for the real construction review", async ({
+  page,
+}, { project }) => {
+  test.skip(project.use.hasTouch || page.viewportSize()!.width < 1024);
+  await startRegionalGame(page);
+  const rail = regionalMap(page).getByRole("complementary", {
+    name: "Build facilities",
+  });
+  await expect(rail).toBeVisible();
+  await expect(
+    regionalDock(page).getByRole("button", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  const initial = await rail.boundingBox();
+  const map = await regionalMap(page).boundingBox();
+  expect(initial!.x).toBeCloseTo(map!.x);
+
+  await rail.getByRole("button", { name: /^Power:/ }).click();
+  const sizing = rail.getByRole("slider", { name: "Generator capacity" });
+  await sizing.fill("11");
+  const power = await sizing.getAttribute("aria-valuetext");
+  await sizing.press("Escape");
+  await rail.getByRole("button", { name: "Choose Solar", exact: true }).click();
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  await expect(build).toHaveAttribute("data-resizable", "true");
+  await build
+    .getByRole("button", { name: "Review purchase of Solar", exact: true })
+    .click();
+  const purchase = page.getByRole("dialog", { name: `Build ${power} Solar?` });
+  await expect(purchase).toBeVisible();
+  await purchase
+    .getByRole("button", { name: "Take loan", exact: true })
+    .click();
+  await expect(purchase).toHaveCount(0);
+  await expect(build).toBeVisible();
+});
+
 test("regional fleet and map details remain reachable without WebGL2", async ({
   page,
 }) => {

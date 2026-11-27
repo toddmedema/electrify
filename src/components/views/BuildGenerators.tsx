@@ -1186,6 +1186,7 @@ export interface DispatchProps {
 export type Props = StateProps &
   DispatchProps & {
     lockedTileId?: TerritoryTileId;
+    railSelection?: GeneratorShoppingType;
     onPickSite?: (facility: GeneratorShoppingType) => void;
   };
 
@@ -1247,6 +1248,14 @@ function BuildGenerators(props: Props): React.JSX.Element {
     `${memoryKey}.exactSizes`,
     {},
   );
+  const railSelection = props.railSelection;
+  React.useLayoutEffect(() => {
+    if (!railSelection) return;
+    const { name, peakW } = railSelection;
+    setSliderTick(wToSliderTick(peakW));
+    setExactSizes((sizes) => ({ ...sizes, [name]: peakW }));
+    revealResizedRow(name);
+  }, [railSelection, revealResizedRow, setExactSizes, setSliderTick]);
   // A remembered site/technology shortcut can outlive the era's minimum project size.
   // Hydro may exceed the global slider maximum because its physical site owns that limit.
   const shownExactSizes = legacyBounds
