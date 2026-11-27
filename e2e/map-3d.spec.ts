@@ -1266,18 +1266,27 @@ test.describe("scene delivery", () => {
     await expect(notice).toHaveText("Loading 3D map…");
     await map.locator('[data-map-target="champlain:city"]').press("Enter");
     const inspector = page.getByRole("dialog", { name: "Burlington" });
-    const inspectorTop = async () => (await inspector.boundingBox())!.y;
-    const loadingTop = await inspectorTop();
+    await expect(inspector).toBeVisible();
     releaseScene();
 
     await expect(notice).toHaveText("The 3D map couldn’t load.");
-    // The Reload control makes the status row taller than the loading message.
-    await expect.poll(inspectorTop).toBeGreaterThan(loadingTop);
     const reload = map.getByRole("button", { name: "Reload page" });
-    const reloadBounds = (await reload.boundingBox())!;
-    expect(reloadBounds.y + reloadBounds.height).toBeLessThanOrEqual(
-      await inspectorTop(),
-    );
+    await expect(reload).toBeVisible();
+    // ResizeObserver moves the inspector after the status row grows. Read both
+    // bounds together as that layout settles.
+    await expect
+      .poll(() =>
+        inspector.evaluate((panel) => {
+          const button = panel
+            .closest(".gameStage")
+            ?.querySelector(".territoryRendererMessage button");
+          return button
+            ? panel.getBoundingClientRect().top -
+                button.getBoundingClientRect().bottom
+            : -Infinity;
+        }),
+      )
+      .toBeGreaterThanOrEqual(0);
     await reviewScreenshot(map, {
       path: info.outputPath("map-scene-reload.png"),
     });
