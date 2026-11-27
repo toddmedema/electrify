@@ -600,8 +600,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await review1.focus();
   await review2.focus();
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
-  const purchase1 = p1.getByRole("dialog", { name: /^Build Solar/ });
-  const purchase2 = p2.getByRole("dialog", { name: /^Build Solar/ });
+  const purchase1 = p1.getByRole("dialog", { name: "Build 50MW Solar?" });
+  const purchase2 = p2.getByRole("dialog", { name: "Build 50MW Solar?" });
   await expect(purchase1).toBeVisible();
   await expect(purchase2).toBeVisible();
   await purchase1
