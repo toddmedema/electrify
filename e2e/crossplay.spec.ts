@@ -90,12 +90,13 @@ async function saveAndQuit(page: Page) {
 
 async function loadCampaign(page: Page) {
   await mainEntry(page).click();
-  await lobby(page)
-    .getByRole("button", { name: "Multiplayer saves", exact: true })
+  await lobby(page).getByRole("button", { name: "Host a game" }).click();
+  await page
+    .getByRole("button", { name: "Load multiplayer save", exact: true })
     .click();
   await page
     .getByRole("dialog", { name: "Multiplayer saves", exact: true })
-    .getByRole("button", { name: "Load save", exact: true })
+    .getByRole("button", { name: "Load", exact: true })
     .click();
 }
 

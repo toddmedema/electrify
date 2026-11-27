@@ -42,13 +42,17 @@ import { getViableLocationsRemaining } from "../../data/FacilitySites";
 import { WEATHER_STARTING_YEAR } from "../../data/Weather";
 import { inEraMoney } from "../../data/FuelPrices";
 import {
-  CUSTOM_EVENT_SCENARIOS,
-  prepareCustomScenario,
+  prepareCustomSetup,
   standardCustomRate,
-} from "../../helpers/CustomScenarioEvents";
+} from "../../helpers/CustomSetup";
 import { getStartingCustomers } from "../../data/LocationProfiles";
 import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
+import { createCustomGameFleetWorker } from "../../helpers/CustomGameFleetClient";
+import {
+  CustomGameFleetRequest,
+  CustomGameFleetResponse,
+} from "../../helpers/CustomGameFleet";
 import {
   useWorkerRequest,
   WorkerRequestOptions,
@@ -128,6 +132,19 @@ const FORECAST_WORKER: WorkerRequestOptions<
   read: (data) => ("outlook" in data ? { result: data.outlook } : undefined),
 };
 
+// The same worker pattern sizes the opening fleet; it is quick once simulation data is loaded.
+const FLEET_WORKER: WorkerRequestOptions<
+  CustomGameFleetResponse,
+  ScenarioFacilityType[]
+> = {
+  // Called through, so tests can replace the client's factory
+  createWorker: () => createCustomGameFleetWorker(),
+  debounceMs: FORECAST_DEBOUNCE_MS,
+  reuseWorker: true,
+  read: (data) =>
+    "facilities" in data ? { result: data.facilities } : undefined,
+};
+
 type OutlookState =
   | { status: "loading" }
   | { status: "invalid" }
@@ -193,14 +210,20 @@ function technologiesFor(
       storage: true,
       maxSize: s.maxPeakWh,
     })),
-    // A technology can be available in a year and still cap out below the smallest plant on
-    // offer - batteries were 50MWh-scale in 2010 - which would leave nothing to pick
-  ].filter(
-    (t: TechnologyType) =>
-      t.maxSize >=
-      (t.name === "Hydro"
-        ? 1000000
-        : (t.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W)[0]),
+  ];
+}
+
+/**
+ * Whether the picker can offer a technology. One can be available in a year and still cap out
+ * below the smallest plant on offer - batteries were 50MWh-scale in 2010 - which would leave
+ * nothing to pick. A starting fleet may still hold a smaller one (a few megawatts of geothermal).
+ */
+function offeredInPicker(t: TechnologyType): boolean {
+  return (
+    t.maxSize >=
+    (t.name === "Hydro"
+      ? 1000000
+      : (t.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W)[0])
   );
 }
 
@@ -225,26 +248,13 @@ function demandServedLabel(outlook: YearOneOutlook): string {
 }
 
 /**
- * Keep the starting fleet's nameplate capacity per customer constant as its customer base moves.
- * Scaling every starting generator together preserves the chosen capacity per customer and
- * generation mix. The setup forecast checks actual demand coverage and reachable headroom. Storage is energy capacity rather than firm generation, so it
- * stays at the size the player selected.
+ * The one-peaker fleet a custom setup opens with before it has been sized to its grid. A fleet
+ * the player has since built up by hand is never replaced just by opening the screen.
  */
-function facilitiesForStartingCustomers(
-  scenario: ScenarioType,
-  startingCustomers: number,
-): ScenarioFacilityType[] {
-  const previousCustomers =
-    scenario.startingCustomers ||
-    getStartingCustomers(getScenarioLocation(scenario));
-  if (previousCustomers <= 0 || previousCustomers === startingCustomers) {
-    return scenario.facilities;
-  }
-  const scale = startingCustomers / previousCustomers;
-  return scenario.facilities.map((facility: ScenarioFacilityType) =>
-    facility.peakW && !facility.peakWh
-      ? { ...facility, peakW: Math.round(facility.peakW * scale) }
-      : facility,
+function isStarterFleet(facilities: readonly ScenarioFacilityType[]): boolean {
+  return (
+    facilities.length === 1 &&
+    facilityName(facilities[0]) === "Natural Gas Peaker"
   );
 }
 
@@ -252,7 +262,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
   const [scenario, setScenario] = React.useState<ScenarioType>(() =>
-    prepareCustomScenario(props.scenario),
+    prepareCustomSetup(props.scenario),
   );
   const currency = currencyForLocation(
     getScenarioLocation(scenario),
@@ -265,6 +275,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const [addSize, setAddSize] = React.useState(GENERATOR_SIZES_W[2]);
   const previewSeed = React.useRef(scenario.seed ?? newSeed());
   const guest = props.coop?.role === "guest";
+  // The starting fleet is the local grid's blend, sized to the customers it serves. It is made
+  // again whenever the location, era or customers change, until the player builds their own.
+  const [fleetStale, setFleetStale] = React.useState(
+    () => !guest && isStarterFleet(scenario.facilities),
+  );
   const { onScenarioChange } = props;
   React.useEffect(() => {
     onScenarioChange?.({
@@ -276,13 +291,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
   React.useEffect(() => {
     if (!guest) return;
     previewSeed.current = props.scenario.seed ?? previewSeed.current;
-    setScenario(prepareCustomScenario(props.scenario));
+    setScenario(prepareCustomSetup(props.scenario));
   }, [guest, props.scenario]);
   const technologies = React.useMemo(
     () => technologiesFor(scenario, game.difficulty),
     [scenario, game.difficulty],
   );
-  const adding = technologies.find((t) => t.name === addName);
+  const offered = React.useMemo(
+    () => technologies.filter(offeredInPicker),
+    [technologies],
+  );
+  const adding = offered.find((t) => t.name === addName);
   const hydroSetup = React.useMemo(() => {
     const location = getScenarioLocation(scenario);
     try {
@@ -413,8 +432,49 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
   const forecastInvalid = unavailable.length > 0 || !!hydroSetup.error;
   const forecastLocation = getScenarioLocation(scenario);
+  // While the grid is being sized the fleet on screen is about to be replaced, so there is
+  // nothing worth forecasting or starting yet.
+  const fleetSizing =
+    fleetStale && !guest && !!forecastLocation && !weatherUnavailable;
+  const fleet = useWorkerRequest(
+    fleetSizing && forecastLocation
+      ? {
+          // Only the grid itself changes what it takes to serve it
+          key: [
+            forecastLocation.id,
+            scenario.startingYear,
+            scenario.startingCustomers ||
+              getStartingCustomers(forecastLocation),
+            scenario.seed ?? previewSeed.current,
+          ].join(":"),
+          message: (requestId: number): CustomGameFleetRequest => ({
+            requestId,
+            scenario: {
+              ...scenario,
+              locationId: forecastLocation.id,
+              location: forecastLocation,
+            },
+            seed: scenario.seed ?? previewSeed.current,
+          }),
+        }
+      : undefined,
+    FLEET_WORKER,
+  );
+  React.useEffect(() => {
+    if (!fleetSizing) return;
+    if (fleet.status === "ready") {
+      setScenario((current: ScenarioType) => ({
+        ...current,
+        facilities: fleet.result,
+      }));
+      setFleetStale(false);
+    } else if (fleet.status === "error") {
+      // Keep the fleet it had; the outlook says whether it serves the grid.
+      setFleetStale(false);
+    }
+  }, [fleet, fleetSizing]);
   const forecast = useWorkerRequest(
-    forecastInvalid || weatherUnavailable || !forecastLocation
+    forecastInvalid || weatherUnavailable || !forecastLocation || fleetSizing
       ? undefined
       : {
           // Anything that changes the scenario is a new request
@@ -434,18 +494,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
     FORECAST_WORKER,
   );
   // The outlook is optional: a worker failure reads as unavailable without blocking Play
-  const outlook: OutlookState = forecastInvalid
-    ? { status: "invalid" }
-    : weatherUnavailable || !forecastLocation || forecast.status === "error"
-      ? { status: "error" }
-      : forecast.status === "ready"
-        ? { status: "ready", outlook: forecast.result }
-        : { status: "loading" };
+  const outlook: OutlookState = fleetSizing
+    ? { status: "loading" }
+    : forecastInvalid
+      ? { status: "invalid" }
+      : weatherUnavailable || !forecastLocation || forecast.status === "error"
+        ? { status: "error" }
+        : forecast.status === "ready"
+          ? { status: "ready", outlook: forecast.result }
+          : { status: "loading" };
 
   // A guest's setup only ever changes when the host's does.
   const change = (delta: Partial<ScenarioType>) => {
     if (guest) return;
-    setScenario(prepareCustomScenario({ ...scenario, ...delta }));
+    setScenario(prepareCustomSetup({ ...scenario, ...delta }));
   };
 
   const changeStartingCustomers = (
@@ -453,16 +515,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
     delta: Partial<ScenarioType> = {},
   ) => {
     if (guest) return;
+    setFleetStale(true);
     setScenario((currentScenario: ScenarioType) =>
-      prepareCustomScenario({
-        ...currentScenario,
-        ...delta,
-        startingCustomers,
-        facilities: facilitiesForStartingCustomers(
-          currentScenario,
-          startingCustomers,
-        ),
-      }),
+      prepareCustomSetup({ ...currentScenario, ...delta, startingCustomers }),
     );
   };
 
@@ -476,6 +531,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const changeStartingYear = (startingYear: number) => {
     const cash = nearestIndex(cashOptions, scenario.cash);
     const fee = nearestIndex(feeOptions, scenario.feePerKgCO2e * 1000);
+    setFleetStale(true);
     change({
       startingYear,
       cash: inEraMoney(STARTING_CASH[cash], startingYear),
@@ -491,10 +547,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
     const facility = adding.storage
       ? { name: adding.name, peakWh: selectedSize }
       : { name: adding.name, peakW: selectedSize };
+    setFleetStale(false);
     change({ facilities: [...scenario.facilities, facility] });
   };
 
   const removeFacility = (index: number) => {
+    setFleetStale(false);
     change({
       facilities: scenario.facilities.filter(
         (_f: Partial<FacilityShoppingType>, i: number) => i !== index,
@@ -678,55 +736,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell>Scenario events</TableCell>
-                    <TableCell>
-                      <Select<number[]>
-                        disabled={guest}
-                        multiple
-                        displayEmpty
-                        fullWidth
-                        sx={{ "& .MuiSelect-select": { whiteSpace: "normal" } }}
-                        inputProps={{ "aria-label": "Scenario events" }}
-                        value={scenario.eventScenarioIds || []}
-                        renderValue={(selected) =>
-                          selected.length
-                            ? CUSTOM_EVENT_SCENARIOS.filter((source) =>
-                                selected.includes(source.id),
-                              )
-                                .map((source) => source.name)
-                                .join(", ")
-                            : "None"
-                        }
-                        onChange={(e: SelectChangeEvent<number[]>) =>
-                          change({
-                            eventScenarioIds: (typeof e.target.value ===
-                            "string"
-                              ? e.target.value.split(",").map(Number)
-                              : e.target.value
-                            ).sort((a, b) => a - b),
-                          })
-                        }
-                      >
-                        {CUSTOM_EVENT_SCENARIOS.map((source) => {
-                          return (
-                            <MenuItem value={source.id} key={source.id}>
-                              {source.name}
-                            </MenuItem>
-                          );
-                        })}
-                      </Select>
-                      <Typography
-                        variant="caption"
-                        component="p"
-                        color="textSecondary"
-                      >
-                        Events keep their preparation time and scale to your
-                        grid. Duration extends to include them. Electricity
-                        prices follow your location and era.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
                     <TableCell>
                       <span className="customSetupLabel">
                         Carbon fee
@@ -774,7 +783,6 @@ export default function CustomGame(props: Props): React.JSX.Element {
                       <DifficultyPicker
                         id="difficulty"
                         variant="select"
-                        showDescription
                         value={game.difficulty}
                         onChange={(difficulty) => onDelta({ difficulty })}
                         readOnly={guest}
@@ -842,12 +850,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
               >
                 Facilities
               </Typography>
-              {hydroSetup.error && (
+              {!fleetSizing && hydroSetup.error && (
                 <Typography color="error" role="alert">
                   {hydroSetup.error}
                 </Typography>
               )}
-              {unavailable.length > 0 && (
+              {!fleetSizing && unavailable.length > 0 && (
                 <Typography variant="body2" color="error">
                   {unavailable.map(facilityName).join(", ")} can't be built with
                   this location and year, or exceeds the number of suitable
@@ -877,7 +885,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 <div role="status" aria-live="polite" aria-atomic="true">
                   {outlook.status === "loading" && (
                     <Typography variant="body2">
-                      Calculating Year 1 outlook…
+                      {fleetSizing
+                        ? "Sizing the starting grid to local demand…"
+                        : "Calculating Year 1 outlook…"}
                     </Typography>
                   )}
                   {outlook.status === "invalid" && (
@@ -936,7 +946,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 </div>
               </section>
 
-              {scenario.facilities.map(
+              {(fleetSizing ? [] : scenario.facilities).map(
                 (f: Partial<FacilityShoppingType>, i: number) => {
                   return (
                     <Card
@@ -970,15 +980,13 @@ export default function CustomGame(props: Props): React.JSX.Element {
 
               <div className="customFacilityPicker">
                 <Select
-                  disabled={guest}
+                  disabled={guest || fleetSizing}
                   id="addFacilityName"
                   inputProps={{ "aria-label": "Facility type" }}
                   displayEmpty
                   value={adding ? adding.name : ""}
                   onChange={(e: SelectChangeEvent<string>) => {
-                    const next = technologies.find(
-                      (t) => t.name === e.target.value,
-                    );
+                    const next = offered.find((t) => t.name === e.target.value);
                     setAddName(e.target.value);
                     // Sizes differ between generators and storage, so carrying the old one over would
                     // offer a watt-hour capacity for a generator. Opens on a middling plant rather
@@ -996,7 +1004,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   <MenuItem value="" disabled>
                     Add a facility
                   </MenuItem>
-                  {technologies.map((t: TechnologyType) => {
+                  {offered.map((t: TechnologyType) => {
                     return (
                       <MenuItem value={t.name} key={t.name}>
                         {t.name}
@@ -1008,7 +1016,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   id="addFacilitySize"
                   inputProps={{ "aria-label": "Facility size" }}
                   value={selectedSize ?? ""}
-                  disabled={guest || !adding || sizes.length === 0}
+                  disabled={
+                    guest || fleetSizing || !adding || sizes.length === 0
+                  }
                   onChange={(e: SelectChangeEvent<number>) =>
                     setAddSize(Number(e.target.value))
                   }
@@ -1027,7 +1037,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   onClick={addFacility}
                   aria-label="Add facility"
                   color="primary"
-                  disabled={!adding || sizes.length === 0}
+                  disabled={fleetSizing || !adding || sizes.length === 0}
                   size="large"
                 >
                   <AddIcon />
@@ -1040,7 +1050,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
           {props.coop ? (
             <CoopStartButton
               coop={props.coop}
-              disabled={forecastInvalid || weatherUnavailable}
+              disabled={forecastInvalid || weatherUnavailable || fleetSizing}
               onStart={() =>
                 onStart({
                   ...scenario,
@@ -1055,7 +1065,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
               variant="contained"
               color="primary"
               startIcon={<PlayCircleIcon />}
-              disabled={forecastInvalid || weatherUnavailable}
+              disabled={forecastInvalid || weatherUnavailable || fleetSizing}
               onClick={() =>
                 onStart({
                   ...scenario,

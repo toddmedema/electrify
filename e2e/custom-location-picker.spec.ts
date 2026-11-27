@@ -235,7 +235,7 @@ test("custom setup uses side-by-side settings and facilities only in two-pane la
   const row = facilities.locator(".build-list-item").first();
   const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
   const removeBox = await row
-    .getByRole("button", { name: "Remove Natural Gas Peaker" })
+    .getByRole("button", { name: /^Remove / })
     .boundingBox();
   expect(contentBox).not.toBeNull();
   expect(removeBox).not.toBeNull();
@@ -292,9 +292,10 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
     timeout: 20000,
   });
 
-  await page
-    .getByRole("button", { name: "Remove Natural Gas Peaker", exact: true })
-    .click();
+  // The grid opens with the local blend of plants, sized to serve its first year.
+  await expect(outlook).toContainText("Demand covered");
+  const remove = page.getByRole("button", { name: /^Remove / });
+  while ((await remove.count()) > 0) await remove.first().click();
   await expect(outlook).toContainText("Calculating Year 1 outlook…");
   await expect(outlook).toContainText("0%", { timeout: 20000 });
   await expect(outlook).toContainText("Deficit forecast");
@@ -521,7 +522,7 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
     .toBe(before);
 });
 
-test("location constraints keep Play valid only where the starting fleet is viable", async ({
+test("moving to another place sizes a starting fleet that is viable there", async ({
   page,
 }) => {
   await openCustomSetup(page);
@@ -529,20 +530,22 @@ test("location constraints keep Play valid only where the starting fleet is viab
   const play = page
     .locator(".customSetupActions")
     .getByRole("button", { name: "Start game", exact: true });
-  await expect(play).toBeEnabled();
-  await page.getByRole("combobox", { name: "Facility type" }).click();
-  await page.getByRole("option", { name: "Geothermal" }).click();
-  await page.getByRole("button", { name: "Add facility" }).click();
-  await expect(play).toBeEnabled();
+  // San Francisco's blend includes the geothermal plant its region has.
+  await expect(play).toBeEnabled({ timeout: 30000 });
+  const geothermal = page.getByRole("button", { name: "Remove Geothermal" });
+  await expect(geothermal).toHaveCount(1);
 
+  // Paris has no geothermal resource: its fleet is made again from its own grid rather than
+  // carrying plants it cannot build, and Play waits for that fleet.
   const search = page.getByRole("combobox", { name: "Search playable cities" });
   await search.fill("Paris");
   await page.getByRole("option", { name: "Paris, France" }).click();
   await expect(play).toBeDisabled();
-
-  await search.fill("San Francisco");
-  await page.getByRole("option", { name: "San Francisco, CA" }).click();
-  await expect(play).toBeEnabled();
+  await expect(play).toBeEnabled({ timeout: 30000 });
+  await expect(geothermal).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^Remove / }).first(),
+  ).toBeVisible();
 });
 
 test("dark theme and reduced motion keep the map legible and still", async ({

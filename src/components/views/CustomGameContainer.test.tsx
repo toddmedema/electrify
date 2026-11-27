@@ -139,3 +139,37 @@ test("a local host back uses the co-op control that returns to the join stage", 
   mapDispatchToProps(jest.fn()).onBack();
   expect(back).toHaveBeenCalledTimes(1);
 });
+
+test("a lobby can choose any difficulty, whatever its host has unlocked", () => {
+  const start = jest.fn();
+  registerCoopControls({
+    start,
+    ready: jest.fn(),
+    back: jest.fn(),
+    copyCode: jest.fn(),
+    openSaves: jest.fn(),
+  });
+  const dispatch = jest.fn();
+  // Nobody here has won anything: only Beginner is unlocked in single player.
+  const alone = mapStateToProps(state());
+  expect(alone.unlockedThrough).toBe("Intern");
+  mapDispatchToProps(dispatch).onDelta({ difficulty: "CEO" });
+  expect(dispatch).not.toHaveBeenCalled();
+
+  mockApp.ui.coop = { role: "host" };
+  mockApp.game.difficulty = "CEO";
+  const hosting = mapStateToProps({
+    ...state(),
+    ui: { coop: { role: "host" } },
+    game: { difficulty: "CEO" },
+  } as unknown as AppStateType);
+  expect(hosting.unlockedThrough).toBe("CEO");
+  expect(hosting.game.difficulty).toBe("CEO");
+  mapDispatchToProps(dispatch).onDelta({ difficulty: "VP" });
+  expect(dispatch).toHaveBeenCalledTimes(1);
+  mapDispatchToProps(dispatch).onStart(setup);
+  expect(start).toHaveBeenCalledWith(
+    expect.objectContaining({ difficulty: "CEO" }),
+  );
+  mockApp.game.difficulty = "Manager";
+});

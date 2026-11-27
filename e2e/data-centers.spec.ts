@@ -114,9 +114,6 @@ test("the landing page opens a prepared current-year grid and supports browser h
     String(new Date().getFullYear()),
   );
   await expect(
-    page.getByRole("combobox", { name: "Scenario events", exact: true }),
-  ).toHaveCount(0);
-  await expect(
     page.getByRole("textbox", { name: "Seed", exact: true }),
   ).toHaveCount(0);
   await page.reload();
@@ -611,7 +608,6 @@ test("location changes prepare a populated grid and launching keeps its data-cen
   expect(game.startingYear).toBe(2030);
   expect(game.customScenario?.startingCustomers).toBeGreaterThan(0);
   expect(game.customScenario?.facilities.length).toBeGreaterThan(1);
-  expect(game.customScenario?.eventScenarioIds).toEqual([]);
   expect(game.customScenario?.loadAdditions).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -635,8 +631,8 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     timeout: 30000,
   });
   await expect
-    .poll(async () => (await savedGame(page))?.customScenario?.eventScenarioIds)
-    .toEqual([]);
+    .poll(async () => (await savedGame(page))?.customScenario?.locationId)
+    .toBeTruthy();
   const growth = (await savedGame(page))!;
   await page.goto("/?dataCenters=1");
   await ready(page);
@@ -649,8 +645,8 @@ test("baseline comparison keeps the same starting assumptions and protects an ex
     timeout: 30000,
   });
   await expect
-    .poll(async () => (await savedGame(page))?.customScenario?.eventScenarioIds)
-    .toEqual([]);
+    .poll(async () => (await savedGame(page))?.customScenario?.locationId)
+    .toBeTruthy();
   const baseline = (await savedGame(page))!;
   const records = await readSaveRecords(page);
   expect(records).toHaveLength(originalRecords.length + 1);

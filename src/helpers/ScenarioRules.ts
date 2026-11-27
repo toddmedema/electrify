@@ -37,13 +37,8 @@ import { compileOfficialArcChoices } from "./ScenarioRuleChoices";
 import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 import { randomAt, RANDOM_STREAM } from "./Math";
 import { scenarioRuleCompositionDiagnostics } from "./ScenarioRuleComposition";
-import {
-  validOfficialArcMetadata,
-  officialArcLoadScale,
-} from "./ScenarioRuleArcs";
-import { SCENARIOS, getScenario } from "../data/Scenarios";
-import { inEraMoney } from "../data/FuelPrices";
-import { getScenarioLocation } from "./Locations";
+import { validOfficialArcMetadata } from "./ScenarioRuleArcs";
+import { getScenario } from "../data/Scenarios";
 import { validOfficialArcChoiceMetadata } from "./ScenarioRuleChoices";
 import { scenarioRuleDependencyDiagnostics } from "./ScenarioRuleDependencies";
 import { requiredFuelShareFeasibility } from "./ScenarioFuelShares";
@@ -227,88 +222,6 @@ export function officialScenarioRules(
   return rules;
 }
 
-const customStoryCache = new Map<string, CompiledScenarioRules>();
-/** Existing custom-game arc selection resolves physical units once without community provenance. */
-function customScenarioRules(
-  scenario: ScenarioType,
-  parameters: Pick<GameType, "difficulty" | "seed">,
-): CompiledScenarioRules | undefined {
-  if (!scenario.eventScenarioIds?.length) return undefined;
-  const durationMonths =
-    scenario.durationMonths + (scenario.startingMonth ?? 1) - 1;
-  const key = JSON.stringify([
-    parameters.difficulty,
-    parameters.seed,
-    scenario.eventScenarioIds,
-    scenario.startingYear,
-    durationMonths,
-    scenario.startingCustomers,
-    scenario.startingDemandScale,
-    getScenarioLocation(scenario),
-    scenario.facilities.map((asset) => asset.assetId),
-  ]);
-  const cached = customStoryCache.get(key);
-  if (cached) return cached;
-  const events: CompiledRuleEvent[] = [];
-  for (const id of scenario.eventScenarioIds) {
-    const source = SCENARIOS.find(
-      (candidate) => candidate.id === id && !candidate.tutorialSteps,
-    );
-    if (!source) continue;
-    const compiled = officialScenarioRules(source, parameters, {
-      startingYear: scenario.startingYear,
-    });
-    if (!compiled) continue;
-    const moneyScale =
-      officialArcLoadScale(source, scenario) *
-      inEraMoney(1, scenario.startingYear, source.startingYear);
-    for (const original of compiled.events) {
-      const event: CompiledRuleEvent = JSON.parse(JSON.stringify(original));
-      event.id = `arc-${id}-${original.id}`;
-      if (event.durationUntilEnd)
-        event.durationMonths = Math.max(0, durationMonths - event.startMonth);
-      if (event.effects.operatingExpensePerMonth !== undefined)
-        event.effects.operatingExpensePerMonth *= moneyScale;
-      event.targets = event.targets.map((operation) =>
-        operation.target.selector === "startingAsset"
-          ? {
-              ...operation,
-              target: { selector: "largestOperating", fuel: "Uranium" },
-            }
-          : operation,
-      );
-      events.push(event);
-    }
-  }
-  const rules: CompiledScenarioRules = {
-    runtimeVersion: 1,
-    namespace: { kind: "official", scenarioId: 999, arcId: "custom-arcs" },
-    difficulty: parameters.difficulty,
-    seed: parameters.seed,
-    startingYear: scenario.startingYear,
-    durationMonths,
-    startingPeakW: 0,
-    startingAssetIds: scenario.facilities.flatMap((asset) =>
-      asset.assetId ? [asset.assetId] : [],
-    ),
-    officialArcs: scenario.eventScenarioIds.map((scenarioId) => ({
-      scenarioId,
-      includeChoices: false,
-    })),
-    events: events.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)),
-    choices: [],
-    loads: [],
-    objectives: [],
-    debriefReports: [],
-  };
-  freezePlain(rules);
-  identityCache.set(rules, ruleDigest(rules));
-  if (customStoryCache.size >= 32)
-    customStoryCache.delete(customStoryCache.keys().next().value!);
-  customStoryCache.set(key, rules);
-  return rules;
-}
-
 const legacyRulesCache = new Map<string, CompiledScenarioRules>();
 
 /** Keep ordinary scenario output unchanged; native campaigns and authored meter goals opt in. */
@@ -458,14 +371,8 @@ export function scenarioRules(
       scenario,
       parameters ?? { difficulty: "Employee", seed: scenario.seed ?? 0 },
     );
-  if (scenario.id === 999)
-    return (
-      scenario.mod?.rules ??
-      customScenarioRules(
-        scenario,
-        parameters ?? { difficulty: "Employee", seed: scenario.seed ?? 0 },
-      )
-    );
+  // A custom game has rules only when a community package supplies them.
+  if (scenario.id === 999) return scenario.mod?.rules;
   if (
     scenario.rules?.namespace.kind === "official" &&
     scenario.rules.namespace.scenarioId === scenario.id

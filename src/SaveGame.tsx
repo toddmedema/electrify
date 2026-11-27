@@ -8,7 +8,7 @@ import { isBuyingRule, isSellingRule } from "./helpers/TradingRules";
 import { validUtilityExpansion } from "./helpers/ExpansionValidation";
 import type { TerritoryPurchaseContext } from "./helpers/TerritoryValidation";
 import { validScenarioMod } from "./helpers/ScenarioMod";
-import { validCustomEventScenario } from "./helpers/CustomScenarioEvents";
+import { validSavedCustomScenario } from "./helpers/CustomSetup";
 import {
   maxLoanAmount,
   validFacilityMaintenanceObligation,
@@ -799,7 +799,7 @@ export function parseSave(
     return null;
   const transmission = game.transmission;
   const scenario = getScenario(game.scenarioId, game.customScenario);
-  if (!validCustomEventScenario(game.customScenario)) return null;
+  if (!validSavedCustomScenario(game.customScenario)) return null;
   // The opening month is part of the scenario contract, not an editable extension of its term.
   if (
     (game.startingMonth ?? 1) !== (scenario?.startingMonth ?? 1) ||

@@ -87,7 +87,6 @@ import {
   startingFacilitySearch,
   startingFacilityQuote,
 } from "../helpers/StartingFacilities";
-import { customEventContext } from "../helpers/CustomScenarioEvents";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import {
   scenarioRules,
@@ -782,7 +781,6 @@ function storyContextAt(state: GameType, date = state.date) {
     rules,
     seed: state.seed,
     scenarioId: state.scenarioId,
-    customEvents: customEventContext(state.customScenario),
     difficulty: state.difficulty,
     date,
     location: state.location,
@@ -868,11 +866,7 @@ function updateWorldEvents(state: GameType): Set<FuelNameType> {
   );
   if (
     state.storyEffectsDisabled ||
-    (!scenarioRules(
-      getScenario(state.scenarioId, state.customScenario),
-      state,
-    ) &&
-      !state.customScenario?.eventScenarioIds?.length)
+    !scenarioRules(getScenario(state.scenarioId, state.customScenario), state)
   ) {
     return storyPriceFuels;
   }
@@ -1439,11 +1433,10 @@ function occurrencesKey(occurrences: ActiveWorldEventType[]): number {
 }
 
 function scheduledStoryCacheKey(date: DateType, state: GameType): string {
-  const fleetSensitive =
-    !!scenarioRules(
-      getScenario(state.scenarioId, state.customScenario),
-      state,
-    ) || !!state.customScenario?.eventScenarioIds?.length;
+  const fleetSensitive = !!scenarioRules(
+    getScenario(state.scenarioId, state.customScenario),
+    state,
+  );
   const fleetKey = fleetSensitive
     ? state.facilities
         .map((facility) =>
@@ -1470,7 +1463,6 @@ function scheduledStoryCacheKey(date: DateType, state: GameType): string {
           state,
         ),
       ),
-    JSON.stringify(customEventContext(state.customScenario)),
     state.difficulty,
     state.seed,
     date.monthsElapsed,
@@ -1519,10 +1511,7 @@ function storyEffectsAt(date: DateType, state: GameType) {
       ...event,
       effects: ruleEffectsForOccurrence(event, context),
     }));
-  if (
-    state.storyEffectsDisabled ||
-    (!context.rules && !state.customScenario?.eventScenarioIds?.length)
-  ) {
+  if (state.storyEffectsDisabled || !context.rules) {
     const effects = combineStoryEffects(persisted);
     storyEffectsCache.set(cacheKey, effects);
     return effects;

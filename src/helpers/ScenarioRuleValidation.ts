@@ -1,4 +1,3 @@
-import { currencyForLocation } from "./Currency";
 import type { GameType, ActiveWorldEventType } from "../Types";
 import type { StoryPhaseDescriptionType } from "../data/WorldEvents";
 import type {
@@ -21,7 +20,6 @@ import { winterizationEffects } from "./Winterization";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { canonicalRuleJson } from "./RuleIdentity";
 import { ID_PATTERN } from "./ScenarioRulesSchema";
-import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 import { ruleChoices } from "./ScenarioRuleDependencies";
 import { scenarioRuleExpectedLoads } from "./ScenarioRuleDecisions";
 import { validRuleReportReceipt } from "./ScenarioRuleReports";
@@ -101,20 +99,6 @@ function validOfficialOccurrence(
     return false;
   const source = definition.source;
   const review = presentation.nativeReview;
-  const custom = game.scenarioId === 999 && !game.customScenario?.mod;
-  const customNames = event.attributes.selectedFacilityNames as
-    string[] | undefined;
-  const title =
-    custom && review === "nuclearTrip"
-      ? customNames?.length
-        ? `${customNames[0]} shuts down`
-        : "Nuclear shutdown: no operating reactor affected"
-      : custom
-        ? definition.title.replace(
-            /\b(?:19|20)\d{2}\b/g,
-            String(rules.startingYear + Math.floor(definition.startMonth / 12)),
-          )
-        : definition.title;
   if (
     event.definitionId !== `${source.arcId}:${source.phaseId}` ||
     event.startsMinute !== definition.startMonth * MINUTES_PER_MONTH ||
@@ -123,13 +107,11 @@ function validOfficialOccurrence(
       (definition.startMonth + definition.durationMonths) * MINUTES_PER_MONTH ||
     event.forecastable !==
       (definition.visibility === "surprise" ? false : undefined) ||
-    event.title !== title ||
+    event.title !== definition.title ||
     event.kind !== (source.kind ?? "WORLD_EVENT") ||
     event.concept !== source.concept ||
     canonicalRuleJson(event.actionTarget) !==
-      canonicalRuleJson(
-        custom ? { card: "FACILITIES", view: "FLEET" } : source.actionTarget,
-      ) ||
+      canonicalRuleJson(source.actionTarget) ||
     event.turningPointPriority !== source.turningPointPriority ||
     event.attributes.scheduledMonth !== definition.startMonth
   )
@@ -230,30 +212,6 @@ function validOfficialOccurrence(
   }
   if (canonicalRuleJson(event.effects) !== canonicalRuleJson(effects))
     return false;
-  if (custom) {
-    const changes = scenarioEffectsSummary(
-      effects,
-      false,
-      currencyForLocation(game.location, game.startingYear),
-    );
-    const message =
-      review === "nuclearTrip"
-        ? customNames?.length
-          ? `${customNames[0]} is offline for the rest of this event. Replace its output with generation, storage or imports.`
-          : "Your grid has no operating nuclear reactor, so this shutdown causes no loss of supply."
-        : `${game.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
-    // Older saves retain their already-recorded USD text. Only the exact old presentation
-    // is accepted; the effects and receipt structure above still have to match the rule.
-    const legacyChanges = scenarioEffectsSummary(effects);
-    const legacyMessage =
-      review === "nuclearTrip"
-        ? message
-        : `${game.location.name}: ${legacyChanges.length ? legacyChanges.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
-    return (
-      (event.message === message || event.message === legacyMessage) &&
-      typeof event.importance === "string"
-    );
-  }
   if (!review || ["hurricaneOutlook", "nuclearContingency"].includes(review))
     return (
       event.message === definition.message &&
@@ -505,8 +463,7 @@ export function validScenarioRuleState(game: GameType): boolean {
     if (definition) {
       if (
         rules.namespace.kind === "official" &&
-        (officialPresentation(definition)?.nativeReview ||
-          rules.namespace.scenarioId === 999)
+        officialPresentation(definition)?.nativeReview
       ) {
         if (!validOfficialOccurrence(event, definition, rules, game))
           return false;

@@ -1,13 +1,11 @@
 /**
  * Pins the output of runs GoldenOutputs does not play: the native official scenarios at CEO on
- * another seed, the two redesigned arcs at every difficulty, and an ordinary custom game that
- * selects every official arc. Rebaseline like GoldenOutputs, with `npm run perf:rebaseline`.
+ * another seed, and the two redesigned arcs at every difficulty. Rebaseline like GoldenOutputs,
+ * with `npm run perf:rebaseline`.
  */
 import { DIFFICULTY_IDS } from "../Constants";
 import { SCENARIOS } from "../data/Scenarios";
-import type { ScenarioType } from "../Types";
 import { digest } from "./CanonicalHash";
-import customScenario from "./fixtures/scenarios/all-official-arcs.json";
 import { expectNoViolations } from "./SimulationTestHelpers";
 import { runSimulation, type SimOptionsType } from "./Simulator";
 
@@ -48,12 +46,4 @@ it("pins the redesigned wildfire and load shedding arcs at every difficulty", ()
         seed: 12345,
       });
   expect(hashes).toMatchSnapshot();
-});
-
-it("pins an ordinary custom game that selects every official arc", () => {
-  const scenario = customScenario as unknown as ScenarioType;
-  expect(scenario.mod).toBeUndefined();
-  expect(
-    runHash({ scenarioId: 999, scenario, difficulty: "Employee" }),
-  ).toMatchSnapshot();
 });

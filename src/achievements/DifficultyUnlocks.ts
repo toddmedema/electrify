@@ -20,7 +20,18 @@ export function difficultyLockReason(
 ): string | undefined {
   const index = DIFFICULTY_IDS.indexOf(difficulty);
   if (index <= DIFFICULTY_IDS.indexOf(unlockedThrough)) return undefined;
-  return `Complete an official non-tutorial scenario on ${DIFFICULTY_LABELS[DIFFICULTY_IDS[index - 1]]} to unlock ${DIFFICULTY_LABELS[difficulty]}.`;
+  return `Complete an official scenario on ${DIFFICULTY_LABELS[DIFFICULTY_IDS[index - 1]]} to unlock ${DIFFICULTY_LABELS[difficulty]}.`;
+}
+
+/**
+ * Playing together never holds a lobby back by one player's single-player progress: a lobby
+ * (host or guest) can choose any difficulty, so only a solo run is limited to what is unlocked.
+ */
+export function unlockedForPlay(
+  unlockedThrough: DifficultyType,
+  inLobby: boolean,
+): DifficultyType {
+  return inLobby ? DIFFICULTY_IDS[DIFFICULTY_IDS.length - 1] : unlockedThrough;
 }
 
 /** Resolve stale preferences before both previewing and starting a new run. */

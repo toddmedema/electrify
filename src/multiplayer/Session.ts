@@ -123,6 +123,8 @@ export class MultiplayerSession {
     loadingSaves: false,
   };
   private libraryRequest = 0;
+  /** What the host last started, so a finished match can be played again. */
+  private matchSpec?: MatchSpec;
   private listeners = new Set<() => void>();
   private worker?: Worker;
   private hostedView = false;
@@ -1185,10 +1187,10 @@ export class MultiplayerSession {
   async removePlayer(seatId: string) {
     this.update({ lobby: await this.request({ kind: "remove", seatId }) });
   }
-  async exportSave(id?: string) {
+  async exportSave() {
     if (!this.services.checkpoints.export)
       throw new Error("Multiplayer export is unavailable.");
-    await this.services.checkpoints.export(id);
+    await this.services.checkpoints.export();
   }
   hasOnlineAuthority() {
     return !!this.services.authority?.();
@@ -1624,6 +1626,9 @@ export class MultiplayerSession {
         if (!receivedView) rollback(error);
         else this.update({ busy: false, error });
       };
+      this.matchSpec = world
+        ? world.spec
+        : (choice as { spec: MatchSpec }).spec;
       this.post(
         world
           ? {
@@ -1750,6 +1755,7 @@ export class MultiplayerSession {
       throw error;
     }
     this.startGeneration++;
+    this.matchSpec = undefined;
     this.worker?.terminate();
     this.worker = undefined;
     this.stopReplica();
@@ -2016,6 +2022,13 @@ export class MultiplayerSession {
     } finally {
       this.closing = false;
     }
+  }
+  /** The host plays the finished match's configuration again, at once, with the same players. */
+  async restart() {
+    const spec = this.matchSpec;
+    if (!this.isHost() || !spec) return;
+    await this.backToLobby();
+    await this.start({ spec });
   }
   private endLocalMatch() {
     this.stopReplica();

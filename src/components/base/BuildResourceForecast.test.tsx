@@ -6,7 +6,7 @@ import { SCENARIOS, DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { LEGACY_CAMPAIGN_ID } from "../../data/LegacyCampaign";
 import { getWeather } from "../../data/Weather";
 import { serializeCommitmentMetadata } from "../../helpers/Commitment";
-import { prepareCustomScenario } from "../../helpers/CustomScenarioEvents";
+import { prepareCustomSetup } from "../../helpers/CustomSetup";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { getHydroConditions } from "../../helpers/Hydro";
 import { createWeatherForecast } from "../../helpers/WeatherForecast";
@@ -132,7 +132,7 @@ it("keeps legacy and modern forecasts isolated while sharing the same loaded cit
   const legacy = createGame({ scenarioId: LEGACY_CAMPAIGN_ID, seed: 611 });
   const modern = createGame({
     scenarioId: 999,
-    scenario: prepareCustomScenario(DEFAULT_CUSTOM_SCENARIO),
+    scenario: prepareCustomSetup(DEFAULT_CUSTOM_SCENARIO),
     seed: 613,
   });
   expect(modern.location.id).toBe(legacy.location.id);
@@ -223,18 +223,14 @@ it("preserves a developed mid-month hydro forecast with pending policy and separ
   );
 });
 
-it("preserves custom offshore and separate-basin readings with composed story arcs", () => {
-  const scenario = prepareCustomScenario({
+it("preserves custom offshore and separate-basin readings", () => {
+  const scenario = prepareCustomSetup({
     ...DEFAULT_CUSTOM_SCENARIO,
     startingYear: 2030,
-    eventScenarioIds: [108, 107, 111],
   });
   const game = createGame({ scenarioId: 999, scenario, seed: 29 });
   expect(game.location.watershedId).not.toBe(game.location.id);
-  const actual = expectUnchangedForecast(
-    game,
-    "285b77fd64780501708384268f82b83c20b1d4d53a82c97a60c4bcafd8825a54",
-  );
+  const actual = expectUnchangedForecast(game);
   expect(actual.offshoreWindSpeeds.length).toBeGreaterThan(0);
 });
 
@@ -311,7 +307,7 @@ it("rebuilds exact readings after another run replaces the loaded location and s
   const original = expectUnchangedForecast(game);
   const other = createGame({
     scenarioId: 999,
-    scenario: prepareCustomScenario(DEFAULT_CUSTOM_SCENARIO),
+    scenario: prepareCustomSetup(DEFAULT_CUSTOM_SCENARIO),
     seed: 4294967295,
   });
   expect(other.location.id).not.toBe(game.location.id);

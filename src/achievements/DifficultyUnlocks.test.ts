@@ -3,6 +3,7 @@ import {
   difficultyLockReason,
   playableDifficulty,
   unlockedDifficulty,
+  unlockedForPlay,
 } from "./DifficultyUnlocks";
 import { emptyRecord, mergeRecords, recordIntent } from "./Progress";
 
@@ -54,10 +55,18 @@ it("does not skip missing rungs or advance for repeated wins at the same difficu
 it("explains the preceding rung for every locked level", () => {
   expect(difficultyLockReason("Intern", "Intern")).toBeUndefined();
   expect(difficultyLockReason("Employee", "Intern")).toBe(
-    "Complete an official non-tutorial scenario on Beginner to unlock Easy.",
+    "Complete an official scenario on Beginner to unlock Easy.",
   );
   expect(difficultyLockReason("CEO", "Intern")).toBe(
-    "Complete an official non-tutorial scenario on Hard to unlock Expert.",
+    "Complete an official scenario on Hard to unlock Expert.",
   );
   expect(difficultyLockReason("CEO", "CEO")).toBeUndefined();
+});
+
+it("never holds a multiplayer lobby back by single-player progress", () => {
+  expect(unlockedForPlay("Intern", false)).toBe("Intern");
+  expect(unlockedForPlay("Intern", true)).toBe("CEO");
+  expect(difficultyLockReason("CEO", unlockedForPlay("Intern", true))).toBe(
+    undefined,
+  );
 });

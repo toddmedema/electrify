@@ -48,6 +48,45 @@ it("shows contextual hints and complete help without a layout preference", () =>
   expect(screen.getAllByText("Unbound").length).toBeGreaterThan(0);
 });
 
+it("hints each kind of dropdown by what the controller can do with it", () => {
+  updateInputPresentation({
+    active: true,
+    connected: true,
+    context: "Menu",
+    glyphs: {
+      left: { label: "D-pad left" },
+      down: { label: "D-pad down" },
+      confirm: { label: "A" },
+    },
+  });
+  render(
+    <Provider store={store}>
+      <select aria-label="Scale">
+        <option>100%</option>
+      </select>
+      <div
+        role="combobox"
+        tabIndex={0}
+        aria-label="Mode"
+        aria-controls="mode-list"
+        aria-expanded="false"
+      >
+        One
+      </div>
+      <InputHints />
+    </Provider>,
+  );
+  // A native select is nudged with Left and Right; its own list is the system's.
+  act(() => screen.getByRole("combobox", { name: "Scale" }).focus());
+  expect(screen.getByText("Adjust value")).toBeVisible();
+  expect(screen.queryByText("Open list")).not.toBeInTheDocument();
+  // A custom dropdown opens its list on Confirm and has no value to nudge.
+  act(() => screen.getByRole("combobox", { name: "Mode" }).focus());
+  expect(screen.getByText("Open list")).toBeVisible();
+  expect(screen.getByText("Next control")).toBeVisible();
+  expect(screen.queryByText("Adjust value")).not.toBeInTheDocument();
+});
+
 it("keeps connected couch hints present when pointer input becomes active", () => {
   window.electrifyCouch = {
     role: "seat",

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { MenuItem, Select } from "@mui/material";
 import { listenForShortcuts } from "./GlobalShortcuts";
 
 const keyMap = {
@@ -96,6 +97,24 @@ it("keeps typing in text fields, but allows Escape and shortcuts from a range sl
   expect(handlers.escape).toHaveBeenCalledTimes(1);
   fireEvent.keyDown(screen.getByLabelText("Capacity"), { key: "q" });
   expect(handlers.build).toHaveBeenCalledTimes(1);
+});
+
+it("leaves a focused dropdown's typed letters to the dropdown, but not Escape", () => {
+  render(
+    <Select value="one" inputProps={{ "aria-label": "Mode" }}>
+      <MenuItem value="one">One</MenuItem>
+      <MenuItem value="two">Two</MenuItem>
+    </Select>,
+  );
+  const mode = screen.getByRole("combobox", { name: "Mode" });
+  // MUI's closed list types ahead without consuming the key, as a native select does.
+  for (const key of ["q", "1", "0", "`", "?"]) fireEvent.keyDown(mode, { key });
+  expect(handlers.build).not.toHaveBeenCalled();
+  expect(handlers.slow).not.toHaveBeenCalled();
+  expect(handlers.pause).not.toHaveBeenCalled();
+  expect(handlers.help).not.toHaveBeenCalled();
+  fireEvent.keyDown(mode, { key: "Escape" });
+  expect(handlers.escape).toHaveBeenCalledTimes(1);
 });
 
 it("lets local controls consume Space and Escape", () => {

@@ -1,5 +1,8 @@
 import { useUnlockedDifficulty } from "../../achievements/useAchievements";
-import { playableDifficulty } from "../../achievements/DifficultyUnlocks";
+import {
+  playableDifficulty,
+  unlockedForPlay,
+} from "../../achievements/DifficultyUnlocks";
 import * as React from "react";
 import {
   Alert,
@@ -102,7 +105,8 @@ export default function Mods(): React.JSX.Element {
 function ModsLibrary(): React.JSX.Element {
   const dispatch = useAppDispatch();
   const coop = useAppSelector((state) => state.ui.coop);
-  const unlockedThrough = useUnlockedDifficulty();
+  // A lobby can play any difficulty; only a solo run is limited to what is unlocked.
+  const unlockedThrough = unlockedForPlay(useUnlockedDifficulty(), !!coop);
   const chosenDifficulty = playableDifficulty(
     useAppSelector(
       (state) => state.ui.previewDifficulty ?? state.game.difficulty,

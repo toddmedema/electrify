@@ -6,16 +6,14 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import {
-  CUSTOM_SCENARIO_ID,
-  DEFAULT_CUSTOM_SCENARIO,
-  SCENARIOS,
-} from "../../data/Scenarios";
+import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { inEraRate } from "../../data/RetailRates";
 import { LOCATIONS } from "../../Constants";
 import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
+import { createCustomGameFleetWorker } from "../../helpers/CustomGameFleetClient";
+import type { ScenarioFacilityType, ScenarioType } from "../../Types";
 import { createGame } from "../../testing/Simulator";
 import CustomGame from "./CustomGame";
 
@@ -25,10 +23,18 @@ jest.mock("../../OfflineWeatherData", () => ({
 jest.mock("../../helpers/CustomGameForecastClient", () => ({
   createCustomGameForecastWorker: jest.fn(),
 }));
+jest.mock("../../helpers/CustomGameFleetClient", () => ({
+  createCustomGameFleetWorker: jest.fn(),
+}));
 
 const mockCreateForecastWorker =
   createCustomGameForecastWorker as jest.MockedFunction<
     typeof createCustomGameForecastWorker
+  >;
+
+const mockCreateFleetWorker =
+  createCustomGameFleetWorker as jest.MockedFunction<
+    typeof createCustomGameFleetWorker
   >;
 
 function forecastWorkerStub(): Worker {
@@ -40,14 +46,43 @@ function forecastWorkerStub(): Worker {
   } as unknown as Worker;
 }
 
+let fleetWorker: Worker;
 beforeEach(() => {
   mockCreateForecastWorker.mockReturnValue(forecastWorkerStub());
+  fleetWorker = forecastWorkerStub();
+  mockCreateFleetWorker.mockReturnValue(fleetWorker);
 });
 
 afterEach(() => {
   jest.useRealTimers();
   mockCreateForecastWorker.mockReset();
+  mockCreateFleetWorker.mockReset();
 });
+
+// The shipped default opens with one peaker, which the screen replaces with a sized local blend.
+// Most tests start from a fleet the player already has, so nothing is waiting to be sized.
+const SIZED: ScenarioType = {
+  ...DEFAULT_CUSTOM_SCENARIO,
+  facilities: [
+    ...DEFAULT_CUSTOM_SCENARIO.facilities,
+    { name: "Natural Gas CC", peakW: 100_000_000, initialAgeYears: 5 },
+  ],
+};
+
+/** Answers the pending fleet-sizing request, as the worker would. */
+function answerFleet(
+  facilities: ScenarioFacilityType[] = SIZED.facilities,
+  worker: Worker = fleetWorker,
+) {
+  act(() => jest.advanceTimersByTime(250));
+  const request = (worker.postMessage as jest.Mock).mock.calls.at(-1)[0];
+  act(() => {
+    worker.onmessage?.({
+      data: { requestId: request.requestId, facilities },
+    } as MessageEvent);
+  });
+  return request;
+}
 
 // Check one labelled control instead of recomputing names for every setup select.
 function setupCombobox(name: string) {
@@ -65,7 +100,7 @@ it("opens after economic data is loaded and names every setup control", () => {
   render(
     <CustomGame
       game={game}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      scenario={{ ...SIZED }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={jest.fn()}
@@ -87,7 +122,6 @@ it("opens after economic data is loaded and names every setup control", () => {
     "Duration",
     "Ownership",
     "Starting cash",
-    "Scenario events",
     "Carbon fee",
     "Difficulty",
     "Facility type",
@@ -110,7 +144,7 @@ it("shows an accessible Year 1 outlook and starts with its preview seed", () => 
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: undefined }}
+      scenario={{ ...SIZED, seed: undefined }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -147,7 +181,7 @@ it("keeps Play available when the optional outlook fails", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      scenario={{ ...SIZED }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={jest.fn()}
@@ -184,7 +218,7 @@ it.each(["startup", "postMessage"])(
     render(
       <CustomGame
         game={createGame({ scenarioId: 100 })}
-        scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+        scenario={{ ...SIZED }}
         onBack={jest.fn()}
         onDelta={jest.fn()}
         onStart={onStart}
@@ -208,6 +242,7 @@ it.each(["startup", "postMessage"])(
         target: { value: 2_000_000 },
       },
     );
+    answerFleet();
     act(() => jest.advanceTimersByTime(250));
     const request = (recoveredWorker.postMessage as jest.Mock).mock.calls[0][0];
     act(() => {
@@ -239,7 +274,7 @@ it.each<[number, string]>([
     render(
       <CustomGame
         game={createGame({ scenarioId: 100 })}
-        scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+        scenario={{ ...SIZED }}
         onBack={jest.fn()}
         onDelta={jest.fn()}
         onStart={jest.fn()}
@@ -254,6 +289,7 @@ it.each<[number, string]>([
         target: { value: 2_000_000 },
       },
     );
+    answerFleet();
     act(() => jest.advanceTimersByTime(250));
     const secondRequest = (worker.postMessage as jest.Mock).mock.calls[1][0];
     act(() => {
@@ -302,11 +338,12 @@ it("does not forecast a facility that is unavailable in the selected year", () =
 });
 
 it("re-quotes starting cash when the starting year changes", () => {
+  jest.useFakeTimers();
   const onStart = jest.fn();
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, cash: 500000000 }}
+      scenario={{ ...SIZED, cash: 500000000 }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -315,6 +352,7 @@ it("re-quotes starting cash when the starting year changes", () => {
 
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "Starting year" }));
   fireEvent.click(screen.getByRole("option", { name: "2080" }));
+  answerFleet();
   fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   const inflation = getFuelEscalation(2080) / getFuelEscalation(2020);
@@ -325,11 +363,12 @@ it("re-quotes starting cash when the starting year changes", () => {
 });
 
 it("quotes electricity rates at the prices of a historical starting year", () => {
+  jest.useFakeTimers();
   const onStart = jest.fn();
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, dollarsPerkWh: 0.05 }}
+      scenario={{ ...SIZED, dollarsPerkWh: 0.05 }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -341,6 +380,8 @@ it("quotes electricity rates at the prices of a historical starting year", () =>
   expect(
     screen.queryByRole("combobox", { name: "Electricity rate" }),
   ).not.toBeInTheDocument();
+  // Era-appropriate plants: nothing built after 1980
+  answerFleet([{ name: "Coal", fuel: "Coal", peakW: 400_000_000 }]);
   fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   expect(onStart).toHaveBeenCalledWith(
@@ -363,45 +404,167 @@ it("quotes electricity rates at the prices of a historical starting year", () =>
   );
 });
 
-it("scales starting nameplate capacity with starting customers", () => {
+it("sizes a starting grid for the setup it opens with", () => {
+  jest.useFakeTimers();
+  const forecast = forecastWorkerStub();
+  mockCreateForecastWorker.mockReturnValue(forecast);
   const onStart = jest.fn();
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{
-        ...DEFAULT_CUSTOM_SCENARIO,
-        facilities: [
-          ...DEFAULT_CUSTOM_SCENARIO.facilities,
-          { name: "Pumped Hydro", peakWh: 500000000 },
-        ],
-      }}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: 4242 }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
     />,
   );
 
+  // Nothing is forecast or started until the grid it would forecast has been sized.
+  expect(
+    screen.getByText("Sizing the starting grid to local demand…"),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "Remove Natural Gas Peaker" }),
+  ).not.toBeInTheDocument();
+  const request = answerFleet([
+    { name: "Coal", fuel: "Coal", peakW: 140_000_000, initialAgeYears: 32 },
+    { name: "Wind", fuel: "Wind", peakW: 220_000_000, initialAgeYears: 7 },
+  ]);
+  expect(request).toMatchObject({
+    seed: 4242,
+    scenario: expect.objectContaining({
+      locationId: DEFAULT_CUSTOM_SCENARIO.locationId,
+      startingYear: 2020,
+      startingCustomers: 1_000_000,
+    }),
+  });
+
+  expect(
+    screen.getByRole("button", { name: "Remove Coal" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Remove Wind" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Remove Natural Gas Peaker" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeEnabled();
+  // The year 1 outlook is then worked out for the fleet that will be played.
+  act(() => jest.advanceTimersByTime(250));
+  expect(forecast.postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      scenario: expect.objectContaining({
+        facilities: [
+          expect.objectContaining({ name: "Coal" }),
+          expect.objectContaining({ name: "Wind" }),
+        ],
+      }),
+    }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({
+      facilities: [
+        expect.objectContaining({ name: "Coal" }),
+        expect.objectContaining({ name: "Wind" }),
+      ],
+    }),
+  );
+});
+
+it("sizes the grid again when its customers, era or place change", () => {
+  jest.useFakeTimers();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...SIZED }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+  expect(fleetWorker.postMessage).not.toHaveBeenCalled();
+
   fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
     target: { value: 2000000 },
   });
-  fireEvent.click(screen.getByRole("button", { name: "Start game" }));
-
-  const scenario = onStart.mock.calls[0][0];
-  expect(scenario.facilities).toEqual([
-    expect.objectContaining({ name: "Natural Gas Peaker", peakW: 1000000000 }),
-    expect.objectContaining({ name: "Pumped Hydro", peakWh: 500000000 }),
-  ]);
-
-  const state = createGame({
-    scenarioId: CUSTOM_SCENARIO_ID,
-    scenario,
+  expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
+  expect(
+    answerFleet([{ name: "Coal", fuel: "Coal", peakW: 900_000_000 }]),
+  ).toMatchObject({
+    scenario: expect.objectContaining({ startingCustomers: 2_000_000 }),
   });
-  const opening = state.timeline[0];
-  expect(opening.supplyW).toBeGreaterThanOrEqual(opening.demandW);
-  expect(opening.reserveW).toBeGreaterThanOrEqual(opening.demandW * 0.05);
+  expect(
+    screen.getByRole("button", { name: "Remove Coal" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeEnabled();
+
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Starting year" }));
+  fireEvent.click(screen.getByRole("option", { name: "2050" }));
+  expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
+  expect(
+    answerFleet([{ name: "Solar", fuel: "Sun", peakW: 1_000_000_000 }]),
+  ).toMatchObject({
+    scenario: expect.objectContaining({ startingYear: 2050 }),
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: /Select Honolulu, HI/ }));
+  expect(
+    answerFleet([{ name: "Oil", fuel: "Oil", peakW: 300_000_000 }]),
+  ).toMatchObject({
+    scenario: expect.objectContaining({ locationId: LOCATIONS.HNL.id }),
+  });
+  expect(
+    screen.getByRole("button", { name: "Remove Oil" }),
+  ).toBeInTheDocument();
 });
 
-it("commits the complete location object when a map marker is selected", () => {
+it("leaves a fleet the player built alone, until the grid it serves changes", () => {
+  jest.useFakeTimers();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...SIZED }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+  act(() => jest.advanceTimersByTime(1000));
+  expect(fleetWorker.postMessage).not.toHaveBeenCalled();
+
+  fireEvent.click(
+    screen.getByRole("button", { name: "Remove Natural Gas Peaker" }),
+  );
+  fireEvent.change(screen.getByRole("textbox", { name: "Seed" }), {
+    target: { value: "77" },
+  });
+  act(() => jest.advanceTimersByTime(1000));
+  expect(fleetWorker.postMessage).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "Remove Natural Gas CC" }),
+  ).toBeInTheDocument();
+
+  // A different grid needs a different fleet, so the hand-built one gives way.
+  fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
+    target: { value: 1500000 },
+  });
+  expect(
+    screen.getByRole("combobox", { name: "Facility type" }),
+  ).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByRole("button", { name: "Add facility" })).toBeDisabled();
+  answerFleet([{ name: "Coal", fuel: "Coal", peakW: 600_000_000 }]);
+  expect(
+    screen.queryByRole("button", { name: "Remove Natural Gas CC" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Remove Coal" }),
+  ).toBeInTheDocument();
+});
+
+it("keeps the fleet and Play available when sizing fails", () => {
+  jest.useFakeTimers();
   const onStart = jest.fn();
   render(
     <CustomGame
@@ -412,11 +575,53 @@ it("commits the complete location object when a map marker is selected", () => {
       onStart={onStart}
     />,
   );
+  act(() => jest.advanceTimersByTime(250));
+  const request = (fleetWorker.postMessage as jest.Mock).mock.calls[0][0];
+  act(() => {
+    fleetWorker.onmessage?.({
+      data: { requestId: request.requestId, error: "No reliable grid" },
+    } as MessageEvent);
+  });
+  expect(
+    screen.getByRole("button", { name: "Remove Natural Gas Peaker" }),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start game" })).toBeEnabled();
+});
+
+it("shows a guest the host's grid without sizing one", () => {
+  jest.useFakeTimers();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      coop={{ role: "guest", hostName: "Ada", players: [] } as never}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+    />,
+  );
+  act(() => jest.advanceTimersByTime(1000));
+  expect(mockCreateFleetWorker).not.toHaveBeenCalled();
+});
+
+it("commits the complete location object when a map marker is selected", () => {
+  jest.useFakeTimers();
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...SIZED }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
 
   fireEvent.click(screen.getByRole("button", { name: /Select Honolulu, HI/ }));
   expect(
     screen.getByRole("combobox", { name: "Search playable cities" }),
   ).toHaveValue(LOCATIONS.HNL.name);
+  answerFleet();
   fireEvent.click(screen.getByRole("button", { name: "Start game" }));
 
   expect(onStart).toHaveBeenCalledWith(
@@ -443,7 +648,7 @@ it("preserves and exposes a playable custom location that is absent from the cat
     <CustomGame
       game={createGame({ scenarioId: 100 })}
       scenario={{
-        ...DEFAULT_CUSTOM_SCENARIO,
+        ...SIZED,
         locationId: customLocation.id,
         location: customLocation,
       }}
@@ -538,7 +743,7 @@ it("updates setup cash and carbon fees from the selected city's currency", () =>
     <CustomGame
       game={createGame({ scenarioId: 100 })}
       scenario={{
-        ...DEFAULT_CUSTOM_SCENARIO,
+        ...SIZED,
         locationId: location.id,
         location,
       }}

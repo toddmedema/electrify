@@ -201,12 +201,12 @@ async function showSaves() {
   });
 }
 
-test("multiplayer saves focus Load save when the opening animation ends without navigation", async () => {
+test("multiplayer saves focus Load when the opening animation ends without navigation", async () => {
   await showSaves();
   const title = screen.getByRole("heading", { name: "Multiplayer saves" });
   expect(title).not.toHaveAttribute("tabindex");
   await act(async () => jest.advanceTimersByTime(1000));
-  expect(screen.getAllByRole("button", { name: "Load save" })[0]).toHaveFocus();
+  expect(screen.getAllByRole("button", { name: "Load" })[0]).toHaveFocus();
   expect(title).not.toHaveFocus();
 });
 

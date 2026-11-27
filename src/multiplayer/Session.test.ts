@@ -2085,6 +2085,38 @@ test("new matches and reconnect baselines send frozen mod definitions before the
   f.session.dispose();
 });
 
+test("a host restarts the finished match with the same configuration and players", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const created = () => f.posts.filter((post) => post.kind === "create");
+  // Nothing to repeat until a match has been started.
+  await f.session.restart();
+  expect(created()).toHaveLength(0);
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  expect(created()).toHaveLength(1);
+  await f.session.restart();
+  expect(
+    f.requests.filter((request) => request.kind === "unlock"),
+  ).toHaveLength(1);
+  expect(created()).toHaveLength(2);
+  expect(created()[1]).toMatchObject({
+    kind: "create",
+    spec: COOP_TEST_SPEC,
+    seats: created()[0].kind === "create" ? created()[0].seats : [],
+  });
+  expect(f.session.getSnapshot().view).toBeDefined();
+  f.session.dispose();
+});
+
+test("a guest cannot restart a match", async () => {
+  const f = fixture(false);
+  await f.session.initialize();
+  await f.session.restart();
+  expect(f.posts.filter((post) => post.kind === "create")).toHaveLength(0);
+  expect(f.requests).not.toContainEqual({ kind: "unlock" });
+  f.session.dispose();
+});
+
 test("a host sleep checkpoint keeps its session open for an explicit resume", async () => {
   const f = fixture(true);
   await f.session.initialize();

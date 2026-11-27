@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   Alert,
   Box,
@@ -35,18 +35,12 @@ export default function SavesDialog({
     session.getSnapshot,
   );
   const [failure, setFailure] = useState<string>();
-  const [withdrawalFailure, setWithdrawalFailure] = useState<string>();
   const [search, setSearch] = useState("");
   const [menu, setMenu] = useState<{
     anchor: HTMLElement;
     id: string;
-    name: string;
   }>();
-  const [deleting, setDeleting] = useState<{ id: string; name: string }>();
   const [loaded, setLoaded] = useState(false);
-  const cancelDelete = useRef<HTMLButtonElement>(null);
-  const deleteReturn = useRef<HTMLElement>();
-  const deleted = useRef(false);
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
     return action().catch((error) =>
@@ -63,12 +57,21 @@ export default function SavesDialog({
       await session.prepareResume(id, name);
       onClose();
     });
+  const remove = (id: string) =>
+    run(async () => {
+      await session.deleteSharedSave(id);
+      // The row that held focus is gone; start again from the dialog's first action.
+      focusInitialDialogAction(
+        document
+          .getElementById("multiplayer-saves-title")
+          ?.closest<HTMLElement>('[role="dialog"]') ?? null,
+        { force: true },
+      );
+    });
   const showSearch = (library?.slots.length || 0) > 3;
   const query = showSearch ? search.trim().toLocaleLowerCase() : "";
   const saves = library?.slots.filter((slot) =>
-    `${slot.name} ${slot.players.join(" ")}`
-      .toLocaleLowerCase()
-      .includes(query),
+    slot.players.join(" ").toLocaleLowerCase().includes(query),
   );
   const loading = loadingSaves && !loaded;
   return (
@@ -98,7 +101,7 @@ export default function SavesDialog({
             sx={{ pt: 1 }}
             className="savedGames coopCampaigns"
           >
-            {failure && !deleting && (
+            {failure && (
               <Alert severity="warning" onClose={() => setFailure(undefined)}>
                 {failure}
               </Alert>
@@ -148,39 +151,32 @@ export default function SavesDialog({
                 dateStyle: "medium",
                 timeStyle: "short",
               });
+              // Every multiplayer save is named for its scenario, so the players tell them apart.
+              const players = save.players.join(", ");
               return (
                 <Paper
                   key={save.id}
                   variant="outlined"
                   component="article"
                   className="saveEntry"
-                  aria-label={save.name}
+                  aria-label={players}
                 >
                   <Box className="coopCampaignHeading">
                     <Typography component="h2" variant="h6">
-                      {save.name}
+                      {players}
                     </Typography>
                     <IconButton
-                      aria-label={`Actions for ${save.name}`}
+                      aria-label={`Actions for ${players}`}
                       aria-haspopup="menu"
                       aria-expanded={menu?.id === save.id || undefined}
                       disabled={busy || loadingSaves}
-                      onClick={(event) => {
-                        deleteReturn.current = event.currentTarget;
-                        deleted.current = false;
-                        setMenu({
-                          anchor: event.currentTarget,
-                          id: save.id,
-                          name: save.name,
-                        });
-                      }}
+                      onClick={(event) =>
+                        setMenu({ anchor: event.currentTarget, id: save.id })
+                      }
                     >
                       <MoreVertIcon />
                     </IconButton>
                   </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {save.players.join(", ")}
-                  </Typography>
                   <Typography
                     component="div"
                     variant="caption"
@@ -201,7 +197,7 @@ export default function SavesDialog({
                       disabled={busy || loadingSaves}
                       onClick={() => void resume(save.id, save.name)}
                     >
-                      Load save
+                      Load
                     </Button>
                   </Box>
                 </Paper>
@@ -222,107 +218,17 @@ export default function SavesDialog({
         anchorEl={menu?.anchor}
         open={!!menu}
         onClose={() => setMenu(undefined)}
-        disableRestoreFocus={!!deleting}
       >
-        {session.onlineCampaigns && (
-          <MenuItem
-            onClick={() => {
-              if (menu) void run(() => session.exportSave(menu.id));
-              setMenu(undefined);
-            }}
-          >
-            Download confirmed save
-          </MenuItem>
-        )}
         <MenuItem
           sx={{ color: "error.main" }}
           onClick={() => {
-            if (menu) setDeleting({ id: menu.id, name: menu.name });
-            setWithdrawalFailure(undefined);
+            if (menu) void remove(menu.id);
             setMenu(undefined);
           }}
         >
-          {session.onlineCampaigns ? "Withdraw from campaign" : "Delete"}
+          Delete
         </MenuItem>
       </Menu>
-      <Dialog
-        open={!!deleting}
-        fullWidth
-        maxWidth="xs"
-        onClose={loadingSaves ? undefined : () => setDeleting(undefined)}
-        aria-labelledby="delete-campaign-title"
-        aria-describedby="delete-campaign-message"
-        slotProps={{
-          transition: {
-            onEntered: () => cancelDelete.current?.focus(),
-            onExited: () => {
-              if (!deleted.current) {
-                deleteReturn.current?.focus();
-                return;
-              }
-              focusInitialDialogAction(
-                document
-                  .getElementById("multiplayer-saves-title")
-                  ?.closest<HTMLElement>('[role="dialog"]') ?? null,
-                { force: true },
-              );
-            },
-          },
-        }}
-      >
-        <DialogTitle id="delete-campaign-title">
-          {session.onlineCampaigns
-            ? "Withdraw from this campaign?"
-            : "Delete multiplayer save?"}
-        </DialogTitle>
-        <DialogContent>
-          <Typography
-            id="delete-campaign-message"
-            sx={{ overflowWrap: "anywhere" }}
-          >
-            {session.onlineCampaigns
-              ? `You will lose access to “${deleting?.name}”. The original roster may be unable to resume without you.`
-              : `“${deleting?.name}” will be permanently deleted.`}
-          </Typography>
-          {withdrawalFailure && (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {withdrawalFailure}
-            </Alert>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button
-            autoFocus
-            ref={cancelDelete}
-            disabled={loadingSaves}
-            onClick={() => setDeleting(undefined)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="error"
-            disabled={loadingSaves}
-            onClick={() => {
-              if (deleting)
-                void session.deleteSharedSave(deleting.id).then(
-                  () => {
-                    deleted.current = true;
-                    setDeleting(undefined);
-                  },
-                  (error) =>
-                    setWithdrawalFailure(crossplayFailure(error, "Try again.")),
-                );
-            }}
-          >
-            {loadingSaves
-              ? "Working…"
-              : session.onlineCampaigns
-                ? "Withdraw"
-                : "Delete"}
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }
