@@ -19,6 +19,7 @@ export interface ModelPart {
     | "city-window"
     | "water"
     | "watershed-water"
+    | "river-water"
     | "mountain"
     | "map-border";
   /** Tile-width offsets at empty and full storage, respectively. */

@@ -2,7 +2,8 @@ import type { TerrainType } from "../../../Types";
 import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
 import { GROUND_RADIUS, tilePosition3D } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
-import type { MapMesh, MapModel, Vec3 } from "./Types";
+import type { MapMesh, MapModel, ModelPart, Vec3 } from "./Types";
+import { WATERSHED_LEVEL_OFFSETS } from "./WaterSurface";
 
 const TERRAINS: readonly TerrainType[] = [
   "plains",
@@ -77,12 +78,16 @@ function insidePad(triangle: readonly Vec3[], halfWidth: number) {
   return polygon;
 }
 
+function isWater({ material }: ModelPart) {
+  return (
+    material === "water" ||
+    material === "watershed-water" ||
+    material === "river-water"
+  );
+}
+
 function waterTriangles(model: MapModel) {
-  return model.parts
-    .filter(
-      ({ material }) => material === "water" || material === "watershed-water",
-    )
-    .flatMap(({ mesh }) => triangles(mesh));
+  return model.parts.filter(isWater).flatMap(({ mesh }) => triangles(mesh));
 }
 
 function edgeWater(model: MapModel, edge: number): Vec3[] {
@@ -130,8 +135,7 @@ it.each(TERRAINS)(
     // Ground decoration sits below the projected shadow plane.
     expect(Math.max(...faces.flat().map((p) => p[1]))).toBeLessThan(0.003);
     model.parts.slice(1).forEach((part) => {
-      const water =
-        part.material === "water" || part.material === "watershed-water";
+      const water = isWater(part);
       expect(part).toMatchObject({
         castsShadow: !water,
         receivesShadow: water,
@@ -342,13 +346,21 @@ it("keeps opaque water level, lake water enclosed and ocean water continuous at 
     expect(edgeWater(getTerrainModel("ocean"), edge)).toHaveLength(2);
   }
   expect(getTerrainModel("lake").height).toBeGreaterThan(0.02);
-  expect(getTerrainModel("river").height).toBeGreaterThan(0.02);
 });
 
 it("opens precisely the requested river edges for every bounded port mask", () => {
   for (let mask = 0; mask < 64; mask++) {
     const ports = [0, 1, 2, 3, 4, 5].filter((edge) => mask & (1 << edge));
     const model = getTerrainModel("river", { ports });
+    const dryLand = triangles(model.parts[0].mesh).filter((face) =>
+      face.every(([, y]) => y === 0),
+    );
+    expect(
+      [...dryLand, ...waterTriangles(model)].reduce(
+        (area, face) => area + projectedArea(face),
+        0,
+      ),
+    ).toBeCloseTo(Math.sqrt(3) / 2, 6);
     for (let edge = 0; edge < 6; edge++) {
       const section = edgeWater(model, edge);
       expect(section).toHaveLength(mask & (1 << edge) ? 2 : 0);
@@ -358,7 +370,7 @@ it("opens precisely the requested river edges for every bounded port mask", () =
             section[0][2] - section[1][2],
           )
         : 0;
-      expect(width).toBeCloseTo(mask & (1 << edge) ? 0.18 : 0, 6);
+      expect(width).toBeCloseTo(mask & (1 << edge) ? 0.29 : 0, 6);
     }
   }
 });
@@ -384,6 +396,41 @@ it("joins the actual reciprocal river ports at identical world-space water cross
         .sort();
     expect(rounded(first, [0, 0, 0])).toEqual(rounded(second, offset));
   }
+});
+
+it("keeps a river crossing open even at the lowest water level", () => {
+  const [lowWater] = WATERSHED_LEVEL_OFFSETS;
+  for (const ports of [[1, 4], [1, 2], [1]]) {
+    const model = getTerrainModel("river", { ports });
+    const sharedFace = triangles(model.parts[0].mesh).filter((face) =>
+      face.every(([x]) => Math.abs(x - 0.5) < EPSILON),
+    );
+    // Cut the exposed tile wall at the lowest water level so a tall triangle
+    // across a port cannot pass merely because its vertices sit on the banks.
+    const wallsAcrossChannel = sharedFace.filter((face) => {
+      const crossings = face.flatMap(([, y, z], i) => {
+        const [, nextY, nextZ] = face[(i + 1) % face.length];
+        const belowWater = y < lowWater;
+        const nextBelowWater = nextY < lowWater;
+        if (belowWater === nextBelowWater) return [];
+        return [z + ((lowWater - y) / (nextY - y)) * (nextZ - z)];
+      });
+      return Math.min(...crossings) <= 0 && Math.max(...crossings) >= 0;
+    });
+    expect(wallsAcrossChannel).toEqual([]);
+  }
+});
+
+it("varies the in-tile channel while preserving the exact edge profiles", () => {
+  const reference = getTerrainModel("river", { ports: [1, 4] });
+  const beds = new Set<string>();
+  for (let variant = 0; variant < 4; variant++) {
+    const model = getTerrainModel("river", { ports: [1, 4], variant });
+    beds.add(JSON.stringify(waterTriangles(model)));
+    for (const edge of [1, 4])
+      expect(edgeWater(model, edge)).toEqual(edgeWater(reference, edge));
+  }
+  expect(beds.size).toBe(4);
 });
 
 it("canonicalizes repeated options into a bounded cache without leaking tile variants", () => {

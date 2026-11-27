@@ -71,6 +71,29 @@ it("uses the drawn water direction and keeps local references distinct from fall
   ).toBe("Example City model grid");
 });
 
+it("keeps the Colorado River connected from the Hill Country past Austin", () => {
+  const { terrainAt } = getRegionalGeography(cities.Austin, 2017, 107);
+  const upstream = { q: -5, r: 1 };
+  const river = [upstream];
+  const seen = new Set(["-5,1"]);
+  for (const { q, r } of river) {
+    for (const [dq, dr] of HEX_NEIGHBORS) {
+      const next = { q: q + dq, r: r + dr };
+      const key = `${next.q},${next.r}`;
+      if (seen.has(key) || terrainAt(next) !== "river") continue;
+      seen.add(key);
+      river.push(next);
+    }
+  }
+  expect(terrainAt(upstream)).toBe("river");
+  expect(river).toEqual(
+    expect.arrayContaining([
+      { q: 0, r: 1 },
+      { q: 3, r: 2 },
+    ]),
+  );
+});
+
 it("uses researched utility names for the selected starting year", () => {
   const nameAt = (id: string, year: number) =>
     getRegionalGeography(cities[id], year, 999, customerSources).utility;
