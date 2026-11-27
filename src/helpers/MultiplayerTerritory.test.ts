@@ -3,7 +3,7 @@ import reducer, { gameSlice } from "../reducers/Game";
 import { acquireTile } from "../reducers/GameActions";
 import { LOCATIONS } from "../Constants";
 import { getBuildFacilityQuote } from "../data/Facilities";
-import { frontierCoordinates } from "../data/Territories";
+import { frontierCoordinates, frontierTerritoryId } from "../data/Territories";
 import { loadSimData } from "../testing/SimData";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { createWorld } from "../multiplayer/World";
@@ -30,7 +30,10 @@ beforeAll(() => {
 
 function adjacent(id: FrontierTerritoryId): FrontierTerritoryId[] {
   const { q, r } = frontierCoordinates(id)!;
-  return HEX_NEIGHBORS.map(([dq, dr]) => `frontier:${q + dq}:${r + dr}`);
+  return HEX_NEIGHBORS.flatMap(([dq, dr]) => {
+    const neighbor = frontierTerritoryId(q + dq, r + dr);
+    return neighbor ? [neighbor] : [];
+  });
 }
 
 test.each([2, 3, 4])(
