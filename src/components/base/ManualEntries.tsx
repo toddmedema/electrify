@@ -27,7 +27,7 @@ function MassUnitName(): React.JSX.Element {
 /**
  * The families of data behind every neighbour's emissions and price trend.
  */
-function IntertieTrendSources(): React.JSX.Element {
+function NeighborPowerSources(): React.JSX.Element {
   return (
     <ul className="manual-sources">
       {INTERTIE_TREND_SOURCE_FAMILIES.map(({ label, href }) => (
@@ -110,7 +110,7 @@ export const MANUAL_ENTRY = {
   PRICING: "Pricing",
   POWER_AND_ENERGY: "Power and energy",
   RESERVE_CAPACITY: "Reserve capacity",
-  INTERTIES: "Interties",
+  AGREEMENTS: "Agreements",
   ROUND_TRIP_EFFICIENCY: "Round-trip efficiency",
   SCORE: "Score",
   SYMBOLS: "Symbol guide",
@@ -303,7 +303,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             store extra energy
           </EntryLink>{" "}
           and{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>
+          <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>
             trade with neighboring grids
           </EntryLink>
           . Fall short and you'll cause{" "}
@@ -312,13 +312,18 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           reliable, affordable, clean grid.
         </p>
         <p>
-          Build plants in{" "}
+          Drag the 3D map to pan. Scroll or pinch to zoom. Select a tile to
+          inspect terrain, a facility, or a city's demand.
+        </p>
+        <p>
+          Use{" "}
           <GameNavigationLabel destination="BUILD_GENERATORS">
             Build
-          </GameNavigationLabel>
-          . Select a plant on the map to inspect it, or open{" "}
-          <GameNavigationLabel destination="FLEET">Fleet</GameNavigationLabel>{" "}
-          to manage your dispatch order.{" "}
+          </GameNavigationLabel>{" "}
+          to compare technologies and choose{" "}
+          <EntryLink to={MANUAL_ENTRY.PROJECT_SITES}>project sites</EntryLink>.
+          Manage the facilities you own in{" "}
+          <GameNavigationLabel destination="FLEET">Fleet</GameNavigationLabel>.{" "}
           <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
             Generators higher in the list run first
           </EntryLink>
@@ -397,7 +402,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Electricity must be made the moment it's used. A blackout happens when{" "}
           <EntryLink to={MANUAL_ENTRY.CUSTOMER_DEMAND}>demand</EntryLink>{" "}
           exceeds your available supply, including storage and{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>imports</EntryLink>.
+          <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>imports</EntryLink>.
         </p>
         <Figure
           src="/images/manual-blackout.webp"
@@ -506,7 +511,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             operating expenses
           </EntryLink>
           . Biomass is exempt, as in most real carbon-pricing schemes.{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>
+          <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>
             Imported electricity
           </EntryLink>{" "}
           carries no local fee, but its emissions still count against your{" "}
@@ -641,9 +646,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
               Insights
             </GameNavigationLabel>
           </EntryLink>
-          . The estimate on each{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>intertie</EntryLink> is an
-          annual average.
+          . The emissions estimate for{" "}
+          <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>imported power</EntryLink>{" "}
+          uses an annual average.
         </p>
         <p>
           Local figures count CO2 from burning fuel, including biomass, with no
@@ -722,10 +727,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         title: MANUAL_SECTION.POWER_EXCHANGE,
         entry: (
           <p>
-            Power bought through{" "}
-            <EntryLink to={MANUAL_ENTRY.INTERTIES}>interties</EntryLink> plots
-            above zero; power sold plots below. Quiet stretches mean no trade.
-            Compare with demand to see when you rely on neighbors.
+            <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>Imported power</EntryLink>{" "}
+            appears above zero. Exported power appears below. Compare with
+            demand to see when you rely on neighbors.
           </p>
         ),
       },
@@ -893,10 +897,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Move a plant higher in the facilities list to run it first. This is
-          the <strong>dispatch order</strong>. Real markets usually run the
-          cheapest plants first, and the last plant needed often sets the price
-          for everyone. In Electrify you choose the order.
+          Move a plant higher in{" "}
+          <GameNavigationLabel destination="FLEET">Fleet</GameNavigationLabel>{" "}
+          to give it priority. This is the <strong>dispatch order</strong>. Real
+          markets usually run the cheapest plants first, and the last plant
+          needed often sets the price for everyone. In Electrify you choose the
+          order.
         </p>
         <p>
           Lower plants cover the demand that's left and start and stop
@@ -1098,7 +1104,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Real grids keep it for plant failures and surprise demand. It counts
           what plants can{" "}
           <EntryLink to={MANUAL_ENTRY.RAMP_RATE}>ramp up</EntryLink> to and{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>exports</EntryLink> you could
+          <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>exports</EntryLink> you could
           redirect to your customers.
         </p>
         <Figure
@@ -1111,39 +1117,64 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     ),
   },
   {
-    title: MANUAL_ENTRY.INTERTIES,
+    title: MANUAL_ENTRY.AGREEMENTS,
     group: "Gameplay",
     keywords:
-      "transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind archetype source citation CO2e proxy quebec california washington IEA EIA line capacity access",
+      "power purchase contracts ppa transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind CO2e quebec california washington IEA EIA line capacity access",
     entry: (
       <div>
         <p>
-          Interties connect neighboring grids. Set Buying and Selling
-          independently. Shortages only buys for unmet customer demand.
-          Shortages + Charging also buys at current prices to charge utility
-          storage after customer demand is met. None disables optional
-          purchases; contracted utility supply stays separate.
+          On the 3D map, open{" "}
+          <GameNavigationLabel destination="AGREEMENTS">
+            Agreements
+          </GameNavigationLabel>{" "}
+          to review your power purchase agreements and available offers. In
+          co-op on the map, set buying and selling under{" "}
+          <strong>Co-op power sharing</strong>.
         </p>
         <p>
-          Surplus only sells leftover electricity after serving customers and
-          charging{" "}
+          In scenarios where{" "}
+          <GameNavigationLabel destination="BUILD_GENERATORS">
+            Build
+          </GameNavigationLabel>{" "}
+          offers regional connections, compare their costs and capacities there.
+          Once a connection is operating, set buying and selling alongside your
+          connections.
+        </p>
+        <p>
+          A regional connection carries power. An agreement sets the pricing,
+          capacity and dates for part of what you can buy through that
+          connection. Contracted supply serves your customers before market
+          purchases.
+        </p>
+        <p>
+          Acquiring another utility can bring its agreements with their original
+          end dates. When a replacement is available, review how much power it
+          can deliver, the rate, the term and any monthly energy minimum. A
+          minimum means you pay for the difference if you use less. When an
+          agreement expires, the connection stays available for market
+          purchases.
+        </p>
+        <p>
+          <strong>Shortages only</strong> buys for unmet customer demand.{" "}
+          <strong>Shortages + Charging</strong> also allows market purchases to
+          charge utility storage after customer demand is met. Choose{" "}
+          <strong>None</strong> to stop optional purchases while keeping
+          contracted supply available.
+        </p>
+        <p>
+          <strong>Surplus only</strong> sells electricity left after serving
+          customers and charging{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>storage</EntryLink>
-          . All profitable also raises output from running plants when current
-          prices exceed added fuel, variable operating and carbon costs. It does
-          not start plants for export or sell stored water or electricity. Later
-          ramp-down costs can still occur when prices fall. None disables
-          exports.
-        </p>
-        <p>
-          Co-op normally trades before charging utility storage; Shortages +
-          Charging gives local charging priority and requests any remaining
-          charge below other players' customer shortages. Exports you could
+          . <strong>All profitable</strong> can also raise output from running
+          plants when the sale price covers the extra fuel, operating and carbon
+          costs. Choose <strong>None</strong> to stop exports. Exports you could
           redirect count toward your{" "}
           <EntryLink to={MANUAL_ENTRY.RESERVE_CAPACITY}>reserve</EntryLink>.
         </p>
         <p>
           Most of the mainland US belongs to one of three largely separate
-          grids:
+          grids.
         </p>
         <Figure
           src="/images/manual-interconnections.webp"
@@ -1166,38 +1197,20 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           its supply and demand.
         </p>
         <p>
-          Mission tiers buy import access as well as line capacity. Custom games
-          start with full regional access, so upgrades only widen the line.
-          Export access never changes, but a wider line can raise export
-          capacity up to that allowance. The upgrade review shows the before and
-          after.
-        </p>
-        <p>
-          Neighbors differ in spare power and price. Each build card names the
-          grid type, such as seasonal hydro or solar surplus; Show details gives
-          monthly estimates. Check &ldquo;At your peak&rdquo; for what the
-          neighbor can usually send in your busiest hours. A heat wave or cold
-          snap can hit both grids at once, and harder difficulties leave them
-          with less to spare.
-        </p>
-        <p>
-          Drag the handles beside your interties to set their trading order. Put
-          a cheaper neighbor first to lower import costs, or a higher-paying one
-          first to raise export revenue. Live details show whether the line, the
-          neighbor, or your own demand and trading rule is limiting the flow.
-          Hot weather can reduce line capacity, because hot wires sag toward the
-          ground.
+          Neighbors differ in spare power and price. A region with surplus solar
+          can have plenty to sell at midday and little left after sunset. A heat
+          wave or cold snap can leave both grids short at once. Hot weather can
+          also reduce line capacity because hot wires sag toward the ground.
         </p>
         <p>
           Neighbors' prices and emissions follow historical data from about 1990
           and official projections through 2050, then stay flat, so events like
           the 2022 energy crisis raise import prices. Each year's estimated{" "}
           <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink> count
-          toward your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>. You
-          can only build a connection once it existed in the real world.
-          Neighbor prices and emissions use annual averages. Sources:
+          toward your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink>. The
+          source data uses annual averages.
         </p>
-        <IntertieTrendSources />
+        <NeighborPowerSources />
       </div>
     ),
   },
@@ -1219,7 +1232,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           Charging needs spare power, up to the facility's{" "}
           <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>power rating</EntryLink>
           , and that power can't also serve customers or be{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>exported</EntryLink>. Pausing
+          <EntryLink to={MANUAL_ENTRY.AGREEMENTS}>exported</EntryLink>. Pausing
           storage stops charging and discharging, but stored energy still slowly
           drains away.
         </p>
@@ -1500,20 +1513,36 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.PROJECT_SITES,
     group: "Gameplay",
     keywords:
-      "sites left viable locations remaining available hydro geothermal",
+      "3d map build tiles siting viable locations remaining available hydro geothermal transmission connection construction time",
     entry: (
       <div>
         <p>
-          Dams and geothermal plants need suitable sites. Hydro uses the
-          smallest remaining site that fits your project, and any unused
-          capacity goes with it. You can't combine sites. Cancel before
-          construction finishes to free a site; selling or retiring a plant
-          won't.
+          Choose a technology and size in{" "}
+          <GameNavigationLabel destination="BUILD_GENERATORS">
+            Build
+          </GameNavigationLabel>{" "}
+          to highlight project sites on the 3D map. You can also select an
+          eligible tile and choose <strong>Plan project here</strong>. Each site
+          holds one facility. Select a site to compare its cost, construction
+          time and expected output before committing.
         </p>
         <p>
-          New <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>Hydro</EntryLink> is only
-          offered where we've researched sites, so an empty list doesn't
-          necessarily mean an area has no potential.
+          At a site that can be connected to your grid,{" "}
+          <strong>Connect &amp; build</strong> starts both the facility and the
+          transmission connection. The price includes both. With a facility
+          loan, you pay for the connection and the facility's down payment up
+          front. Construction runs in parallel, so the longer of the two
+          timelines determines when the facility comes online. Choose{" "}
+          <strong>Connect only</strong> from the tile to extend the grid on its
+          own.
+        </p>
+        <p>
+          Terrain affects what fits on a site and can change the cost, build
+          time and output. Conventional geothermal needs a geothermal site,
+          offshore wind needs an offshore site, and{" "}
+          <EntryLink to={MANUAL_ENTRY.HYDROPOWER}>dams</EntryLink> need a mapped
+          hydro site. Canceling a dam before it opens frees the site. Once
+          commissioned, the dam uses that hydro site permanently.
         </p>
       </div>
     ),

@@ -18,7 +18,11 @@ import { territoryTileViews } from "./TerritoryMapState";
 import cloneDeep from "lodash.clonedeep";
 import gameReducer, { buildFacility, tickState } from "../reducers/Game";
 import { getDateFromMinute } from "./DateTime";
-import { TICKS_PER_YEAR } from "../Constants";
+import { TICK_MINUTES, TICKS_PER_YEAR } from "../Constants";
+import { parseSave, serializeSave } from "../SaveGame";
+import { validTerritoryNetwork } from "./TerritoryValidation";
+import { validUtilityExpansion } from "./ExpansionValidation";
+import { facilityConstructionReview } from "./FacilityConstructionReview";
 
 function fixture() {
   const game = createGame({ scenarioId: 116, seed: 188 });
@@ -209,3 +213,116 @@ it("shows the actual reducer completion month for fractional-month construction"
     year: actual.year,
   });
 });
+
+it.each([
+  ["Facility", 20e6, false],
+  ["Connection", 10e3, true],
+] as const)(
+  "%s finishes last when both jobs start together",
+  (last, peakW, financed) => {
+    const game = createGame({
+      scenarioId: 116,
+      seed: 188,
+      difficulty: "Intern",
+    });
+    currentTick(game)!.cash = 1e9;
+    const option = GENERATORS(game, peakW, [], []).find(
+      ({ name }) => name === "Wind",
+    );
+    const quote = projectSiteQuote(
+      game,
+      selectProject(option!),
+      "green-uplands:site-1",
+    );
+    if (!quote.facility || !quote.connection) throw new Error(quote.reason);
+    const review = projectReview(game, quote, financed);
+    const facilityOnly = facilityConstructionReview(
+      game,
+      quote.facility,
+      financed,
+      quote.tile.id,
+    );
+    const connects = quote.connection.connectionMinute;
+    const lineFinishesLast = last === "Connection";
+    expect(connects > facilityOnly.online.minute).toBe(lineFinishesLast);
+    expect(review.online.minute).toBe(
+      Math.max(connects, facilityOnly.online.minute),
+    );
+    const order = {
+      facility: quote.facility,
+      financed,
+      territoryId: quote.tile.territoryId,
+      tileId: quote.tile.id,
+      connectionQuoteKey: quote.connection.quoteKey,
+      reviewKey: review.buildKey,
+    };
+    const underfunded = cloneDeep(game);
+    currentTick(underfunded)!.cash = review.required - 1;
+    expect(gameReducer(underfunded, buildFacility(order))).toBe(underfunded);
+    expect(
+      gameReducer(game, buildFacility({ ...order, reviewKey: "stale" })),
+    ).toBe(game);
+    const accepted = gameReducer(game, buildFacility(order));
+    expect(currentTick(game)!.cash - currentTick(accepted)!.cash).toBeCloseTo(
+      review.required,
+      5,
+    );
+    expect(accepted.territoryNetwork?.tilePurchases).toEqual([
+      expect.objectContaining({
+        tileId: quote.tile.id,
+        minute: game.date.minute,
+        connectionMinute: connects,
+      }),
+    ]);
+    const started = accepted.facilities.find(
+      (plant) => plant.tileId === quote.tile.id,
+    )!;
+    expect(started).toMatchObject({
+      minuteCreated: game.date.minute,
+      yearsToBuildLeft: quote.facility.yearsToBuild,
+    });
+    expect(started.loanAmountTotal).toBe(review.terms.loanAmount);
+    expect(gameReducer(accepted, buildFacility(order))).toBe(accepted);
+    expect(parseSave(serializeSave(game))).not.toBeNull();
+    expect(validTerritoryNetwork(accepted)).toBe(true);
+    expect(validUtilityExpansion(accepted)).toBe(true);
+    const decoded = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(accepted))),
+    );
+    expect(decoded).not.toBeNull();
+    const restored = decoded!.game;
+    const state = cloneDeep(restored);
+    const plant = state.facilities.find(({ id }) => id === started.id)!;
+    while (state.date.minute < connects - TICK_MINUTES) tickState(state);
+    expect(plant.minuteOperational).toBeUndefined();
+    expect(plant.currentW).toBe(0);
+    const savedBeforeConnection = parseSave(
+      JSON.parse(JSON.stringify(serializeSave(state))),
+    );
+    expect(savedBeforeConnection).not.toBeNull();
+    expect(
+      plant.constructionKgco2eEmitted === plant.constructionKgco2eTotal,
+    ).toBe(lineFinishesLast);
+    tickState(state);
+    expect(plant.minuteOperational).toBe(
+      lineFinishesLast ? connects : undefined,
+    );
+    while (
+      plant.yearsToBuildLeft > 0 &&
+      state.date.minute <= facilityOnly.online.minute
+    )
+      tickState(state);
+    const opening = getDateFromMinute(
+      plant.minuteOperational!,
+      state.startingYear,
+    );
+    expect(opening).toMatchObject({
+      month: review.online.month,
+      year: review.online.year,
+    });
+    expect(plant.yearsToBuildLeft).toBe(0);
+    expect(plant.minuteOperational).toBeLessThan(
+      facilityOnly.online.minute + (connects - game.date.minute),
+    );
+  },
+);

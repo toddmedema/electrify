@@ -1044,6 +1044,7 @@ export class MultiplayerSession {
         territoryId?: TerritoryId;
         tileId?: TerritoryTileId;
         reviewKey?: string;
+        connectionQuoteKey?: string;
       };
       const { name, peakW, peakWh, gasCycle, resilience } = payload.facility;
       command = {
@@ -1057,6 +1058,9 @@ export class MultiplayerSession {
           ...(payload.tileId !== undefined && { tileId: payload.tileId }),
           ...(payload.reviewKey !== undefined && {
             reviewKey: payload.reviewKey,
+          }),
+          ...(payload.connectionQuoteKey !== undefined && {
+            connectionQuoteKey: payload.connectionQuoteKey,
           }),
         },
       };

@@ -658,7 +658,7 @@ it("keeps a failed planner load in one closable panel and retries on the next op
 });
 
 it.each([undefined, 1280])(
-  "keeps the confirmed project locked when Build is activated during host Connect (%s)",
+  "keeps the confirmed project locked when Build is activated during host Connect & build (%s)",
   async (width) => {
     const game = ready();
     game.multiplayer = { seat: "0" };
@@ -667,12 +667,6 @@ it.each([undefined, 1280])(
     registerMultiplayerRuntime({
       submit: async (command) => {
         commands.push(command);
-        if (command.kind === "action" && command.name === "buildFacility")
-          store.dispatch(
-            buildFacility(
-              command.payload as Parameters<typeof buildFacility>[0],
-            ),
-          );
       },
       command: jest.fn(),
       activity: jest.fn(),
@@ -687,7 +681,7 @@ it.each([undefined, 1280])(
     );
     inspect("green-uplands:site-1");
     fireEvent.click(
-      within(surface()).getByRole("button", { name: /^Connect ·/ }),
+      within(surface()).getByRole("button", { name: /^Connect & build ·/ }),
     );
     await act(async () => {
       await Promise.resolve();
@@ -697,9 +691,9 @@ it.each([undefined, 1280])(
     inspect("champlain:site-13");
     fireEvent.keyDown(surface(), { key: "Escape" });
     showPanel(true);
-    expect(within(surface()).getByText("Connecting…")).toBeVisible();
+    expect(within(surface()).getByText("Starting construction…")).toBeVisible();
     expect(
-      within(surface()).getByRole("button", { name: /^Connect ·/ }),
+      within(surface()).getByRole("button", { name: /^Connect & build ·/ }),
     ).toBeDisabled();
     expect(screen.queryByRole("slider")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
@@ -707,17 +701,19 @@ it.each([undefined, 1280])(
     expect(store.getState().game.facilities).toHaveLength(
       game.facilities.length,
     );
-    const connect = commands[0];
-    if (connect.kind !== "action" || connect.name !== "acquireTile")
-      throw new Error("Expected connection command");
+    const command = commands[0];
+    if (command.kind !== "action" || command.name !== "buildFacility")
+      throw new Error("Expected a combined construction command");
     act(() => {
+      showPanel(false);
       store.dispatch(
-        acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
+        buildFacility(command.payload as Parameters<typeof buildFacility>[0]),
       );
     });
     expect(
-      await within(surface()).findByText(/Constructing transmission lines/),
+      await screen.findByText(/Constructing transmission lines/),
     ).toBeVisible();
+    expect(await screen.findByText(/Under construction .* left/)).toBeVisible();
     expect(
       within(surface()).queryByRole("button", { name: "Cash" }),
     ).not.toBeInTheDocument();

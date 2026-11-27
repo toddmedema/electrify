@@ -1,4 +1,5 @@
 import { FacilityOperatingType, isStorage } from "../../Types";
+import { AWAITING_TILE_CONNECTION } from "../../helpers/TerritoryConnections";
 import { facilityPermanentlyShutdown } from "../../helpers/Financials";
 import {
   isUpgradingAt,
@@ -52,7 +53,13 @@ export function facilityOperatingStatus(
 ): FacilityMapStatus {
   const paused = facility.paused ? "; operation paused" : "";
   if (facility.yearsToBuildLeft > 0)
-    return { kind: "construction", label: `Under construction${paused}` };
+    return {
+      kind: "construction",
+      label:
+        facility.yearsToBuildLeft === AWAITING_TILE_CONNECTION
+          ? `Facility built · waiting for grid connection${paused}`
+          : `Under construction${paused}`,
+    };
   if (facilityPermanentlyShutdown(facility, minute))
     return { kind: "idle", label: "Permanently shut down" };
   const upgrading = isUpgradingAt(facility, minute);
