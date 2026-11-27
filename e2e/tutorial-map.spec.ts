@@ -255,6 +255,19 @@ async function signValleyAgreement(page: Page) {
   await goal(page, "Open Fleet to see power flows");
 }
 
+async function openFleetBesideAgreements(page: Page) {
+  await action(page, "Fleet");
+  // Expose the heading, chart and Close button even after Agreements opens.
+  const title = page.getByRole("heading", { name: "Fleet", exact: true });
+  const box = (await title.boundingBox())!;
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 480, y, { steps: 5 });
+  await page.mouse.up();
+}
+
 test("closing a tool keeps Agreements waiting for Fleet selection", async ({
   page,
 }) => {
@@ -265,18 +278,7 @@ test("closing a tool keeps Agreements waiting for Fleet selection", async ({
     name: "Agreements",
     exact: true,
   });
-  if (floating) {
-    await action(page, "Fleet");
-    // Leave Fleet's Close button exposed when Agreements comes to the front.
-    const title = fleet.getByRole("heading", { name: "Fleet", exact: true });
-    const box = (await title.boundingBox())!;
-    const x = box.x + box.width / 2;
-    const y = box.y + box.height / 2;
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x - 480, y, { steps: 5 });
-    await page.mouse.up();
-  }
+  if (floating) await openFleetBesideAgreements(page);
   await signValleyAgreement(page);
   if (floating) {
     await expect(fleet).toHaveAttribute("data-map-window-front", "false");
@@ -288,6 +290,60 @@ test("closing a tool keeps Agreements waiting for Fleet selection", async ({
   await expect(fleet).toHaveCount(0);
   await goal(page, "Open Fleet to see power flows");
   await action(page, "Fleet");
+  await goal(page, "Run the clock until your grid imports power");
+});
+
+test("selecting Fleet directly displays the agreement clock objective", async ({
+  page,
+}) => {
+  await startMission(page, 112);
+  const floating = page.viewportSize()!.width >= 1024;
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  if (floating) await openFleetBesideAgreements(page);
+  await signValleyAgreement(page);
+  if (floating) {
+    await expect(fleet).toHaveAttribute("data-map-window-front", "false");
+    await fleet.getByRole("heading", { name: "Fleet", exact: true }).click();
+  } else {
+    await gameAction(page, "Fleet").press("Enter");
+  }
+  await expect(fleet).toHaveAttribute("data-map-window-front", "true");
+  await expect(fleet.locator("#chartSupplyDemand")).toBeVisible();
+  await goal(page, "Run the clock until your grid imports power");
+});
+
+test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
+  page,
+}) => {
+  await startMission(page, 112);
+  const floating = page.viewportSize()!.width >= 1024;
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const closeAgreements = page.getByRole("button", {
+    name: "Close Agreements",
+    exact: true,
+  });
+  if (floating) await action(page, "Fleet");
+  await signValleyAgreement(page);
+  if (!floating) await closeAgreements.click();
+  await tutorialMap(page)
+    .locator('[data-map-facility="Biomass"][data-owned="true"]')
+    .press("Enter");
+  const inspector = page.getByRole("dialog", { name: "Biomass", exact: true });
+  await expect(inspector).toBeVisible();
+  if (floating) {
+    await action(page, "Agreements");
+    await closeAgreements.click();
+    await expect(inspector).toHaveAttribute("data-map-window-front", "true");
+    await expect(fleet).toHaveAttribute("data-map-window-front", "false");
+  }
+  await goal(page, "Open Fleet to see power flows");
+  await page.keyboard.press("Escape");
+  await expect(inspector).toHaveCount(0);
+  if (!floating) {
+    await goal(page, "Open Fleet to see power flows");
+    await action(page, "Fleet");
+  }
+  await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   await goal(page, "Run the clock until your grid imports power");
 });
 

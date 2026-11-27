@@ -130,7 +130,7 @@ export default function MapPanelWindow({
   stackingIndex: number;
   front: boolean;
   floating?: MapWindowLayout;
-  onRaise: () => void;
+  onRaise: (toClose: boolean) => void;
   onClose: () => void;
   onBack?: () => void;
   children: React.ReactNode;
@@ -142,6 +142,7 @@ export default function MapPanelWindow({
   const [draft, setDraft] = React.useState<Rect>();
   const gesture = React.useRef<Gesture>();
   const title = React.useRef<HTMLHeadingElement>(null);
+  const closeButton = React.useRef<HTMLButtonElement>(null);
   const body = useToolScroll<HTMLDivElement>(`workspace.${tool}.scroll`);
   const area = floating?.area;
   const scale = floating?.scale ?? 1;
@@ -266,6 +267,12 @@ export default function MapPanelWindow({
     );
   };
 
+  const raiseFrom = (event: React.SyntheticEvent<HTMLElement>) => {
+    const target = event.target;
+    if (target instanceof Node && event.currentTarget.contains(target))
+      onRaise(closeButton.current?.contains(target) ?? false);
+  };
+
   return (
     <section
       id={`tool-${tool}`}
@@ -285,15 +292,9 @@ export default function MapPanelWindow({
         }
       }
       onPointerDownCapture={(event) => {
-        if (
-          event.button === 0 &&
-          event.currentTarget.contains(event.target as Node)
-        )
-          onRaise();
+        if (event.button === 0) raiseFrom(event);
       }}
-      onFocusCapture={(event) => {
-        if (event.currentTarget.contains(event.target)) onRaise();
-      }}
+      onFocusCapture={raiseFrom}
       onPointerMove={(event) => {
         const next = update(event);
         if (next) setDraft(next);
@@ -330,7 +331,11 @@ export default function MapPanelWindow({
           {icon && <span className="gameToolTitleIcon">{icon}</span>}
           {label}
         </h2>
-        <IconButton aria-label={`Close ${label}`} onClick={onClose}>
+        <IconButton
+          aria-label={`Close ${label}`}
+          onClick={onClose}
+          ref={closeButton}
+        >
           <CloseIcon />
         </IconButton>
       </header>

@@ -5,7 +5,7 @@ import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import {
   prepareStorageReorder,
   tutorialInspectedMapFacility,
-  tutorialRaisedMapTool,
+  tutorialViewedMapTool,
   tutorialRateCommitted,
 } from "../reducers/GameActions";
 import * as React from "react";
@@ -738,9 +738,8 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "AGREEMENTS",
         target: "#fleetNav",
-        advanceOn: (s) => s.card.name === "FLEET",
         advanceOnAction: (action) =>
-          tutorialRaisedMapTool.match(action) && action.payload === "FLEET",
+          tutorialViewedMapTool.match(action) && action.payload === "FLEET",
         action: "Open Fleet to see power flows",
         content: (
           <TutorialPrompt text="The chart in Fleet shows live imports and exports." />

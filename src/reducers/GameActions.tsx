@@ -88,8 +88,8 @@ export const cloudSavePromptVisible = createAction<boolean>(
 export const generatorSizeChanged = createAction("game/generatorSizeChanged");
 export const prepareStorageReorder = createAction("game/prepareStorageReorder");
 
-export const tutorialRaisedMapTool = createAction<TutorialActionType>(
-  "tutorial/raisedMapTool",
+export const tutorialViewedMapTool = createAction<TutorialActionType>(
+  "tutorial/viewedMapTool",
 );
 export const tutorialRateCommitted = createAction("tutorial/rateCommitted");
 export const tutorialInspectedMapFacility = createAction<number>(
