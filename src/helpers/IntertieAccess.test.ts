@@ -199,7 +199,7 @@ describe("authored utility transmission access", () => {
   });
 
   it("keeps tutorial scarcity binding after every upgrade", () => {
-    const ctx = { ...context(112), tutorialSupplyLimitW: 150e6 };
+    const ctx = { ...context(100), tutorialSupplyLimitW: 150e6 };
     for (const capacityW of [500e6, 750e6, 1125e6, 1687.5e6]) {
       const limits = intertieOfferLimits(
         { corridorId: "california-north", capacityW },

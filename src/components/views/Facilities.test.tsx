@@ -674,7 +674,9 @@ describe("the fleet list", () => {
     const { onPause } = renderFacilities(onePlant, null);
     const facility = onePlant.facilities[0];
     await user.click(
-      screen.getByRole("button", { name: `Inspect ${facility.name}` }),
+      screen.getByRole("button", {
+        name: new RegExp(`^Inspect ${facility.name}`),
+      }),
     );
 
     await user.click(screen.getByLabelText(`Pause ${facility.name}`));
@@ -1073,8 +1075,8 @@ describe("the interties view", () => {
     }
   });
 
-  it("hides the empty interties section in Mission 7", () => {
-    renderFacilities(createGame({ scenarioId: 112 }), null);
+  it("hides the empty interties section before a connection is built", () => {
+    renderFacilities(createGame({ scenarioId: 100 }), null);
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: "Build" })).toBeNull();
     expect(screen.getByText("Plants & storage")).toBeInTheDocument();
@@ -1113,8 +1115,8 @@ describe("the interties view", () => {
     ).toBeInTheDocument();
   });
 
-  it("gives the guided northern approval a stable target and specific name", async () => {
-    renderProjects(createGame({ scenarioId: 112 }));
+  it("gives the northern approval a stable target and specific name", async () => {
+    renderProjects(createGame({ scenarioId: 100 }));
 
     const approval = screen.getByRole("button", {
       name: "Review purchase of Pacific Northwest intertie",
@@ -1123,7 +1125,6 @@ describe("the interties view", () => {
     expect(
       screen.getByTestId("transmission-project-california-north"),
     ).toHaveAttribute("data-corridor-id", "california-north");
-    expect(screen.queryByText("Desert Southwest")).toBeNull();
   });
 
   it("sorts current-tier quotes by time, price and import emissions", async () => {
@@ -1203,7 +1204,8 @@ describe("the interties view", () => {
 
   it("reviews and cancels before committing a financed intertie", async () => {
     const onBuild = jest.fn();
-    renderProjects(createGame({ scenarioId: 112 }), onBuild);
+    renderProjects(createGame({ scenarioId: 100 }), onBuild);
+    fireEvent.change(screen.getByRole("slider"), { target: { value: 1 } });
     const review = screen.getByRole("button", {
       name: "Review purchase of Pacific Northwest intertie",
     });

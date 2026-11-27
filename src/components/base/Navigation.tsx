@@ -145,13 +145,19 @@ export default function Navigation({
   const mapWorkspace = useAppSelector((state) =>
     hasTerritoryNetwork(state.game),
   );
+  const tutorialDock = mapWorkspace && !!tutorialActions;
+  const mapViews = mapWorkspace
+    ? MAP_VIEWS.filter(
+        (view) => !tutorialActions || tutorialActions.includes(view.id),
+      )
+    : [];
   const tools = GAME_TOOLS.filter(
     (tool) =>
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
       (!mapWorkspace || showMapBuild || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
-  if (!tools.length && !regionalGridView) return null;
+  if (!tools.length && !mapViews.length && !regionalGridView) return null;
   const openFleet = regionalGridView?.showingMap;
   const regionalViewLabel = openFleet ? "Fleet" : "Map";
   const regionalViewTrigger = openFleet ? "fleetNav" : "mapNav";
@@ -159,6 +165,7 @@ export default function Navigation({
     <nav
       id="navfooter"
       className="gameActionDock"
+      data-tutorial-dock={tutorialDock || undefined}
       aria-label="Game actions"
       {...dockLabels}
     >
@@ -185,39 +192,43 @@ export default function Navigation({
           </Button>
         </Tooltip>
       )}
-      {mapWorkspace &&
-        MAP_VIEWS.map((view) => {
-          const open = openMapViews.includes(view.id);
-          return (
-            <Tooltip
-              key={view.id}
-              title={view.label}
-              placement="top"
-              open={labelId === view.triggerId}
-              disableHoverListener
-              disableFocusListener
-              disableTouchListener
-              disableInteractive
+      {mapViews.map((view) => {
+        const open = openMapViews.includes(view.id);
+        return (
+          <Tooltip
+            key={view.id}
+            title={view.label}
+            placement="top"
+            open={labelId === view.triggerId}
+            disableHoverListener
+            disableFocusListener
+            disableTouchListener
+            disableInteractive
+          >
+            <Button
+              id={view.triggerId}
+              {...buttonLabels}
+              className={`gameDockAction${open ? " gameDockActionOpen" : ""}`}
+              aria-label={view.label}
+              aria-expanded={open}
+              aria-controls={open ? `tool-${view.id}` : undefined}
+              data-game-destination={view.id}
+              onClick={() =>
+                onToggleMapView
+                  ? onToggleMapView(view.id)
+                  : dispatch(navigate(open ? "FACILITIES" : view.id))
+              }
             >
-              <Button
-                id={view.triggerId}
-                {...buttonLabels}
-                className={`gameDockAction${open ? " gameDockActionOpen" : ""}`}
-                aria-label={view.label}
-                aria-expanded={open}
-                aria-controls={open ? `tool-${view.id}` : undefined}
-                data-game-destination={view.id}
-                onClick={() =>
-                  onToggleMapView
-                    ? onToggleMapView(view.id)
-                    : dispatch(navigate(open ? "FACILITIES" : view.id))
-                }
-              >
-                <Badge>{view.icon}</Badge>
-              </Button>
-            </Tooltip>
-          );
-        })}
+              <Badge>{view.icon}</Badge>
+              {tutorialDock && (
+                <span className="gameDockTutorialLabel" aria-hidden>
+                  {view.label}
+                </span>
+              )}
+            </Button>
+          </Tooltip>
+        );
+      })}
       {tools.map((tool) => {
         const open = opened.includes(tool.id);
         return (
@@ -278,6 +289,11 @@ export default function Navigation({
               >
                 {tool.icon}
               </Badge>
+              {tutorialDock && (
+                <span className="gameDockTutorialLabel" aria-hidden>
+                  {tool.label}
+                </span>
+              )}
               {tool.id === "EVENTS" && emergency && (
                 <span className="srOnly" id="eventsEmergency">
                   Ongoing emergency

@@ -11,7 +11,7 @@ function CustomerGrowthChallenge({
 }) {
   return (
     <TutorialPrompt
-      text={`Reach at least ${formatNumber(Math.ceil(startingCustomers * 1.05))} customers (5% above the starting ${formatNumber(startingCustomers)}) in six months.`}
+      text={`Reach at least ${formatNumber(Math.ceil(startingCustomers * 1.05))} customers in six months. Finish below 7¢ per kWh.`}
     />
   );
 }

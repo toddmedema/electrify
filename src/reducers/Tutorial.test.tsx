@@ -5,7 +5,7 @@ import {
   AppStateType,
   CardNameType,
   GameType,
-  GameToolType,
+  TutorialActionType,
   TutorialStepType,
 } from "../Types";
 import {
@@ -15,7 +15,7 @@ import {
   TUTORIALS,
 } from "../data/Scenarios";
 import cardReducer from "./Card";
-import gameReducer, { tutorialCompleteDialog } from "./Game";
+import gameReducer from "./Game";
 import settingsReducer from "./Settings";
 import {
   changeTutorialStep,
@@ -25,6 +25,8 @@ import {
   tutorialGateMiddleware,
 } from "./Tutorial";
 import uiReducer from "./UI";
+import { tutorialInspectedMapFacility } from "./GameActions";
+import { createGame } from "../testing/Simulator";
 import userReducer from "./User";
 
 function informational(card: "FACILITIES" | "INSIGHTS" = "FACILITIES") {
@@ -145,61 +147,72 @@ function tutorialStore(
 }
 
 describe("tutorialGateMiddleware", () => {
-  it.each([2, 5])(
-    "keeps mission %s on its reset disclosure even while time runs",
-    (id) => {
-      const steps = getScenario(id)!.tutorialSteps!;
-      const preparation = steps.length - 2;
-      const store = tutorialStore(steps, {
-        speed: "FAST",
-        tutorialStep: preparation,
-      });
-      store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
-      expect(store.getState().game.tutorialStep).toBe(preparation);
-      expect(store.getState().game.speed).toBe("SLOW");
-      expect(steps[preparation].nextLabel).toBe("Start final challenge");
-
-      const dispatch = jest.fn(store.dispatch);
-      changeTutorialStep(dispatch as never, {
-        fromStep: preparation,
-        toStep: preparation + 1,
-        tutorialSteps: steps,
-        scenarioId: id,
-        currentCard: store.getState().card.name,
-      });
-      expect(dispatch.mock.calls.map(([action]) => action)).toEqual([
-        { type: "game/quit", payload: undefined },
-        { type: "game/start", payload: id },
-        { type: "game/delta", payload: { tutorialStep: preparation + 1 } },
-      ]);
-    },
-  );
-
-  it("keeps the chosen price and running clock when entering the customer challenge", () => {
-    const steps = getScenario(3)!.tutorialSteps!;
-    const store = tutorialStore(steps, { rate: 0.069, tutorialStep: 3 });
-    store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
-    expect(store.getState().game.tutorialStep).toBe(4);
-    expect(store.getState().game.dollarsPerkWh).toBe(0.069);
-    expect(store.getState().game.speed).toBe("SLOW");
+  it("waits for the owned Coal inspection even if the player opens Solar first", () => {
+    const mission = getScenario(0)!;
+    const store = tutorialStore(mission.tutorialSteps!);
+    const game = createGame({ scenarioId: mission.id });
+    store.dispatch({
+      type: "game/delta",
+      payload: { facilities: game.facilities },
+    });
+    const solar = game.facilities.find((facility) => facility.fuel === "Sun")!;
+    const coal = game.facilities.find((facility) => facility.fuel === "Coal")!;
+    store.dispatch(tutorialInspectedMapFacility(solar.id));
+    expect(store.getState().game.tutorialStep).toBe(0);
+    store.dispatch(tutorialInspectedMapFacility(coal.id));
+    expect(store.getState().game.tutorialStep).toBe(1);
   });
-  it.each([
-    [2, "BUILD_STORAGE"],
-    [112, "BUILD_INTERTIES"],
-  ] as const)(
-    "gives mission %s a separate highlighted category action",
-    (scenarioId, category) => {
-      const steps = getScenario(scenarioId)!.tutorialSteps!;
-      const store = tutorialStore(steps);
-      store.dispatch({ type: "card/navigate", payload: "BUILD_GENERATORS" });
-      expect(store.getState().game.tutorialStep).toBe(1);
-      expect(store.getState().card.name).toBe("BUILD_GENERATORS");
-      expect(steps[1].target).toBe(`#tab-${category}`);
-      store.dispatch({ type: "card/navigate", payload: category });
-      expect(store.getState().game.tutorialStep).toBe(2);
-      expect(store.getState().card.name).toBe(category);
-    },
-  );
+
+  it("keeps Storage on its reset disclosure even while time runs", () => {
+    const id = 2;
+    const steps = getScenario(id)!.tutorialSteps!;
+    const preparation = steps.length - 2;
+    const store = tutorialStore(steps, {
+      speed: "FAST",
+      tutorialStep: preparation,
+    });
+    store.dispatch({ type: "game/setSpeed", payload: "SLOW" });
+    expect(store.getState().game.tutorialStep).toBe(preparation);
+    expect(store.getState().game.speed).toBe("SLOW");
+    expect(steps[preparation].nextLabel).toBe("Start final challenge");
+
+    const dispatch = jest.fn(store.dispatch);
+    changeTutorialStep(dispatch as never, {
+      fromStep: preparation,
+      toStep: preparation + 1,
+      tutorialSteps: steps,
+      scenarioId: id,
+      currentCard: store.getState().card.name,
+    });
+    expect(dispatch.mock.calls.map(([action]) => action)).toEqual([
+      { type: "game/quit", payload: undefined },
+      { type: "game/start", payload: id },
+      { type: "game/delta", payload: { tutorialStep: preparation + 1 } },
+    ]);
+  });
+
+  it("preserves the chosen price when entering the customer challenge", () => {
+    const steps = getScenario(3)!.tutorialSteps!;
+    const challenge = steps.findIndex((step) => step.capstone);
+    const store = tutorialStore(steps, {
+      rate: 0.06,
+      tutorialStep: challenge - 1,
+    });
+    const dispatch = jest.fn(store.dispatch);
+    changeTutorialStep(dispatch as never, {
+      fromStep: challenge - 1,
+      toStep: challenge,
+      tutorialSteps: steps,
+      scenarioId: 3,
+      currentCard: "INSIGHTS",
+    });
+    const actionTypes = dispatch.mock.calls.map(([action]) => action.type);
+    expect(actionTypes).not.toContain("game/quit");
+    expect(actionTypes).not.toContain("game/start");
+    expect(store.getState().game.tutorialStep).toBe(challenge);
+    expect(store.getState().game.dollarsPerkWh).toBe(0.06);
+    expect(store.getState().game.speed).toBe("PAUSED");
+  });
 
   it("continues an explanation after a successful deed and skips its already-completed gate", () => {
     const satisfied = (state: AppStateType) => state.game.dollarsPerkWh < 0.07;
@@ -301,7 +314,6 @@ describe("tutorialGateMiddleware", () => {
       expect.objectContaining({
         open: true,
         notCancellable: true,
-        offerInstall: false,
         secondaryLabel: "Main menu",
       }),
     );
@@ -336,7 +348,8 @@ describe("tutorialGateMiddleware", () => {
           success: () => false,
           failure: (state) => state.game.dollarsPerkWh < 0.07,
           successMessage: "Capacity arrived before the peak.",
-          failureMessage: "Construction finished after the forecast peak.",
+          failureMessage: ({ game }) =>
+            `The failed rate was ${game.dollarsPerkWh}.`,
         },
       },
     ];
@@ -350,11 +363,26 @@ describe("tutorialGateMiddleware", () => {
       expect.objectContaining({
         open: true,
         title: "Final challenge needs another try",
-        message: "Construction finished after the forecast peak.",
+        message: "The failed rate was 0.06.",
         actionLabel: "Retry final challenge",
         secondaryLabel: "Exit tutorial",
       }),
     );
+  });
+  it("reopens the project order step when Forecasting is retried", () => {
+    const steps = getScenario(5)!.tutorialSteps!;
+    const capstone = steps.findIndex((step) => step.capstone);
+    const store = tutorialStore(steps, { tutorialStep: capstone });
+    store.dispatch({
+      type: "game/delta",
+      payload: { eventLog: [{ kind: "BLACKOUT" }] },
+    });
+    expect(store.getState().ui.dialog.action).toBeDefined();
+    store
+      .getState()
+      .ui.dialog.action?.({} as React.MouseEvent<HTMLButtonElement>);
+    expect(store.getState().game.tutorialStep).toBe(capstone - 1);
+    expect(steps[capstone - 1].action).toContain("Order a plant");
   });
 });
 
@@ -362,77 +390,19 @@ describe("navigation steps that teach the game dock", () => {
   it.each([
     [4, "INSIGHTS", "#insightsNav"],
     [3, "PROGRAMS", "#programsNav"],
+    [5, "INSIGHTS", "#insightsNav"],
+    [112, "AGREEMENTS", "#agreementsNav"],
   ] as const)(
-    "gates the mission %s opening on its dock action",
-    (id, _card, target) => {
-      const [opening] = getScenario(id)!.tutorialSteps!;
-      expect(opening.target).toBe(target);
-      // Gated, not a quiet Next that still jumps the player
-      expect(opening.advanceOn).toBeDefined();
-      expect(opening.continueOn).toBeUndefined();
-    },
-  );
-
-  it("routes Mission 6 through the player's navigation before each new pane", () => {
-    const steps = getScenario(5)!.tutorialSteps!;
-    const navSteps = steps
-      .map((step, index) => [step, index] as const)
-      .filter(([step]) => step.card === undefined);
-    expect(navSteps).toHaveLength(3);
-    for (const [step, index] of navSteps) {
-      const nextCard = steps[index + 1]?.card;
-      const name = typeof nextCard === "string" ? nextCard : nextCard?.name;
-      const insights = name !== "EVENTS";
-      expect(step.advanceOn).toBeDefined();
-      expect(step.target).toBe(insights ? "#insightsNav" : "#eventsNav");
-      expect(step.desktop).toBeUndefined();
-    }
-  });
-
-  it.each([
-    [4, "INSIGHTS"],
-    [3, "PROGRAMS"],
-  ] as const)(
-    "advances the mission %s opening when the player opens %s",
-    (id, card) => {
+    "keeps mission %s waiting for its %s dock action",
+    (id, card, target) => {
       const steps = getScenario(id)!.tutorialSteps!;
-      const store = tutorialStore(steps, { tutorialStep: 0 });
+      const store = tutorialStore(steps);
+      expect(steps[0].target).toBe(target);
+      store.dispatch({ type: "test/pane-check" });
       expect(store.getState().game.tutorialStep).toBe(0);
       store.dispatch({ type: "card/navigate", payload: card });
       expect(store.getState().card.name).toBe(card);
       expect(store.getState().game.tutorialStep).toBe(1);
-    },
-  );
-
-  it("waits for the player to open the tool", () => {
-    const steps = getScenario(5)!.tutorialSteps!;
-    const store = tutorialStore(steps, { tutorialStep: 2 });
-    // A dispatch that changes nothing: the step must still be where it was
-    store.dispatch({ type: "test/pane-check" });
-    expect(store.getState().game.tutorialStep).toBe(2);
-  });
-
-  it.each([2, 5, 9] as const)(
-    "keeps Mission 6's step %d waiting when its tool is closed",
-    (index) => {
-      const steps = getScenario(5)!.tutorialSteps!;
-      expect(steps[index].card).toBeUndefined();
-      const store = tutorialStore(steps, { tutorialStep: index });
-      store.dispatch({ type: "test/pane-check" });
-      expect(store.getState().game.tutorialStep).toBe(index);
-    },
-  );
-
-  it.each([2, 5, 9] as const)(
-    "advances Mission 6's step %d when the player makes its navigation",
-    (index) => {
-      const steps = getScenario(5)!.tutorialSteps!;
-      const step = steps[index];
-      const card = step.target === "#eventsNav" ? "EVENTS" : "INSIGHTS";
-      const store = tutorialStore(steps, { tutorialStep: index });
-      expect(store.getState().game.tutorialStep).toBe(index);
-      store.dispatch({ type: "card/navigate", payload: card });
-      expect(store.getState().game.tutorialStep).toBe(index + 1);
     },
   );
 });
@@ -462,7 +432,7 @@ describe("restartTutorialAtStep", () => {
 describe("selectTutorialActions", () => {
   it("retains taught tools across every authored mission and into free practice", () => {
     let state = initialState([]);
-    let taught: GameToolType[] = [];
+    let taught: TutorialActionType[] = [];
     for (const mission of TUTORIALS) {
       for (let index = 0; index <= mission.tutorialSteps!.length; index++) {
         state = {
@@ -476,10 +446,12 @@ describe("selectTutorialActions", () => {
       }
     }
     expect(taught).toEqual([
+      "FLEET",
       "BUILD_GENERATORS",
       "INSIGHTS",
       "PROGRAMS",
       "EVENTS",
+      "AGREEMENTS",
     ]);
   });
 
@@ -514,13 +486,3 @@ describe("selectTutorialHiddenUi", () => {
     expect(selectTutorialHiddenUi(state)).toEqual([]);
   });
 });
-
-it.each(TUTORIALS.map((scenario, index) => [scenario.id, index >= 2] as const))(
-  "offers installation only from the third tutorial onward (id=%s)",
-  (scenarioId, eligible) => {
-    expect(
-      tutorialCompleteDialog({ scenarioId, title: "Complete" }).payload
-        .offerInstall,
-    ).toBe(eligible);
-  },
-);

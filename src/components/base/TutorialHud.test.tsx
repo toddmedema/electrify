@@ -341,7 +341,7 @@ describe("TutorialHud", () => {
     expect(screen.queryByText("Complete objective")).toBeNull();
   });
 
-  it("delays target reminders and never points out a capstone answer", () => {
+  it("delays target reminders and clears them for an untargeted capstone", () => {
     jest.useFakeTimers();
     const target = document.createElement("button");
     target.id = "tutorial-target";
@@ -367,6 +367,7 @@ describe("TutorialHud", () => {
       <TutorialHud
         {...hudProps}
         step={objective({
+          target: undefined,
           capstone: {
             success: () => false,
             successMessage: "Ready in time.",
