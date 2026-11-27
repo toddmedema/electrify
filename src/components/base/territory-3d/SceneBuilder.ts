@@ -416,6 +416,7 @@ export class SceneBuilder {
         instances.push(cell.gridJunction);
         endpoint.gridJunction = cell.gridJunction;
       }
+      const onPlayerGrid = tile.city && view.owned ? true : undefined;
       const waterLevel = tile.city
         ? undefined
         : reservoirFill(view.operatingFacility);
@@ -424,7 +425,8 @@ export class SceneBuilder {
         cell.structure.active !== active ||
         cell.structure.producing !== producing ||
         cell.structure.motionKey !== motionKey ||
-        cell.structure.waterLevel !== waterLevel
+        cell.structure.waterLevel !== waterLevel ||
+        cell.structure.onPlayerGrid !== onPlayerGrid
       )
         cell.structure = {
           id: `structure:${tileKey}`,
@@ -435,6 +437,7 @@ export class SceneBuilder {
           producing,
           motionKey,
           waterLevel,
+          onPlayerGrid,
         };
       instances.push(cell.structure);
     }

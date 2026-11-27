@@ -87,6 +87,76 @@ async function readyDiagnostics(canvas: Locator, scene = false) {
   return diagnostics!;
 }
 
+for (const theme of ["light", "dark"] as const) {
+  test(`city windows follow the served share and stand out at night in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await startPausedMap(page, theme);
+
+    async function resumeAt(minute: number, served: number) {
+      await editSavedGame(page, ({ game }) => {
+        game.date = getDateFromMinute(minute, game.startingYear);
+        game.speed = "PAUSED";
+        for (const tick of game.timeline) tick.supplyW = tick.demandW * served;
+      });
+      await page.goto("/");
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      const map = await returnToTerritoryMap(page);
+      const canvas = map.locator("canvas.territory3DCanvas");
+      await expect(canvas).toHaveAttribute("data-renderer", "ready");
+      const screenshot = await canvas.screenshot({ scale: "css" });
+      return page.evaluate(async (base64) => {
+        const png = Uint8Array.from(atob(base64), (byte) => byte.charCodeAt(0));
+        const bitmap = await createImageBitmap(
+          new Blob([png], { type: "image/png" }),
+        );
+        const context = new OffscreenCanvas(
+          bitmap.width,
+          bitmap.height,
+        ).getContext("2d")!;
+        context.drawImage(bitmap, 0, 0);
+        const pixels = context.getImageData(
+          0,
+          0,
+          bitmap.width,
+          bitmap.height,
+        ).data;
+        bitmap.close();
+        let warm = 0;
+        let brightness = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          const r = pixels[i],
+            g = pixels[i + 1],
+            b = pixels[i + 2];
+          brightness += (r + g + b) / 3;
+          // Count bright amber from illuminated panes, including partially covered pixels.
+          if (r > 155 && r - g > 20 && g - b > 35) warm++;
+        }
+        return { warm, brightness: brightness / (pixels.length / 4) };
+      }, screenshot.toString("base64"));
+    }
+
+    const daytime = await resumeAt(720, 1);
+    const dark = await resumeAt(0, 0);
+    const partial = await resumeAt(0, 0.5);
+    await reviewScreenshot(page, {
+      path: info.outputPath("partial-service.png"),
+    });
+    const restored = await resumeAt(0, 1);
+    await reviewScreenshot(page, { path: info.outputPath("full-service.png") });
+
+    expect(dark.brightness).toBeLessThan(daytime.brightness * 0.65);
+    expect(restored.warm).toBeGreaterThan(dark.warm + 12);
+    expect(
+      (partial.warm - dark.warm) / (restored.warm - dark.warm),
+    ).toBeGreaterThan(0.25);
+    expect(
+      (partial.warm - dark.warm) / (restored.warm - dark.warm),
+    ).toBeLessThan(0.75);
+  });
+}
+
 test("Valley town growth survives resume and adds buildings to the map", async ({
   page,
 }, info) => {
