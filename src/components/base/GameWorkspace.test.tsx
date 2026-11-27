@@ -143,8 +143,9 @@ it.each([390, 1280])(
     await app.user.click(
       within(build).getByRole("button", { name: "Finish purchase" }),
     );
-    if (width < SIDE_TOOL_MIN_WIDTH) expect(build).not.toBeInTheDocument();
-    else expect(build).toBeVisible();
+    expect(!!screen.queryByRole("region", { name: "Build" })).toBe(
+      width >= SIDE_TOOL_MIN_WIDTH,
+    );
     expect(map).toBeVisible();
     expect(notes).toHaveValue("Keep the map state");
   },
