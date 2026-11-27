@@ -431,7 +431,8 @@ a:hover {
   gap: 2rem;
 }
 
-.panel--contact:target {
+.panel--contact:target,
+#comparison-title:target {
   scroll-margin-top: 5.5rem;
 }
 

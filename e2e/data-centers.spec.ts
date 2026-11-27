@@ -336,6 +336,9 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   const before = (await savedGame(page))!;
   expect(before.inGame).toBe(true);
   expect(before.speed).toBe("PAUSED");
+  // Focus the dialog itself so Space tests the game shortcut without activating a button.
+  await intro.focus();
+  await expect(intro).toBeFocused();
   for (const key of ["1", "3", "Space", "q", "w", "g", "?"])
     await page.keyboard.press(key);
   await expect(intro).toBeVisible();
