@@ -1781,7 +1781,7 @@ describe("Insights layers", () => {
     expect(
       within(exchange).getByRole("button", { name: "What is Power exchange?" }),
     ).toBeVisible();
-    expect(within(exchange).queryByText("How agreements work")).toBeNull();
+    expect(within(exchange).queryByText("How power trading works")).toBeNull();
     expect(localStorage.getItem("insightsLayers")).toBe(
       JSON.stringify(["cash", "supplyDemand"]),
     );

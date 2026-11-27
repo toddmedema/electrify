@@ -1124,12 +1124,25 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Open{" "}
+          On the 3D map, open{" "}
           <GameNavigationLabel destination="AGREEMENTS">
             Agreements
           </GameNavigationLabel>{" "}
-          to review your power purchase agreements and available offers. A
-          regional connection carries power. An agreement sets the pricing,
+          to review your power purchase agreements and available offers. In
+          co-op on the map, set buying and selling under{" "}
+          <strong>Co-op power sharing</strong>.
+        </p>
+        <p>
+          In scenarios where{" "}
+          <GameNavigationLabel destination="BUILD_GENERATORS">
+            Build
+          </GameNavigationLabel>{" "}
+          offers regional connections, compare their costs and capacities there.
+          Once a connection is operating, set buying and selling alongside your
+          connections.
+        </p>
+        <p>
+          A regional connection carries power. An agreement sets the pricing,
           capacity and dates for part of what you can buy through that
           connection. Contracted supply serves your customers before market
           purchases.
@@ -1143,12 +1156,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           purchases.
         </p>
         <p>
-          In co-op, use <strong>Co-op power sharing</strong> in Agreements to
-          set buying and selling separately. <strong>Shortages only</strong>{" "}
-          buys for unmet customer demand. <strong>Shortages + Charging</strong>{" "}
-          also allows market purchases to charge utility storage, after players'
-          customer shortages have priority. Choose <strong>None</strong> to stop
-          optional purchases while keeping contracted supply available.
+          <strong>Shortages only</strong> buys for unmet customer demand.{" "}
+          <strong>Shortages + Charging</strong> also allows market purchases to
+          charge utility storage after customer demand is met. Choose{" "}
+          <strong>None</strong> to stop optional purchases while keeping
+          contracted supply available.
         </p>
         <p>
           <strong>Surplus only</strong> sells electricity left after serving

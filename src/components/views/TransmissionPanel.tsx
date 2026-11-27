@@ -1591,7 +1591,7 @@ export default function TransmissionPanel({
       {projectsOnly && (
         <ManualLink
           entry={MANUAL_ENTRY.AGREEMENTS}
-          text="How agreements work"
+          text="How power trading works"
         />
       )}
       {cancelLine && (
