@@ -1989,6 +1989,12 @@ export interface CoopSelectionType {
   /** Host only: this computer has multiplayer saves to load instead. */
   hasSaves?: boolean;
 }
+/** One request to center the map on a tile, its affected fleet, or the home grid. */
+export interface MapFocusTarget {
+  tileId?: TerritoryTileId;
+  facilityIds?: number[];
+}
+
 export interface UIType {
   feedback?: import("./Feedback").FeedbackContext;
   /** Set while this player chooses a co-op game together with their lobby. */
@@ -2001,6 +2007,7 @@ export interface UIType {
   // The Insights date range outlives the pane, which unmounts when a narrow layout switches cards.
   insightsViewport?: { viewport: [number, number]; month: number };
   evidenceRequest?: EvidenceRequestType;
+  mapFocus?: MapFocusTarget;
   evidenceSequence?: number;
   evidenceRunId?: number;
   manualHelpEntry?: string;

@@ -26,7 +26,8 @@ import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
 import { readMapWeather } from "../base/territory-3d/MapWeather";
 import WeatherAtmosphere from "../base/territory-3d/WeatherAtmosphere";
-import { useAppSelector } from "../../Store";
+import { useAppDispatch, useAppSelector } from "../../Store";
+import { setMapFocus } from "../../reducers/UI";
 import {
   citySizeLabel,
   formatTerrainPercent,
@@ -194,6 +195,8 @@ export default function TerritoryHexMap({
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
+  const dispatch = useAppDispatch();
+  const mapFocus = useAppSelector((state) => state.ui?.mapFocus);
   const runId = useAppSelector((state) => state.ui?.evidenceRunId);
   const { formatPurchasePrice: money } = useMoney();
   const { pendingIds, availableCash, message, purchase } =
@@ -564,6 +567,65 @@ export default function TerritoryHexMap({
     byKey,
     views,
     setCamera,
+  ]);
+  React.useLayoutEffect(() => {
+    if (!mapFocus || !size.width || !size.height || !homeTile) return;
+    // Let an old inspector restore its focus before moving the camera to the news.
+    if (
+      !projectPending &&
+      onDeselect &&
+      (selected || inspected || projectPlanning)
+    ) {
+      onDeselect();
+      return;
+    }
+    const affected = views.filter(
+      ({ tile, operatingFacility }) =>
+        tile.id === mapFocus.tileId ||
+        (operatingFacility &&
+          mapFocus.facilityIds?.includes(operatingFacility.id)),
+    );
+    const points = affected.length
+      ? affected.map(({ tile }) => hexCenter(tile))
+      : [hexCenter(homeTile)];
+    const xs = points.map(({ x }) => x);
+    const ys = points.map(({ y }) => y);
+    const left = Math.min(...xs);
+    const right = Math.max(...xs);
+    const top = Math.min(...ys);
+    const bottom = Math.max(...ys);
+    const minZoom = MIN_TILE_TARGET_HEIGHT / (HEX_HEIGHT * baseScale);
+    const fit =
+      Math.min(
+        size.width / (right - left + 2 * HEX_WIDTH),
+        size.height / (bottom - top + 2 * HEX_HEIGHT),
+      ) / baseScale;
+
+    dispatch(setMapFocus(undefined));
+    clearHover();
+    setBuyMode(false);
+    setCamera({
+      x: (left + right) / 2,
+      y: (top + bottom) / 2,
+      zoom: Math.min(camera.getZoom(), Math.max(minZoom, fit)),
+    });
+    viewport.current?.focus({ preventScroll: true });
+  }, [
+    baseScale,
+    camera,
+    clearHover,
+    dispatch,
+    homeTile,
+    inspected,
+    mapFocus,
+    onDeselect,
+    projectPending,
+    projectPlanning,
+    selected,
+    setCamera,
+    size.height,
+    size.width,
+    views,
   ]);
   React.useLayoutEffect(() => {
     const element = viewport.current;
@@ -1092,6 +1154,7 @@ export default function TerritoryHexMap({
         role="region"
         aria-label={regional ? "Regional map" : "Territory map"}
         data-camera-scale={scale}
+        tabIndex={-1}
         ref={viewport}
         onDragOver={(event) => {
           if (!onProjectDrop) return;
