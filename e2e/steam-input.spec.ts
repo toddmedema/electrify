@@ -1932,6 +1932,11 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(
       page.getByRole("button", { name: "Build", exact: true }),
     ).toBeFocused();
+    await select(
+      page,
+      page.getByRole("button", { name: "Fleet", exact: true }),
+    );
+    await input(page, "confirm");
     await capture("fleet");
     const inspect = page.getByRole("button", {
       name: "Inspect Coal",
@@ -1939,6 +1944,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     });
     await select(page, inspect);
     await input(page, "confirm");
+    await expect(inspect).toHaveAttribute("aria-expanded", "true");
     await capture("fleet-expanded");
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });
