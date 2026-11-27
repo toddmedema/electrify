@@ -353,6 +353,7 @@ html:has(
   background: var(--bg-raised);
   box-shadow: none;
   overflow-x: auto;
+  touch-action: pan-x;
   .gameDockAction.MuiButton-root {
     flex: 1 0 max(44px, 2.75rem);
     min-width: max(44px, 2.75rem);
