@@ -25,9 +25,9 @@ async function startGame(
   );
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect(page.locator(".gameMapStage .facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   await page.keyboard.press("0");
-  await expect(page.locator(".facilities > .paneHeader")).toHaveCount(0);
+  await expect(page.locator("#mapPane > .paneHeader")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Facilities", exact: true }),
   ).toHaveCount(0);
@@ -1094,7 +1094,7 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(build).toBeVisible();
   await page.getByRole("button", { name: "Close Build", exact: true }).click();
   await expect(build).toHaveCount(0);
-  await expect(page.locator(".gameMapStage .facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
 });
 
 test("desktop map windows restore after narrowing around the active tool", async ({

@@ -496,7 +496,7 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await page
       .getByRole("button", { name: "pause", exact: true })
       .first()
@@ -518,7 +518,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await page
       .getByRole("button", { name: "normal speed", exact: true })
       .first()
@@ -616,7 +616,7 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start campaign", exact: true })
         .click();
-      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expect(page.locator("#mapPane")).toBeVisible();
       await page
         .getByRole("button", { name: "pause", exact: true })
         .first()
@@ -679,7 +679,7 @@ test("a later-generation URL opens campaign setup instead of a fresh successor c
   await page
     .getByRole("button", { name: "Start campaign", exact: true })
     .click();
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   const game = await readSavedGame(page);
   expect(game?.scenarioId).toBe(117);
   expect(game?.startingYear).toBe(1882);

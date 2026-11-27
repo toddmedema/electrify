@@ -335,9 +335,16 @@ html:has(
   display: none !important;
 }
 
-// Reserve one bottom edge across the map. The background separates the actions
-// from the terrain without an additional border or inset shadow.
+// The phone dock sits below the map, with a single edge between their surfaces.
+.gameWorkspace[data-compact-dock="true"] {
+  --game-dock-clearance: 12px;
+}
 .gameWorkspace[data-compact-dock="true"] #navfooter.gameActionDock {
+  position: relative;
+  flex: 0 0 auto;
+  bottom: auto;
+  left: auto;
+  transform: none;
   width: 100%;
   max-width: 100%;
   padding: 4px env(safe-area-inset-right)
@@ -379,7 +386,7 @@ html:has(
     min-width: 0;
     min-height: 0;
 
-    > .facilities {
+    > .pane {
       height: 100%;
     }
   }

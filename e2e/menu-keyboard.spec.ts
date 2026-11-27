@@ -401,7 +401,7 @@ test("global shortcuts keep shifted fleet actions and manual typing separate", a
   await expect(search).toHaveValue("q?123");
   await search.press("Escape");
   await expect(search).toHaveCount(0);
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(page.locator("#facilitiesPane")).toBeVisible();
   await expect(paused).toHaveAttribute("aria-pressed", "true");
 });
 

@@ -19,7 +19,7 @@ const entry = (page: Page) =>
   page.getByRole("button", { name: "Play with friends", exact: true });
 const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
-const grid = (page: Page) => page.locator(".facilities:visible");
+const grid = (page: Page) => page.locator("#mapPane");
 
 type MultiplayerWindow = Window & {
   observedRoomView?: RoomView;

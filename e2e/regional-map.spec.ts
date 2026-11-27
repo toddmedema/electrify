@@ -174,7 +174,7 @@ test("map layers align with the desktop dock and clear the flush phone dock", as
   if (width < 700) {
     expect(dockBox!.x).toBeCloseTo(mapBox!.x);
     expect(right(dockBox!)).toBeCloseTo(right(mapBox!));
-    expect(bottom(dockBox!)).toBeCloseTo(bottom(mapBox!));
+    expect(dockBox!.y).toBeCloseTo(bottom(mapBox!));
     expect(dockBox!.y - bottom(layersBox!)).toBeGreaterThanOrEqual(8);
     await expect(dock).toHaveCSS("border-top-width", "0px");
     await expect(dock).toHaveCSS("box-shadow", "none");

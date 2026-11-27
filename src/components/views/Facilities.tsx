@@ -1366,7 +1366,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
 
     return (
       <GameCard
-        className="facilities"
+        className={showFleet ? "facilities" : undefined}
         id={this.props.paneId ?? "facilitiesPane"}
       >
         <>

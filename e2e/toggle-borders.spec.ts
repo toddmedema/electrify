@@ -191,7 +191,7 @@ for (const theme of ["light", "dark"]) {
       animations: "disabled",
     });
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(page.locator(".gameStage .facilities")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await page.mouse.move(0, 0);
     const blue = theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)";
     const supportsHover = await page.evaluate(

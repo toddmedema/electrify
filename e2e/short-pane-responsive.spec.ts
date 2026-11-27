@@ -18,15 +18,15 @@ test("a live resize switches tablet, foldable and desktop game controls", async 
   const goals = events.getByRole("heading", { name: "Goals", exact: true });
   const ultra = page.getByRole("button", { name: "ultra speed", exact: true });
 
-  for (const [width, height, layout, operations, wide] of [
-    [768, 1024, "single", false, false],
-    [844, 690, "single", true, false],
-    [1280, 800, "side", true, false],
-    [1440, 900, "side", true, true],
-    [768, 1024, "single", false, false],
+  for (const [width, height, operations, wide] of [
+    [768, 1024, false, false],
+    [844, 690, true, false],
+    [1280, 800, true, false],
+    [1440, 900, true, true],
+    [768, 1024, false, false],
   ] as const) {
     await page.setViewportSize({ width, height });
-    await expect(stage).toHaveAttribute("data-layout", layout);
+    await expect(stage).toHaveAttribute("data-layout", "map");
     if (wide) await expect(ultra).toBeVisible();
     else await expect(ultra).toHaveCount(0);
 
@@ -41,7 +41,7 @@ test("a live resize switches tablet, foldable and desktop game controls", async 
     await expect(history).toBeInViewport();
     await eventsButton.click();
     await expect(events).toBeHidden();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
   }
 });
 

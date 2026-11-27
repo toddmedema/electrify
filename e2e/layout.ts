@@ -350,7 +350,7 @@ export async function openBuild(page: Page): Promise<Locator> {
 
 /** Select Fleet when the game opens on its map, then bring the fleet into view. */
 export async function openFleet(page: Page): Promise<Locator> {
-  const fleet = page.locator("#facilitiesPane");
+  const fleet = page.locator("#facilitiesPane:not([inert] *)");
   const action = page.getByRole("button", { name: "Fleet", exact: true });
   await openPane(fleet, action);
   if (
