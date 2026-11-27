@@ -135,9 +135,15 @@ async function saveAndResume(
   await resume.click();
   for (const player of [host, guest])
     await expect(clock(player)).toHaveAttribute("data-active-speed", "PAUSED");
-  const resumed = await fixture.checkpoint();
-  expect(resumed?.matchId).toBe(confirmed?.matchId);
-  expect(resumed?.epoch).not.toBe(confirmed?.epoch);
+  // The resumed match saves under a new epoch; it is the same match.
+  await expect
+    .poll(() => {
+      const resumed = fixture.checkpoint();
+      return resumed && resumed.epoch !== confirmed?.epoch
+        ? resumed.matchId
+        : undefined;
+    })
+    .toBe(confirmed?.matchId);
 }
 
 for (const steamHost of [false, true]) {

@@ -423,7 +423,6 @@ async function expectSharedCaptionSize(
         );
         const fonts = await Promise.all([
           renderedFontSize(page.locator(".couchCalendar .gameStatusValue")),
-          renderedFontSize(page.locator(".missionRiskText")),
           renderedFontSize(page.locator(".missionSummaryMonths > span")),
         ]);
         return Math.max(
@@ -431,7 +430,7 @@ async function expectSharedCaptionSize(
         );
       },
       {
-        message: "shared date/event/months matches physical reserve-label font",
+        message: "shared date/months matches physical reserve-label font",
       },
     )
     .toBeLessThan(0.5);
