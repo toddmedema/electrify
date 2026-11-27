@@ -492,6 +492,17 @@ for (const count of [2, 3, 4]) {
       await expect(clock(host)).toHaveAccessibleDescription(
         /SolarSam \(you\) selected 24×/,
       );
+      if (!info.project.use.isMobile && buyer.viewportSize()!.width >= 1024) {
+        const rail = territorialMap(buyer).getByRole("complementary", {
+          name: "Build facilities",
+        });
+        await rail.getByRole("button", { name: "Build", exact: true }).click();
+        const build = buyer.getByRole("region", { name: "Build", exact: true });
+        await expect(build).toHaveAttribute("data-resizable", "true");
+        await build
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
+      }
       const buyerGame = (await projection(buyer))!.game!;
       const before = buyerGame.facilities.length;
       const site = multiplayerTerritoryTiles(buyerGame).find(

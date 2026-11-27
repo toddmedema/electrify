@@ -127,15 +127,15 @@ test("map notifications follow the full desktop header and clear the compact doc
   await expectBelowHeader();
 });
 
-for (const side of [false, true]) {
-  test(`purchases ${side ? "keep the Build window open" : "close the compact Build panel"}`, async ({
+for (const floating of [false, true]) {
+  test(`purchases ${floating ? "keep the Build window open" : "close the compact Build panel"}`, async ({
     page,
   }, info) => {
     test.skip(
-      side && !!info.project.use.hasTouch,
-      "Side-panel coverage uses the desktop project",
+      floating && !!info.project.use.hasTouch,
+      "Floating window coverage uses the desktop project",
     );
-    const width = side
+    const width = floating
       ? 1300
       : info.project.use.hasTouch
         ? page.viewportSize()!.width
@@ -166,7 +166,7 @@ for (const side of [false, true]) {
         .getByRole("button", { name: "Take loan", exact: true })
         .click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
-      if (side) {
+      if (floating) {
         await expect(build).toBeVisible();
         await build
           .getByRole("button", { name: "Close Build", exact: true })

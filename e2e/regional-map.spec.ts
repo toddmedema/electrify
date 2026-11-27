@@ -99,9 +99,11 @@ test("regional map starts with two connected sites and keeps Fleet and intertie 
     path: info.outputPath("connected-opening-site.png"),
     animations: "disabled",
   });
-  await site.getByRole("button", { name: "Build", exact: true }).click();
+  await site.getByRole("button", { name: "Build", exact: true }).press("Enter");
   const build = page.getByRole("region", { name: "Build", exact: true });
-  await expect(build).toBeVisible();
+  await expect(
+    build.getByRole("heading", { name: "Build", exact: true }),
+  ).toBeFocused();
   await build.getByRole("tab", { name: "Interties", exact: true }).click();
   await expect(
     build.getByRole("button", {

@@ -64,7 +64,7 @@ export default function MapWorkspace({
   const [rememberedBuildCategory, setBuildCategory] =
     React.useState<typeof card.name>("BUILD_GENERATORS");
   const buildCategory = building ? card.name : rememberedBuildCategory;
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     if (building) setBuildCategory(card.name);
   }, [building, card.name]);
   const [projectBusy, setProjectBusy] = React.useState(false);
