@@ -43,14 +43,18 @@ export function getDataCenterPowerMix(
   location: LocationType,
   startingYear = new Date().getFullYear(),
 ): DataCenterPowerMix {
+  const admin = location.admin || "";
   const state =
-    location.country === "United States"
-      ? states[location.admin || ""]
+    location.country === "United States" && Object.hasOwn(states, admin)
+      ? states[admin]
       : undefined;
   const country =
     location.admin === "Puerto Rico" ? "Puerto Rico" : location.country || "";
-  const scope = state ? "state" : countries[country] ? "country" : "world";
-  const years = state?.years || countries[country] || countries.World;
+  const countryYears = Object.hasOwn(countries, country)
+    ? countries[country]
+    : undefined;
+  const scope = state ? "state" : countryYears ? "country" : "world";
+  const years = state?.years || countryYears || countries.World;
   const available = Object.keys(years)
     .map(Number)
     .filter((year) => years[year].some((value) => value > 0))

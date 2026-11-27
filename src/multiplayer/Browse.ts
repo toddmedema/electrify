@@ -1,4 +1,4 @@
-import { DIFFICULTY_IDS } from "../Constants";
+import { COOP_CUSTOM_FACILITY_LIMIT, DIFFICULTY_IDS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, getScenario } from "../data/Scenarios";
 import { storyHash } from "../data/WorldEvents";
 import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
@@ -19,8 +19,6 @@ export const BROWSE_CARDS = [
   "MODS",
 ] as const;
 export type BrowseCard = (typeof BROWSE_CARDS)[number];
-
-const MAX_CUSTOM_FACILITIES = 40;
 
 /** What the host is looking at, mirrored to every guest. The host is its only author. */
 export interface BrowseState {
@@ -100,7 +98,7 @@ function validCustom(value: unknown): value is ScenarioType {
     finite(custom.cash) &&
     finite(custom.dollarsPerkWh) &&
     Array.isArray(custom.facilities) &&
-    custom.facilities.length <= MAX_CUSTOM_FACILITIES &&
+    custom.facilities.length <= COOP_CUSTOM_FACILITY_LIMIT &&
     isValidLocation(getScenarioLocation(custom))
   );
 }

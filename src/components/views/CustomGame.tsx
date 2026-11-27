@@ -894,7 +894,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
               {scenario.startingFleetSource === "regional" ? (
                 <Typography variant="caption" color="textSecondary">
                   Starting facilities follow the regional capacity mix until you
-                  edit the fleet.
+                  edit the fleet. Where available fuels cannot fill the grid,
+                  the model may substitute gas backup.
                 </Typography>
               ) : (
                 <Button

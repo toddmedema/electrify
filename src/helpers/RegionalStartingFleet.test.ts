@@ -5,7 +5,14 @@ import {
 } from "../data/DataCenterPowerMix";
 import { DEFAULT_CUSTOM_SCENARIO, getScenario } from "../data/Scenarios";
 import { HYDRO_SITES } from "../data/HydroSites";
-import { getSimLocation, loadSimData } from "../testing/SimData";
+import { browseSpec, validBrowseState } from "../multiplayer/Browse";
+import { createWorld } from "../multiplayer/World";
+import { coopSeats } from "../testing/MultiplayerFixtures";
+import {
+  getSimLocation,
+  loadSimData,
+  simLocationIds,
+} from "../testing/SimData";
 import { forecastCustomGameYearOne } from "./CustomGameForecast";
 import {
   regionalStartingFleet,
@@ -99,4 +106,71 @@ it("uses the available resources of hydro-heavy and hydro-constrained locations"
       ({ fuel }) => fuel === "Hydro",
     ),
   ).toBe(false);
+});
+
+function largeCustomSetup(id: string, startingYear: number) {
+  const location = getSimLocation(id)!;
+  return withRegionalStartingFleet({
+    ...DEFAULT_CUSTOM_SCENARIO,
+    locationId: location.id,
+    location,
+    startingYear,
+    startingCustomers: 5_000_000,
+  });
+}
+
+it("starts a large Vienna fleet from the co-op lobby selection", () => {
+  const custom = largeCustomSetup("Vienna", 2010);
+  const setup = {
+    session: "regional-test",
+    revision: 1,
+    phase: "browsing",
+    card: "CUSTOM_GAME",
+    difficulty: "Intern",
+    custom,
+  } as const;
+  expect(validBrowseState(setup)).toBe(true);
+  const hydroSites = custom.facilities.flatMap(({ hydroSiteId }) =>
+    hydroSiteId ? [hydroSiteId] : [],
+  );
+  expect(hydroSites[0]).toBe("orl-k-cze");
+  loadSimData(custom.location!);
+  const world = createWorld(browseSpec(setup)!, coopSeats(2), "test", "epoch");
+  expect(world.grids.map(({ facilities }) => facilities.length)).toEqual([
+    custom.facilities.length,
+    custom.facilities.length,
+  ]);
+});
+
+it("covers constrained opening capacity using local fuels or modeled backup", () => {
+  const { facilities: paraguay } = largeCustomSetup("Asuncion", 2020);
+  expect(
+    paraguay.reduce((total, { peakW }) => total + (peakW ?? 0), 0),
+  ).toBeGreaterThan(4.49e9);
+  expect(
+    paraguay.every(({ fuel }) => fuel === "Oil" || fuel === "Biomass"),
+  ).toBe(true);
+  const { facilities: laos } = largeCustomSetup("Vientiane", 2010);
+  expect(laos).toMatchObject([
+    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 4.5e9 },
+  ]);
+});
+
+it("opens a nonempty co-op-ready fleet across the selectable location catalogue", () => {
+  for (const id of simLocationIds()) {
+    for (const year of [1980, 2000, 2010, 2020, 2050, 2100]) {
+      const custom = largeCustomSetup(id, year);
+      expect(custom.facilities.length).toBeGreaterThan(0);
+      expect(
+        validBrowseState({
+          session: "regional-test",
+          revision: 1,
+          phase: "browsing",
+          card: "CUSTOM_GAME",
+          difficulty: "Intern",
+          custom,
+        }),
+      ).toBe(true);
+    }
+  }
 });

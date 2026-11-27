@@ -106,9 +106,13 @@ San Francisco default a comparable opening reserve after introducing intermitten
 plants. The Year 1 outlook reports any shortfall from the selected weather,
 load and fleet. Before the first observation, custom setup uses the earliest
 observation as an illustrative mix and filters unavailable technologies by start
-year. Named hydro sites limit local hydro capacity. Editing the fleet keeps
-the player's selections until they select **Use regional fleet**. Data Center
-mode sizes its portfolio against the opening load in the simulation.
+year. Custom setup takes the largest eligible named hydro sites first and leaves
+room for the other fuels within the 40-facility co-op setup limit. Capacity the
+game cannot represent is distributed among available non-hydro fuels in their
+observed proportions. If none are available, a modeled gas peaker supplies the
+remaining nameplate budget. Editing the fleet keeps the player's selections until
+they select **Use regional fleet**. Data Center mode sizes its portfolio against
+the opening load in the simulation.
 
 Heatwave + Drought, Sudden Nuclear Shutdown, Wildfire Emergency, Load Shedding
 and Delhi Summer apply their opening-year wind and solar proportions to a fixed

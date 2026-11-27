@@ -101,3 +101,23 @@ test("unknown places are explicitly world scope, and Puerto Rico has its own mix
   ).toBe("world");
   expect(getDataCenterPowerMix(LOCATIONS.SJU).geography).toBe("Puerto Rico");
 });
+
+test.each(["constructor", "__proto__", "toString"])(
+  "unknown country or state %s falls back to the available observation",
+  (name) => {
+    const world = getDataCenterPowerMix(
+      { ...LOCATIONS.SF, country: "Unknown" },
+      2020,
+    );
+    const country = getDataCenterPowerMix(
+      { ...LOCATIONS.SF, admin: undefined },
+      2020,
+    );
+    expect(
+      getDataCenterPowerMix({ ...LOCATIONS.SF, country: name }, 2020),
+    ).toEqual(world);
+    expect(
+      getDataCenterPowerMix({ ...LOCATIONS.SF, admin: name }, 2020),
+    ).toEqual(country);
+  },
+);
