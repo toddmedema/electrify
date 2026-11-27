@@ -169,13 +169,16 @@ export default function MapWorkspace({
               ],
             },
       );
-      // A stacked tool can be brought forward without navigating or changing browser history.
-      if (isDockTool(item) && item !== active && stack.windows.includes(item)) {
-        dispatch(tutorialRaisedMapTool(item));
-      }
     },
-    [active, dispatch, floating, stack.windows],
+    [floating],
   );
+  // A deliberate request to see an existing tool counts as selecting it. Pointer
+  // and focus capture also raise windows, including when their Close button is used.
+  const selectOpenTool = (tool: MapTool) => {
+    if (!floating || tool === active) return;
+    raise(tool);
+    dispatch(tutorialRaisedMapTool(tool));
+  };
   const focusHeading = React.useCallback((item: MapWindow) => {
     workspace.current
       ?.querySelector<HTMLElement>(`#tool-${item} .gameToolTitle`)
@@ -189,7 +192,7 @@ export default function MapWorkspace({
     }
     if (tool !== "BUILD_GENERATORS" && openPanels.includes(tool)) {
       if (floating && tool !== active) {
-        raise(tool);
+        selectOpenTool(tool);
         focusHeading(tool);
       } else close(tool);
     } else dispatch(navigate(tool));
@@ -332,7 +335,7 @@ export default function MapWorkspace({
                       territoryView="FACILITIES"
                       onTerritoryView={(view) => {
                         if (view !== "FACILITIES" && openPanels.includes(view))
-                          raise(view);
+                          selectOpenTool(view);
                         else dispatch(navigate(view));
                       }}
                     />

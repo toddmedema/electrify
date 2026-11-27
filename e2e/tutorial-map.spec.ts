@@ -236,16 +236,7 @@ test("Mission 6 · read a shortage forecast and finish a new generator", async (
   await complete(page);
 });
 
-test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
-  page,
-}) => {
-  await startMission(page, 112);
-  const floating = page.viewportSize()!.width >= 1024;
-  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
-  if (floating) {
-    await action(page, "Fleet");
-    await expect(fleet).toHaveAttribute("data-map-window-front", "true");
-  }
+async function signValleyAgreement(page: Page) {
   await action(page, "Agreements");
   await page
     .getByRole("button", {
@@ -262,6 +253,55 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     .getByRole("button", { name: "Accept agreement", exact: true })
     .click();
   await goal(page, "Open Fleet to see power flows");
+}
+
+test("closing a tool keeps Agreements waiting for Fleet selection", async ({
+  page,
+}) => {
+  await startMission(page, 112);
+  const floating = page.viewportSize()!.width >= 1024;
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const agreements = page.getByRole("region", {
+    name: "Agreements",
+    exact: true,
+  });
+  if (floating) {
+    await action(page, "Fleet");
+    // Leave Fleet's Close button exposed when Agreements comes to the front.
+    const title = fleet.getByRole("heading", { name: "Fleet", exact: true });
+    const box = (await title.boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 480, y, { steps: 5 });
+    await page.mouse.up();
+  }
+  await signValleyAgreement(page);
+  if (floating) {
+    await expect(fleet).toHaveAttribute("data-map-window-front", "false");
+    await fleet.getByRole("button", { name: "Close Fleet" }).click();
+    await expect(agreements).toHaveAttribute("data-map-window-front", "true");
+  } else {
+    await agreements.getByRole("button", { name: "Close Agreements" }).click();
+  }
+  await expect(fleet).toHaveCount(0);
+  await goal(page, "Open Fleet to see power flows");
+  await action(page, "Fleet");
+  await goal(page, "Run the clock until your grid imports power");
+});
+
+test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
+  page,
+}) => {
+  await startMission(page, 112);
+  const floating = page.viewportSize()!.width >= 1024;
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  if (floating) {
+    await action(page, "Fleet");
+    await expect(fleet).toHaveAttribute("data-map-window-front", "true");
+  }
+  await signValleyAgreement(page);
   if (floating) {
     await expect(fleet).toHaveAttribute("data-map-window-front", "false");
   } else {
