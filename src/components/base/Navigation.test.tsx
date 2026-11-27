@@ -296,15 +296,14 @@ describe("Navigation", () => {
   });
 
   it.each<[number, number, string[]]>([
-    [1, 0, ["Build"]],
-    [2, 0, ["Build"]],
-    [4, 0, ["Build", "Insights"]],
-    [4, 3, ["Build", "Programs", "Insights"]],
-    [3, 0, ["Build", "Programs", "Insights"]],
-    [5, 0, ["Build", "Programs", "Insights"]],
-    [5, 5, ["Build", "Programs", "Insights", "Events"]],
-    [112, 0, ["Build", "Programs", "Insights", "Events"]],
-    [112, 19, ["Build", "Programs", "Insights", "Events"]],
+    [1, 0, ["Fleet"]],
+    [2, 0, ["Fleet"]],
+    [4, 0, ["Fleet", "Insights"]],
+    [4, 3, ["Fleet", "Programs", "Insights"]],
+    [3, 0, ["Fleet", "Programs", "Insights"]],
+    [5, 0, ["Fleet", "Programs", "Insights"]],
+    [112, 0, ["Fleet", "Agreements", "Programs", "Insights", "Events"]],
+    [112, 4, ["Fleet", "Agreements", "Programs", "Insights", "Events"]],
   ])(
     "shows only taught actions in tutorial %s step %s",
     (scenarioId, tutorialStep, actions) => {

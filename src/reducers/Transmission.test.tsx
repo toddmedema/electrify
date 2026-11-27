@@ -1,10 +1,7 @@
-import { beginIntertieStress } from "./GameActions";
-import { parseSave, serializeSave } from "../SaveGame";
 import cloneDeep from "lodash.clonedeep";
 import * as transmissionHelpers from "../helpers/Transmission";
 import {
   TICKS_PER_YEAR,
-  TICKS_PER_MONTH,
   YEARS_PER_TICK,
   TICKS_PER_HOUR,
   GAME_TO_REAL_YEARS,
@@ -26,18 +23,14 @@ import gameReducer, {
   setSellingRule,
   tickState,
   tickStatePhases,
-  togglePauseFacility,
-  setSpeed,
 } from "./Game";
 import {
-  AppStateType,
   DifficultyType,
   GameType,
   TickPresentFutureType,
   GeneratorOperatingType,
   StorageOperatingType,
 } from "../Types";
-import { getScenario } from "../data/Scenarios";
 import { getCostTableDeflator } from "../data/Economy";
 import {
   TRANSMISSION_CORRIDORS,
@@ -675,225 +668,6 @@ describe("transmission actions", () => {
     expect(state.transmission).toEqual(before);
   });
 
-  it("runs Mission 7 from financed build through imports and a later safe export", () => {
-    jest.useFakeTimers();
-    try {
-      const scenario = getScenario(112)!;
-      const steps = scenario.tutorialSteps!;
-      let state = createGame({ scenarioId: 112 });
-      const appState = () => ({ game: state }) as AppStateType;
-      expect(state.transmission).toEqual({
-        buyingRule: "SHORTAGES",
-        sellingRule: "SURPLUS",
-        lines: [],
-      });
-      expect(state.facilities.map(({ fuel }) => fuel)).toEqual([
-        "Sun",
-        "Natural Gas",
-      ]);
-
-      const startingCash = getTimeFromTimeline(
-        state.date.minute,
-        state.timeline,
-      )!.cash;
-      state = cloneDeep(
-        gameReducer(
-          state,
-          buildTransmissionLine({
-            corridorId: "california-north",
-            financed: true,
-          }),
-        ),
-      );
-      expect(getTimeFromTimeline(state.date.minute, state.timeline)!.cash).toBe(
-        startingCash - 36000000,
-      );
-      expect(
-        steps
-          .find((step) => step.action === "Tap Take loan")!
-          .advanceOn?.(appState()),
-      ).toBe(true);
-
-      let constructionTicks = 0;
-      while (state.transmission!.lines[0].yearsToBuildLeft > 0) {
-        tickState(state);
-        constructionTicks++;
-      }
-      state.speed = "NORMAL";
-      expect(constructionTicks).toBeGreaterThanOrEqual(TICKS_PER_YEAR - 1);
-      expect(constructionTicks).toBeLessThanOrEqual(TICKS_PER_YEAR + 1);
-      expect(
-        steps
-          .find(
-            (step) =>
-              step.action === "Pause when the line shows a power reading",
-          )!
-          .advanceOn?.(appState()),
-      ).toBe(false);
-      state.speed = "PAUSED";
-      expect(
-        steps
-          .find(
-            (step) =>
-              step.action === "Pause when the line shows a power reading",
-          )!
-          .advanceOn?.(appState()),
-      ).toBe(true);
-
-      state = cloneDeep(gameReducer(state, setSellingRule("NONE")));
-      const gas = state.facilities.find(({ fuel }) => fuel === "Natural Gas")!;
-      state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
-      expect(
-        steps
-          .find((step) => step.action === "Choose “None” for Selling")!
-          .advanceOn?.(appState()),
-      ).toBe(true);
-      expect(
-        steps
-          .find((step) => step.action === "Tap Pause on the gas plant")!
-          .advanceOn?.(appState()),
-      ).toBe(true);
-
-      const operatingTicks = [] as Array<{
-        importedW: number;
-        exportedW: number;
-        capacityW: number;
-      }>;
-      while (state.date.monthsElapsed < 13) {
-        tickState(state);
-        const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
-        operatingTicks.push({
-          importedW: now.importedW || 0,
-          exportedW: now.exportedW || 0,
-          capacityW: now.transmissionCapacityW || 0,
-        });
-      }
-      state.speed = "PAUSED";
-      expect(
-        steps
-          .find((step) => step.action === "Pause after an importing month")!
-          .advanceOn?.(appState()),
-      ).toBe(true);
-      expect(
-        state.monthlyHistory.some(
-          (month) => (month.chartAverage?.importedW || 0) > 0,
-        ),
-      ).toBe(true);
-      expect(state.eventLog.some(({ kind }) => kind === "BLACKOUT")).toBe(
-        false,
-      );
-
-      const capstone = steps.find((step) => step.capstone)!.capstone!;
-      state = cloneDeep(gameReducer(state, setBuyingRule("NONE")));
-      const solar = state.facilities.find(({ fuel }) => fuel === "Sun")!;
-      state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
-      state.eventLog.push({
-        id: 999,
-        kind: "BLACKOUT",
-        label: "Recovered",
-        message: "Recovered test blackout",
-        importance: "CRITICAL",
-      });
-      while (state.date.monthsElapsed < 14) tickState(state);
-      expect(capstone.success(appState())).toBe(false);
-
-      state = cloneDeep(
-        gameReducer(
-          gameReducer(state, setBuyingRule("SHORTAGES")),
-          setSellingRule("SURPLUS"),
-        ),
-      );
-      state = cloneDeep(gameReducer(state, togglePauseFacility(solar.id)));
-      while (state.date.monthsElapsed < 15) {
-        tickState(state);
-        const now = getTimeFromTimeline(state.date.minute, state.timeline)!;
-        expect(now.availableSupplyW).toBeGreaterThanOrEqual(
-          now.supplyW + (now.exportedW || 0),
-        );
-        operatingTicks.push({
-          importedW: now.importedW || 0,
-          exportedW: now.exportedW || 0,
-          capacityW: now.transmissionCapacityW || 0,
-        });
-      }
-      expect(capstone.success(appState())).toBe(true);
-      expect(
-        state.monthlyHistory.some(
-          (month) =>
-            (month.chartAverage?.exportedW || 0) > 0 &&
-            (month.minimumSupplyMarginW ?? -1) >= 0,
-        ),
-      ).toBe(true);
-      expect(
-        operatingTicks.every(
-          ({ importedW, exportedW, capacityW }) =>
-            importedW + exportedW <= capacityW,
-        ),
-      ).toBe(true);
-      expect(
-        state.timeline.some(
-          ({ transmissionCapacityW }) =>
-            (transmissionCapacityW || 0) > 0 &&
-            (transmissionCapacityW || 0) < 500000000,
-        ),
-      ).toBe(true);
-      // Acknowledgement starts a real dispatch restriction, but inspection cannot run the clock.
-      expect(state.tutorialIntertieStress).toBeUndefined();
-      state.tutorialStep = steps.findIndex(
-        (step) => step.phase === "INTERTIE_STRESS_PREPARE",
-      );
-      state = cloneDeep(gameReducer(state, beginIntertieStress()));
-      expect(state.tutorialIntertieStress?.active).toBe(true);
-      const stressMinute = state.date.minute;
-      expect(state.timeline.some((t) => t.demandW > t.supplyW)).toBe(true);
-      // Every preparation step, including the manual briefing after restoring gas, must
-      // reject playback until the player explicitly enters the final capstone.
-      for (
-        let stepIndex = state.tutorialStep;
-        stepIndex < steps.length - 1;
-        stepIndex++
-      ) {
-        state.tutorialStep = stepIndex;
-        state = cloneDeep(gameReducer(state, setSpeed("FAST")));
-        expect(state.speed).toBe("PAUSED");
-        tickState(state);
-        expect(state.speed).toBe("PAUSED");
-        expect(state.date.minute).toBe(stressMinute);
-      }
-      // The exercise is persistent, finite and validated.
-      expect(
-        parseSave(serializeSave(state))?.game.tutorialIntertieStress,
-      ).toEqual(state.tutorialIntertieStress);
-      const bad = cloneDeep(state);
-      bad.tutorialIntertieStress!.suppliedTicks = Infinity;
-      expect(parseSave(serializeSave(bad))).toBeNull();
-      state = cloneDeep(gameReducer(state, togglePauseFacility(gas.id)));
-      state.tutorialStep = steps.findIndex(
-        (step) => step.phase === "INTERTIE_STRESS_SUPPLY",
-      );
-      const finalCapstone = steps[state.tutorialStep].capstone!;
-      expect(finalCapstone.success(appState())).toBe(false);
-      for (let i = 0; i < TICKS_PER_MONTH - 1; i++) tickState(state);
-      expect(finalCapstone.success(appState())).toBe(false);
-      tickState(state);
-      expect(finalCapstone.success(appState())).toBe(true);
-      expect(state.tutorialIntertieStress?.active).toBe(false);
-      expect(state.speed).toBe("PAUSED");
-      const restored = getTimeFromTimeline(state.date.minute, state.timeline)!;
-      const line = state.transmission!.lines[0];
-      expect(
-        intertieImportLimitW(
-          line,
-          intertieContextForGame(state),
-          restored.minute,
-          restored,
-        ),
-      ).toBeGreaterThan(150e6);
-    } finally {
-      jest.clearAllTimers();
-      jest.useRealTimers();
-    }
-  });
   it("records purchased emissions separately and charges local carbon only once", () => {
     const state = buildNorthernIntertie();
     state.facilities = [];

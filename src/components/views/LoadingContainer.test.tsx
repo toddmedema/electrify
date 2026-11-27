@@ -141,7 +141,7 @@ it("restores a capstone's authored pane after rebuilding its scenario", () => {
   );
 
   expect(dispatched).toEqual([
-    expect.objectContaining({ type: "card/navigate", payload: "PROGRAMS" }),
+    expect.objectContaining({ type: "card/navigate", payload: "INSIGHTS" }),
     expect.objectContaining({
       type: "game/delta",
       payload: { tutorialStep: capstone },

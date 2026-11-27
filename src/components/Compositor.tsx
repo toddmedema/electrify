@@ -34,8 +34,7 @@ import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import FeedbackDialog from "./base/FeedbackDialog";
-import InstallAppButton from "./base/InstallAppButton";
-import TutorialHud from "./base/TutorialHud";
+import TutorialHud, { type TutorialHudProps } from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
 import VictoryDialogContainer from "./base/VictoryDialogContainer";
@@ -68,7 +67,8 @@ import {
   shouldDismissSwipe,
   SWIPE_DISMISS_EXIT_MS,
 } from "./base/SwipeDismiss";
-import { isDesktopScreen, isSideToolLayout } from "../Globals";
+import { isDesktopScreen } from "../Globals";
+import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../WorkspaceLayout";
 import { store } from "../Store";
 import LazyViewBoundary, { lazyView } from "./base/LazyViewBoundary";
 import { loadSavedGames } from "./views/SavedGamesLoader";
@@ -348,6 +348,20 @@ export function isGameCard(name: CardNameType) {
   return isNavCard(name) || name.startsWith("BUILD_");
 }
 
+function WorkspaceTutorialHud({
+  workspace,
+  settings,
+  ...props
+}: Omit<TutorialHudProps, "desktop"> & {
+  workspace: React.RefObject<HTMLElement>;
+  settings: SettingsType;
+}) {
+  const { effectiveWidth } = useWorkspaceLayout(workspace, settings);
+  return (
+    <TutorialHud {...props} desktop={effectiveWidth >= SIDE_TOOL_MIN_WIDTH} />
+  );
+}
+
 const COMPACT_TUTORIAL_ACTIONS_MEDIA = "(max-width: 599px)";
 const tutorialCompletionSx = {
   "& .MuiDialog-paper": { width: 560, maxWidth: "calc(100% - 24px)" },
@@ -594,7 +608,10 @@ export default class Compositor extends React.Component<Props, {}> {
   }
 
   public shouldComponentUpdate(nextProps: Props) {
-    if (this.props.tutorialStep !== nextProps.tutorialStep) {
+    if (
+      this.props.tutorialStep !== nextProps.tutorialStep ||
+      this.props.settings !== nextProps.settings
+    ) {
       return true;
     }
 
@@ -719,8 +736,9 @@ export default class Compositor extends React.Component<Props, {}> {
           this.props.card.name !== "LOADING" &&
           this.props.card.name !== "MANUAL" &&
           !ui.manualHelpEntry && (
-            <TutorialHud
-              desktop={isSideToolLayout()}
+            <WorkspaceTutorialHud
+              workspace={transitionNodeRef}
+              settings={this.props.settings}
               step={currentTutorialStep}
               stepIndex={tutorialStep}
               totalSteps={tutorialSteps.length}
@@ -799,16 +817,6 @@ export default class Compositor extends React.Component<Props, {}> {
               >
                 Feedback
               </Button>
-            )}
-            {ui.dialog.offerInstall && (
-              <InstallAppButton
-                label={compactTutorialActions ? "Install" : "Install for later"}
-                aria-label={
-                  compactTutorialActions ? "Install for later" : undefined
-                }
-                afterMilestone
-                showIcon={false}
-              />
             )}
             {ui.dialog.secondaryAction && (
               <Button
