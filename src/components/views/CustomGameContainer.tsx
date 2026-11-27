@@ -19,7 +19,9 @@ import { withoutMod } from "../../helpers/ScenarioMod";
 import { store } from "../../Store";
 import { delta as uiDelta } from "../../reducers/UI";
 import { startWithSaveGuard } from "./StartGame";
-import { AppStateType, GameType, ScenarioType } from "../../Types";
+import type { AppStateType, GameType, ScenarioType } from "../../Types";
+import CoopBrowseBar from "../base/CoopBrowseBar";
+import ScreenPage from "../base/ScreenPage";
 import CustomGame, { DispatchProps, StateProps } from "./CustomGame";
 import { coopControls } from "../../multiplayer/Registry";
 
@@ -40,40 +42,39 @@ const selectedDifficulty = () =>
     unlockedNow(),
   );
 
+type SetupProps = Omit<StateProps, "scenario"> & { scenario?: ScenarioType };
+
 // An explicit second parameter lets connect observe synced unlock changes.
 export const mapStateToProps = (
   state: AppStateType,
   ownProps?: { unlockedThrough: DifficultyType },
-): StateProps => {
+): SetupProps => {
   const coop = state.ui.coop;
   const unlockedThrough = unlockedForPlay(
     ownProps?.unlockedThrough ??
       unlockedDifficulty(achievementJournal.getSnapshot().progress),
     !!coop,
   );
-  // A co-op guest sees the host's setup rather than the one it played last.
-  // A modded run is not a setup to tweak: its rules belong to the mod, so fall back to the
-  // last custom setup instead.
+  const game = {
+    ...state.game,
+    difficulty: playableDifficulty(
+      state.ui.previewDifficulty ?? state.game.difficulty,
+      unlockedThrough,
+    ),
+  };
+  // The host can withdraw the setup while sizing a replacement fleet.
+  if (coop?.role === "guest")
+    return { coop, game, unlockedThrough, scenario: coop.custom };
+
+  // Start from the player's last custom setup. Mod rules belong to their original scenario.
   const current = state.game.customScenario?.mod
     ? undefined
     : state.game.customScenario;
-  const scenario =
-    (coop?.role === "guest" && coop.custom) ||
-    current ||
-    getCustomScenario(DEFAULT_CUSTOM_SCENARIO);
   return {
     coop,
+    game,
     unlockedThrough,
-    game: {
-      ...state.game,
-      difficulty: playableDifficulty(
-        state.ui.previewDifficulty ?? state.game.difficulty,
-        unlockedThrough,
-      ),
-    },
-    // The game the player set up last time, so tweaking one setting and starting again doesn't mean
-    // re-entering all of them
-    scenario,
+    scenario: current ?? getCustomScenario(DEFAULT_CUSTOM_SCENARIO),
   };
 };
 
@@ -121,10 +122,24 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
   };
 };
 
+function CustomGameView({ scenario, ...props }: SetupProps & DispatchProps) {
+  if (scenario) return <CustomGame {...props} scenario={scenario} />;
+  return (
+    <ScreenPage id="listCard" title="Custom setup" onBack={props.onBack}>
+      <CoopBrowseBar coop={props.coop} offerSaves />
+      <div className="scrollable">
+        <p className="customSetupActions" role="status">
+          Receiving scenario…
+        </p>
+      </div>
+    </ScreenPage>
+  );
+}
+
 const ConnectedCustomGame = connect(
   mapStateToProps,
   mapDispatchToProps,
-)(CustomGame);
+)(CustomGameView);
 
 export default function CustomGameContainer() {
   const unlockedThrough = useUnlockedDifficulty();

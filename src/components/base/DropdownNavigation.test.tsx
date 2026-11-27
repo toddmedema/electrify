@@ -11,6 +11,7 @@ import {
   TextField,
   ThemeProvider,
 } from "@mui/material";
+import { moveInputFocus } from "../../desktop/InputNavigation";
 import { createGame } from "../../testing/Simulator";
 import ConstructionBuildHeader from "./ConstructionBuildHeader";
 import DifficultyPicker from "./DifficultyPicker";
@@ -144,7 +145,7 @@ const focus = (control: HTMLElement) => act(() => control.focus());
 const press = (key: string) =>
   fireEvent.keyDown(document.activeElement!, { key });
 
-// Focus returns as the menu starts to exit. Finish that transition before the next key.
+// Let the previous menu unmount before opening another one in the fixture.
 const finishMenuExit = () => act(() => jest.runOnlyPendingTimers());
 
 test.each(["ArrowDown", "ArrowUp"])(
@@ -180,11 +181,11 @@ test("Enter opens a dropdown, choosing closes it onto the dropdown, and the arro
     expect(screen.getByRole("listbox")).toBeVisible();
     press("ArrowDown");
     press("Enter");
-    finishMenuExit();
-    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
     expect(dropdown).toHaveFocus();
     press("ArrowDown");
     expect(dropdown).not.toHaveFocus();
+    finishMenuExit();
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   }
 });
 
@@ -234,11 +235,14 @@ test("a dropdown in a dialog hands arrows to the dialog's own controls", () => {
   expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   focus(region);
   press("Enter");
-  press("ArrowDown");
+  expect(screen.getByRole("option", { name: "North" })).toHaveFocus();
+  act(() => moveInputFocus("down"));
+  expect(screen.getByRole("option", { name: "South" })).toHaveFocus();
   press("Enter");
-  finishMenuExit();
   expect(region).toHaveTextContent("South");
   expect(region).toHaveFocus();
+  // The listbox is still mounted for its exit animation when the first arrow arrives.
+  expect(screen.getByRole("listbox", { hidden: true })).toBeInTheDocument();
   press("ArrowDown");
   expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
 });

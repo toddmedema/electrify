@@ -2,14 +2,18 @@ import { recordIntent } from "../../achievements/Progress";
 import * as React from "react";
 import { act, render, screen } from "@testing-library/react";
 import { Provider } from "react-redux";
-import { configureStore } from "@reduxjs/toolkit";
+import { configureStore, createAction } from "@reduxjs/toolkit";
 import type { StateProps } from "./CustomGame";
 import { achievementJournal } from "../../achievements/Journal";
 import { modScenario } from "../../mods/ModScenario";
 import { DEFAULT_CUSTOM_SCENARIO } from "../../data/Scenarios";
 import { getCustomScenario, recordCustomScenario } from "../../LocalStorage";
 import { launchCustomScenario } from "../../reducers/Game";
-import type { AppStateType, ScenarioType } from "../../Types";
+import type {
+  AppStateType,
+  CoopSelectionType,
+  ScenarioType,
+} from "../../Types";
 import { registerCoopControls } from "../../multiplayer/Registry";
 import CustomGameContainer, {
   mapDispatchToProps,
@@ -23,8 +27,12 @@ const mockApp: {
 
 jest.mock("./CustomGame", () => ({
   __esModule: true,
-  default: ({ game, unlockedThrough }: StateProps) =>
-    `${game.difficulty}/${unlockedThrough}`,
+  default: ({ game, scenario, unlockedThrough }: StateProps) => (
+    <>
+      <p>{[game.difficulty, unlockedThrough].join("/")}</p>
+      <p>{scenario.name}</p>
+    </>
+  ),
 }));
 
 jest.mock("./StartGame", () => ({
@@ -69,8 +77,8 @@ beforeEach(() => {
 test("a running mod never seeds or leaks into the custom game setup", () => {
   recordCustomScenario(setup);
   const props = mapStateToProps(state(modded));
-  expect(props.scenario.mod).toBeUndefined();
-  expect(props.scenario.name).toBe("My setup");
+  expect(props.scenario?.mod).toBeUndefined();
+  expect(props.scenario).toHaveProperty("name", "My setup");
   // An ordinary custom run still reopens where the player left it.
   expect(mapStateToProps(state(setup)).scenario).toBe(setup);
 });
@@ -138,6 +146,64 @@ test("a local host back uses the co-op control that returns to the join stage", 
   mockApp.ui.coop = { role: "host" };
   mapDispatchToProps(jest.fn()).onBack();
   expect(back).toHaveBeenCalledTimes(1);
+});
+
+test("a guest waits for the host's replacement setup without showing its own", () => {
+  const first = { ...DEFAULT_CUSTOM_SCENARIO, name: "Host setup" };
+  const replacement = { ...first, name: "Resized host setup" };
+  const guest: CoopSelectionType = {
+    role: "guest",
+    hostName: "Ada",
+    players: [],
+    ready: false,
+    starting: false,
+    custom: first,
+  };
+  const hostSetupChanged = createAction<ScenarioType | undefined>(
+    "hostSetupChanged",
+  );
+  const app = state(setup);
+  const initialState = { ...app, ui: { ...app.ui, coop: guest } };
+  const appStore = configureStore({
+    reducer: (app = initialState, action) =>
+      hostSetupChanged.match(action)
+        ? {
+            ...app,
+            ui: {
+              ...app.ui,
+              coop: {
+                ...guest,
+                custom: action.payload,
+                receivingScenario: !action.payload,
+              },
+            },
+          }
+        : app,
+  });
+  render(
+    <Provider store={appStore}>
+      <CustomGameContainer />
+    </Provider>,
+  );
+  expect(screen.getByText("Host setup")).toBeInTheDocument();
+
+  act(() => {
+    appStore.dispatch(hostSetupChanged(undefined));
+  });
+  expect(screen.queryByText("My setup")).not.toBeInTheDocument();
+  expect(screen.getByText("Receiving scenario…")).toHaveAttribute(
+    "role",
+    "status",
+  );
+  expect(
+    screen.queryByRole("button", { name: "I'm ready" }),
+  ).not.toBeInTheDocument();
+
+  act(() => {
+    appStore.dispatch(hostSetupChanged(replacement));
+  });
+  expect(screen.getByText("Resized host setup")).toBeInTheDocument();
+  expect(screen.queryByText("Receiving scenario…")).not.toBeInTheDocument();
 });
 
 test("a lobby can choose any difficulty, whatever its host has unlocked", () => {
