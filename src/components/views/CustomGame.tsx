@@ -269,29 +269,12 @@ function facilitiesForStartingCustomers(
   );
 }
 
-/**
- * The one-peaker fleet a custom setup opens with before it has been sized to its grid. A fleet
- * the player has since built up by hand is never replaced just by opening the screen.
- */
-function isStarterFleet(facilities: readonly ScenarioFacilityType[]): boolean {
-  return (
-    facilities.length === 1 &&
-    facilityName(facilities[0]) === "Natural Gas Peaker"
-  );
-}
-
 export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
-  const [scenario, setScenario] = React.useState<ScenarioType>(() => {
-    const initial = prepareCustomSetup(props.scenario);
-    if (props.coop?.role === "guest") return initial;
-    const source = initial.startingFleetSource;
-    return source === "regional" ||
-      (!source && isStarterFleet(initial.facilities))
-      ? { ...initial, startingFleetSource: "regional" }
-      : initial;
-  });
+  const [scenario, setScenario] = React.useState<ScenarioType>(() =>
+    prepareCustomSetup(props.scenario),
+  );
   const currency = currencyForLocation(
     getScenarioLocation(scenario),
     scenario.startingYear,

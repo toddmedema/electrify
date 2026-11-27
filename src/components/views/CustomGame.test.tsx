@@ -558,7 +558,11 @@ it("sizes a starting grid for the setup it opens with", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: 4242 }}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        startingFleetSource: "regional",
+        seed: 4242,
+      }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -625,7 +629,11 @@ it("only shares a custom setup once the starting grid has settled", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: 4242 }}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        startingFleetSource: "regional",
+        seed: 4242,
+      }}
       coop={{
         role: "host",
         hostName: "Ada",
@@ -711,6 +719,38 @@ it("sizes the grid again when its customers, era or place change", () => {
   ).toBeInTheDocument();
 });
 
+it.each([
+  { peakW: 25_000_000, valid: true },
+  { peakW: 10_000_000_000_000, valid: false },
+])(
+  "recalls a manual single peaker with its saved $peakW W capacity",
+  ({ peakW, valid }) => {
+    jest.useFakeTimers();
+    const onStart = jest.fn();
+    const facility = { name: "Natural Gas Peaker", peakW, initialAgeYears: 7 };
+    render(
+      <CustomGame
+        game={createGame({ scenarioId: 100 })}
+        scenario={{ ...DEFAULT_CUSTOM_SCENARIO, facilities: [facility] }}
+        onBack={jest.fn()}
+        onDelta={jest.fn()}
+        onStart={onStart}
+      />,
+    );
+    act(() => jest.advanceTimersByTime(300));
+    expect(mockCreateFleetWorker).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Remove Natural Gas Peaker" }),
+    ).toBeVisible();
+    const play = screen.getByRole("button", { name: "Start game" });
+    expect(play).toHaveProperty("disabled", !valid);
+    fireEvent.click(play);
+    expect(onStart.mock.calls.map(([scenario]) => scenario.facilities)).toEqual(
+      valid ? [[facility]] : [],
+    );
+  },
+);
+
 it("preserves a manually edited fleet until the player requests the regional blend", () => {
   jest.useFakeTimers();
   render(
@@ -766,7 +806,7 @@ it("keeps the fleet and Play available when sizing fails", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, startingFleetSource: "regional" }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
