@@ -7,6 +7,7 @@ import {
 } from "./Hailstones";
 import { interpolateMapLighting } from "./Lighting";
 import { createMapProgram } from "./MapProgram";
+import { COAST_TRIM_HEIGHT } from "./CoastModels";
 import {
   OCEAN_FALLBACK_FRAGMENT,
   OCEAN_FRAGMENT,
@@ -78,6 +79,11 @@ void main() {
     world.y = 0.003;
   }
   gl_Position = uProjection * world;
+  if (aMaterial.z == 4.0 && !uShadow) {
+    // Keep territory and selection outlines over coastal cliffs: take the depth
+    // of a point raised above the tallest rim, without moving the outline.
+    gl_Position.z += uProjection[1][2] * ${(COAST_TRIM_HEIGHT + 0.01).toFixed(4)};
+  }
   vNormal = normalize(mat3(aTransform) * aNormal);
   vColor = aColor;
   vStyle = aStyle;

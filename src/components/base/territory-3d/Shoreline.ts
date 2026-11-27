@@ -23,7 +23,7 @@ export const SHORE_RING_POSITIONS: readonly (readonly [number, number])[] =
   SHORE_RING_OFFSETS.map(([dq, dr]) => [dq + dr / 2, (dr * Math.sqrt(3)) / 2]);
 
 /** Any authored non-ocean tile is shoreline land; tiles off the map read as open sea. */
-export const isShoreLand = (terrain: TerrainType | undefined) =>
+const isShoreLand = (terrain: TerrainType | undefined) =>
   terrain !== undefined && terrain !== "ocean";
 
 /**

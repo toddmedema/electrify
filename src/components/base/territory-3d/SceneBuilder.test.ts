@@ -331,7 +331,8 @@ test("gives ocean tiles their nearby land and coastal land a sea-facing trim", (
   expect(byId.get(`terrain:${shore.tile.id}`)!.shore).toBeUndefined();
   expect(byId.has(`coast:${ocean.tile.id}`)).toBe(false);
   const coast = byId.get(`coast:${shore.tile.id}`)!;
-  expect(coast.model.key).toMatch(/^coast:(beach|cliff):16(:|$)/);
+  // Every other edge is off the map, which reads as open water.
+  expect(coast.model.key).toMatch(/^coast:(beach|cliff):16\/63(:|$)/);
   expect(coast.position).toBe(byId.get(`terrain:${shore.tile.id}`)!.position);
 });
 

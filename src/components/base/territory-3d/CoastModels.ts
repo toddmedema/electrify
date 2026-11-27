@@ -1,10 +1,11 @@
 import type { TerrainType } from "../../../Types";
 import { MeshBuilder } from "./MeshBuilder";
+import { tintTerrainMesh } from "./TerrainWeatherMaterials";
 import { PALETTE } from "./Palette";
 import { GROUND_HEX_CORNERS as HEX } from "./Projection";
 import type { MapModel, RGB, Vec3 } from "./Types";
 
-/** A strand is a narrow beach without spits, beside wide facilities. */
+/** A strand is a narrow beach without spits, beside wide facilities and sea cables. */
 export type CoastStyle = "beach" | "strand" | "cliff";
 type Point = readonly [number, number];
 
@@ -14,8 +15,12 @@ const SIN_60 = Math.sqrt(3) / 2;
 const SAND_Y = 0.0025;
 const BEACH_WIDTH = 0.14;
 const BEACH_JUT = 0.03;
+/** Mid-edge width of the narrow beach beside wide facilities. */
+const STRAND_WIDTH = 0.095;
 const CLIFF_WIDTH = 0.17;
 const CLIFF_HEIGHT = 0.1;
+/** Tallest coast trim: the highest jittered cliff rim. */
+export const COAST_TRIM_HEIGHT = CLIFF_HEIGHT * 1.3;
 /** Rim height, as a share of CLIFF_HEIGHT, where the cliff meets a land edge. */
 const CLIFF_GULLY = 0.2;
 const CLIFF_JUT = 0.02;
@@ -72,6 +77,25 @@ function edgeFrame(edge: number, edges: number) {
   ];
 }
 
+/** Flat-shaded triangle whose normal faces `toward`, whatever the corner order. */
+function facingTriangle(
+  builder: MeshBuilder,
+  [a, b, c]: readonly Vec3[],
+  color: RGB,
+  toward: Vec3,
+) {
+  const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]],
+    v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const normal = [
+    u[1] * v[2] - u[2] * v[1],
+    u[2] * v[0] - u[0] * v[2],
+    u[0] * v[1] - u[1] * v[0],
+  ];
+  if (normal[0] * toward[0] + normal[1] * toward[1] + normal[2] * toward[2] < 0)
+    builder.triangle(a, c, b, color);
+  else builder.triangle(a, b, c, color);
+}
+
 /** Flat-shaded quad whose normal faces `toward`, whatever the corner order. */
 function facing(
   builder: MeshBuilder,
@@ -102,7 +126,6 @@ const mixColor = (a: RGB, b: RGB, t: number): RGB => [
   a[1] + (b[1] - a[1]) * t,
   a[2] + (b[2] - a[2]) * t,
 ];
-const SUNLIT_TURF: RGB = [0xd8 / 255, 0xe0 / 255, 0xb8 / 255];
 
 /** Rows of ground points across one edge, joined segment by segment into quads. */
 function strip(
@@ -143,8 +166,9 @@ function beach(
       const swell = bump(t);
       const jut = reachOut * swell * (0.35 + 0.65 * jitter(edge, k, 1));
       // Two octaves keep the dune line from following the hex edge.
+      // Every beach keeps the full width at corners, so neighbours always meet.
       const reach =
-        width *
+        (BEACH_WIDTH + (width - BEACH_WIDTH) * swell) *
         (1 +
           0.8 * swell * (jitter(edge, k, 2) - 0.5) +
           0.45 * swell * (jitter(edge, k >> 1, 7) - 0.5));
@@ -210,7 +234,7 @@ function cliff(builder: MeshBuilder, edge: number, edges: number, top: RGB) {
     },
     [
       top,
-      mixColor(top, SUNLIT_TURF, 0.25),
+      mixColor(top, PALETTE.sunlitTurf, 0.25),
       PALETTE.cliffLip,
       PALETTE.cliffFace,
       PALETTE.cliffFaceShade,
@@ -227,32 +251,40 @@ function cliff(builder: MeshBuilder, edge: number, edges: number, top: RGB) {
     const away: Vec3 = index ? [bx - ax, 0, bz - az] : [ax - bx, 0, az - bz];
     const base = [profile[0][0], SUBMERGED_Y, profile[0][2]] as Vec3;
     for (let i = 1; i < profile.length - 1; i++)
-      facing(
+      facingTriangle(
         builder,
-        [base, profile[i], profile[i + 1], profile[i + 1]],
+        [base, profile[i], profile[i + 1]],
         PALETTE.cliffFace,
         away,
       );
   });
 }
 
-/** Trim for a land tile's sea-facing edges, shared by every tile with the same edges. */
+/**
+ * Trim for a land tile's sea-facing edges, shared by every tile with the same
+ * edges. `open` marks untrimmed edges that also face open water (a river mouth
+ * or the edge of the map), where a band mitres instead of meeting a neighbour.
+ */
 export function getCoastModel(
   style: CoastStyle,
   edges: number,
   top: RGB = PALETTE.grass,
+  open = 0,
 ): MapModel {
+  edges &= 63;
+  const joins = (edges | open) & 63;
   const topKey =
     style === "cliff" && top !== PALETTE.grass ? `:${top.join(",")}` : "";
-  const key = `coast:${style}:${edges & 63}${topKey}`;
+  const openKey = joins === edges ? "" : `/${joins}`;
+  const key = `coast:${style}:${edges}${openKey}${topKey}`;
   const cached = cache.get(key);
   if (cached) return cached;
   const builder = new MeshBuilder();
   for (let edge = 0; edge < 6; edge++)
     if (edges & (1 << edge))
-      if (style === "cliff") cliff(builder, edge, edges, top);
-      else if (style === "strand") beach(builder, edge, edges, 0.095, 0);
-      else beach(builder, edge, edges, BEACH_WIDTH, BEACH_JUT);
+      if (style === "cliff") cliff(builder, edge, joins, top);
+      else if (style === "strand") beach(builder, edge, joins, STRAND_WIDTH, 0);
+      else beach(builder, edge, joins, BEACH_WIDTH, BEACH_JUT);
   const model: MapModel = {
     key,
     parts: [
@@ -264,10 +296,28 @@ export function getCoastModel(
     ],
     terminals: [],
     footprint: 1,
-    height: style === "cliff" ? CLIFF_HEIGHT * 1.3 : SAND_Y,
+    height: style === "cliff" ? COAST_TRIM_HEIGHT : SAND_Y,
   };
   cache.set(key, model);
   return model;
+}
+
+const scorched = new WeakMap<MapModel, MapModel>();
+
+/** Burnt turf and dune grass, matching the scorched terrain beside them. */
+export function scorchedCoast(model: MapModel): MapModel {
+  const cached = scorched.get(model);
+  if (cached) return cached;
+  const tinted = {
+    ...model,
+    key: `${model.key}:scorched`,
+    parts: model.parts.map((part) => ({
+      ...part,
+      mesh: tintTerrainMesh(part.mesh, "ash"),
+    })),
+  };
+  scorched.set(model, tinted);
+  return tinted;
 }
 
 /** Highlands meet the sea with cliffs; low farmland and river mouths with sand. */
@@ -275,9 +325,11 @@ export function coastStyle(
   terrain: TerrainType,
   artHash: number,
   footprint: number,
+  cabled = false,
 ): CoastStyle {
-  // Wide facilities reach the shoreline: a narrow level strand keeps their pads clear.
-  if (footprint > 0.65) return "strand";
+  // Wide facilities reach the shoreline, and sea cables come ashore there: a
+  // narrow level strand keeps both clear.
+  if (footprint > 0.65 || cabled) return "strand";
   switch (terrain) {
     case "mountain":
     case "hills":

@@ -75,6 +75,63 @@ describe.each(["beach", "strand", "cliff"] as CoastStyle[])(
   },
 );
 
+it.each([
+  ["beach", "strand"],
+  ["strand", "beach"],
+] as const)("joins a %s to a %s at the same dune line", (first, second) => {
+  const edge = 0;
+  const [bq, br] = HEX_NEIGHBORS[1];
+  const [oq, or] = HEX_NEIGHBORS[edge];
+  const towardSea = HEX_NEIGHBORS.findIndex(
+    ([q, r]) => q === oq - bq && r === or - br,
+  );
+  const start = HEX[1],
+    end = HEX[2];
+  expect(
+    [
+      ...onLine(
+        getCoastModel(first, 1 << edge),
+        tilePosition3D({ q: 0, r: 0 }),
+        start,
+        end,
+      ),
+    ].sort(),
+  ).toEqual(
+    [
+      ...onLine(
+        getCoastModel(second, 1 << towardSea),
+        tilePosition3D({ q: bq, r: br }),
+        start,
+        end,
+      ),
+    ].sort(),
+  );
+});
+
+it.each(["beach", "cliff"] as const)(
+  "ends a %s on the corner's bisector beside a river mouth, clear of the channel",
+  (style) => {
+    // Edge 5 is the mouth: open water, but untrimmed.
+    const mouth = getCoastModel(style, 1 << 0, undefined, 1 << 5);
+    const [cx, cz] = HEX[0],
+      [mx, mz] = HEX[5];
+    // Nothing crosses the corner's bisector toward the mouth edge.
+    const mouthSide = Math.sign(mx * cz - mz * cx);
+    const { positions } = mouth.parts[0].mesh;
+    for (let i = 0; i < positions.length; i += 3)
+      expect(
+        (positions[i] * cz - positions[i + 2] * cx) * mouthSide,
+      ).toBeLessThan(1e-5);
+    // Without the mouth as open water, the band runs along it instead.
+    const cut = getCoastModel(style, 1 << 0).parts[0].mesh.positions;
+    expect(
+      Array.from({ length: cut.length / 3 }, (_, i) => i * 3).some(
+        (i) => (cut[i] * cz - cut[i + 2] * cx) * mouthSide > 0.01,
+      ),
+    ).toBe(true);
+  },
+);
+
 it("keeps beaches between farm fields and the projected shadow plane", () => {
   const { positions } = getCoastModel("beach", 63).parts[0].mesh;
   for (let i = 1; i < positions.length; i += 3)

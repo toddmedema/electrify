@@ -38,7 +38,6 @@ const cache: Record<
 };
 
 let mountainFloor: MapMesh | undefined;
-/** Outward bulge of each closed-lake side, per art variant, in tile widths. */
 /** Shore radius at each corner, per closed-lake art variant. */
 const LAKE_CORNERS = [
   [0.73, 0.76, 0.69, 0.75, 0.7, 0.74],
@@ -46,6 +45,7 @@ const LAKE_CORNERS = [
   [0.76, 0.68, 0.72, 0.79, 0.67, 0.73],
   [0.7, 0.74, 0.79, 0.66, 0.72, 0.77],
 ] as const;
+/** Outward bulge of each closed-lake side, per art variant, in tile widths. */
 const LAKE_BULGES = [
   [0.045, 0.025, 0.05, 0.035, 0.055, 0.03],
   [0.03, 0.055, 0.025, 0.05, 0.035, 0.045],

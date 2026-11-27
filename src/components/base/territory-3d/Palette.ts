@@ -30,6 +30,7 @@ export const PALETTE = {
   sand: rgb("#F5E9C6"),
   wetSand: rgb("#C9B684"),
   lakeShore: rgb("#DDD5B6"),
+  sunlitTurf: rgb("#D8E0B8"),
   duneGrass: rgb("#B7C58C"),
   surf: rgb("#EEF6F2"),
   cliffLip: rgb("#DAD5C4"),
