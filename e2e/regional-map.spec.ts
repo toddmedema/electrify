@@ -1,11 +1,17 @@
-import { expect, type Page, test } from "./fixtures";
-import { openBuild, openCustomSetup } from "./layout";
+import { expect, type Locator, type Page, test } from "./fixtures";
+import { openCustomSetup } from "./layout";
+import { reviewScreenshot } from "./review-screenshot";
 
 const regionalMap = (page: Page) =>
   page.getByRole("region", { name: "Regional map workspace", exact: true });
 
 const regionalDock = (page: Page) =>
   page.getByRole("navigation", { name: "Game actions", exact: true });
+
+const vacantSites = (map: Locator) =>
+  map.locator(
+    '[data-map-target][data-build-site="true"][data-owned="true"]:not([data-map-facility])',
+  );
 
 async function startRegionalGame(page: Page) {
   await page.addInitScript(() => {
@@ -20,9 +26,9 @@ async function startRegionalGame(page: Page) {
   await expect(regionalMap(page)).toBeVisible();
 }
 
-test("regional map presents the city and plants while Fleet and intertie builds remain reachable", async ({
+test("regional map starts with two connected sites and keeps Fleet and intertie builds reachable", async ({
   page,
-}) => {
+}, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await startRegionalGame(page);
   const map = regionalMap(page);
@@ -81,7 +87,18 @@ test("regional map presents the city and plants while Fleet and intertie builds 
     page.locator("#facilitiesPane #chartSupplyDemand"),
   ).toBeVisible();
   await dock.getByRole("button", { name: "Map", exact: true }).click();
-  const build = await openBuild(page);
+  const plots = vacantSites(map);
+  await expect.poll(() => plots.count()).toBeGreaterThanOrEqual(2);
+  await plots.first().press("Enter");
+  const site = map.getByRole("dialog").filter({ hasText: "Connected site" });
+  await expect(site).toBeVisible();
+  await reviewScreenshot(page, {
+    path: info.outputPath("connected-opening-site.png"),
+    animations: "disabled",
+  });
+  await site.getByRole("button", { name: "Build", exact: true }).click();
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  await expect(build).toBeVisible();
   await build.getByRole("tab", { name: "Interties", exact: true }).click();
   await expect(
     build.getByRole("button", {
@@ -149,4 +166,5 @@ test("a new custom grid starts on the 3D map for the selected city", async ({
   await expect(
     map.getByRole("button", { name: "Inspect Paris on map", exact: true }),
   ).toBeVisible();
+  await expect.poll(() => vacantSites(map).count()).toBeGreaterThanOrEqual(2);
 });

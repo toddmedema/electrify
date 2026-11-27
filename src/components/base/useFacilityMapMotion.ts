@@ -10,7 +10,10 @@ export const FACILITY_MAP_PLAYBACK_RATE: Record<SpeedType, number> = {
 };
 
 /** One preference/visibility subscription for the whole map, never one per plant. */
-export default function useFacilityMapMotion(speed: SpeedType = "PAUSED") {
+export default function useFacilityMapMotion(
+  speed: SpeedType = "PAUSED",
+  covered = false,
+) {
   const [reduced] = React.useState(() =>
     window.matchMedia("(prefers-reduced-motion: reduce)"),
   );
@@ -28,8 +31,11 @@ export default function useFacilityMapMotion(speed: SpeedType = "PAUSED") {
     };
   }, [reduced]);
   return React.useMemo(
-    () => ({ allowed, rate: FACILITY_MAP_PLAYBACK_RATE[speed] }),
-    [allowed, speed],
+    () => ({
+      allowed: allowed && !covered,
+      rate: FACILITY_MAP_PLAYBACK_RATE[speed],
+    }),
+    [allowed, covered, speed],
   );
 }
 

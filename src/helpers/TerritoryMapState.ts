@@ -50,6 +50,8 @@ export interface TerritoryTileView {
   connection?: TileConnection;
   facility?: TileFacilityView;
   operatingFacility?: FacilityOperatingType;
+  /** A vacant, connected plot represented by the regional map. */
+  buildSite?: boolean;
   connectable?: boolean;
   acquisitionId?: UtilityAcquisitionId;
   reserved?: boolean;

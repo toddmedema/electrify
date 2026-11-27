@@ -5,6 +5,7 @@ import type {
   Locator,
   Page,
   Route,
+  TestInfo,
 } from "@playwright/test";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -541,10 +542,31 @@ async function expectSeatChromeRemoved(seat: Page | Frame) {
     await expect(seat.getByRole("button", { name, exact: true })).toBeVisible();
 }
 
-test("TV couch companies keep independent dialogs and purchases through atomic save and resume", async ({
-  context,
-  page,
-}, info) => {
+for (const purchase of [
+  { megawatts: 20, seed: undefined }, // Fits every opening terrain, including mountains.
+  { megawatts: 50, seed: 4242 }, // Both companies and the second review have room for 50 MW.
+]) {
+  test(`TV couch companies keep independent dialogs and purchases through atomic save and resume (${purchase.megawatts} MW)`, async ({
+    context,
+    page,
+  }, info) => {
+    await checkCouchPurchases(
+      context,
+      page,
+      info,
+      purchase.megawatts,
+      purchase.seed,
+    );
+  });
+}
+
+async function checkCouchPurchases(
+  context: BrowserContext,
+  page: Page,
+  info: TestInfo,
+  megawatts: number,
+  seed?: number,
+) {
   test.skip(
     !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
     "Two seat renderer journey at 1080p in each palette",
@@ -552,8 +574,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   const couch = await createCouchFixture(context, page, {
     nativeBindings: true,
   });
-  // The second Solar review needs another owned site with room for 50 MW.
-  await startCouch(page, couch, 4242);
+  await startCouch(page, couch, seed);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
   for (const seat of [p1, p2]) {
@@ -585,7 +606,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   const sizeSolar = (build: Locator) =>
     build
       .getByRole("slider", { name: /^Capacity / })
-      .fill(String(wToSliderTick(50e6)));
+      .fill(String(wToSliderTick(megawatts * 1e6)));
   await Promise.all([sizeSolar(build1), sizeSolar(build2)]);
   const review1 = build1.getByRole("button", {
     name: "Review purchase of Solar",
@@ -595,12 +616,18 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     name: "Review purchase of Solar",
     exact: true,
   });
+  await expect(review1).toBeEnabled();
+  await expect(review2).toBeEnabled();
   // Each document retains its own real focus; both devices confirm in the same sample.
   await review1.focus();
   await review2.focus();
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
-  const purchase1 = p1.getByRole("dialog", { name: "Build 50MW Solar?" });
-  const purchase2 = p2.getByRole("dialog", { name: "Build 50MW Solar?" });
+  const purchase1 = p1.getByRole("dialog", {
+    name: `Build ${megawatts}MW Solar?`,
+  });
+  const purchase2 = p2.getByRole("dialog", {
+    name: `Build ${megawatts}MW Solar?`,
+  });
   await expect(purchase1).toBeVisible();
   await expect(purchase2).toBeVisible();
   await purchase1
@@ -698,9 +725,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   // A purchase review remains usable while the partner's real forecast/chart is open.
   await couch.input({ "101": ["build"] });
   await sizeSolar(build1);
-  await build1
-    .getByRole("button", { name: "Review purchase of Solar", exact: true })
-    .focus();
+  await expect(review1).toBeEnabled();
+  await review1.focus();
   await couch.input({ "101": ["confirm"] });
   await expect(purchase1).toBeVisible();
   await expect(
@@ -714,7 +740,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     if (await dismiss.isVisible()) await dismiss.click();
     await expect(dismiss).toHaveCount(0);
   }
-  if (process.env.REVIEW_SCREENSHOT_DIR) {
+  if (megawatts === 50 && process.env.REVIEW_SCREENSHOT_DIR) {
     await p1.screenshot({
       path: path.join(
         process.env.REVIEW_SCREENSHOT_DIR,
@@ -822,7 +848,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   expect(
     couch.checkpoint()!.grids.map((grid) => grid.facilities.length),
   ).toEqual(complete.grids.map((grid) => grid.facilities.length));
-});
+}
 
 test("TV couch intertie construction requires approval from both company owners", async ({
   context,

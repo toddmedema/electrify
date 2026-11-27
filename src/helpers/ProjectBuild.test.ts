@@ -33,6 +33,22 @@ function fixture() {
   return { game, project };
 }
 
+it.each([0, 1, 2, 3, 4, 5, 112, 116])(
+  "starts authored map %i with two or more connected sites for a normal project",
+  (scenarioId) => {
+    const game = createGame({ scenarioId, seed: 188 });
+    const project = { name: "Wind", fuel: "Wind", peakW: 20e6 } as const;
+    const sites = territoryTileViews(game).filter(
+      ({ tile, developed, owned }) => {
+        if (!developed || !owned) return false;
+        const quote = projectSiteQuote(game, project, tile.id);
+        return "facility" in quote && quote.connectionCost === 0;
+      },
+    );
+    expect(sites.length).toBeGreaterThanOrEqual(2);
+  },
+);
+
 it("offers terrain-bounded map catalogue maxima while retaining lower technology limits and off-map sizes", () => {
   const { game } = fixture();
   game.date.year = 2035;
