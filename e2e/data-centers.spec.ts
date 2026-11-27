@@ -318,7 +318,7 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   await page.goto("/data-centers.html");
   await page
     .locator(".topnav")
-    .getByRole("link", { name: "Explore the impact" })
+    .getByRole("link", { name: "Open simulator" })
     .click();
   await expect(page).toHaveURL(/dataCenters=1/);
   await ready(page);
@@ -336,6 +336,9 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   const before = (await savedGame(page))!;
   expect(before.inGame).toBe(true);
   expect(before.speed).toBe("PAUSED");
+  // Focus the dialog itself so Space tests the game shortcut without activating a button.
+  await intro.focus();
+  await expect(intro).toBeFocused();
   for (const key of ["1", "3", "Space", "q", "w", "g", "?"])
     await page.keyboard.press(key);
   await expect(intro).toBeVisible();

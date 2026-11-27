@@ -92,7 +92,7 @@ describe("the CTA blue is the logo blue", () => {
   it("is what every home-screen button and link reads, with no quieter or deeper blue", () => {
     const styles = withoutComments(read("src/app.scss"));
     expect(styles).toMatch(
-      /\.homeExplore a\s*\{[^}]*color:\s*var\(--interactive-blue\);/,
+      /\.homeExplore a\s*\{[^}]*text-decoration-color:\s*var\(--interactive-blue\);/,
     );
     expect(styles).toMatch(
       /#menuCard\s+\.homeExplore\s+a:focus\s*\{[^}]*outline:\s*2px solid var\(--interactive-blue\);/,
@@ -111,9 +111,11 @@ describe("the CTA blue is the logo blue", () => {
       /\.button--primary\s*\{\s*border-color:\s*var\(--brand\);\s*background:\s*var\(--brand\);/,
     );
     const shell = read("public/index.html");
-    expect(shell).toMatch(/\.app-loading a\s*\{[^}]*color:\s*#0084f8;/);
     expect(shell).toMatch(
-      /data-theme="dark"\]\s*\.app-loading a\s*\{\s*color:\s*#629be1;/,
+      /\.app-loading a\s*\{[^}]*text-decoration-color:\s*#0084f8;/,
+    );
+    expect(shell).toMatch(
+      /@media \(prefers-color-scheme: dark\)[^@]*\.app-loading a\s*\{[^}]*text-decoration-color:\s*#629be1;/,
     );
   });
 

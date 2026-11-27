@@ -5,51 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>Page not found — Electrify</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        font-family: system-ui, sans-serif;
-        background: #f3f5f7;
-        color: #172333;
-      }
-      body {
-        max-width: 42rem;
-        margin: 15vh auto;
-        padding: 24px;
-        line-height: 1.6;
-      }
-      a {
-        color: #075ab4;
-        display: inline-flex;
-        align-items: center;
-        min-height: 44px;
-        margin-right: 16px;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          background: #111923;
-          color: #edf3fa;
-        }
-        a {
-          color: #8ec5ff;
-        }
-      }
-    </style>
+    <link rel="stylesheet" href="/legal.css" />
   </head>
-  <body>
-    <main>
+  <body class="site-message-page">
+    <main class="site-message">
       <h1>Page not found</h1>
       <p>
-        This address does not lead to an Electrify page. Start a game or explore
-        the guides below.
+        You can still open the game, pick a scenario, or learn how to run your
+        grid.
       </p>
-      <nav aria-label="Explore Electrify">
-        <a href="/">Play Electrify</a>
-        <a href="/power-grid-simulator.html">How to play</a>
-        <a href="/scenarios.html">Scenarios</a>
-        <a href="/classroom.html">For teachers</a>
-        <a href="/about.html">About</a>
-      </nav>
+      <a class="button button--primary" href="/">Play Electrify</a>
+      <div class="site-footer">
+        <nav aria-label="Explore Electrify">
+          <a href="/power-grid-simulator.html">Learn how to play</a>
+          <a href="/scenarios.html">Scenarios</a>
+          <a href="/classroom.html">For teachers</a>
+          <a href="/about.html">About</a>
+        </nav>
+      </div>
     </main>
   </body>
 </html>

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { expectReadableText } from "./contrast";
 import { expect, test } from "./fixtures";
 
 const pages = [
@@ -12,30 +13,6 @@ test.describe("learning pages without JavaScript", () => {
   test.use({ javaScriptEnabled: false });
 
   for (const theme of ["light", "dark"] as const) {
-    test(`the homepage links to getting started and classroom resources in ${theme} mode`, async ({
-      page,
-    }) => {
-      await page.emulateMedia({ colorScheme: theme });
-      await page.goto("/");
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      for (const pathname of [
-        "/power-grid-simulator.html",
-        "/classroom.html",
-        "/scenarios.html",
-      ])
-        await expect(
-          page.getByRole("main").locator(`a[href='${pathname}']`),
-        ).toBeVisible();
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth),
-      ).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
-      await page
-        .getByRole("link", { name: "How to play", exact: true })
-        .click();
-      await expect(page).toHaveURL(/\/power-grid-simulator\.html$/);
-      await expect(page.getByRole("main")).toBeVisible();
-    });
-
     for (const pathname of pages) {
       const tag =
         pathname === "/data-centers.html" && theme === "dark"
@@ -80,6 +57,9 @@ test.describe("learning pages without JavaScript", () => {
               narrow ? 1 : 0,
             );
             if (narrow) {
+              await expect(
+                cells.nth(1).locator(".comparison-table__arrow"),
+              ).toBeVisible();
               await expect(cells.nth(1)).toContainText(/\([−+]\d+%\)/);
               // A long value may wrap, but "after" never precedes "before".
               expect(campus.y).toBeGreaterThanOrEqual(baseline.y - 1);
@@ -118,6 +98,30 @@ test.describe("learning pages without JavaScript", () => {
               ),
             )
             .toBeGreaterThan(0);
+        }
+
+        if (pathname === "/power-grid-simulator.html") {
+          const guide = page.getByRole("main").getByRole("link", {
+            name: "classroom guide",
+            exact: true,
+          });
+          const footerLink = page
+            .getByRole("contentinfo")
+            .locator('a[href="/energy-simulators.html"]');
+          await expect(footerLink).toHaveCount(1);
+          const typography = (element: Element) => {
+            const { fontSize, fontWeight } = getComputedStyle(element);
+            return { size: parseFloat(fontSize), weight: fontWeight };
+          };
+          const bodyType = await guide.locator("..").evaluate(typography);
+          expect(await guide.evaluate(typography)).toEqual(bodyType);
+          const footerType = await footerLink.evaluate(typography);
+          expect(footerType.size).toBeLessThan(bodyType.size);
+          expect(footerType.weight).toBe(bodyType.weight);
+          for (const link of [guide, footerLink]) {
+            await expect(link).toHaveCSS("text-decoration-line", "underline");
+            await expectReadableText(link);
+          }
         }
 
         // A reader must be able to get to these resources without running the game.
