@@ -182,6 +182,34 @@ async function select(
   ).toBeFocused();
 }
 
+async function reorderFirstFleetRow(page: Page) {
+  const rows = page.locator(".facilities:visible .facilityRow");
+  const firstId = (await rows.first().getAttribute("data-rfd-draggable-id"))!;
+  const grip = rows.first().getByRole("button", { name: /^Reorder / });
+  await select(page, grip);
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
+  await input(page, "down");
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
+  return { rows, firstId };
+}
+
+async function reopenReorderedFleetChart(
+  page: Page,
+  rows: Locator,
+  firstId: string,
+) {
+  await input(page, "nextChart");
+  const chart = page.locator(
+    '.accessibleChart > [role="img"][tabindex="0"]:focus',
+  );
+  await expect(chart).toBeFocused();
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
+  return chart;
+}
+
 /** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
 async function selectMapTile(page: Page, id: TerritoryTileId) {
   const target = page.locator(`[data-map-target="${id}"]`);
@@ -727,22 +755,13 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await expect(
     page.getByRole("region", { name: "Fleet", exact: true }),
   ).toBeVisible();
-  const rows = page.locator(".facilities:visible .facilityRow");
-  const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
-  const grip = rows.first().getByRole("button", { name: /^Reorder / });
-  await select(page, grip);
-  await input(page, "confirm");
-  await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
-  await input(page, "down");
-  await input(page, "confirm");
-  await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
-  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  const { rows, firstId } = await reorderFirstFleetRow(page);
   await input(page, "confirm");
   await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
   await input(page, "up");
   await input(page, "back");
   await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
-  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
 
   // Use the Build action from Fleet and verify category memory through the pane ring.
   await input(page, "build");
@@ -798,12 +817,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
-  await input(page, "nextChart");
-  const chart = page.locator(
-    '.accessibleChart > [role="img"][tabindex="0"]:focus',
-  );
-  await expect(chart).toBeFocused();
-  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  const chart = await reopenReorderedFleetChart(page, rows, firstId);
   await input(page, "confirm");
   await expect(chart.locator("..").getByRole("status")).not.toBeEmpty();
   await input(page, "right");
@@ -1267,6 +1281,10 @@ test("controller cycles six tools around the persistent map", async ({
   ).toHaveCount(0);
   const viewport = map.locator(".territoryMapViewport");
   const original = await viewport.elementHandle();
+  await input(page, "nextPane");
+  const { rows, firstId } = await reorderFirstFleetRow(page);
+  await input(page, "previousPane");
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   for (const name of [
     "Fleet",
     "Agreements",
@@ -1299,7 +1317,7 @@ test("controller cycles six tools around the persistent map", async ({
   await expect(
     page.getByRole("button", { name: "Rapid connection mode", exact: true }),
   ).toBeFocused();
-  await input(page, "nextChart");
+  await reopenReorderedFleetChart(page, rows, firstId);
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   await expect(fleet).toBeVisible();
   await expect(fleet.locator('#chartSupplyDemand [role="img"]')).toBeFocused();

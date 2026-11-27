@@ -235,9 +235,7 @@ for (const theme of ["light", "dark"]) {
     const supportsHover = await page.evaluate(
       () => matchMedia("(hover: hover) and (pointer: fine)").matches,
     );
-    const build = page
-      .getByRole("navigation", { name: "Game actions" })
-      .getByRole("button", { name: "Build", exact: true });
+    const build = page.getByRole("button", { name: "Build", exact: true });
     await expect(build).toHaveAttribute("aria-expanded", "false");
     await expectGlyphContrast(build, supportsHover, blue);
     const speeds = page.getByRole("group", { name: "game speed", exact: true });
