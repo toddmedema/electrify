@@ -34,7 +34,6 @@ import {
 } from "./reducers/User";
 
 import {
-  customEventFromSearch,
   campaignSetupUrl,
   isLegacyCampaignSearch,
   isDataCenterSetupSearch,
@@ -360,22 +359,9 @@ export default function App() {
         !challenge && isDataCenterSetupSearch(window.location.search);
       // A data-center visitor already starts on its setup (see startupCard in reducers/Card), and
       // the guide stays the browser's Back destination because no catalog entry is pushed.
-      const customEvent =
-        !challenge &&
-        !dataCenterSetup &&
-        customEventFromSearch(window.location.search);
-      if (typeof customEvent === "number") {
-        const url = window.location.pathname + window.location.search;
-        getHistoryApi().replaceState(null, "", scenarioListUrl());
-        store.dispatch(
-          navigate({ name: "NEW_GAME", skipBrowserHistory: true }),
-        );
-        store.dispatch(navigate({ name: "CUSTOM_GAME", url }));
-      }
       const legacyCampaign =
         !challenge &&
         !dataCenterSetup &&
-        customEvent === undefined &&
         isLegacyCampaignSearch(window.location.search);
       if (legacyCampaign) {
         const url = campaignSetupUrl();
@@ -388,7 +374,6 @@ export default function App() {
       const sharedScenario =
         !challenge &&
         !dataCenterSetup &&
-        customEvent === undefined &&
         !legacyCampaign &&
         scenarioFromSearch(window.location.search);
       if (sharedScenario) {
@@ -415,13 +400,6 @@ export default function App() {
       if (isDataCenterSetupSearch(window.location.search)) {
         store.dispatch(
           navigate({ name: "DATA_CENTER_SETUP", skipBrowserHistory: true }),
-        );
-        e.preventDefault();
-        return;
-      }
-      if (customEventFromSearch(window.location.search) !== undefined) {
-        store.dispatch(
-          navigate({ name: "CUSTOM_GAME", skipBrowserHistory: true }),
         );
         e.preventDefault();
         return;

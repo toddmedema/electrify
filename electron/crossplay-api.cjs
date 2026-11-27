@@ -71,7 +71,7 @@ const REQUESTS = {
     { ...room, key: values(["ready", "slot"]), value: text(512) },
   ],
   "room/lock": [{ ...room, ids: list, requiredIds: list }],
-  "room/unlock": [room],
+  "room/unlock": [room, { finished: values([true]) }],
   "room/leave": [room],
   "room/suspend": [{ ...room, presence: id }, { seq }],
   "room/resume": [{ ...room, presence: id }, { seq }],

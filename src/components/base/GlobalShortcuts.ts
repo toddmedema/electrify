@@ -38,6 +38,8 @@ function shouldIgnoreShortcut(event: KeyboardEvent): boolean {
   if (!tagName) {
     return false;
   }
+  // A custom dropdown (MUI Select) types ahead like a native select: its letters are its own.
+  if (target?.matches('[role="combobox"]')) return true;
   if (
     tagName === "input" &&
     NON_TEXT_INPUT_TYPES.has((target as HTMLInputElement).type)

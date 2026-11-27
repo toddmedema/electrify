@@ -45,8 +45,8 @@ for (const theme of ["light", "dark"] as const) {
       info.project.name === "desktop-chromium"
     ) {
       await expect(
-        page.getByText("Calculating Year 1 outlook…", { exact: true }),
-      ).toHaveCount(0, { timeout: 20000 });
+        page.getByRole("region", { name: "Year 1 outlook" }),
+      ).not.toHaveAttribute("aria-busy", "true", { timeout: 20000 });
       await map.scrollIntoViewIfNeeded();
       await page.screenshot({ path: ".tmp/pr-desktop.png" });
     }

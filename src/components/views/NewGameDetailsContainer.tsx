@@ -3,6 +3,7 @@ import { achievementJournal } from "../../achievements/Journal";
 import {
   playableDifficulty,
   unlockedDifficulty,
+  unlockedForPlay,
 } from "../../achievements/DifficultyUnlocks";
 import type { DifficultyType } from "../../Types";
 import type { AppDispatch } from "../../Store";
@@ -17,39 +18,41 @@ import { AppStateType, GameType } from "../../Types";
 import NewGameDetails, { DispatchProps, StateProps } from "./NewGameDetails";
 import { coopControls } from "../../multiplayer/Registry";
 
-const difficultyAllowed = (difficulty: DifficultyType) =>
-  playableDifficulty(
-    difficulty,
+// Co-op guests follow the host's selection.
+const coopRole = () => store.getState().ui.coop?.role;
+
+// A lobby can play any difficulty; only a solo run is limited to what its player has unlocked.
+const unlockedNow = () =>
+  unlockedForPlay(
     unlockedDifficulty(achievementJournal.getSnapshot().progress),
-  ) === difficulty;
+    !!coopRole(),
+  );
+const difficultyAllowed = (difficulty: DifficultyType) =>
+  playableDifficulty(difficulty, unlockedNow()) === difficulty;
 const selectedDifficulty = () =>
   playableDifficulty(
     store.getState().ui.previewDifficulty ?? store.getState().game.difficulty,
-    unlockedDifficulty(achievementJournal.getSnapshot().progress),
+    unlockedNow(),
   );
-
-// Co-op guests follow the host's selection.
-const coopRole = () => store.getState().ui.coop?.role;
 
 // An explicit second parameter lets connect observe synced unlock changes.
 export const mapStateToProps = (
   state: AppStateType,
   ownProps?: { unlockedThrough: DifficultyType },
 ): StateProps => {
-  const unlockedThrough =
+  const unlockedThrough = unlockedForPlay(
     ownProps?.unlockedThrough ??
-    unlockedDifficulty(achievementJournal.getSnapshot().progress);
+      unlockedDifficulty(achievementJournal.getSnapshot().progress),
+    !!state.ui.coop,
+  );
   return {
     game: {
       ...state.game,
       scenarioId: state.ui.scenarioPreview ?? state.game.scenarioId,
-      difficulty:
-        state.ui.coop?.role === "guest"
-          ? (state.ui.previewDifficulty ?? state.game.difficulty)
-          : playableDifficulty(
-              state.ui.previewDifficulty ?? state.game.difficulty,
-              unlockedThrough,
-            ),
+      difficulty: playableDifficulty(
+        state.ui.previewDifficulty ?? state.game.difficulty,
+        unlockedThrough,
+      ),
     },
     uid: state.user.uid,
     coop: state.ui.coop,

@@ -185,12 +185,6 @@ describe("deterministic story schedules", () => {
     ).toBe(false);
     expect(otherScenario.effects.fuelPriceMultipliers).toBeUndefined();
     expect(resolveStoryAtDate(context(48, 999)).occurrences).toEqual([]);
-    expect(
-      resolveStoryAtDate({
-        ...context(48, 999),
-        customEvents: [{ scenarioId: 103, moneyScale: 1 }],
-      }).effects.fuelPriceMultipliers,
-    ).toEqual({ "Natural Gas": 0.75 });
   });
 
   it("returns the same scheduled effect throughout its forecast window", () => {
@@ -359,7 +353,7 @@ describe("authored upcoming-event previews", () => {
     OFFICIAL_SCENARIO_RULES.filter((arc) => arc.scenarioId !== 111).map(
       (arc) => [arc.arcId, arc] as const,
     ),
-  )("%s hides exact outcomes in native and custom forecasts", (_id, arc) => {
+  )("%s hides exact outcomes in native forecasts", (_id, arc) => {
     const difficulties: DifficultyType[] = [
       "Intern",
       "Employee",
@@ -368,78 +362,71 @@ describe("authored upcoming-event previews", () => {
       "CEO",
     ];
     for (const difficulty of difficulties) {
-      for (const scenarioId of [arc.scenarioId, 999]) {
-        const start = {
-          ...context(0, scenarioId),
-          difficulty,
-          customEvents:
-            scenarioId === 999
-              ? [{ scenarioId: arc.scenarioId, moneyScale: 2 }]
-              : undefined,
-        };
-        const events = upcomingStoryPhases(start);
-        for (const event of events) {
-          expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
-          expect(event.startsMinute).toBeGreaterThan(start.date.minute);
-        }
-        // Current results and plant names cannot stand in for a future event's outcome.
-        const withResults = upcomingStoryPhases({
-          ...start,
-          snapshot: {
-            ...EMPTY_SNAPSHOT,
-            deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
-            demandWh12m: 100,
-            unservedWh12m: 30,
-            netIncome12m: -100,
-            facilities: [
+      const start = {
+        ...context(0, arc.scenarioId),
+        difficulty,
+      };
+      const events = upcomingStoryPhases(start);
+      for (const event of events) {
+        expect(`${event.title} ${event.message}`).not.toMatch(/[\d%$]/);
+        expect(event.startsMinute).toBeGreaterThan(start.date.minute);
+      }
+      // Current results and plant names cannot stand in for a future event's outcome.
+      const withResults = upcomingStoryPhases({
+        ...start,
+        snapshot: {
+          ...EMPTY_SNAPSHOT,
+          deliveredWhByFuel12m: { Coal: 80, "Natural Gas": 10 },
+          demandWh12m: 100,
+          unservedWh12m: 30,
+          netIncome12m: -100,
+          facilities: [
+            {
+              id: 1,
+              name: "Current coal plant",
+              fuel: "Coal",
+              ageYears: 40,
+              peakW: 100,
+              operational: true,
+            },
+          ],
+        },
+      });
+      expect(
+        withResults.map(({ key, title, message }) => ({
+          key,
+          title,
+          message,
+        })),
+      ).toEqual(
+        events.map(({ key, title, message }) => ({ key, title, message })),
+      );
+      const hiddenIds = (arc.definitions.events ?? [])
+        .filter(
+          (event) =>
+            event.visibility === "surprise" ||
+            arc.presentation[event.id]?.hidePreview ||
+            !event.preview,
+        )
+        .map((event) => event.id);
+      expect(
+        events.filter((event) =>
+          hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
+        ),
+      ).toEqual([]);
+      const previews = (arc.definitions.events ?? []).flatMap((event) =>
+        event.preview
+          ? [
               {
-                id: 1,
-                name: "Current coal plant",
-                fuel: "Coal",
-                ageYears: 40,
-                peakW: 100,
-                operational: true,
+                title: arc.presentation[event.id]?.previewTitle ?? event.title,
+                message: event.preview,
               },
-            ],
-          },
-        });
-        expect(
-          withResults.map(({ key, title, message }) => ({
-            key,
-            title,
-            message,
-          })),
-        ).toEqual(
-          events.map(({ key, title, message }) => ({ key, title, message })),
-        );
-        const hiddenIds = (arc.definitions.events ?? [])
-          .filter(
-            (event) =>
-              event.visibility === "surprise" ||
-              arc.presentation[event.id]?.hidePreview ||
-              !event.preview,
-          )
-          .map((event) => event.id);
-        expect(
-          events.filter((event) =>
-            hiddenIds.some((id) => event.key.endsWith(`:${id}`)),
-          ),
-        ).toEqual([]);
-        const previews = (arc.definitions.events ?? []).flatMap((event) =>
-          event.preview
-            ? [
-                {
-                  title:
-                    arc.presentation[event.id]?.previewTitle ?? event.title,
-                  message: event.preview,
-                },
-              ]
-            : [],
-        );
-        for (const preview of previews) {
-          // Also review the opening phase, which may already be active at month zero.
-          expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
-        }
+            ]
+          : [],
+      );
+      for (const preview of previews) {
+        // Also review the opening phase, which may already be active at month zero.
+        expect(`${preview.title} ${preview.message}`).not.toMatch(/[\d%$]/);
       }
     }
   });

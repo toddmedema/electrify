@@ -91,6 +91,16 @@ export async function verifyMenuKeyboard(page: Page): Promise<void> {
   });
   await expect(scale).toBeFocused();
   await expect(scale).toHaveValue("1");
+  // Arrow keys carry focus on past a dropdown, and back, instead of opening or changing it;
+  // Enter, Space and a controller's A open it.
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    page.getByRole("switch", { name: "Sound", exact: true }),
+  ).toBeFocused();
+  await expect(scale).toHaveValue("1");
+  await page.keyboard.press("ArrowUp");
+  await expect(scale).toBeFocused();
+  await expect(scale).toHaveValue("1");
   // Native typeahead works with both desktop popups and mobile pickers; Tab commits the choice.
   await page.keyboard.type("125%");
   await page.keyboard.press("Tab");

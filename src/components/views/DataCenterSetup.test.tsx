@@ -89,7 +89,6 @@ function preparedScenario(): ScenarioType {
       },
       { name: "Natural Gas CC", fuel: "Natural Gas", peakW: 2000000000 },
     ],
-    eventScenarioIds: [106],
     loadAdditions: [
       {
         id: "campus",
