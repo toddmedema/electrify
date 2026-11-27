@@ -207,6 +207,36 @@ Before UI work, read and follow the [interface design guidance](docs/interface-d
 covers action hierarchy, spacing and control heights, palette and contrast, reflow down to 360 px,
 and accessible labels for controls and charts.
 
+## Player-facing writing
+
+Use this whenever you add or change words players see, even as part of a code change: UI labels,
+tooltips, status and error messages, tutorials, the manual and in-game help, scenarios, and web or
+Steam copy. Also use the public-site and scenario writing skills for those surfaces.
+
+- Write like you're explaining the grid to a friend who wants to play. Use “you,” familiar verbs,
+  and contractions where they sound natural. Start with the action, decision, or consequence.
+  Give one concrete detail instead of a generic promise. Read neighboring shipped copy before
+  changing terminology or tone.
+- **UI:** Name the action or state. A warning should explain what happened and what the player can
+  do next, if anything. Keep accessible names useful out of context.
+- **Tutorials:** Teach one action at a time. Use the exact on-screen control name; tell players
+  what to look for when it matters. Don't assume a mouse when the same text is used on touch or
+  controller.
+- **Manual and help:** Start with the answer, then explain why it works. Keep prerequisites,
+  units, limits, and exceptions that could change a player's choice. Use an example when it
+  explains a mechanic better than another paragraph.
+- **Before shipping:** Cut text the screen already tells the player. Verify labels and claims
+  against the game, and read the copy in the screen or lesson where it appears. For UI strings,
+  check the 360 px layout and any affected input modes or localization.
+
+Examples (illustrative, not new game strings):
+
+- Button: “Copy link” instead of “Copy invitation URL to clipboard.”
+- Tutorial: “Open Build and choose a Battery” instead of “Navigate to the construction interface
+  to begin adding storage capacity.”
+- Manual: “Solar stops producing at night. A battery can store daytime power for later” instead
+  of “Storage assets can mitigate intermittency from renewable sources.”
+
 ## Task guidance skills
 
 Read the matching skill before starting.
