@@ -5,6 +5,8 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import { getStorageJson, setStorageKeyValue } from "../../LocalStorage";
 import { useToolScroll, useToolState } from "./GameToolMemory";
 import { MapWindowFrontContext } from "./GameWorkspaceContext";
+import ConceptIcon from "./ConceptIcon";
+import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 
 type Size = { width: number; height: number };
 type MapWindowLayout = {
@@ -116,23 +118,25 @@ export default function MapPanelWindow({
   tool,
   label,
   icon,
-  stackingIndex,
-  front,
+  stackingIndex = 0,
+  front = true,
   floating,
   onRaise,
   onClose,
   onBack,
+  project,
   children,
 }: {
   tool: string;
   label: string;
   icon: React.ReactNode;
-  stackingIndex: number;
-  front: boolean;
+  stackingIndex?: number;
+  front?: boolean;
   floating?: MapWindowLayout;
-  onRaise: (toClose: boolean) => void;
+  onRaise?: (toClose: boolean) => void;
   onClose: () => void;
   onBack?: () => void;
+  project?: { catalogue: boolean; focusKey: React.Key };
   children: React.ReactNode;
 }) {
   const storageKey = `electrify.mapWindow.${tool}`;
@@ -143,6 +147,12 @@ export default function MapPanelWindow({
   const gesture = React.useRef<Gesture>();
   const title = React.useRef<HTMLHeadingElement>(null);
   const closeButton = React.useRef<HTMLButtonElement>(null);
+  const titleId = React.useId();
+  const projectFocus = project?.focusKey;
+  React.useLayoutEffect(() => {
+    if (projectFocus !== undefined)
+      title.current?.focus({ preventScroll: true });
+  }, [projectFocus]);
   const body = useToolScroll<HTMLDivElement>(`workspace.${tool}.scroll`);
   const area = floating?.area;
   const scale = floating?.scale ?? 1;
@@ -270,18 +280,24 @@ export default function MapPanelWindow({
   const raiseFrom = (event: React.SyntheticEvent<HTMLElement>) => {
     const target = event.target;
     if (target instanceof Node && event.currentTarget.contains(target))
-      onRaise(closeButton.current?.contains(target) ?? false);
+      onRaise?.(closeButton.current?.contains(target) ?? false);
   };
 
   return (
     <section
       id={`tool-${tool}`}
-      className="gameToolPanel"
+      className={
+        project
+          ? `gameToolPanel tileWorkspaceSurface ${project.catalogue ? "tileWorkspaceBuilding" : "tileWorkspaceProject"}`
+          : "gameToolPanel"
+      }
+      role={project ? "dialog" : undefined}
       data-resizable={floating ? "true" : undefined}
-      aria-label={label}
+      aria-label={project ? undefined : label}
+      aria-labelledby={project ? titleId : undefined}
       data-game-tool={tool}
       data-tool-side={floating ? undefined : "right"}
-      data-map-window-front={front}
+      data-map-window-front={project ? undefined : front}
       style={
         rect && {
           left: rect.x,
@@ -302,6 +318,20 @@ export default function MapPanelWindow({
       onPointerUp={end}
       onPointerCancel={end}
       onLostPointerCapture={end}
+      onKeyDown={
+        project &&
+        ((event) => {
+          if (
+            event.key !== "Escape" ||
+            event.defaultPrevented ||
+            hasVisibleEscapeOverlay()
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        })
+      }
     >
       <header
         className="gameToolHeader"
@@ -317,6 +347,7 @@ export default function MapPanelWindow({
           </IconButton>
         )}
         <h2
+          id={titleId}
           className="gameToolTitle"
           tabIndex={floating ? 0 : -1}
           aria-keyshortcuts={floating ? WINDOW_SHORTCUTS : undefined}
@@ -332,14 +363,18 @@ export default function MapPanelWindow({
           {label}
         </h2>
         <IconButton
-          aria-label={`Close ${label}`}
+          aria-label={project ? "Close project" : `Close ${label}`}
           onClick={onClose}
           ref={closeButton}
         >
           <CloseIcon />
         </IconButton>
       </header>
-      <div className="gameToolBody" data-chart-viewport ref={body}>
+      <div
+        className={project ? "gameToolBody tileWorkspaceBody" : "gameToolBody"}
+        data-chart-viewport
+        ref={body}
+      >
         <MapWindowFrontContext.Provider value={front}>
           {children}
         </MapWindowFrontContext.Provider>
@@ -355,5 +390,31 @@ export default function MapPanelWindow({
           />
         ))}
     </section>
+  );
+}
+
+export function MapProjectPanel({
+  title,
+  catalogue,
+  focusKey,
+  onClose,
+  children,
+}: {
+  title: string;
+  catalogue: boolean;
+  focusKey: React.Key;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <MapPanelWindow
+      tool="BUILD_GENERATORS"
+      label={title}
+      icon={catalogue && <ConceptIcon concept="build" decorative />}
+      project={{ catalogue, focusKey }}
+      onClose={onClose}
+    >
+      {children}
+    </MapPanelWindow>
   );
 }

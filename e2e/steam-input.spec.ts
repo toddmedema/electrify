@@ -1538,7 +1538,7 @@ test("TV saved display preferences style direct scenario links before play", asy
   const warning = page.locator(".gridHealth.statusWarning");
   await expect(warning).toBeVisible();
   await expect(warning.locator(".gridStatusFuture")).toContainText(
-    "FUTURE Supply risk:",
+    "FUTURE Shortage:",
   );
   expect(
     await foregroundContrast(warning.locator(".gridStatusButton")),

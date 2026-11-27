@@ -206,7 +206,7 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   });
   await expect(map).toBeVisible();
   const front = workspace.locator(
-    '[data-map-window-front="true"], .tileWorkspaceInspector:not([data-game-tool]), .tileWorkspaceBuilding',
+    ':is([data-map-window-front="true"], .tileWorkspaceInspector:not([data-game-tool]), .tileWorkspaceBuilding):not([inert] *)',
   );
   while (await front.count()) {
     if (
@@ -223,7 +223,7 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   }
   await expect(
     workspace.locator(
-      ".gameToolPanel:visible, .tileWorkspaceInspector:visible, .tileWorkspaceBuilding:visible",
+      ".gameToolPanel:visible:not(.tileWorkspaceProject), .tileWorkspaceInspector:visible, .tileWorkspaceBuilding:visible",
     ),
   ).toHaveCount(0);
   return map;

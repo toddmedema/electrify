@@ -525,6 +525,9 @@ for (const theme of ["light", "dark"] as const) {
           await readTerritoryMapCamera(viewport),
           "opening a tool does not pan or zoom the map",
         ).toEqual(camera);
+        await expect(page.locator(".mapPanelSlide-enter-active")).toHaveCount(
+          0,
+        );
         const geometry = await panel.evaluate((element) => {
           const box = element.getBoundingClientRect();
           const stage = element.closest(".gameStage")!.getBoundingClientRect();
@@ -536,7 +539,7 @@ for (const theme of ["light", "dark"] as const) {
               .querySelector("#navfooter")!
               .getBoundingClientRect().top,
             rightInset: parseFloat(
-              getComputedStyle(element.parentElement!).right,
+              getComputedStyle(element.closest(".gameToolTray")!).right,
             ),
             stageRight: stage.right,
             overflow: element.scrollWidth - element.clientWidth,
@@ -1494,15 +1497,24 @@ for (const theme of ["light", "dark"] as const) {
       scale: "css",
     });
     await expect(surface).not.toContainText("Cash after connection");
+    const connect = surface.getByRole("button", {
+      name: `Connect ${formatPurchasePrice(quote.price)}`,
+      exact: true,
+    });
+    await expect(connect).toBeEnabled();
+    await connect.click();
     await expect(
-      surface.getByRole("button", {
-        name: `Connect (${formatPurchasePrice(quote.price)})`,
-        exact: true,
-      }),
-    ).toBeEnabled();
-    await surface.getByRole("button", { name: /^Connect \(/ }).click();
-    await expect(surface).toContainText("Connection under construction");
+      surface.getByRole("button", { name: "Build here", exact: true }),
+    ).toBeDisabled();
+    await expect(surface).toContainText(
+      /Constructing transmission lines · \d+ months? left/,
+    );
     await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
+    await reviewScreenshot(surface, {
+      path: info.outputPath(`transmission-construction-${theme}.png`),
+      animations: "disabled",
+      scale: "css",
+    });
     const owned = (await readSavedGame(page))!;
     expect(currentTick(owned)!.cash).toBeCloseTo(
       currentTick(before)!.cash - quote.price,
@@ -1572,7 +1584,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await inspectTile(page, neighbor);
     await expect(
-      surface.getByRole("button", { name: /^Connect \(/ }),
+      surface.getByRole("button", { name: /^Connect / }),
     ).toBeEnabled();
   });
 
@@ -1831,7 +1843,7 @@ for (const theme of ["light", "dark"] as const) {
     await target.click();
     const surface = tileSurface(page);
     await expect(
-      surface.getByRole("button", { name: /^Connect \(/ }),
+      surface.getByRole("button", { name: /^Connect / }),
     ).toBeDisabled();
     await expect(surface.getByRole("status")).toContainText("more cash needed");
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(1);
@@ -1996,7 +2008,7 @@ for (const theme of ["light", "dark"] as const) {
         await openMap(page);
       }
       const surface = await inspectTile(page, tile);
-      await surface.getByRole("button", { name: /^Connect \(/ }).click();
+      await surface.getByRole("button", { name: /^Connect / }).click();
       await waitForTileConnection(page, tile.id);
       await openLockedBuild(surface);
       const plant = await reviewTileBuild(page, resource.name);
@@ -2120,7 +2132,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await target.click({ button: "right" });
   const menu = page.getByRole("menu", { name: "Tile actions" });
   const connect = menu.getByRole("menuitem", {
-    name: `Connect (${formatPurchasePrice(quote.price)})`,
+    name: `Connect ${formatPurchasePrice(quote.price)}`,
     exact: true,
   });
   await expect(connect).toBeEnabled();

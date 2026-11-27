@@ -1,6 +1,8 @@
 import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
 import { TransitionGroup } from "react-transition-group";
+import MapPanelSlide from "../base/MapPanelSlide";
+import { MapProjectPanel } from "../base/MapPanelWindow";
 import RemovalCollapse from "../base/RemovalCollapse";
 import { Button, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
@@ -12,6 +14,7 @@ import {
   landTransferredCustomers,
 } from "../../helpers/Territories";
 import { utilityOffer } from "../../helpers/Expansion";
+import TileConnectionBuildStatus from "../base/TileConnectionBuildStatus";
 import { currentTick } from "../../helpers/GameSelectors";
 import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import {
@@ -51,6 +54,7 @@ import { cityCustomerCount } from "../../helpers/CityProfiles";
 import {
   citySizeLabel,
   formatTerrainPercent,
+  tileHasConstructionTechnology,
 } from "../base/TerritoryTileFacts";
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
@@ -65,7 +69,7 @@ import {
   tutorialInspectedMapFacility,
 } from "../../reducers/GameActions";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import TileWorkspaceSurface, {
+import {
   findTileControl,
   TileInspectionSurface,
 } from "../base/TileWorkspaceSurface";
@@ -99,19 +103,17 @@ import {
 
 function ProjectBuildUnavailable({ onClose }: { onClose: () => void }) {
   return (
-    <TileWorkspaceSurface
-      id="tool-BUILD_GENERATORS"
-      closeLabel="Close project"
+    <MapProjectPanel
+      catalogue
       title="Project planner unavailable"
       focusKey="project-unavailable"
-      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={onClose}
     >
       <p role="status">
         The project planner could not load. Close this panel and open Build to
         try again.
       </p>
-    </TileWorkspaceSurface>
+    </MapProjectPanel>
   );
 }
 
@@ -129,17 +131,14 @@ function DeferredProjectBuild(
   return (
     <React.Suspense
       fallback={
-        <TileWorkspaceSurface
-          id="tool-BUILD_GENERATORS"
-          closeLabel="Close project"
+        <MapProjectPanel
+          catalogue
           title="Build"
-          titleIcon={<ConceptIcon concept="build" decorative />}
           focusKey="project-loading"
-          returnFocusSelector=".desktopBuildRail, #buildNav"
           onClose={props.onClose}
         >
           <p role="status">Loading project planner…</p>
-        </TileWorkspaceSurface>
+        </MapProjectPanel>
       }
     >
       <ProjectBuild {...props} />
@@ -280,6 +279,16 @@ function TileNetwork(props: Props) {
     !tile.city &&
     !view.facility
   );
+  const buildConnection =
+    buildAllowed &&
+    view?.owned &&
+    view.connection &&
+    !view.reserved &&
+    !view.facility &&
+    tile &&
+    tileHasConstructionTechnology(tile)
+      ? view.connection
+      : undefined;
   const showSiteCatalogue =
     buildAllowed && building && !desktopRail && siteCatalogue;
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
@@ -351,11 +360,22 @@ function TileNetwork(props: Props) {
     if (panel?.projectRequested) startProject();
   }, [panel?.projectRequested, startProject]);
   const projectVisible = planning && (!panel?.open || projectPending);
+  const closeProject = React.useCallback(() => {
+    if (projectBusy.current) return;
+    close();
+    map.current
+      ?.querySelector<HTMLElement>(".desktopBuildRail")
+      ?.focus({ preventScroll: true });
+    map.current
+      ?.closest(".gameWorkspace")
+      ?.querySelector<HTMLElement>("#buildNav")
+      ?.focus({ preventScroll: true });
+  }, [close]);
   React.useLayoutEffect(() => {
     if (!projectVisible || !showProject) return;
-    showProject(close);
+    showProject(closeProject);
     return hideProject;
-  }, [projectVisible, showProject, hideProject, close]);
+  }, [projectVisible, showProject, hideProject, closeProject]);
   const projectPricingKey = mapProject
     ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => territoryMapTileKey(tile)))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
     : undefined;
@@ -551,35 +571,39 @@ function TileNetwork(props: Props) {
         onExpand={() => menu && inspect(menu.key, true, "expand")}
         onAcquire={setReview}
       />
-      {projectVisible && (
-        <DeferredProjectBuild
-          game={game}
-          project={project}
-          candidate={candidate}
-          compatibleSites={projectSites?.size ?? 0}
-          catalogue={catalogue}
-          onProject={(selection) => {
-            if (projectBusy.current) return;
-            setProject(selection);
-            setCatalogue(false);
-            setCandidate(undefined);
-            setSelected(undefined);
-          }}
-          onUpdateProject={
-            desktopRail
-              ? (selection) => {
-                  if (!projectBusy.current) setProject(selection);
-                }
-              : undefined
-          }
-          onClose={close}
-          onBusy={(busy) => {
-            projectBusy.current = busy;
-            setProjectPending(busy);
-            panel?.onProjectBusyChange?.(busy);
-          }}
-        />
-      )}
+      <TransitionGroup component={null}>
+        {projectVisible && (
+          <MapPanelSlide key="project">
+            <DeferredProjectBuild
+              game={game}
+              project={project}
+              candidate={candidate}
+              compatibleSites={projectSites?.size ?? 0}
+              catalogue={catalogue}
+              onProject={(selection) => {
+                if (projectBusy.current) return;
+                setProject(selection);
+                setCatalogue(false);
+                setCandidate(undefined);
+                setSelected(undefined);
+              }}
+              onUpdateProject={
+                desktopRail
+                  ? (selection) => {
+                      if (!projectBusy.current) setProject(selection);
+                    }
+                  : undefined
+              }
+              onClose={closeProject}
+              onBusy={(busy) => {
+                projectBusy.current = busy;
+                setProjectPending(busy);
+                panel?.onProjectBusyChange?.(busy);
+              }}
+            />
+          </MapPanelSlide>
+        )}
+      </TransitionGroup>
       {view && tile && inspected && (
         <TileInspectionSurface
           map={map}
@@ -700,10 +724,20 @@ function TileNetwork(props: Props) {
             </>
           ) : (
             <>
-              {view.connection && (
-                <Typography role="status" variant="body2">
-                  {tileConnectionStatus(view.connection, game)}
-                </Typography>
+              {buildConnection ? (
+                <div className="tilePurchaseSummary">
+                  <TileConnectionBuildStatus
+                    connection={buildConnection}
+                    minute={game.date.minute}
+                    paused={game.speed === "PAUSED"}
+                  />
+                </div>
+              ) : (
+                view.connection && (
+                  <Typography role="status" variant="body2">
+                    {tileConnectionStatus(view.connection, game)}
+                  </Typography>
+                )
               )}
               {tile.city ? (
                 <div className="tileCityMetrics">
@@ -772,7 +806,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `Connect (${formatPurchasePrice(quote.price)})`
+                          ? `Connect ${formatPurchasePrice(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
                     {quote && (

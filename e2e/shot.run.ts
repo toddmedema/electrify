@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, Page, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openMapProjectCatalogue, openPane } from "./layout";
 import { readShotRequest, ShotRequest } from "./shot-request";
 
 // Runner for `npm run shot`; see scripts/dev/shot.js. It starts the game and opens panes with
@@ -21,8 +21,11 @@ async function openView(page: Page, view: ShotRequest["view"]) {
       page.locator(".facilities:visible"),
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-  else if (view === "build") await openBuild(page);
-  else {
+  else if (view === "build") {
+    if (await page.locator(".gameWorkspace[data-persistent-map]").count())
+      await openMapProjectCatalogue(page);
+    else await openBuild(page);
+  } else {
     const label = TOOL_LABELS[view];
     await openPane(
       page.getByRole("region", { name: label, exact: true }),
