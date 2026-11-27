@@ -10,6 +10,11 @@ import {
 import { pooledPeerExportEmissions } from "../helpers/PeerExportEmissions";
 import { assignTerritoryTiles } from "../helpers/TerritoryTiles";
 import {
+  multiplayerBuildAvailability,
+  multiplayerClaimQuote,
+  multiplayerHydroAvailability,
+} from "../helpers/MultiplayerTerritory";
+import {
   hasTerritoryNetwork,
   territoryBuildAvailability,
   legacyTerritoryConnections,
@@ -2664,6 +2669,28 @@ export const gameSlice = createSlice({
       logGameEvent(state, "BUILD", "Acquired territory");
     });
     builder.addCase(acquireTile, (state, action) => {
+      const territorial = state.multiplayer?.territorial;
+      if (territorial) {
+        const quote = multiplayerClaimQuote(state, action.payload?.tileId);
+        const tick = getTimeFromTimeline(state.date.minute, state.timeline);
+        if (
+          !quote ||
+          quote.quoteKey !== action.payload.quoteKey ||
+          !tick ||
+          tick.cash < quote.price
+        )
+          return;
+        tick.cash -= quote.price;
+        territorial.claims.push({
+          tileId: quote.tileId,
+          minute: state.date.minute,
+          price: quote.price,
+        });
+        refreshInterestRate(state, tick.cash);
+        state.timeline = reforecastSupply(state, true);
+        logGameEvent(state, "BUILD", "Claimed land tile");
+        return;
+      }
       if (!purchaseTile(state, action.payload)) return;
       refreshInterestRate(
         state,
@@ -2922,9 +2949,11 @@ export function previewFacilityBuild(
   const cash = now.cash;
   const customers = now.customers;
   const existingIds = new Set(snapshot.facilities.map(({ id }) => id));
-  const placement = hasTerritoryNetwork(snapshot)
-    ? territoryBuildAvailability(snapshot, facility, territoryId, tileId)
-    : undefined;
+  const placement = snapshot.multiplayer?.territorial
+    ? multiplayerBuildAvailability(snapshot, facility, tileId)
+    : hasTerritoryNetwork(snapshot)
+      ? territoryBuildAvailability(snapshot, facility, territoryId, tileId)
+      : undefined;
   if (placement && !placement.buildable) throw new Error(placement.reason);
   if (placement) {
     const priced = getMatchingBuildFacilityQuote(
@@ -2939,11 +2968,18 @@ export function previewFacilityBuild(
     facility = { ...priced, yearsToBuild: facility.yearsToBuild };
   }
   const hydroSite = isConventionalHydro(facility)
-    ? getHydroAvailability(
-        snapshot,
-        facility.peakW,
-        territoryId,
-        placement?.tileId,
+    ? (snapshot.multiplayer?.territorial
+        ? multiplayerHydroAvailability(
+            snapshot,
+            facility.peakW,
+            placement?.tileId,
+          )
+        : getHydroAvailability(
+            snapshot,
+            facility.peakW,
+            territoryId,
+            placement?.tileId,
+          )
       ).selected
     : undefined;
   buildFacilityHelper(
@@ -2953,10 +2989,8 @@ export function previewFacilityBuild(
   );
   const added = snapshot.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) throw new Error("No facility added to the forecast");
-  if (hasTerritoryNetwork(snapshot)) {
-    added.territoryId = territoryId;
-    added.tileId = placement?.tileId;
-  }
+  if (hasTerritoryNetwork(snapshot)) added.territoryId = territoryId;
+  if (placement) added.tileId = placement.tileId;
   const year = TICKS_PER_YEAR * TICK_MINUTES;
   const step = TICK_MINUTES;
   let commissionedMinute: number | undefined;
@@ -3093,10 +3127,22 @@ function applyBuildFacility(
     (!hasTerritoryNetwork(state) || !isTerritoryId(payload.territoryId))
   )
     return false;
-  if (payload.tileId !== undefined && !hasTerritoryNetwork(state)) return false;
-  const placement = hasTerritoryNetwork(state)
-    ? territoryBuildAvailability(state, requested, territoryId, payload.tileId)
-    : undefined;
+  if (
+    payload.tileId !== undefined &&
+    !hasTerritoryNetwork(state) &&
+    !state.multiplayer?.territorial
+  )
+    return false;
+  const placement = state.multiplayer?.territorial
+    ? multiplayerBuildAvailability(state, requested, payload.tileId)
+    : hasTerritoryNetwork(state)
+      ? territoryBuildAvailability(
+          state,
+          requested,
+          territoryId,
+          payload.tileId,
+        )
+      : undefined;
   if (placement && !placement.buildable) return false;
   if (placement) {
     const priced = getMatchingBuildFacilityQuote(
@@ -3167,12 +3213,14 @@ function applyBuildFacility(
     return false;
   const hydro = isConventionalHydro(requested);
   const hydroSite = hydro
-    ? getHydroAvailability(
-        state,
-        requested.peakW,
-        territoryId,
-        placement?.tileId,
-      )
+    ? state.multiplayer?.territorial
+      ? multiplayerHydroAvailability(state, requested.peakW, placement?.tileId)
+      : getHydroAvailability(
+          state,
+          requested.peakW,
+          territoryId,
+          placement?.tileId,
+        )
     : undefined;
   if (hydro && (state.date.year <= 1882 || hydroSite?.status !== "available"))
     return false;
@@ -3213,10 +3261,8 @@ function applyBuildFacility(
   state = buildFacilityHelper(state, built, payload.financed);
   const added = state.facilities.find(({ id }) => !existingIds.has(id));
   if (!added) return false;
-  if (hasTerritoryNetwork(state)) {
-    added.territoryId = territoryId;
-    added.tileId = placement?.tileId;
-  }
+  if (hasTerritoryNetwork(state)) added.territoryId = territoryId;
+  if (placement) added.tileId = placement.tileId;
   // Book this loan at the quoted rate, then price the next one against the new debt and cash.
   if (payload.financed) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {
@@ -3550,7 +3596,9 @@ function applyBuildTransmissionLine(
   logGameEvent(
     state,
     "BUILD",
-    `Started ${corridor.name}: ${formatWatts(corridor.capacityW)} to ${adjacentMarketForCorridor(corridor.id)?.name}`,
+    isPeerCorridorId(corridor.id)
+      ? `Started intertie with ${corridor.name}: ${formatWatts(corridor.capacityW)}`
+      : `Started ${corridor.name}: ${formatWatts(corridor.capacityW)} to ${adjacentMarketForCorridor(corridor.id)?.name}`,
     {
       importance: "NOTABLE",
       actionTarget: { card: "FACILITIES", view: "FLEET" },
@@ -5949,7 +5997,12 @@ function* supplyFacilitiesFinancesPhases(
       0,
       line.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
     );
-    accrueConstruction(line, corridorById(line.corridorId)?.yearsToBuild ?? 0);
+    const corridor =
+      corridorById(line.corridorId) ??
+      state.multiplayer?.peers?.find(
+        ({ corridor }) => corridor.id === line.corridorId,
+      )?.corridor;
+    accrueConstruction(line, corridor?.yearsToBuild ?? 0);
     if (line.yearsToBuildLeft === 0 && !simulated) {
       logGameEvent(state, "CONSTRUCTION", `Intertie open: ${line.name}`);
     }
@@ -7378,7 +7431,8 @@ function* supplyFacilitiesFinancesPhases(
   transmission.lines
     .filter(
       (line) =>
-        line.yearsToBuildLeft <= 0 && !isPeerCorridorId(line.corridorId),
+        line.yearsToBuildLeft <= 0 &&
+        (state.multiplayer?.territorial || !isPeerCorridorId(line.corridorId)),
     )
     .forEach((line) => {
       expensesOM +=
@@ -8385,7 +8439,10 @@ function getNetWorth(
   cash: number,
   currentMinute: number,
   transmissionLines: readonly TransmissionLineOperatingType[] = [],
-  game?: Pick<GameType, "utilityExpansion" | "territoryNetwork">,
+  game?: Pick<
+    GameType,
+    "utilityExpansion" | "territoryNetwork" | "multiplayer"
+  >,
 ): number {
   let netWorth = cash;
   facilities.forEach((g: FacilityOperatingType) => {
@@ -8416,6 +8473,10 @@ function getNetWorth(
           0,
         ) ?? 0) +
         (game.territoryNetwork?.tilePurchases?.reduce(
+          (sum, receipt) => sum + receipt.price,
+          0,
+        ) ?? 0) +
+        (game.multiplayer?.territorial?.claims.reduce(
           (sum, receipt) => sum + receipt.price,
           0,
         ) ?? 0)

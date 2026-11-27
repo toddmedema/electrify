@@ -227,6 +227,7 @@ export function getHydroAvailability(
   peakW: number,
   territoryId?: TerritoryId,
   tileId?: TerritoryTileId,
+  territorySites?: ReadonlySet<string>,
 ) {
   const inventory = resolveHydroInventory(
     state.location,
@@ -259,7 +260,10 @@ export function getHydroAvailability(
     : (inventory && offeredHydroSiteIds(inventory))
         ?.map((id) => HYDRO_SITES[id])
         .filter(Boolean) || [];
-  const remaining = sites
+  const allowedSites = territorySites
+    ? sites.filter((site) => territorySites.has(site.id))
+    : sites;
+  const remaining = allowedSites
     .filter(
       (site) =>
         !used.has(site.id) &&
@@ -283,7 +287,7 @@ export function getHydroAvailability(
       ? "prohibited"
       : !frontier && (!inventory || inventory.status === "unresearched")
         ? "unavailable"
-        : !sites.length
+        : !allowedSites.length
           ? "empty"
           : !remaining.length
             ? "exhausted"
