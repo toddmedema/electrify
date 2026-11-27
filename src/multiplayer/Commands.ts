@@ -50,7 +50,7 @@ import {
 import type { FacilityShoppingType, GameType, TerritoryTileId } from "../Types";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
-import type { ConnectionOrder } from "./Types";
+import type { ConnectionOrder, ProposalResponse, UpgradeOrder } from "./Types";
 
 /** Real game action names, so renaming a reducer action fails type-checking here. */
 type GameActionName = keyof typeof gameSlice.actions | keyof typeof GameActions;
@@ -88,6 +88,16 @@ const dispatchPosition =
       : { payload };
   };
 
+function validProposalResponse(
+  target: ConnectionOrder | UpgradeOrder,
+): target is ProposalResponse & (ConnectionOrder | UpgradeOrder) {
+  return (
+    (target.intent === "accept" || target.intent === "withdraw") &&
+    Number.isSafeInteger(target.proposalRevision) &&
+    target.proposalRevision > 0
+  );
+}
+
 /** Co-op players can only build or upgrade their links to each other. */
 const peerLine: Validator = (game, payload) => {
   const target = payload as ConnectionOrder | null;
@@ -113,11 +123,7 @@ const peerLine: Validator = (game, payload) => {
       payload: { corridorId, financed, intent, border: { here, there } },
     };
   }
-  if (
-    (intent === "accept" || intent === "withdraw") &&
-    Number.isSafeInteger(target.proposalRevision) &&
-    target.proposalRevision > 0
-  ) {
+  if (validProposalResponse(target)) {
     return {
       payload: {
         corridorId,
@@ -132,15 +138,32 @@ const peerLine: Validator = (game, payload) => {
 
 /** Existing outside assets belong to one company; shared links still require both owners. */
 const upgradeLine: Validator = (game, payload) => {
-  const target = payload as { corridorId?: string; financed?: boolean } | null;
-  return !hasTerritoryNetwork(game) &&
-    target &&
-    typeof target.financed === "boolean" &&
-    game.transmission?.lines.some(
+  const target = payload as UpgradeOrder | null;
+  if (
+    hasTerritoryNetwork(game) ||
+    !target ||
+    typeof target.financed !== "boolean" ||
+    !game.transmission?.lines.some(
       (line) => line.corridorId === target.corridorId,
     )
-    ? { payload }
-    : { error: "Choose an owned connection" };
+  )
+    return { error: "Choose an owned connection" };
+  if (!game.multiplayer?.territorial || !isPeerCorridorId(target.corridorId))
+    return { payload };
+
+  const { corridorId, financed, intent } = target;
+  if (intent === "propose")
+    return { payload: { corridorId, financed, intent } };
+  if (validProposalResponse(target))
+    return {
+      payload: {
+        corridorId,
+        financed,
+        intent,
+        proposalRevision: target.proposalRevision,
+      },
+    };
+  return { error: "Review the current connection before continuing" };
 };
 
 const policy: Validator = (_game, payload) =>

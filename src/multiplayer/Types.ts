@@ -23,17 +23,27 @@ export interface BorderConnection {
   a: FrontierTerritoryId;
   b: FrontierTerritoryId;
 }
+export type ProposalResponse = {
+  intent: "accept" | "withdraw";
+  proposalRevision: number;
+};
+
 export type ConnectionDecision =
   | {
       intent: "propose";
       border: { here: FrontierTerritoryId; there: FrontierTerritoryId };
     }
-  | { intent: "accept" | "withdraw"; proposalRevision: number };
+  | ProposalResponse;
 
-export type ConnectionOrder = ConnectionDecision & {
+export type UpgradeDecision = { intent: "propose" } | ProposalResponse;
+
+export type IntertieOrder = {
   corridorId: string;
   financed: boolean;
 };
+
+export type ConnectionOrder = ConnectionDecision & IntertieOrder;
+export type UpgradeOrder = UpgradeDecision & IntertieOrder;
 
 export interface Edge {
   disabled?: boolean;
@@ -47,6 +57,7 @@ export interface Edge {
   /** Positive from a to b. */
   flowW: number;
   approval?: string;
+  approvalRevision?: number;
   /** Ordered by edge endpoint. A proposal reserves the crossing until both owners sign. */
   crossing?: BorderConnection;
   proposal?: {

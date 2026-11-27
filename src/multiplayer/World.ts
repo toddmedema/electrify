@@ -99,9 +99,12 @@ import type {
   Edge,
   CommandEnvelope,
   ConnectionOrder,
+  IntertieOrder,
   MatchSpec,
   RoomView,
   Seat,
+  UpgradeDecision,
+  UpgradeOrder,
   World,
 } from "./Types";
 import type {
@@ -569,7 +572,7 @@ function applyCommandOnce(
       return coSignUpgrade(
         world,
         sender,
-        validation.payload as { corridorId: string; financed: boolean },
+        validation.payload as IntertieOrder | UpgradeOrder,
       );
     const before = game.facilities.length;
     const reduced = reducer(
@@ -630,6 +633,18 @@ function applyCommandOnce(
   return "Unknown command";
 }
 
+const changedProposal =
+  "This connection proposal changed. Review the current connection.";
+
+function staleProposal(
+  decision: UpgradeDecision,
+  revision: number | undefined,
+) {
+  return decision.intent === "propose"
+    ? revision !== undefined
+    : revision !== decision.proposalRevision;
+}
+
 /** Both owners sign the same crossing. Neither half is booked until both can pay. */
 function coSignBuild(
   world: World,
@@ -649,12 +664,7 @@ function coSignBuild(
   if (!isActive(world, partner.id))
     return `${partner.name}'s company has retired`;
   const proposal = edge.proposal;
-  if (
-    target.intent === "propose"
-      ? !!proposal
-      : proposal?.revision !== target.proposalRevision
-  )
-    return "This connection proposal changed. Review the current connection.";
+  if (staleProposal(target, proposal?.revision)) return changedProposal;
   if (target.intent === "withdraw") {
     if (proposal?.seat !== sender) return "Only the proposer can withdraw";
     delete edge.proposal;
@@ -732,7 +742,7 @@ function coSignBuild(
 function coSignUpgrade(
   world: World,
   sender: string,
-  target: { corridorId: string; financed: boolean },
+  target: IntertieOrder | UpgradeOrder,
 ): string | undefined {
   const edge = world.edges.find(
     (e) => peerCorridorId(e.id) === target.corridorId,
@@ -743,11 +753,17 @@ function coSignUpgrade(
   if (!isActive(world, partner.id))
     return `${partner.name}'s company has retired`;
   const own = world.grids[world.seats.findIndex((s) => s.id === sender)];
-  if (
-    world.spec.territorialVersion === 1 &&
-    (edge.disabled || !edge.crossing || edge.proposal)
-  )
-    return "Finish the connection before upgrading it";
+  const territorial = world.spec.territorialVersion === 1;
+  if (territorial) {
+    if (edge.disabled || !edge.crossing || edge.proposal)
+      return "Finish the connection before upgrading it";
+    if (!("intent" in target) || staleProposal(target, edge.approvalRevision))
+      return changedProposal;
+    if (target.intent === "accept" && edge.approval === sender)
+      return "Only the other company can accept this proposal";
+    if (target.intent === "withdraw" && edge.approval !== sender)
+      return "Only the proposer can withdraw";
+  }
   if (
     own.transmission?.lines.find((l) => l.corridorId === target.corridorId)
       ?.upgrade
@@ -756,11 +772,13 @@ function coSignUpgrade(
   if (!edge.approval) {
     edge.approval = sender;
     edge.approvalFinanced = target.financed;
+    if (territorial) edge.approvalRevision = world.revision;
     return;
   }
   if (edge.approval === sender) {
     delete edge.approval;
     delete edge.approvalFinanced;
+    delete edge.approvalRevision;
     return;
   }
   const owners = [edge.a, edge.b].map((id) =>
@@ -772,7 +790,7 @@ function coSignUpgrade(
     return commandResult(
       grid,
       reducer(
-        world.spec.territorialVersion === 1 ? cloneGrid(grid) : grid,
+        territorial ? cloneGrid(grid) : grid,
         upgradeTransmissionLine({
           corridorId: target.corridorId,
           financed:
@@ -797,6 +815,7 @@ function coSignUpgrade(
   });
   delete edge.approval;
   delete edge.approvalFinanced;
+  delete edge.approvalRevision;
 }
 
 export function stepWorld(world: World): void {
@@ -1010,6 +1029,7 @@ export function stepWorld(world: World): void {
       delete edge.proposal;
       delete edge.approval;
       delete edge.approvalFinanced;
+      delete edge.approvalRevision;
       for (const grid of world.grids) {
         const line = grid.transmission?.lines.find(
           (entry) => entry.corridorId === peerCorridorId(edge.id),
@@ -1161,6 +1181,9 @@ function buildRoomView(
           (seat) => seat.id === edge.approval,
         )?.name,
         upgradeRequestedBySelf: edge.approval === seatId,
+        ...(edge.approvalRevision !== undefined && {
+          upgradeProposalRevision: edge.approvalRevision,
+        }),
       };
     }),
     results: Object.keys(world.outcomes).length
@@ -1587,7 +1610,9 @@ function validEdges(world: World, ids: Set<string>, initial: World) {
     if (
       territorial
         ? !validTerritorialCrossing(world, edge, expected, endpoints)
-        : edge.crossing !== undefined || edge.proposal !== undefined
+        : edge.crossing !== undefined ||
+          edge.proposal !== undefined ||
+          edge.approvalRevision !== undefined
     )
       return false;
     pairs.add(pair);

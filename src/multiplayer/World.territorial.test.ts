@@ -411,6 +411,35 @@ test("two bordering owners co-sign atomically, restore the crossing and trade on
   });
   expect(hydrateWorld(save(world)).edges[0]).toEqual(resumed);
 
+  const upgrade = (seat: string, decision: object) =>
+    action(world, seat, "upgradeTransmissionLine", {
+      corridorId,
+      financed: false,
+      ...decision,
+    });
+  expect(upgrade("new0", { intent: "propose" })).toBeUndefined();
+  const firstUpgrade = world.revision;
+  expect(
+    upgrade("new0", { intent: "withdraw", proposalRevision: firstUpgrade }),
+  ).toBeUndefined();
+  expect(upgrade("new0", { intent: "propose" })).toBeUndefined();
+  const secondUpgrade = world.revision;
+  expect(
+    upgrade("new1", { intent: "accept", proposalRevision: firstUpgrade }),
+  ).toMatch(/proposal changed/i);
+  expect(
+    roomView(world, "new1").game!.multiplayer!.peers![0]
+      .upgradeProposalRevision,
+  ).toBe(secondUpgrade);
+  expect(hydrateWorld(save(world)).edges[0].approvalRevision).toBe(
+    secondUpgrade,
+  );
+  expect(
+    upgrade("new1", { intent: "accept", proposalRevision: secondUpgrade }),
+  ).toBeUndefined();
+  expect(resumed.approvalRevision).toBeUndefined();
+  expect(world.grids[0].transmission!.lines[0].upgrade).toBeDefined();
+
   currentTick(world.grids[1])!.cash = -1e12;
   for (let i = 0; i < 2 * TICKS_PER_DAY && !world.outcomes["new1"]; i++)
     stepWorld(world);

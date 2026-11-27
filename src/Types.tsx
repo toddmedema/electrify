@@ -1655,6 +1655,7 @@ export interface GameType {
       upgradeRequestedBy?: string;
       /** This player asked for the pending upgrade and waits on the other owner. */
       upgradeRequestedBySelf?: boolean;
+      upgradeProposalRevision?: number;
       border?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
       endpoints?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
       connectionRequestedBy?: string;

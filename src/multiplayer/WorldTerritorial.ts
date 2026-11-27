@@ -132,6 +132,15 @@ function ownedAt(grid: GameType, tileId: TerritoryTileId, minute: number) {
   );
 }
 
+function validProposalRevision(revision: number | undefined, limit: number) {
+  return (
+    typeof revision === "number" &&
+    Number.isSafeInteger(revision) &&
+    revision >= 1 &&
+    revision <= limit
+  );
+}
+
 /** A crossing uses two paid properties, with only a proposal or two installed line halves. */
 export function validTerritorialCrossing(
   world: World,
@@ -142,7 +151,10 @@ export function validTerritorialCrossing(
   if (
     edge.a !== expected.a ||
     edge.b !== expected.b ||
-    typeof edge.disabled !== "boolean"
+    typeof edge.disabled !== "boolean" ||
+    (edge.approval === undefined
+      ? edge.approvalRevision !== undefined
+      : !validProposalRevision(edge.approvalRevision, world.revision))
   )
     return false;
   const [a, b] = grids;
@@ -173,9 +185,7 @@ export function validTerritorialCrossing(
       !active ||
       (proposal.seat !== edge.a && proposal.seat !== edge.b) ||
       typeof proposal.financed !== "boolean" ||
-      !Number.isSafeInteger(proposal.revision) ||
-      proposal.revision < 1 ||
-      proposal.revision > world.revision ||
+      !validProposalRevision(proposal.revision, world.revision) ||
       Object.keys(proposal).length !== 4
     )
       return false;
