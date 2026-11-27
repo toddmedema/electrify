@@ -72,7 +72,10 @@ const RESEARCHED_REGIONS: Readonly<Partial<Record<string, ResearchedRegion>>> =
     },
     SJU: {
       city: "San Juan",
-      utility: [[1979, "Puerto Rico Electric Power Authority"]],
+      utility: [
+        [2021, "LUMA Energy"],
+        [1979, "Puerto Rico Electric Power Authority"],
+      ],
       relief: [
         [-2, 5, 3],
         [-4, 4, 2],

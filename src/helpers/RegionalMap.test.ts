@@ -39,6 +39,7 @@ it("has an opening city and period-correct reference for every official location
     getRegionalGeography(cities[id], year, scenarioId, customerSources).utility;
   expect(nameAt("SF", 1880)).toBe("San Francisco model grid");
   expect(nameAt("SJU", 2000)).toBe("Puerto Rico Electric Power Authority");
+  expect(nameAt("SJU", 2026)).toBe("LUMA Energy");
   expect(nameAt("Paris", 2010)).toBe("ERDF");
   expect(nameAt("Paris", 2023)).toBe("Enedis");
   expect(nameAt("Kyiv", 1986)).toBe("Kyivenergo");
