@@ -34,6 +34,13 @@ function mockContext() {
     INCR: 19,
     SRC_ALPHA: 20,
     ONE_MINUS_SRC_ALPHA: 21,
+    SYNC_GPU_COMMANDS_COMPLETE: 0x9117,
+    TIMEOUT_EXPIRED: 0x911b,
+    CONDITION_SATISFIED: 0x911c,
+    fenceSync: jest.fn((): { id: number } | null => ({ id: ++identity })),
+    clientWaitSync: jest.fn((): number => 0x911c),
+    deleteSync: jest.fn(),
+    flush: jest.fn(),
     NO_ERROR: 0,
     OUT_OF_MEMORY: 0x0505,
     CONTEXT_LOST_WEBGL: 0x9242,
@@ -436,6 +443,44 @@ it("checks GPU errors on allocation without synchronizing an animated buffer upd
   flush(2000);
   expect(gl.getError).toHaveBeenCalledTimes(2);
   renderer.dispose();
+});
+
+it("waits for outstanding GPU work before animating but paints a changed map immediately", () => {
+  const { renderer, gl, canvas } = setup();
+  const instances = scene();
+  renderer.update(instances, frame);
+  flush(0);
+  const first = gl.fenceSync.mock.results[0]?.value;
+  gl.clientWaitSync.mockReturnValue(gl.TIMEOUT_EXPIRED);
+  flush(16);
+  flush(32);
+  expect(renderer.diagnostics().frames).toBe(1);
+  expect(first).toBeTruthy();
+  expect(gl.clientWaitSync).toHaveBeenCalledWith(first, 0, 0);
+  expect(callbacks.size).toBe(1);
+  gl.clientWaitSync.mockReturnValue(gl.CONDITION_SATISFIED);
+  flush(48);
+  expect(renderer.diagnostics().frames).toBe(2);
+  expect(gl.deleteSync).toHaveBeenCalledWith(first);
+
+  gl.clientWaitSync.mockReturnValue(gl.TIMEOUT_EXPIRED);
+  renderer.update(instances, { ...frame, width: 400 });
+  flush(64);
+  expect(canvas.style.width).toBe("400px");
+  expect(renderer.diagnostics().frames).toBe(3);
+  const beforeLoss = gl.fenceSync.mock.results[2].value;
+  canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+  expect(gl.deleteSync).not.toHaveBeenCalledWith(beforeLoss);
+  canvas.dispatchEvent(new Event("webglcontextrestored"));
+  gl.fenceSync.mockReturnValueOnce(null);
+  flush(80);
+  expect(renderer.diagnostics().frames).toBe(4);
+  flush(96);
+  expect(renderer.diagnostics().frames).toBe(5);
+  const last = gl.fenceSync.mock.results[4].value;
+  renderer.dispose();
+  expect(gl.deleteSync).toHaveBeenCalledWith(last);
+  expect(callbacks.size).toBe(0);
 });
 
 it("draws idle/reduced scenes once, retains stopped poses and suspends hidden documents", () => {
