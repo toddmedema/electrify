@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "./fixtures";
-import { openBuild } from "./layout";
+import { openBuild, openCustomSetup } from "./layout";
 
 const regionalMap = (page: Page) =>
   page.getByRole("region", { name: "Regional map workspace", exact: true });
@@ -130,7 +130,7 @@ test("regional fleet and map details remain reachable without WebGL2", async ({
 test("a new custom grid starts on the 3D map for the selected city", async ({
   page,
 }) => {
-  await page.goto("/?customEvent=100");
+  await openCustomSetup(page);
   const start = page.getByRole("button", { name: "Start game", exact: true });
   await expect(start).toBeEnabled();
   const search = page.getByRole("combobox", { name: "Search playable cities" });
