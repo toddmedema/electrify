@@ -2295,12 +2295,16 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "confirm");
     await expect(sound).not.toBeChecked();
     await input(page, "back");
-    await select(page, page.getByRole("button", { name: "menu", exact: true }));
-    await input(page, "confirm");
-    await select(
-      page,
-      page.getByRole("menuitem", { name: "Manual", exact: true }),
-    );
+    await expect(sound).toBeHidden();
+    const manual = page.getByRole("menuitem", { name: "Manual", exact: true });
+    if (!(await manual.isVisible())) {
+      await select(
+        page,
+        page.getByRole("button", { name: "menu", exact: true }),
+      );
+      await input(page, "confirm");
+    }
+    await select(page, manual);
     await input(page, "confirm");
     const search = page.getByRole("textbox", { name: "Search the manual" });
     await select(page, search);
