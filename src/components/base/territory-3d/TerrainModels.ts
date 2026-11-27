@@ -38,6 +38,21 @@ const cache: Record<
 };
 
 let mountainFloor: MapMesh | undefined;
+/** Outward bulge of each closed-lake side, per art variant, in tile widths. */
+/** Shore radius at each corner, per closed-lake art variant. */
+const LAKE_CORNERS = [
+  [0.73, 0.76, 0.69, 0.75, 0.7, 0.74],
+  [0.66, 0.78, 0.74, 0.68, 0.77, 0.71],
+  [0.76, 0.68, 0.72, 0.79, 0.67, 0.73],
+  [0.7, 0.74, 0.79, 0.66, 0.72, 0.77],
+] as const;
+const LAKE_BULGES = [
+  [0.045, 0.025, 0.05, 0.035, 0.055, 0.03],
+  [0.03, 0.055, 0.025, 0.05, 0.035, 0.045],
+  [0.05, 0.04, 0.03, 0.055, 0.025, 0.04],
+  [0.035, 0.05, 0.045, 0.025, 0.05, 0.035],
+] as const;
+const LAKE_SIDE_STEPS = 4;
 
 const point = ([x, z]: GroundPoint, y = 0): Vec3 => [x, y, z];
 const lerp = (a: GroundPoint, b: GroundPoint, t: number): GroundPoint => [
@@ -166,35 +181,37 @@ function mound(
     );
 }
 
+/** A low sandy berm between two shore points, pushed outward by each point's own offset. */
 function bank(
   builder: MeshBuilder,
   a: GroundPoint,
   b: GroundPoint,
-  outward: GroundPoint,
+  outA: GroundPoint,
+  outB: GroundPoint,
   clear: number,
 ) {
-  const length = Math.hypot(...outward) || 1;
-  const offset = scaled(outward, 0.027 / length);
-  const outer = (p: GroundPoint): GroundPoint => [
-    p[0] + offset[0],
-    p[1] + offset[1],
+  const outer = (p: GroundPoint, out: GroundPoint, share = 1): GroundPoint => [
+    p[0] + out[0] * share,
+    p[1] + out[1] * share,
   ];
-  const ridge = (p: GroundPoint): Vec3 => [
-    p[0] + offset[0] * 0.55,
-    0.027,
-    p[1] + offset[1] * 0.55,
-  ];
+  const ridge = (p: GroundPoint, out: GroundPoint): Vec3 =>
+    point(outer(p, out, 0.6), 0.022);
   raisedFace(
     builder,
-    [point(a), point(b), ridge(b), ridge(a)],
+    [point(a), point(b), ridge(b, outB), ridge(a, outA)],
     clear,
-    PALETTE.earth,
+    PALETTE.sand,
   );
   raisedFace(
     builder,
-    [ridge(a), ridge(b), point(outer(b)), point(outer(a))],
+    [
+      ridge(a, outA),
+      ridge(b, outB),
+      point(outer(b, outB)),
+      point(outer(a, outA)),
+    ],
     clear,
-    PALETTE.grassShade,
+    PALETTE.grass,
   );
 }
 
@@ -214,7 +231,7 @@ function waterBank(
       point(lowB, WATERSHED_BANK_DEPTH),
       point(lowA, WATERSHED_BANK_DEPTH),
     ],
-    PALETTE.earthShade,
+    PALETTE.lakeShore,
   );
 }
 
@@ -501,29 +518,58 @@ function lake(
   water: MeshBuilder,
   clear: number,
   riverPorts: number,
+  variant: number,
 ) {
   const shore = HEX.map((p, index) =>
-    scaled(p, [0.73, 0.76, 0.69, 0.75, 0.7, 0.74][index]),
+    scaled(p, LAKE_CORNERS[variant & 3][index]),
   );
   if (riverPorts) {
     riverBasin(floor, water, riverPorts, shore, [0, 0]);
     return;
   }
+  // Bow each side outward between pinned corners, so a closed lake reads as a
+  // natural basin rather than a hexagonal reservoir. The bulges keep it convex.
+  const bulges = LAKE_BULGES[variant & 3];
+  const curved: GroundPoint[] = [];
+  const rim: GroundPoint[] = [];
+  const berm: GroundPoint[] = [];
+  for (let side = 0; side < 6; side++) {
+    const a = shore[side],
+      b = shore[(side + 1) % 6];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const normal: GroundPoint = [
+      (b[1] - a[1]) / length,
+      -(b[0] - a[0]) / length,
+    ];
+    const outwardSign = normal[0] * a[0] + normal[1] * a[1] > 0 ? 1 : -1;
+    for (let step = 0; step < LAKE_SIDE_STEPS; step++) {
+      const t = step / LAKE_SIDE_STEPS;
+      const bow = bulges[side] * 4 * t * (1 - t) * outwardSign;
+      const p = lerp(a, b, t);
+      curved.push([p[0] + normal[0] * bow, p[1] + normal[1] * bow]);
+      rim.push(lerp(HEX[side], HEX[(side + 1) % 6], t));
+      // The berm widens and narrows around the shore.
+      const width = 0.009 * (0.5 + ((side * 7 + step * 3 + variant) % 5) / 4);
+      const radius = Math.hypot(...curved[curved.length - 1]);
+      berm.push(scaled(curved[curved.length - 1], width / radius));
+    }
+  }
   surface(
     water,
-    shore.map((p) => point(p)),
+    curved.map((p) => point(p)),
     PALETTE.water,
   );
-  for (let i = 0; i < 6; i++) {
-    const a = shore[i],
-      b = shore[(i + 1) % 6];
+  for (let i = 0; i < curved.length; i++) {
+    const next = (i + 1) % curved.length;
+    const a = curved[i],
+      b = curved[next];
     surface(
       floor,
-      [point(a), point(HEX[i]), point(HEX[(i + 1) % 6]), point(b)],
+      [point(a), point(rim[i]), point(rim[next]), point(b)],
       PALETTE.grass,
     );
     waterBank(floor, a, b, scaled(a, 0.76), scaled(b, 0.76));
-    bank(relief, a, b, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], clear);
+    bank(relief, a, b, berm[i], berm[next], clear);
   }
 }
 
@@ -551,7 +597,7 @@ function build(
       river(floor, water, mask, variant);
       break;
     case "lake":
-      lake(floor, relief, water, clear, mask);
+      lake(floor, relief, water, clear, mask, variant);
       break;
     case "ocean":
       // The ocean shader derives depth, texture and foam from nearby land.
@@ -700,8 +746,12 @@ export function getTerrainModel(
   if ((terrain === "river" || terrain === "lake") && options?.ports)
     for (const port of options.ports)
       if (Number.isInteger(port) && port >= 0 && port < 6) ports |= 1 << port;
+  // Bent rivers and closed lakes have alternative shapes.
   const bend =
-    terrain === "river" && OPPOSITE_RIVER_PORTS.includes(ports) ? variant : 0;
+    (terrain === "river" && OPPOSITE_RIVER_PORTS.includes(ports)) ||
+    (terrain === "lake" && ports === 0)
+      ? variant
+      : 0;
   const index = (bend * CLEAR_WIDTHS.length + bucket) * 64 + ports;
   const model = (cache[terrain][index] ??= build(terrain, bucket, ports, bend));
   return terrain === "hills" && scorched ? scorchedRelief(model) : model;

@@ -4,17 +4,20 @@ import { PALETTE } from "./Palette";
 import { GROUND_HEX_CORNERS as HEX } from "./Projection";
 import type { MapModel, RGB, Vec3 } from "./Types";
 
-export type CoastStyle = "beach" | "cliff";
+/** A strand is a narrow beach without spits, beside wide facilities. */
+export type CoastStyle = "beach" | "strand" | "cliff";
 type Point = readonly [number, number];
 
 const SEGMENTS = 8;
 const SIN_60 = Math.sqrt(3) / 2;
 /** Above farm fields (0.0015) and below the projected shadow plane (0.003). */
 const SAND_Y = 0.0025;
-const BEACH_WIDTH = 0.1;
+const BEACH_WIDTH = 0.14;
 const BEACH_JUT = 0.03;
-const CLIFF_WIDTH = 0.13;
-const CLIFF_HEIGHT = 0.05;
+const CLIFF_WIDTH = 0.17;
+const CLIFF_HEIGHT = 0.1;
+/** Rim height, as a share of CLIFF_HEIGHT, where the cliff meets a land edge. */
+const CLIFF_GULLY = 0.2;
 const CLIFF_JUT = 0.02;
 /** Below the ocean surface, so every trim meets the water without a visible seam. */
 const SUBMERGED_Y = -0.02;
@@ -94,77 +97,133 @@ const lift = ([x, z]: Point, y: number): Vec3 => [x, y, z];
 // Peaks in the middle of an edge and vanishes at the corners neighbours share.
 const bump = (t: number) => 4 * t * (1 - t);
 
-function beach(builder: MeshBuilder, edge: number, edges: number) {
-  const at = edgeFrame(edge, edges);
-  const rows = (t: number, k: number) => {
-    const jut = BEACH_JUT * bump(t) * (0.35 + 0.65 * jitter(edge, k, 1));
-    const reach =
-      BEACH_WIDTH * (1 + 0.6 * bump(t) * (jitter(edge, k, 2) - 0.4));
-    return [
-      lift(at(t, -reach), SAND_Y),
-      lift(at(t, -reach * 0.18 + jut * 0.6), SAND_Y),
-      lift(at(t, jut), 0.0012),
-      lift(at(t, jut + 0.035), SUBMERGED_Y),
-    ];
-  };
-  const colors = [PALETTE.sand, PALETTE.wetSand, PALETTE.wetSand];
-  let previous = rows(0, 0);
-  for (let k = 1; k <= SEGMENTS; k++) {
-    const current = rows(k / SEGMENTS, k);
-    for (let row = 0; row < 3; row++)
-      facing(
-        builder,
-        [previous[row], current[row], current[row + 1], previous[row + 1]],
-        colors[row],
-        UP,
-      );
-    previous = current;
-  }
-}
+const mixColor = (a: RGB, b: RGB, t: number): RGB => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+const SUNLIT_TURF: RGB = [0xd8 / 255, 0xe0 / 255, 0xb8 / 255];
 
-function cliff(builder: MeshBuilder, edge: number, edges: number, top: RGB) {
-  const at = edgeFrame(edge, edges);
-  const [nx, nz] = [
-    (HEX[edge][0] + HEX[(edge + 1) % 6][0]) * 2 * SIN_60,
-    (HEX[edge][1] + HEX[(edge + 1) % 6][1]) * 2 * SIN_60,
-  ];
-  const outward: Vec3 = [nx, 0.35, nz];
-  const rows = (t: number, k: number) => {
-    const end = k === 0 || k === SEGMENTS;
-    const height = end
-      ? CLIFF_HEIGHT
-      : CLIFF_HEIGHT * (0.6 + 0.8 * jitter(edge, k, 3));
-    const jut = CLIFF_JUT * bump(t) * (0.3 + 0.7 * jitter(edge, k, 4));
-    const ledge = end ? 0.006 : 0.004 + 0.006 * jitter(edge, k, 5);
-    return [
-      lift(at(t, -CLIFF_WIDTH), 0),
-      lift(at(t, -CLIFF_WIDTH * 0.42 + jut * 0.5), height * 0.82),
-      lift(at(t, jut - 0.006), height),
-      lift(at(t, jut + ledge), height * 0.46),
-      lift(at(t, jut + 0.016), SUBMERGED_Y),
-    ];
-  };
-  const colors = [top, top, PALETTE.rockShade, PALETTE.cliffFace];
-  const normals: Vec3[] = [UP, UP, outward, outward];
-  const ends: Vec3[][] = [];
+/** Rows of ground points across one edge, joined segment by segment into quads. */
+function strip(
+  builder: MeshBuilder,
+  rows: (t: number, k: number) => Vec3[],
+  colors: readonly (RGB | ((segment: number) => RGB))[],
+  normals: readonly Vec3[],
+) {
   let previous = rows(0, 0);
-  ends.push(previous);
+  const first = previous;
   for (let k = 1; k <= SEGMENTS; k++) {
     const current = rows(k / SEGMENTS, k);
-    for (let row = 0; row < 4; row++)
+    for (let row = 0; row < colors.length; row++)
       facing(
         builder,
         [previous[row], current[row], current[row + 1], previous[row + 1]],
-        colors[row],
+        typeof colors[row] === "function"
+          ? (colors[row] as (segment: number) => RGB)(k)
+          : (colors[row] as RGB),
         normals[row],
       );
     previous = current;
   }
-  ends.push(previous);
-  // Close the ridge where a neighbouring tile might continue with a low beach.
+  return [first, previous];
+}
+
+function beach(
+  builder: MeshBuilder,
+  edge: number,
+  edges: number,
+  width: number,
+  reachOut: number,
+) {
+  const at = edgeFrame(edge, edges);
+  strip(
+    builder,
+    (t, k) => {
+      const swell = bump(t);
+      const jut = reachOut * swell * (0.35 + 0.65 * jitter(edge, k, 1));
+      // Two octaves keep the dune line from following the hex edge.
+      const reach =
+        width *
+        (1 +
+          0.8 * swell * (jitter(edge, k, 2) - 0.5) +
+          0.45 * swell * (jitter(edge, k >> 1, 7) - 0.5));
+      const wet = 0.3 + 0.1 * swell * jitter(edge, k, 6);
+      return [
+        lift(at(t, -reach - 0.014), SAND_Y),
+        lift(at(t, -reach), SAND_Y),
+        lift(at(t, -reach * wet + jut * 0.6), SAND_Y),
+        lift(at(t, jut), 0.0012),
+        lift(at(t, jut + 0.008), 0.0004),
+        lift(at(t, jut + 0.035), SUBMERGED_Y),
+      ];
+    },
+    [
+      PALETTE.duneGrass,
+      PALETTE.sand,
+      PALETTE.wetSand,
+      PALETTE.surf,
+      PALETTE.wetSand,
+    ],
+    [UP, UP, UP, UP, UP],
+  );
+}
+
+function cliff(builder: MeshBuilder, edge: number, edges: number, top: RGB) {
+  const at = edgeFrame(edge, edges);
   const [ax, az] = HEX[edge],
     [bx, bz] = HEX[(edge + 1) % 6];
-  ends.forEach((profile, index) => {
+  const outward: Vec3 = [(ax + bx) * 2, 0.35, (az + bz) * 2];
+  // Where the next edge is land the rim dips into a gully, so a neighbouring
+  // cliff continues at the same height and a neighbouring beach meets a low cap.
+  const mitred = [
+    (edges & (1 << ((edge + 5) % 6))) !== 0,
+    (edges & (1 << ((edge + 1) % 6))) !== 0,
+  ];
+  const [start, end] = strip(
+    builder,
+    (t, k) => {
+      const corner = k === 0 ? 0 : k === SEGMENTS ? 1 : -1;
+      // Ease the rim down toward a gully over the last 40% of the edge.
+      const ease = (distance: number, open: boolean) => {
+        if (open) return 1;
+        const f = Math.min(1, distance / 0.4);
+        return CLIFF_GULLY + (1 - CLIFF_GULLY) * f * f * (3 - 2 * f);
+      };
+      const envelope = ease(t, mitred[0]) * ease(1 - t, mitred[1]);
+      const height =
+        CLIFF_HEIGHT *
+        envelope *
+        (corner < 0 ? 0.8 + 0.5 * jitter(edge, k, 3) : 1);
+      const jut = CLIFF_JUT * bump(t) * (0.3 + 0.7 * jitter(edge, k, 4));
+      const ledge = corner < 0 ? 0.012 + 0.008 * jitter(edge, k, 5) : 0.016;
+      return [
+        lift(at(t, -CLIFF_WIDTH), 0),
+        lift(at(t, -CLIFF_WIDTH * 0.25 + jut * 0.5), height * 0.82),
+        lift(at(t, jut - 0.016), height),
+        lift(at(t, jut + 0.004), height * 0.97),
+        lift(at(t, jut + ledge), height * 0.46),
+        lift(at(t, jut + 0.026), 0.004),
+        lift(at(t, jut + 0.034), 0.0008),
+        lift(at(t, jut + 0.042), SUBMERGED_Y),
+      ];
+    },
+    [
+      top,
+      mixColor(top, SUNLIT_TURF, 0.25),
+      PALETTE.cliffLip,
+      PALETTE.cliffFace,
+      PALETTE.cliffFaceShade,
+      PALETTE.cliffBase,
+      // Broken surf where waves meet the cliff foot.
+      (segment) =>
+        jitter(edge, segment, 8) < 0.6 ? PALETTE.surf : PALETTE.cliffBase,
+    ],
+    [UP, UP, UP, outward, outward, outward, UP],
+  );
+  // Close the ridge where it may meet a lower beach on the next tile.
+  [start, end].forEach((profile, index) => {
+    if (mitred[index]) return;
     const away: Vec3 = index ? [bx - ax, 0, bz - az] : [ax - bx, 0, az - bz];
     const base = [profile[0][0], SUBMERGED_Y, profile[0][2]] as Vec3;
     for (let i = 1; i < profile.length - 1; i++)
@@ -183,27 +242,29 @@ export function getCoastModel(
   edges: number,
   top: RGB = PALETTE.grass,
 ): MapModel {
-  const topKey = top === PALETTE.grass ? "" : `:${top.join(",")}`;
+  const topKey =
+    style === "cliff" && top !== PALETTE.grass ? `:${top.join(",")}` : "";
   const key = `coast:${style}:${edges & 63}${topKey}`;
   const cached = cache.get(key);
   if (cached) return cached;
   const builder = new MeshBuilder();
   for (let edge = 0; edge < 6; edge++)
     if (edges & (1 << edge))
-      if (style === "beach") beach(builder, edge, edges);
-      else cliff(builder, edge, edges, top);
+      if (style === "cliff") cliff(builder, edge, edges, top);
+      else if (style === "strand") beach(builder, edge, edges, 0.095, 0);
+      else beach(builder, edge, edges, BEACH_WIDTH, BEACH_JUT);
   const model: MapModel = {
     key,
     parts: [
       {
         mesh: builder.build(),
         castsShadow: style === "cliff",
-        receivesShadow: style === "beach",
+        receivesShadow: style !== "cliff",
       },
     ],
     terminals: [],
     footprint: 1,
-    height: style === "cliff" ? CLIFF_HEIGHT * 1.28 : SAND_Y,
+    height: style === "cliff" ? CLIFF_HEIGHT * 1.3 : SAND_Y,
   };
   cache.set(key, model);
   return model;
@@ -215,8 +276,8 @@ export function coastStyle(
   artHash: number,
   footprint: number,
 ): CoastStyle {
-  // Wide facilities reach the shoreline; a level beach keeps their pads clear.
-  if (footprint > 0.65) return "beach";
+  // Wide facilities reach the shoreline: a narrow level strand keeps their pads clear.
+  if (footprint > 0.65) return "strand";
   switch (terrain) {
     case "mountain":
     case "hills":

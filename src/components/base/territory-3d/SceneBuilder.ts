@@ -313,7 +313,9 @@ export class SceneBuilder {
           variant:
             tile.terrain === "plains"
               ? farmLayout(tile.q, tile.r, this.farms)
-              : tile.terrain === "mountain" || tile.terrain === "river"
+              : tile.terrain === "mountain" ||
+                  tile.terrain === "river" ||
+                  tile.terrain === "lake"
                 ? terrainArtHash(tile.q, tile.r) >>> 30
                 : undefined,
           ports,
