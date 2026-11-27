@@ -61,6 +61,15 @@ test("regional map presents the city and plants while Fleet and intertie builds 
       exact: true,
     });
     await expect(plantDetails.locator(".tileFacilityStatus")).toBeVisible();
+    const pausePlant = plantDetails.getByRole("button", {
+      name: `Pause ${plantName}`,
+      exact: true,
+    });
+    await pausePlant.click();
+    await plantDetails
+      .getByRole("button", { name: `Resume ${plantName}`, exact: true })
+      .click();
+    await expect(pausePlant).toBeVisible();
     await plantDetails.getByRole("button", { name: "Close tile" }).click();
   }
 
