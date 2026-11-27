@@ -1,6 +1,6 @@
 import type { ChallengeInvitation } from "../Types";
 import { createAction } from "@reduxjs/toolkit";
-import type { GameType, PolicyChangeType } from "../Types";
+import type { GameType, PolicyChangeType, TutorialActionType } from "../Types";
 
 // UI actions observed by the game are dependency-free: importing the forecasting
 // reducer must not initialize navigation, account services or browser storage.
@@ -87,6 +87,14 @@ export const cloudSavePromptVisible = createAction<boolean>(
 /** Player-acknowledged, tutorial-only stress exercise. */
 export const generatorSizeChanged = createAction("game/generatorSizeChanged");
 export const prepareStorageReorder = createAction("game/prepareStorageReorder");
+
+export const tutorialViewedMapTool = createAction<TutorialActionType>(
+  "tutorial/viewedMapTool",
+);
+export const tutorialRateCommitted = createAction("tutorial/rateCommitted");
+export const tutorialInspectedMapFacility = createAction<number>(
+  "tutorial/inspectedMapFacility",
+);
 
 export const beginIntertieStress = createAction("game/beginIntertieStress");
 

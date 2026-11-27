@@ -1,3 +1,4 @@
+import { readTutorialSupplyChart } from "./tutorial-fixture";
 import { expect, test, ElectronApplication, Page } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -381,10 +382,10 @@ test("a fresh offline install launches fullscreen with every bundled file and a 
 test("the first offline walkthrough leads to a mission that saves, resumes after relaunch, and quits from the game", async () => {
   let page = desktop.page;
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByText("Select slow speed to start time")).toBeVisible();
+  await readTutorialSupplyChart(page);
+  await expect(
+    page.getByText("Start the clock", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "normal speed", exact: true }).click();
   await expect(
     page.getByText("Reach midnight without a blackout"),

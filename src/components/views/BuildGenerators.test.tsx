@@ -1217,29 +1217,6 @@ it("keeps comparison with the scrolling catalog when Fleet is hidden or space is
   ).toBeVisible();
 });
 
-it("keeps expanded details with their generator when tutorial choices expand", () => {
-  const game = createGame({ scenarioId: 1 });
-  game.tutorialStep = 3;
-  const callbacks = { onBack: jest.fn(), onBuildGenerator: jest.fn() };
-  const { rerender } = render(<BuildGenerators game={game} {...callbacks} />);
-  expect(
-    screen.getAllByRole("button", { name: /^Review purchase of/ }),
-  ).toHaveLength(4);
-  fireEvent.click(screen.getByRole("button", { name: "Show Wind details" }));
-  rerender(
-    <BuildGenerators game={{ ...game, tutorialStep: 4 }} {...callbacks} />,
-  );
-  expect(
-    screen.getByRole("button", { name: "Hide Wind details" }),
-  ).toHaveAttribute("aria-expanded", "true");
-  expect(
-    screen.getAllByRole("button", { name: /^Hide .* details/ }),
-  ).toHaveLength(1);
-  expect(
-    screen.getAllByRole("button", { name: /^Review purchase of/ }).length,
-  ).toBeGreaterThan(4);
-});
-
 it("remembers dismissal of Hydro help when reopening the build screen", () => {
   localStorage.removeItem("hydroPrimerSeen");
   const game = createGame({ scenarioId: 103 });

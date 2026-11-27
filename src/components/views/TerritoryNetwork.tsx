@@ -6,6 +6,8 @@ import { MapProjectPanel } from "../base/MapPanelWindow";
 import RemovalCollapse from "../base/RemovalCollapse";
 import { Button, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
+import { CUSTOMER_MARKET_MULTIPLIER } from "../../helpers/Customers";
+import { tutorialActionsForGame } from "../../reducers/Tutorial";
 import DesktopBuildRail from "../base/DesktopBuildRail";
 import {
   tilePurchaseQuote,
@@ -62,7 +64,10 @@ import AcquisitionReviewDialog from "../base/AcquisitionReviewDialog";
 import ConceptIcon from "../base/ConceptIcon";
 import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
-import { generatorSizeChanged } from "../../reducers/GameActions";
+import {
+  generatorSizeChanged,
+  tutorialInspectedMapFacility,
+} from "../../reducers/GameActions";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import {
   findTileControl,
@@ -165,6 +170,10 @@ function TileNetwork(props: Props) {
   const restoringFocus = React.useRef(false);
   const layout = React.useContext(GameWorkspaceLayoutContext);
   const desktopRail = (layout?.effectiveWidth ?? 0) >= SIDE_TOOL_MIN_WIDTH;
+  const tutorialActions = tutorialActionsForGame(game);
+  const buildAllowed =
+    !tutorialActions || tutorialActions.includes("BUILD_GENERATORS");
+  const showBuildRail = desktopRail && buildAllowed;
   const [railFocusRequest, setRailFocusRequest] = React.useState(0);
   const [railSite, setRailSite] = React.useState<TerritoryTileId>();
   const [projectPending, setProjectPending] = React.useState(false);
@@ -235,10 +244,16 @@ function TileNetwork(props: Props) {
   const quote =
     tile && view?.connectable ? tilePurchaseQuote(game, tile.id) : undefined;
   const tick = currentTick(game);
+  const openingCustomers =
+    tutorialActions &&
+    !game.utilityExpansion &&
+    tile?.territoryId === "champlain"
+      ? game.customerMarketSize / CUSTOMER_MARKET_MULTIPLIER
+      : utility?.customers;
   const customers = tile?.city
     ? view?.owned && view.developed
       ? (acquisition?.transferredCustomers ??
-        utility?.customers ??
+        openingCustomers ??
         landTransferredCustomers(game, tile.territoryId))
       : (quote?.customers ??
         customerMarketSizeAt(
@@ -265,6 +280,7 @@ function TileNetwork(props: Props) {
     !view.facility
   );
   const canPlanHere = !!(
+    buildAllowed &&
     tile &&
     view &&
     quote &&
@@ -273,6 +289,7 @@ function TileNetwork(props: Props) {
     tileHasConstructionTechnology(tile)
   );
   const buildConnection =
+    buildAllowed &&
     view?.owned &&
     view.connection &&
     !view.reserved &&
@@ -281,7 +298,8 @@ function TileNetwork(props: Props) {
     tileHasConstructionTechnology(tile)
       ? view.connection
       : undefined;
-  const showSiteCatalogue = building && !desktopRail && siteCatalogue;
+  const showSiteCatalogue =
+    buildAllowed && building && !desktopRail && siteCatalogue;
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
   const closeSiteCatalogue = React.useCallback(
     () => setSiteCatalogue(false),
@@ -333,6 +351,10 @@ function TileNetwork(props: Props) {
     if (blocksInspection) close();
   }, [blocksInspection, close]);
   const startProject = React.useCallback(() => {
+    if (!buildAllowed) {
+      panel?.returnToMap();
+      return;
+    }
     if (projectBusy.current || pendingIds.size > 0) return;
     panel?.returnToMap();
     setInspected(undefined);
@@ -342,7 +364,7 @@ function TileNetwork(props: Props) {
     setRailSite(undefined);
     setPlanning(!desktopRail);
     if (desktopRail) setRailFocusRequest((value) => value + 1);
-  }, [panel, setSelected, desktopRail, pendingIds.size]);
+  }, [buildAllowed, panel, setSelected, desktopRail, pendingIds.size]);
   React.useEffect(() => {
     if (panel?.projectRequested) startProject();
   }, [panel?.projectRequested, startProject]);
@@ -430,9 +452,11 @@ function TileNetwork(props: Props) {
     setSiteCatalogue(false);
     setCategory("generators");
     setInspected(key);
+    if (tutorialActions && activated.operatingFacility)
+      dispatch(tutorialInspectedMapFacility(activated.operatingFacility.id));
     setRailSite(undefined);
     if (
-      desktopRail &&
+      showBuildRail &&
       activated.owned &&
       activated.developed &&
       !activated.tile.city &&
@@ -443,7 +467,7 @@ function TileNetwork(props: Props) {
     }
   };
   const planAtSite = (key: TerritoryMapTileKey) => {
-    if (projectBusy.current || pendingIds.size > 0) return;
+    if (!buildAllowed || projectBusy.current || pendingIds.size > 0) return;
     const site = views.find(({ tile }) => territoryMapTileKey(tile) === key);
     if (!site?.connectable) return;
     if (desktopRail) {
@@ -505,7 +529,7 @@ function TileNetwork(props: Props) {
       data-desktop-build-rail={desktopRail || undefined}
       aria-label="Territory map workspace"
     >
-      {desktopRail && views.length > 0 && (
+      {showBuildRail && views.length > 0 && (
         <DesktopBuildRail
           game={game}
           project={planning && !catalogue ? project : undefined}
@@ -565,8 +589,12 @@ function TileNetwork(props: Props) {
         projectSite={!!menu && !!projectSites?.has(menu.key)}
         onClose={() => setMenu(null)}
         onChooseSite={() => menu && inspect(menu.key, true)}
-        onBuild={() => menu && inspect(menu.key, true, "build")}
-        onPlan={() => menu && planAtSite(menu.key)}
+        onBuild={
+          buildAllowed
+            ? () => menu && inspect(menu.key, true, "build")
+            : undefined
+        }
+        onPlan={buildAllowed ? () => menu && planAtSite(menu.key) : undefined}
         onExpand={() => menu && inspect(menu.key, true, "expand")}
         onAcquire={setReview}
       />
@@ -733,7 +761,7 @@ function TileNetwork(props: Props) {
           ) : building ? (
             <>
               <TileTerrainModifiers terrain={tile.terrain} />
-              {!desktopRail && (
+              {buildAllowed && !desktopRail && (
                 <Button
                   variant="contained"
                   onClick={() => setSiteCatalogue(true)}

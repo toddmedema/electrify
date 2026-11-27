@@ -1,3 +1,4 @@
+import { openTutorialFleet } from "./tutorial-fixture";
 import { expect, test } from "./fixtures";
 
 // The tutorial cue is a ring overlay around the highlighted control. It must stay visible on
@@ -22,11 +23,7 @@ test("keeps the tutorial ring visible on all sides of a full-bleed chart", async
   const hud = page.locator(".tutorialHud");
   await hud.waitFor({ timeout: 20_000 });
 
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  // After the introduction, inspect the coal plant and then the supply/demand chart, which runs
-  // edge to edge in every layout.
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await expect(hud.getByText("Tap the supply and demand chart")).toBeVisible();
+  await openTutorialFleet(page);
   const chart = page.locator("#chartSupplyDemand");
   await expect(chart).toBeVisible();
   // On short viewports the chart can sit below the fold; bring it into view like a player

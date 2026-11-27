@@ -25,7 +25,7 @@ import {
 } from "../data/Territories";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { hasEconomy } from "../data/Economy";
-import { isUtilityExpansionGame } from "./ExpansionContext";
+import { isTutorialMapGame, isUtilityExpansionGame } from "./ExpansionContext";
 import {
   facilityTerritoryId,
   ownedTerritories,
@@ -172,7 +172,7 @@ export function validTerritoryNetwork(
   game: GameType,
   peers?: TerritoryPurchaseContext,
 ): boolean {
-  if (!isUtilityExpansionGame(game))
+  if (!isUtilityExpansionGame(game) && !isTutorialMapGame(game))
     return (
       game.territoryNetwork === undefined &&
       game.facilities.every(

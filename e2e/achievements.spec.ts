@@ -1,3 +1,4 @@
+import { readTutorialSupplyChart } from "./tutorial-fixture";
 import path from "node:path";
 import catalog from "../src/achievements/AchievementCatalog.json";
 import { expect, Page, test, TestInfo } from "./fixtures";
@@ -172,9 +173,7 @@ test("a real mission stacks simultaneous awards and persists them without repeat
   await page.clock.install();
   await page.goto("/");
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await readTutorialSupplyChart(page);
   await page.getByRole("button", { name: "normal speed", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),

@@ -1,13 +1,14 @@
+import { readTutorialSupplyChart } from "./tutorial-fixture";
 import { expect, Page, test } from "./fixtures";
 
 async function reachStartTimeStep(page: Page) {
   await page.addInitScript(() => window.localStorage.clear());
   await page.goto("/");
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Next" }).click();
-  await expect(page.getByText("Select slow speed to start time")).toBeVisible();
+  await readTutorialSupplyChart(page);
+  await expect(
+    page.getByText("Start the clock", { exact: true }),
+  ).toBeVisible();
 }
 
 // Regression test. Entering Mission 1's capstone rebuilt the scenario, which reloaded the game
@@ -39,7 +40,9 @@ test("Exit returns directly to the main menu and leaves the unfinished tutorial 
   ).toBeVisible();
   await expect(page.locator(".snackbarContent")).toBeHidden();
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-  await expect(page.getByText("Welcome to Electrify")).toBeVisible();
+  await expect(
+    page.getByText("Inspect the coal plant on the map", { exact: true }),
+  ).toBeVisible();
 });
 
 for (const explicitlyExit of [false, true]) {
@@ -68,6 +71,8 @@ for (const explicitlyExit of [false, true]) {
         .click();
     }
     await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-    await expect(page.getByText("Welcome to Electrify")).toBeVisible();
+    await expect(
+      page.getByText("Inspect the coal plant on the map", { exact: true }),
+    ).toBeVisible();
   });
 }

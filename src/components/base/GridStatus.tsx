@@ -5,7 +5,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import type {
   CardNameType,
   EvidenceTargetType,
-  GameToolType,
+  TutorialActionType,
   GameType,
   TickPresentFutureType,
 } from "../../Types";
@@ -95,7 +95,7 @@ export default function GridStatus({
 }: {
   game: GameType;
   now: TickPresentFutureType;
-  tutorialActions?: GameToolType[];
+  tutorialActions?: TutorialActionType[];
   onEvidence?: (target: EvidenceTargetType) => void;
   onNavigate?: (card: CardNameType) => void;
   onReserveHelp?: () => void;
