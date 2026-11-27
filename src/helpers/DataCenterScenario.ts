@@ -41,7 +41,6 @@ export function configureDataCenterGrowth(
     );
   return {
     ...scenario,
-    eventScenarioIds: [],
     durationMonths: Math.max(
       16 * 12,
       (arrivalYear - scenario.startingYear + 10) * 12,
@@ -60,31 +59,19 @@ export function configureDataCenterGrowth(
   };
 }
 
-/** Illustrative regional supply, not an inventory of the selected utility's plants. */
-export function createDataCenterScenario(
+/**
+ * The region's installed capacity mix for a grid serving `scale` customers' worth of demand.
+ * Illustrative regional supply, not an inventory of the selected utility's plants: research
+ * establishes relative installed capacity, not the local inventory or its size, so every
+ * portfolio is later sized to the same modeled load.
+ */
+export function regionalStartingFleet(
   location: LocationType,
   startingYear: number,
-  startingCustomers: number,
-): ScenarioType {
-  const researched = SCENARIOS.find(
-    (scenario) =>
-      !scenario.tutorialSteps &&
-      scenario.locationId === location.id &&
-      scenario.startingDemandScale,
-  );
-  if (
-    !Number.isInteger(startingCustomers) ||
-    startingCustomers < 1 ||
-    startingCustomers > 100000000
-  ) {
-    throw new RangeError("Choose between 1 and 100M customer accounts.");
-  }
-  const startingDemandScale = researched?.startingDemandScale || 1;
-  const scale = startingCustomers * startingDemandScale;
+  scale: number,
+): ScenarioFacilityType[] {
   const mix = getDataCenterPowerMix(location, startingYear);
   const facilities: ScenarioFacilityType[] = [];
-  // Research establishes relative installed capacity, not the local inventory or its size.
-  // The same model load sizing and baseline-only calibration apply to every portfolio.
   Object.entries(mix.shares).forEach(([fuel, share]) => {
     // Hawaii's reported geothermal capacity is on Hawaii Island, not Oahu.
     if (fuel === "Geothermal" && location.id === "HNL") return;
@@ -130,6 +117,32 @@ export function createDataCenterScenario(
       ).ageYears;
     }
   });
+  return facilities;
+}
+
+/** Illustrative regional supply, not an inventory of the selected utility's plants. */
+export function createDataCenterScenario(
+  location: LocationType,
+  startingYear: number,
+  startingCustomers: number,
+): ScenarioType {
+  const researched = SCENARIOS.find(
+    (scenario) =>
+      !scenario.tutorialSteps &&
+      scenario.locationId === location.id &&
+      scenario.startingDemandScale,
+  );
+  if (
+    !Number.isInteger(startingCustomers) ||
+    startingCustomers < 1 ||
+    startingCustomers > 100000000
+  ) {
+    throw new RangeError("Choose between 1 and 100M customer accounts.");
+  }
+  const startingDemandScale = researched?.startingDemandScale || 1;
+  const scale = startingCustomers * startingDemandScale;
+  // The same model load sizing and baseline-only calibration apply to every portfolio.
+  const facilities = regionalStartingFleet(location, startingYear, scale);
   const scenario: ScenarioType = {
     ...DEFAULT_CUSTOM_SCENARIO,
     name: "Data centers & your community",
@@ -144,7 +157,6 @@ export function createDataCenterScenario(
     durationMonths: 16 * 12,
     cash: inEraMoney(scale * 800, startingYear),
     facilities,
-    eventScenarioIds: [],
   };
   return configureDataCenterGrowth(
     scenario,
@@ -158,7 +170,6 @@ export function withoutDataCenterGrowth(scenario: ScenarioType): ScenarioType {
   return {
     ...scenario,
     name: "Your community without added data centers",
-    eventScenarioIds: [],
     loadAdditions: scenario.loadAdditions?.map((load) => ({
       ...load,
       peakW: load.demandType === "Data Centers" ? 0 : load.peakW,

@@ -32,7 +32,6 @@ export default function Lobby({
   onAuthorize,
   onJoined,
   onDiscardInvite,
-  onOpenSaves,
   canAuthenticate = true,
   onChooseNew,
   onCopyCode,
@@ -48,7 +47,6 @@ export default function Lobby({
   onAuthorize?: () => Promise<void>;
   onJoined?: () => void;
   onDiscardInvite?: () => void;
-  onOpenSaves?: () => void;
   canAuthenticate?: boolean;
   /** Host: set the multiplayer save aside and choose a new game. */
   onChooseNew: () => void;
@@ -309,14 +307,6 @@ export default function Lobby({
                   }}
                 >
                   Enter another code
-                </Button>
-              )}
-              {!initialInviteCode && onOpenSaves && (
-                <Button
-                  disabled={!canAuthenticate || busy || authorizing}
-                  onClick={() => run(() => authorized(onOpenSaves), "join")}
-                >
-                  Multiplayer saves
                 </Button>
               )}
             </>

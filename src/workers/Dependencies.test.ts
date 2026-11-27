@@ -53,6 +53,7 @@ describe("forecast worker dependencies", () => {
     "Outlook",
     "PolicyPreview",
     "CustomGameForecast",
+    "CustomGameFleet",
     "ScenarioStartingPeak",
     "DataCenterSetup",
   ])("initializes %s without loading browser services", (worker) => {

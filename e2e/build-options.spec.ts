@@ -1140,9 +1140,16 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     const build = await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
-    // The default custom fleet opens at 2 GWh. Select a 1 GWh / 10 MW project.
+    // Where the capacity slider opens depends on the grid's size, so step up from its smallest
+    // size to the 1 GWh / 10 MW project.
     const size = build.getByRole("slider");
-    await size.press("ArrowLeft");
+    await size.press("Home");
+    for (
+      let steps = 0;
+      steps < 60 && (await size.getAttribute("aria-valuetext")) !== "1GWh";
+      steps++
+    )
+      await size.press("ArrowRight");
     await expect(size).toHaveAccessibleName("Capacity 1GWh");
     const ironAir = page.locator(".buildOption").filter({
       has: page.getByRole("button", {

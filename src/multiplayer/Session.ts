@@ -50,6 +50,23 @@ import {
   VIEW_INTERVAL_MS,
 } from "./Timing";
 
+/** React and the chart commit work in microtasks after the synchronous store update. Return
+ * view credit in the next task so its round trip includes that work. A message also runs in
+ * hidden windows where an animation frame can stop and timers can be throttled. */
+function afterViewUpdate(acknowledge: () => void) {
+  if (typeof MessageChannel === "undefined") {
+    setTimeout(acknowledge, 0);
+    return;
+  }
+  const { port1, port2 } = new MessageChannel();
+  port1.onmessage = () => {
+    port1.close();
+    port2.close();
+    acknowledge();
+  };
+  port2.postMessage(null);
+}
+
 function validPendingCampaign(value: unknown): value is PendingCampaign {
   if (!value || typeof value !== "object") return false;
   const campaign = value as PendingCampaign;
@@ -123,6 +140,8 @@ export class MultiplayerSession {
     loadingSaves: false,
   };
   private libraryRequest = 0;
+  /** What the host last started, so a finished match can be played again. */
+  private matchSpec?: MatchSpec;
   private listeners = new Set<() => void>();
   private worker?: Worker;
   private hostedView = false;
@@ -782,9 +801,15 @@ export class MultiplayerSession {
                   view.disconnected = [...this.replicaDisconnected];
                   this.acceptView(view);
                 }
-                worker.postMessage({
-                  kind: "views-applied",
-                } satisfies ReplicaRequest);
+                afterViewUpdate(() => {
+                  if (
+                    generation === this.replicaGeneration &&
+                    this.replica === worker
+                  )
+                    worker.postMessage({
+                      kind: "views-applied",
+                    } satisfies ReplicaRequest);
+                });
               } else if (data.kind === "progress") {
                 if (!this.replicationStream(data)) return;
                 const { matchId, epoch, applied, verified } = data;
@@ -1189,10 +1214,10 @@ export class MultiplayerSession {
   async removePlayer(seatId: string) {
     this.update({ lobby: await this.request({ kind: "remove", seatId }) });
   }
-  async exportSave(id?: string) {
+  async exportSave() {
     if (!this.services.checkpoints.export)
       throw new Error("Multiplayer export is unavailable.");
-    await this.services.checkpoints.export(id);
+    await this.services.checkpoints.export();
   }
   hasOnlineAuthority() {
     return !!this.services.authority?.();
@@ -1616,10 +1641,10 @@ export class MultiplayerSession {
               connected: [...this.state.lobby.connected],
             });
         }
-        // Subscribers apply the host grid synchronously. Only then may the worker clone
-        // another bundle; small clock/liveness messages remain independent of this credit.
-        if (current() && this.worker === worker)
-          this.post({ kind: "views-applied" });
+        afterViewUpdate(() => {
+          if (current() && this.worker === worker)
+            this.post({ kind: "views-applied" });
+        });
       };
       this.worker.onerror = () => {
         if (!current() || this.worker !== worker) return;
@@ -1628,6 +1653,9 @@ export class MultiplayerSession {
         if (!receivedView) rollback(error);
         else this.update({ busy: false, error });
       };
+      this.matchSpec = world
+        ? world.spec
+        : (choice as { spec: MatchSpec }).spec;
       this.post(
         world
           ? {
@@ -1754,6 +1782,7 @@ export class MultiplayerSession {
       throw error;
     }
     this.startGeneration++;
+    this.matchSpec = undefined;
     this.worker?.terminate();
     this.worker = undefined;
     this.stopReplica();
@@ -2015,11 +2044,18 @@ export class MultiplayerSession {
     this.closing = true;
     try {
       if (this.worker) await this.save(true);
-      await this.request({ kind: "unlock" });
+      await this.request({ kind: "unlock", finished: true });
       this.endLocalMatch();
     } finally {
       this.closing = false;
     }
+  }
+  /** The host plays the finished match's configuration again, at once, with the same players. */
+  async restart() {
+    const spec = this.matchSpec;
+    if (!this.isHost() || !spec) return;
+    await this.backToLobby();
+    await this.start({ spec });
   }
   private endLocalMatch() {
     this.stopReplica();

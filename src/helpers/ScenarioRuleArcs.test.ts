@@ -13,7 +13,7 @@ import {
   resolveScenarioRuleTargets,
   type ScenarioRuleTargetFacility,
 } from "./ScenarioRuleTargets";
-import { prepareCustomScenario } from "./CustomScenarioEvents";
+import { prepareOfficialArcScenario } from "./CustomSetup";
 import type { RuleDiagnostic } from "../data/ScenarioRules";
 
 const challenges = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
@@ -205,7 +205,7 @@ test("relocation keeps preparation for phases and choices and already-prepared a
     (campus.startsYear - source(106).startingYear) * 12,
     "load",
   );
-  const prepared = prepareCustomScenario({
+  const prepared = prepareOfficialArcScenario({
     ...DEFAULT_CUSTOM_SCENARIO,
     startingYear: 2050,
     eventScenarioIds: [106],

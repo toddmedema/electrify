@@ -1,8 +1,6 @@
 import { modScenario } from "../mods/ModScenario";
 import { modPlayerFacts } from "../mods/ModAuthoring";
 import { modBrowseSummary } from "../multiplayer/ModBrowse";
-import { prepareCustomScenario } from "./CustomScenarioEvents";
-import { scenarioRules } from "./ScenarioRules";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { tickState } from "../reducers/Game";
 import { validScenarioRuleState } from "./ScenarioRuleValidation";
@@ -151,33 +149,6 @@ test("Chernobyl saves retain their previously authored dollar receipts", () => {
   // The old receipt differs only in its authored display text; numeric obligations are identical.
   disaster.message = disaster.message!.replace("SUR 250M", "$250M");
   expect(validScenarioRuleState(game)).toBe(true);
-});
-
-test("custom non-dollar saves retain legacy dollar carbon-fee receipts", () => {
-  const scenario = prepareCustomScenario({
-    ...DEFAULT_CUSTOM_SCENARIO,
-    locationId: delhi.locationId,
-    location: delhi.location,
-    eventScenarioIds: [100],
-    cash: 1e12,
-    startingDemandScale: 0.1,
-  });
-  const game = createGame({ scenarioId: 999, scenario, seed: 17 });
-  const onset = scenarioRules(scenario, game)!.events.find(
-    (event) => event.effects.carbonFeePerKgCO2e,
-  )!;
-  runMonths(game, onset.startMonth);
-  tickState(game);
-  const receipt = game.worldEvents.occurrences.find(
-    (event) => event.effects.carbonFeePerKgCO2e,
-  )!;
-  expect(receipt.message).toContain("₹");
-  expect(validScenarioRuleState(game)).toBe(true);
-  receipt.message = `${game.location.name}: ${scenarioEffectsSummary(receipt.effects).join("; ")}.`;
-  expect(receipt.message).toContain("$");
-  expect(validScenarioRuleState(game)).toBe(true);
-  receipt.effects.carbonFeePerKgCO2e = 999;
-  expect(validScenarioRuleState(game)).toBe(false);
 });
 
 test("community and co-op mod previews use the selected location's currency", () => {

@@ -74,6 +74,22 @@ are realistic consequences of service-territory size. Authored Data Center Boom
 retains its 90% annual utilization, now flat at 90 MW for its 100 MW nameplate.
 No load schedule invents a January peak and July trough for a data center.
 
+## Custom Game uses the same sizing
+
+The custom setup opens with the local grid's blend of plants rather than one gas peaker.
+`regionalStartingFleet` takes the region's measured capacity mix for the starting year,
+`sizeStartingFleet` finds the smallest scale of that blend that serves every hour of the
+first year in the real model with the same 5% allowance, and `sizeCustomGameFleet` applies
+both to the custom game's location, era and customers. Technologies that do not yet exist in
+the starting year, or that the location cannot build, are left out of the blend, and nameplates
+are rounded to the two significant digits the game builds them at. A shortfall that no plant in
+the blend can cover is made up with one firm gas, steam, coal or oil plant of the era.
+
+The fleet is sized at the hardest difficulty and the setup's seed, so every easier difficulty is
+covered too, and is made again whenever the location, starting year or customers change. Adding
+or removing a plant keeps the player's own fleet until one of those changes. The Year 1 outlook
+then forecasts the fleet that will be played.
+
 ## Existing data centers and growth
 
 Measured retail sales already contain operating data centers. The regional

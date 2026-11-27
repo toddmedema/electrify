@@ -235,6 +235,8 @@ function fixture(
         payload: { kind: "baseline", ...baseline },
       });
       await flushReplica();
+      jest.advanceTimersByTime(0);
+      await flushReplica();
     },
     project: async (current: RoomView) => {
       if (replicaIdentity !== `${current.matchId}/${current.epoch}`) {
@@ -1142,10 +1144,11 @@ test("worker keepalives relay only to connected guests without replacing the hos
   f.session.dispose();
 });
 
-test("worker view credit follows synchronous host consumption and cannot outlive its session", async () => {
+test("worker view credit follows the renderer task and cannot outlive its session", async () => {
   const f = fixture(true);
   await f.session.initialize();
   await f.session.start({ spec: COOP_TEST_SPEC });
+  jest.advanceTimersByTime(0);
   f.posts.length = 0;
   const consumed = jest.fn(() => {
     expect(f.posts).not.toContainEqual({ kind: "views-applied" });
@@ -1171,6 +1174,8 @@ test("worker view credit follows synchronous host consumption and cannot outlive
         (request.payload as { kind: string }).kind === "view",
     ),
   ).toBe(false);
+  expect(f.posts).not.toContainEqual({ kind: "views-applied" });
+  jest.advanceTimersByTime(0);
   expect(f.posts).toEqual([
     { kind: "replica-peers", connected: [guest] },
     { kind: "views-applied" },
@@ -1179,8 +1184,26 @@ test("worker view credit follows synchronous host consumption and cannot outlive
   f.posts.length = 0;
   f.session.subscribe(() => f.session.dispose());
   publish();
+  jest.advanceTimersByTime(0);
   expect(f.worker.terminate).toHaveBeenCalled();
   expect(f.posts).toEqual([]);
+});
+
+test("a guest releases view credit after applying the grid and discards credit queued before disposal", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  await f.project(view({ revision: 1 }));
+  const credit = { kind: "views-applied" };
+  expect(f.session.getSnapshot().view?.revision).toBe(1);
+  expect(f.replicaPosts).not.toContainEqual(credit);
+  jest.advanceTimersByTime(0);
+  expect(f.replicaPosts).toContainEqual(credit);
+  f.replicaPosts.length = 0;
+  await f.project(view({ revision: 2 }));
+  expect(f.session.getSnapshot().view?.revision).toBe(2);
+  f.session.dispose();
+  jest.advanceTimersByTime(0);
+  expect(f.replicaPosts).not.toContainEqual(credit);
 });
 
 test.each(["command", "disconnect"])(
@@ -1682,6 +1705,32 @@ test("custom setup waits for the host's settings before offering Ready", async (
   const key = selectionKey(f.session.getSnapshot().browse!);
   await f.session.setReady(key);
   expect(coopSelection(f.session.getSnapshot()).ready).toBe(true);
+
+  // If the host changes the grid, the editor withdraws the old setup while sizing it.
+  sendBrowse(f, browse({ card: "CUSTOM_GAME", revision: 3 }));
+  expect(coopSelection(f.session.getSnapshot())).toMatchObject({
+    receivingScenario: true,
+    ready: false,
+  });
+  await expect(f.session.setReady(key)).rejects.toThrow("Receiving scenario");
+  sendBrowse(
+    f,
+    browse({
+      card: "CUSTOM_GAME",
+      revision: 4,
+      custom: {
+        ...DEFAULT_CUSTOM_SCENARIO,
+        seed: 2468,
+        startingCustomers: 2_000_000,
+      },
+    }),
+  );
+  expect(coopSelection(f.session.getSnapshot())).toMatchObject({
+    receivingScenario: false,
+    ready: false,
+  });
+  await f.session.setReady(selectionKey(f.session.getSnapshot().browse!));
+  expect(coopSelection(f.session.getSnapshot()).ready).toBe(true);
   f.session.dispose();
 });
 
@@ -2082,6 +2131,39 @@ test("new matches and reconnect baselines send frozen mod definitions before the
   const resumed = sentSnapshots();
   await publish();
   expect(sentSnapshots()).toBe(resumed + 1);
+  f.session.dispose();
+});
+
+test("a host restarts the finished match with the same configuration and players", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const created = () => f.posts.filter((post) => post.kind === "create");
+  // Nothing to repeat until a match has been started.
+  await f.session.restart();
+  expect(created()).toHaveLength(0);
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  expect(created()).toHaveLength(1);
+  await f.session.restart();
+  // The finished match's saved campaign is set aside, so the same lobby can play on.
+  expect(f.requests.filter((request) => request.kind === "unlock")).toEqual([
+    { kind: "unlock", finished: true },
+  ]);
+  expect(created()).toHaveLength(2);
+  expect(created()[1]).toMatchObject({
+    kind: "create",
+    spec: COOP_TEST_SPEC,
+    seats: created()[0].kind === "create" ? created()[0].seats : [],
+  });
+  expect(f.session.getSnapshot().view).toBeDefined();
+  f.session.dispose();
+});
+
+test("a guest cannot restart a match", async () => {
+  const f = fixture(false);
+  await f.session.initialize();
+  await f.session.restart();
+  expect(f.posts.filter((post) => post.kind === "create")).toHaveLength(0);
+  expect(f.requests).not.toContainEqual({ kind: "unlock" });
   f.session.dispose();
 });
 

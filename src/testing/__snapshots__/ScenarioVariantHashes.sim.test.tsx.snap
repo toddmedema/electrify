@@ -1,7 +1,5 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`pins an ordinary custom game that selects every official arc 1`] = `"5161f5ae132d5bf1da5c5aa9393d7e2e64925db9f848f69e40e6592bc354ae9d"`;
-
 exports[`pins every official scenario at CEO on another seed 1`] = `
 Object {
   "100": "732bc7cc2e6451c31411eef61bdd8c98b7b7ec0ced65d6cf0015a2349643edae",

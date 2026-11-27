@@ -550,9 +550,21 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
         });
         break;
       case "room/unlock": {
-        withOnlyRoom();
+        // The host of a finished match may set its saved campaign aside to play the same game
+        // again, or another, with the players who are still here. An unfinished campaign belongs
+        // to its original roster and cannot be reopened.
+        if (Object.hasOwn(body, "finished")) {
+          keys(body, "roomId", "finished");
+          requireValue(body.finished === true);
+        } else withOnlyRoom();
         await edit(id, actor, "host", async (room, _self, now) => {
-          requireValue(!room.head, 409, "roster_locked");
+          requireValue(
+            !room.head || body.finished === true,
+            409,
+            "roster_locked",
+          );
+          delete room.head;
+          delete room.restoreHead;
           room.members = room.members.filter((member) => !member.withdrawn);
           room.locked = false;
           room.requiredIds = [];

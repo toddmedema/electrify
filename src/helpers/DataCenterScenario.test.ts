@@ -108,7 +108,6 @@ it("honors adjustable demand and arrival through game initialization and saves",
     expect(scenario.durationMonths).toBeGreaterThanOrEqual(
       (arrival - 2010 + 10) * 12,
     );
-    expect(scenario.eventScenarioIds).toEqual([]);
     const game = createGame({
       scenarioId: 999,
       scenario,
@@ -182,7 +181,6 @@ it("pairs ordinary demand exactly before the new campus and preserves zero-load 
     );
   }
   expect(baseline.facilities).toEqual(scenario.facilities);
-  expect(baseline.eventScenarioIds).toEqual([]);
   const added = configureDataCenterGrowth(scenario, 100000000, 2032);
   for (let month = 0; month < 12; month++) {
     const date = getDateFromMinute(

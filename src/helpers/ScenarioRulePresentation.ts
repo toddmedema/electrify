@@ -1,4 +1,3 @@
-import { currencyForLocation } from "./Currency";
 import { formatPercent } from "./Format";
 import type {
   CompiledRuleEvent,
@@ -15,7 +14,6 @@ import type {
   StoryAttributeValueType,
 } from "../Types";
 import { MINUTES_PER_MONTH } from "./DateTime";
-import { scenarioEffectsSummary } from "./ScenarioEffectsSummary";
 
 type Occurrence = ActiveWorldEventType & StoryPhaseDescriptionType;
 const share = (part: number, whole: number) =>
@@ -266,28 +264,5 @@ export function presentOfficialRuleOccurrence(
     attributes,
     effects,
   };
-  if (context?.scenarioId === 999) {
-    const changes = scenarioEffectsSummary(
-      occurrence.effects,
-      false,
-      currencyForLocation(context.location, rules.startingYear),
-    );
-    if (!preview)
-      occurrence.message = `${context.location.name}: ${changes.length ? changes.join("; ") + "." : "Review your supply and reserves before the upcoming scenario event."}`;
-    occurrence.actionTarget = { card: "FACILITIES", view: "FLEET" };
-    if (presentation.nativeReview === "nuclearTrip") {
-      occurrence.title = selectedNames.length
-        ? `${selectedNames[0]} shuts down`
-        : "Nuclear shutdown: no operating reactor affected";
-      occurrence.message = selectedNames.length
-        ? `${selectedNames[0]} is offline for the rest of this event. Replace its output with generation, storage or imports.`
-        : "Your grid has no operating nuclear reactor, so this shutdown causes no loss of supply.";
-    }
-    const eventYear = rules.startingYear + Math.floor(event.startMonth / 12);
-    occurrence.title = occurrence.title?.replace(
-      /\b(?:19|20)\d{2}\b/g,
-      String(eventYear),
-    );
-  }
   return occurrence;
 }

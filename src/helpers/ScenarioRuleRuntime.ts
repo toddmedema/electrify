@@ -310,21 +310,14 @@ function resolveEvent(
     preview && context.rules!.namespace.kind === "mod"
       ? []
       : scenarioRuleTargetOperations(event).map((operation) =>
-          resolveScenarioRuleTargets(
-            context.scenarioId === 999 &&
-              context.rules!.namespace.kind === "official" &&
-              operation.target.selector === "startingAsset"
-              ? { selector: "largestOperating", fuel: "Uranium" }
-              : operation.target,
-            {
-              seed: context.seed,
-              eventKey: event.key,
-              facilities,
-              ...(event.source?.drawKey
-                ? { officialDrawKey: event.source.drawKey }
-                : {}),
-            },
-          ),
+          resolveScenarioRuleTargets(operation.target, {
+            seed: context.seed,
+            eventKey: event.key,
+            facilities,
+            ...(event.source?.drawKey
+              ? { officialDrawKey: event.source.drawKey }
+              : {}),
+          }),
         );
   const noMatch = targets.some((target) => target.noMatch);
   const grant = event.transactions
@@ -413,17 +406,6 @@ function resolveEvent(
     effects: event.effects,
   };
   occurrence.effects = ruleEffectsForOccurrence(occurrence, context);
-  if (
-    context.scenarioId === 999 &&
-    context.rules!.namespace.kind === "official" &&
-    context.rules!.namespace.scenarioId !== 999 &&
-    event.source &&
-    occurrence.effects.operatingExpensePerMonth !== undefined
-  )
-    occurrence.effects.operatingExpensePerMonth *=
-      context.customEvents?.find(
-        (arc) => arc.scenarioId === event.source!.scenarioId,
-      )?.moneyScale ?? 1;
   if (
     context.rules!.namespace.kind === "mod" &&
     event.source &&

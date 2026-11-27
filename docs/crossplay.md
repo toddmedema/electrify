@@ -5,7 +5,7 @@ The website uses Google sign-in and the Steam edition uses your signed-in Steam
 account. Hosting opens the custom game editor. Share the invite link or
 six-character code so friends can join directly. The host can remove a player
 before the game starts. Each player keeps their company for the campaign.
-Existing campaigns can be resumed from **Multiplayer saves**.
+After hosting, existing campaigns can be resumed with **Load multiplayer save**.
 
 Any player can host. The host's device runs the simulation and each guest's
 device replays the records to produce its own views. Backgrounding or losing a
@@ -177,8 +177,7 @@ deployment and inspect aggregate logs.
 2. On the same locked roster, background and reconnect a required mobile
    device, change networks, replace an account session, and expire the host
    lease. Compete for takeover and recover from the confirmed checkpoint.
-   Exercise Save & Quit, returning to the game, downloading a permitted save,
-   and denying access to outsiders and displaced sessions. Verify the campaign
+   Exercise Save & Quit, returning to the game, and denying access to outsiders and displaced sessions. Verify the campaign
    remains unranked.
 3. Exercise malformed and oversized input and exhaust the room and grant
    quotas in the protected deployment. Measure late-game command latency,

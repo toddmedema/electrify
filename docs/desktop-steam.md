@@ -578,7 +578,9 @@ The only change is the intertie setup below. Each company answers its own scenar
 the shared clock waits until everyone has. Co-op is unranked. A company that goes bankrupt, is
 fired or misses its objective retires: its grid freezes, its links stop, and it no longer holds
 the shared clock, while the others play on. The match ends at the scenario's term or once every
-company has retired, with a results table and **Back to lobby** for the host.
+company has retired, with a results table. The host can **Restart** the same game with the same
+players, **Return to lobby** to choose a new game in the custom setup without anyone reconnecting,
+or go to the main menu.
 
 The host's worker runs every grid on one clock. Multiplayer uses the normal game view, including
 the full build catalog, storage, policies, forecasts, rate controls and facility management.
@@ -639,8 +641,7 @@ current bundle and solo save schemas with matching game code and data, and valid
 and shared connection before play. Unsupported checkpoints are rejected.
 
 When the host has multiplayer saves, the scenario list shows **Load multiplayer save** across the
-top. It lists each save with its players and save time, and its menu offers deletion with
-confirmation. Loading a save gathers the lobby to pick companies: each row is labelled with the
+top. It lists each save by its players with its save time, and its menu offers deletion. Loading a save gathers the lobby to pick companies: each row is labelled with the
 Steam name that saved it. A returning player takes back their own company by default, and anyone
 in the lobby can take an open one; the host resumes once every company still playing has a
 connected player. A company handed to a new player is saved under that player's Steam ID and name.

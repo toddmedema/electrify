@@ -5,7 +5,6 @@ import {
   utilityOwnedAt,
 } from "../../helpers/PowerAgreements";
 import { formatWatts } from "../../helpers/Format";
-import { customEventContext } from "../../helpers/CustomScenarioEvents";
 import {
   AppStateType,
   GameType,
@@ -121,9 +120,7 @@ function computeUpcomingStoryEvents(
     getScenario(game.scenarioId, game.customScenario),
     game,
   );
-  const customEvents = customEventContext(game.customScenario);
-  if (!game.loadAdditions?.length && !rules && !customEvents?.length)
-    return NO_UPCOMING;
+  if (!game.loadAdditions?.length && !rules) return NO_UPCOMING;
   const fleetKey = game.facilities
     .map((facility) =>
       [
@@ -172,7 +169,6 @@ function computeUpcomingStoryEvents(
     JSON.stringify(game.loadAdditions),
     JSON.stringify(game.utilityExpansion?.acquisitions),
     JSON.stringify(game.transmission?.acceptedAgreements),
-    JSON.stringify(customEvents),
     JSON.stringify(
       game.worldEvents.occurrences.map((event) => [
         event.key,
@@ -194,7 +190,6 @@ function computeUpcomingStoryEvents(
     ),
     seed: game.seed,
     scenarioId: game.scenarioId,
-    customEvents,
     difficulty: game.difficulty,
     date: game.date,
     location: game.location,
