@@ -803,6 +803,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
     '.accessibleChart > [role="img"][tabindex="0"]:focus',
   );
   await expect(chart).toBeFocused();
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
   await input(page, "confirm");
   await expect(chart.locator("..").getByRole("status")).not.toBeEmpty();
   await input(page, "right");
@@ -1938,6 +1939,9 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "left");
     await expect(fleet).toBeFocused();
     await input(page, "confirm");
+    await expect(
+      page.getByRole("region", { name: "Fleet", exact: true }),
+    ).toBeVisible();
     await capture("fleet");
     const inspect = page.getByRole("button", {
       name: "Inspect Coal",

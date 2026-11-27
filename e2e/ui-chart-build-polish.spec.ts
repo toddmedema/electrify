@@ -1,5 +1,5 @@
 import path from "node:path";
-import { expect, test, type Locator } from "./fixtures";
+import { expect, test, type Locator, type Page } from "./fixtures";
 import { openBuild, openPane, sortBuildCatalog, openFleet } from "./layout";
 import { chartScale } from "../src/components/base/UPlotHelpers";
 import { editSavedGame, readSavedGame } from "./save-fixture";
@@ -551,18 +551,23 @@ async function expectFullRowFocus(row: Locator) {
   expect(header.x + header.width).toBeLessThanOrEqual(pane.x + pane.width);
 }
 
+async function openConstructionCatalog(page: Page, theme: "light" | "dark") {
+  await page.addInitScript((mode) => {
+    localStorage.clear();
+    localStorage.setItem("theme", mode);
+    localStorage.setItem("audioEnabled", "false");
+  }, theme);
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  return openBuild(page);
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`construction cards share spacing and icon silhouettes in ${theme}`, async ({
     page,
   }, info) => {
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-      localStorage.setItem("audioEnabled", "false");
-    }, theme);
-    await page.goto("/?scenario=100");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const build = await openBuild(page);
+    const build = await openConstructionCatalog(page, theme);
     const layouts = [];
     const colors = [];
     for (const category of ["Generators", "Storage", "Interties"]) {
@@ -632,8 +637,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(layouts[2]).toEqual(layouts[0]);
     expect(colors[0]).toBe(colors[1]);
     expect(colors[2]).toBe(colors[1]);
+  });
 
-    // Check the silhouettes and edge-to-edge focus after buying both kinds of project.
+  test(`purchased storage and interties retain their Fleet silhouettes and row focus in ${theme}`, async ({
+    page,
+  }, info) => {
+    const build = await openConstructionCatalog(page, theme);
+    await build.getByRole("tab", { name: "Interties", exact: true }).click();
     await build
       .getByRole("button", {
         name: "Review purchase of Pacific Northwest intertie",
@@ -645,12 +655,17 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
+    const reviewBattery = page.getByRole("button", {
+      name: "Review purchase of Lithium Battery",
+      exact: true,
+    });
     await build
-      .getByRole("button", {
-        name: "Review purchase of Lithium Battery",
-        exact: true,
-      })
+      .getByRole("listitem")
+      .filter({ has: reviewBattery })
+      .getByRole("button", { name: "Use max size", exact: true })
       .click();
+    await expect(reviewBattery).toBeEnabled();
+    await reviewBattery.click();
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })

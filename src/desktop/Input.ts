@@ -218,11 +218,14 @@ export function startDesktopInput(
     }
   };
   const chart = (delta: number) => {
-    const charts = controls().filter((element) =>
+    const availableControls = controls();
+    const charts = availableControls.filter((element) =>
       element.matches('.accessibleChart > [role="img"][tabindex="0"]'),
     );
     if (!charts.length) {
-      const fleet = controls().find((control) => control.id === "fleetNav");
+      const fleet = availableControls.find(
+        (control) => control.id === "fleetNav",
+      );
       if (fleet && store.getState().card.name !== "FLEET") {
         store.dispatch(navigate("FLEET"));
         if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);

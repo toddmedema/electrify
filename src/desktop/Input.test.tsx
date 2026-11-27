@@ -618,6 +618,45 @@ it.each([
   },
 );
 
+it.each([
+  ["SCENARIO", "nextPane"],
+  ["FLEET", "previousPane"],
+] as const)(
+  "%s %s returns to the map in the active workspace",
+  async (tool, action) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate(tool));
+    const previousWorkspace = jest.fn();
+    render(
+      <div className="appFrame">
+        <main className="base_main" aria-hidden="true">
+          <nav className="gameActionDock">
+            <button onClick={previousWorkspace}>Previous workspace</button>
+          </nav>
+        </main>
+        <main className="base_main">
+          <div className="gameWorkspace">
+            <nav className="gameActionDock">
+              <button aria-controls="tool-FLEET">Fleet</button>
+              <button aria-controls="tool-SCENARIO">Scenario</button>
+            </nav>
+          </div>
+        </main>
+      </div>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    f.emit({ actions: [action] });
+    expect(store.getState().card.name).toBe("FACILITIES");
+    f.emit({ actions: ["nextPane"] });
+    expect(store.getState().card.name).toBe("FLEET");
+    f.emit({ actions: ["previousPane"] });
+    expect(store.getState().card.name).toBe("FACILITIES");
+    expect(previousWorkspace).not.toHaveBeenCalled();
+  },
+);
+
 it.each(["BUILD_STORAGE", "BUILD_INTERTIES"] as const)(
   "pane cycling retains %s in an already open Build pane",
   async (category) => {

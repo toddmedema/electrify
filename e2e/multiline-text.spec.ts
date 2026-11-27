@@ -133,15 +133,15 @@ for (const theme of ["light", "dark"] as const) {
       expect(cashBox.x + cashBox.width + 4).toBeLessThanOrEqual(clock.x);
     });
 
-    test(`purchase explanations and long titles wrap in ${theme}`, async ({
-      page,
-    }, info) => {
-      for (const [category, name] of [
-        ["Generators", "Solar"],
-        ["Generators", "Natural Gas CC"],
-        ["Storage", "Pumped Hydro"],
-        ["Interties", "Pacific Northwest intertie"],
-      ]) {
+    for (const [category, name] of [
+      ["Generators", "Solar"],
+      ["Generators", "Natural Gas CC"],
+      ["Storage", "Pumped Hydro"],
+      ["Interties", "Pacific Northwest intertie"],
+    ]) {
+      test(`${name} purchase explanations and long titles wrap in ${theme}`, async ({
+        page,
+      }, info) => {
         await page.getByRole("tab", { name: category, exact: true }).click();
         await page
           .getByRole("button", {
@@ -194,8 +194,8 @@ for (const theme of ["light", "dark"] as const) {
           .getByRole("button", { name: "close", exact: true })
           .click();
         await expect(dialog).toHaveCount(0);
-      }
-    });
+      });
+    }
 
     test(`generator detail labels and values fit their columns in ${theme}`, async ({
       page,
