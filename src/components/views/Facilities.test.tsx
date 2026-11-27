@@ -764,7 +764,7 @@ it("shows that a built facility is waiting for its grid connection", () => {
   const game = createGame({ scenarioId: 116 });
   const plant = game.facilities.find(({ name }) => name === "Wind")!;
   plant.yearsToBuildLeft = AWAITING_TILE_CONNECTION;
-  renderFacilities(game);
+  renderFacilities(game, null);
   const row = screen.getByRole("button", {
     name: /^Inspect Wind, .*Waiting for grid connection/,
   });
