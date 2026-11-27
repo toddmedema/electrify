@@ -42,7 +42,9 @@ export default defineConfig({
     baseURL,
     headless: true,
     screenshot: "only-on-failure",
-    trace: "retain-on-failure",
+    // Continuous screencasts force both 3D canvases through GPU readbacks and
+    // delay context teardown. Keep the failure screenshots and structured trace.
+    trace: { mode: "retain-on-failure", screenshots: false },
   },
   webServer: process.env.E2E_BASE_URL
     ? undefined
