@@ -93,8 +93,10 @@ export type WireMessage =
   | { kind: "campaign"; campaign?: PendingCampaign };
 export type SessionRequest =
   | {
-      kind: "state" | "leave" | "unlock" | "restart-host";
+      kind: "state" | "leave" | "restart-host";
     }
+  /** `finished` sets a completed match's saved campaign aside, so its lobby can play on. */
+  | { kind: "unlock"; finished?: true }
   | { kind: "reconnect"; roomId?: string }
   | { kind: "remove"; seatId: string }
   | { kind: "create"; rules: string }

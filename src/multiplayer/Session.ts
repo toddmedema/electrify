@@ -2017,7 +2017,7 @@ export class MultiplayerSession {
     this.closing = true;
     try {
       if (this.worker) await this.save(true);
-      await this.request({ kind: "unlock" });
+      await this.request({ kind: "unlock", finished: true });
       this.endLocalMatch();
     } finally {
       this.closing = false;

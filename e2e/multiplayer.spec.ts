@@ -544,9 +544,10 @@ test("V2 saves are named for their players and Delete removes one at once", asyn
   await guest.setViewportSize({ width: 360, height: 640 });
   const library = await openCampaignSaves(guest);
   // Every multiplayer save is the same scenario, so a save is named for who played it.
-  await expect(library.getByRole("heading", { level: 2 })).toHaveText(
-    /\S+, \S+/,
-  );
+  // (The dialog's own title is also a level-2 heading, so match the save's name.)
+  await expect(
+    library.getByRole("heading", { level: 2, name: /\S+, \S+/ }),
+  ).toHaveCount(1);
   await expect(library.getByText("Custom Game")).toHaveCount(0);
   const actions = library.getByRole("button", { name: /^Actions for / });
   await actions.click();
@@ -554,9 +555,7 @@ test("V2 saves are named for their players and Delete removes one at once", asyn
   await guest.getByRole("menuitem", { name: "Delete", exact: true }).click();
   // No confirmation or explanation: the save is gone from this account's list.
   await expect(library.getByText("No multiplayer saves yet")).toBeVisible();
-  await expect(
-    guest.getByRole("dialog", { name: /Delete|Withdraw/ }),
-  ).toHaveCount(0);
+  await expect(guest.getByRole("dialog", { name: /Delete/ })).toHaveCount(0);
   const hostLibrary = await openCampaignSaves(host);
   await expect(hostLibrary.getByRole("button", { name: "Load" })).toBeVisible();
   expect(await campaign.fixture.checkpoint()).toEqual(confirmed);

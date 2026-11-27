@@ -2095,9 +2095,10 @@ test("a host restarts the finished match with the same configuration and players
   await f.session.start({ spec: COOP_TEST_SPEC });
   expect(created()).toHaveLength(1);
   await f.session.restart();
-  expect(
-    f.requests.filter((request) => request.kind === "unlock"),
-  ).toHaveLength(1);
+  // The finished match's saved campaign is set aside, so the same lobby can play on.
+  expect(f.requests.filter((request) => request.kind === "unlock")).toEqual([
+    { kind: "unlock", finished: true },
+  ]);
   expect(created()).toHaveLength(2);
   expect(created()[1]).toMatchObject({
     kind: "create",

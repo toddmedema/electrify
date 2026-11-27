@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DesktopBridge } from "../Desktop";
 import type { LobbyState, SharedSaveLibrary } from "./Native";
@@ -94,6 +94,10 @@ test("each save is named for its players and offers a plain Load", async () => {
 test("Delete removes a save at once, without exporting or asking again", async () => {
   const user = userEvent.setup();
   const { requests } = await showSaves();
+  // Let the opening animation finish, so its own focus move cannot stand in for the delete's.
+  await waitFor(() =>
+    expect(screen.getAllByRole("button", { name: "Load" })[0]).toHaveFocus(),
+  );
   await user.click(
     screen.getByRole("button", { name: "Actions for Ada, Grace" }),
   );
@@ -107,4 +111,8 @@ test("Delete removes a save at once, without exporting or asking again", async (
   expect(screen.getByRole("heading", { name: "Hedy" })).toBeInTheDocument();
   // Nothing else asks the player to confirm or explain.
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  // The row that held focus is gone, so focus restarts from the dialog's first action.
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Load" })).toHaveFocus(),
+  );
 });

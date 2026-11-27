@@ -4,7 +4,7 @@ import { TickPresentFutureType } from "../Types";
 import { summarizeYearOneOutlook } from "./CustomGameForecast";
 
 /** A model allowance, not a claim about a utility's contracted reserve margin. */
-export const SUPPLY_MARGIN = 0.05;
+const SUPPLY_MARGIN = 0.05;
 
 /**
  * Finds the smallest opening fleet, in the real weather and dispatch model, that serves every

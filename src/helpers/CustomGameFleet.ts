@@ -37,7 +37,7 @@ const RESERVE_PLANTS = [
 ];
 
 /** The seed and difficulty setup is sized at: the hardest, so every easier one is covered too. */
-export const FLEET_DIFFICULTY = DATA_CENTER_DIFFICULTY;
+const FLEET_DIFFICULTY = DATA_CENTER_DIFFICULTY;
 
 /**
  * The local grid's blend of plants, sized so the first year is served in the real model: the
