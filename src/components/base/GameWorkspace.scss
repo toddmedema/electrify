@@ -30,6 +30,14 @@
   --game-dock-label-line: 1.25rem;
 }
 
+:root:has(.gameWorkspace[data-compact-dock="true"]) {
+  --game-dock-bottom: 0px;
+  --game-dock-button-height: max(48px, 2.75rem);
+  --game-dock-clearance: calc(
+    var(--game-dock-button-height) + 20px + env(safe-area-inset-bottom)
+  );
+}
+
 .gameWorkspace {
   --game-tool-width: clamp(22.5rem, 28vw, 30rem);
   position: relative;
@@ -282,11 +290,6 @@
 .gameWorkspace .gameStatusBar .gridHealth {
   flex: 0 1 auto;
 }
-.gameDockLabel {
-  font-weight: var(--font-weight-emphasis);
-  white-space: nowrap;
-}
-
 .app_container:has(.gameWorkspace) .snackbar-above-nav {
   bottom: calc(var(--game-dock-clearance) + 8px) !important;
 }
@@ -332,28 +335,39 @@ html:has(
   display: none !important;
 }
 
-// Compact docks keep icon targets readable; hover and hold previews supply their labels.
+// Reserve one bottom edge across the map. The background separates the actions
+// from the terrain without an additional border or inset shadow.
 .gameWorkspace[data-compact-dock="true"] #navfooter.gameActionDock {
   width: 100%;
   max-width: 100%;
-  margin-inline: 0;
-  padding-inline: 0;
-  gap: 0;
-  border-width: 1px 0 0;
+  padding: 4px env(safe-area-inset-right)
+    calc(4px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
   border-radius: 0;
+  background: var(--bg-raised);
+  box-shadow: none;
+  overflow-x: auto;
   .gameDockAction.MuiButton-root {
-    flex: 1 0 auto;
-    min-width: 3rem;
-    width: 3rem;
-    min-height: 3rem;
-    gap: 0;
-    border-radius: 0;
+    flex: 1 0 max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
+    border-radius: var(--radius-md);
+    &:focus-visible {
+      outline-offset: -2px;
+    }
   }
-  .gameDockLabel {
-    font-size: 0.6875rem;
+}
+
+// The tutorial displays action names as the controls are introduced.
+.gameWorkspace #navfooter.gameActionDock[data-tutorial-dock="true"] {
+  .gameDockAction.MuiButton-root {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: var(--game-dock-button-width);
+    padding-inline: 8px;
   }
-  .gameDockAction.MuiButton-root:focus-visible {
-    outline-offset: -2px;
+
+  .gameDockTutorialLabel {
+    font-weight: var(--font-weight-emphasis);
+    white-space: nowrap;
   }
 }
 
@@ -364,6 +378,10 @@ html:has(
     grid-area: 1 / 1;
     min-width: 0;
     min-height: 0;
+
+    > .facilities {
+      height: 100%;
+    }
   }
   .gameToolTray {
     position: absolute;

@@ -153,3 +153,37 @@ test("a new custom grid starts on the 3D map for the selected city", async ({
     map.getByRole("button", { name: "Inspect Paris on map", exact: true }),
   ).toBeVisible();
 });
+
+test("map layers align with the desktop dock and clear the flush phone dock", async ({
+  page,
+}) => {
+  await startRegionalGame(page);
+  const dock = regionalDock(page);
+  const map = regionalMap(page);
+  const layers = map.getByRole("button", { name: "Map layers", exact: true });
+  await expect(layers).toBeInViewport();
+
+  const bottom = (box: { y: number; height: number }) => box.y + box.height;
+  const right = (box: { x: number; width: number }) => box.x + box.width;
+  const width = page.viewportSize()!.width;
+  const [mapBox, dockBox, layersBox] = await Promise.all([
+    map.boundingBox(),
+    dock.boundingBox(),
+    layers.boundingBox(),
+  ]);
+  if (width < 700) {
+    expect(dockBox!.x).toBeCloseTo(mapBox!.x);
+    expect(right(dockBox!)).toBeCloseTo(right(mapBox!));
+    expect(bottom(dockBox!)).toBeCloseTo(bottom(mapBox!));
+    expect(dockBox!.y - bottom(layersBox!)).toBeGreaterThanOrEqual(8);
+    await expect(dock).toHaveCSS("border-top-width", "0px");
+    await expect(dock).toHaveCSS("box-shadow", "none");
+  } else if (width >= 1024) {
+    expect(bottom(layersBox!)).toBeCloseTo(bottom(dockBox!));
+    expect(layersBox!.x - right(dockBox!)).toBeGreaterThanOrEqual(8);
+  } else {
+    expect(dockBox!.y - bottom(layersBox!)).toBeGreaterThanOrEqual(8);
+  }
+  await layers.click();
+  await expect(page.getByRole("dialog", { name: "Map layers" })).toBeVisible();
+});

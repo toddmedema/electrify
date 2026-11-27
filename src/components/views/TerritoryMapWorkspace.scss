@@ -235,7 +235,7 @@
 .territoryMapControl {
   position: absolute;
   z-index: 4;
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right));
   bottom: 16px;
   display: grid;
   place-items: center;
@@ -276,7 +276,7 @@
 }
 @media (max-width: 599px) {
   .territoryMapControl {
-    right: 8px;
+    right: max(8px, env(safe-area-inset-right));
     bottom: 8px;
   }
   .territoryUtilityLabel strong {
@@ -284,62 +284,12 @@
     line-height: 16px;
   }
 }
-.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"] {
-  --game-dock-button-height: 48px;
-  --game-dock-clearance: calc(72px + var(--game-dock-bottom));
-  .territoryMapControl {
-    bottom: var(--game-dock-clearance);
-  }
+// Keep the map controls above the dock until there is room to share its row.
+.gameWorkspace .territoryMapControl {
+  bottom: var(--game-dock-clearance);
 }
-// Keep the compact map dock floating, with horizontal scrolling when needed.
-.gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
-  #navfooter.gameActionDock {
-  position: absolute;
-  width: max-content;
-  max-width: calc(100% - 16px);
-  left: var(--game-dock-left, 50%);
+.gameWorkspace[data-desktop-map="true"] .territoryMapControl {
   bottom: var(--game-dock-bottom);
-  transform: translateX(-50%);
-  margin: 0;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 4px 20px var(--shadow-ring);
-  overflow-x: auto;
-  .gameDockAction.MuiButton-root {
-    flex: 0 0 44px;
-    width: 44px;
-    min-width: 44px;
-    min-height: 48px;
-    border-radius: var(--radius-md);
-  }
-  .gameDockLabel {
-    display: none;
-  }
-}
-@media (max-width: 399px) {
-  .gameWorkspace[data-map-workspace="true"][data-compact-dock="true"]
-    #navfooter.gameActionDock {
-    max-width: calc(100% - 4px);
-    gap: 0;
-    padding-inline: 0;
-  }
-}
-// Tutorial prompts name these controls as they are introduced.
-.gameWorkspace[data-map-workspace="true"]
-  #navfooter.gameActionDock[data-tutorial-dock="true"] {
-  .gameDockAction.MuiButton-root {
-    flex: 0 0 auto;
-    width: auto;
-    min-width: var(--game-dock-button-width);
-    padding-inline: 8px;
-  }
-
-  .gameDockTutorialLabel {
-    font-weight: var(--font-weight-emphasis);
-    white-space: nowrap;
-  }
 }
 
 .gameWorkspace[data-map-workspace="true"] .territoryAgreements {
@@ -380,7 +330,7 @@
   stroke-width: 2;
 }
 .territoryMapLayerToggle {
-  right: 72px;
+  right: calc(max(16px, env(safe-area-inset-right)) + 56px);
 }
 .mapStatusLayersPanel {
   padding: 8px 16px;
@@ -391,7 +341,7 @@
 }
 @media (max-width: 599px) {
   .territoryMapLayerToggle {
-    right: 64px;
+    right: calc(max(8px, env(safe-area-inset-right)) + 56px);
   }
 }
 
@@ -452,8 +402,7 @@
 
 .regionalMapWorkspace {
   .territoryMapLayerToggle {
-    right: 12px;
-    bottom: max(12px, var(--game-dock-clearance));
+    right: max(12px, env(safe-area-inset-right));
   }
   .tileWorkspaceSurface.tileWorkspaceInspector .tileWorkspaceHeading {
     display: flex;
