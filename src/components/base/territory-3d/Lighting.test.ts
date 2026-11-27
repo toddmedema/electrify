@@ -13,6 +13,8 @@ it("follows simulated day/night and keeps the stylized moon cool", () => {
   expect(noon.color[0]).toBeGreaterThan(noon.color[2]);
   expect(night.color[2]).toBeGreaterThan(night.color[0]);
   expect(noon.ambient).toBeGreaterThan(night.ambient);
+  expect(noon.night).toBe(0);
+  expect(night.night).toBe(1);
   expect(noon.direction[2]).toBeGreaterThan(0);
   expect(mapLighting({ ...day, minute: 480 }).direction[0]).toBeGreaterThan(0);
   expect(mapLighting({ ...day, minute: 960 }).direction[0]).toBeLessThan(0);
@@ -31,6 +33,7 @@ it("crosses both horizons continuously, with fading bounded shadows", () => {
       );
       expect(Math.abs(before.color[i] - after.color[i])).toBeLessThan(0.005);
     }
+    expect(Math.abs(before.night - after.night)).toBeLessThan(0.005);
     expect(before.shadow).toBeLessThan(0.001);
     expect(after.shadow).toBeLessThan(0.001);
   }
@@ -67,6 +70,9 @@ it.each(["polar-day", "polar-night"] as const)(
       return light.color[0] - light.color[2];
     });
     const sign = daylight === "polar-day" ? 1 : -1;
+    expect(mapLighting({ ...day, daylight }).night).toBe(
+      daylight === "polar-day" ? 0 : 1,
+    );
     expect(redMinusBlue.every((difference) => difference * sign > 0)).toBe(
       true,
     );
