@@ -274,7 +274,9 @@ for (const theme of ["light", "dark"]) {
       .getByRole("button", { name: "Build", exact: true });
     await expect(build).toHaveAttribute("aria-expanded", "false");
     await expectGlyphContrast(build, supportsHover, blue);
-    await page.getByRole("button", { name: "pause", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "pause", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await build.click();
     await expect(build).toHaveAttribute("aria-expanded", "true");
     await page.mouse.move(0, 0);
