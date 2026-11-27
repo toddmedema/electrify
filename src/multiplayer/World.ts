@@ -71,7 +71,6 @@ import { selectWeatherLocation } from "../data/Weather";
 import { currentTick } from "../helpers/GameSelectors";
 import { purchaseTerms } from "../helpers/Financials";
 import {
-  createMultiplayerTerritory,
   multiplayerBorderConnection,
   multiplayerOwnedTileIds,
   multiplayerTerritoryTiles,
@@ -339,6 +338,9 @@ export function createWorld(
         customers: scenario.startingCustomers || getStartingCustomers(location),
         location,
         seed,
+        territorialStart: territorial
+          ? { seatIndex: index, seatCount: seats.length }
+          : undefined,
       }),
     );
     const result = cloneGrid(game);
@@ -356,9 +358,7 @@ export function createWorld(
     result.inGame = true;
     result.speed = "NORMAL";
     result.runIdentity = undefined;
-    return territorial
-      ? createMultiplayerTerritory(result, index, seats.length)
-      : result;
+    return result;
   });
   const budgets = grids.map(
     (g) =>

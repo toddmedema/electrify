@@ -8,6 +8,7 @@ import {
   multiplayerClaimQuote,
   multiplayerOwnedTileIds,
   multiplayerTerritoryClaimable,
+  multiplayerTerritoryTile,
   multiplayerTerritoryTiles,
 } from "../helpers/MultiplayerTerritory";
 import { territoryHexDistance } from "../helpers/TerritoryTiles";
@@ -127,6 +128,39 @@ test.each([2, 3, 4])(
     ).toEqual(initial);
   },
 );
+
+test("opening forecasts reflect each company's wind site before anyone acts", () => {
+  const world = createWorld(
+    {
+      ...COOP_TEST_SPEC,
+      territorialVersion: 1,
+      customScenario: {
+        ...COOP_TEST_SPEC.customScenario!,
+        seed: 1,
+        facilities: [{ name: "Wind", fuel: "Wind", peakW: 60e6 }],
+      },
+    },
+    coopSeats(4),
+    "wind-siting",
+    "opening",
+  );
+  const sites = world.grids.map((grid) => {
+    const [current, next] = roomView(world, grid.multiplayer!.seat).game!
+      .timeline;
+    return {
+      terrain: multiplayerTerritoryTile(grid, grid.facilities[0].tileId)
+        ?.terrain,
+      currentSupply: current.supplyW,
+      nextSupply: next.supplyW,
+    };
+  });
+  const hills = sites.find(({ terrain }) => terrain === "hills");
+  const forest = sites.find(({ terrain }) => terrain === "forest");
+  expect(hills).toBeDefined();
+  expect(forest).toBeDefined();
+  expect(hills!.currentSupply).toBeGreaterThan(forest!.currentSupply);
+  expect(hills!.nextSupply).toBeGreaterThan(forest!.nextSupply);
+});
 
 test("a host orders competing claims and charges only the winning company", () => {
   const world = create();
