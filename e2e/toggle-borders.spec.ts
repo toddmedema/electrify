@@ -45,33 +45,31 @@ async function speedGlyphPaint(button: Locator): Promise<"fill" | "stroke"> {
 async function expectThumbUnder(button: Locator, blue: string) {
   await expect(button).toHaveAttribute("aria-pressed", "true");
   await button.scrollIntoViewIfNeeded();
+  const paint = await speedGlyphPaint(button);
   // The thumb glides and the label's colour eases in behind it, so read until both settle.
   await expect(async () => {
-    const thumb = await button.evaluate(
-      (element, property) => {
-        const group = element.closest(".speedToggles")!;
-        const style = getComputedStyle(group, "::before");
-        const box = element.getBoundingClientRect();
-        const centre =
-          group.getBoundingClientRect().left +
-          parseFloat(style.left) +
-          new DOMMatrix(style.transform).m41 +
-          parseFloat(style.width) / 2;
-        const glyph = element.querySelector(".speedLabel svg path");
-        return {
-          background: style.backgroundColor,
-          label: glyph
-            ? getComputedStyle(glyph)[property]
-            : getComputedStyle(element).color,
-          offCentre: Math.abs(centre - (box.left + box.width / 2)),
-          // The thumb sits beneath the segment, so the label is what a tap lands on.
-          labelOnTop: element.contains(
-            document.elementFromPoint(box.left + box.width / 2, box.top + 8),
-          ),
-        };
-      },
-      await speedGlyphPaint(button),
-    );
+    const thumb = await button.evaluate((element, property) => {
+      const group = element.closest(".speedToggles")!;
+      const style = getComputedStyle(group, "::before");
+      const box = element.getBoundingClientRect();
+      const centre =
+        group.getBoundingClientRect().left +
+        parseFloat(style.left) +
+        new DOMMatrix(style.transform).m41 +
+        parseFloat(style.width) / 2;
+      const glyph = element.querySelector(".speedLabel svg path");
+      return {
+        background: style.backgroundColor,
+        label: glyph
+          ? getComputedStyle(glyph)[property]
+          : getComputedStyle(element).color,
+        offCentre: Math.abs(centre - (box.left + box.width / 2)),
+        // The thumb sits beneath the segment, so the label is what a tap lands on.
+        labelOnTop: element.contains(
+          document.elementFromPoint(box.left + box.width / 2, box.top + 8),
+        ),
+      };
+    }, paint);
     expect(thumb.background, "the thumb uses the logo blue").toBe(blue);
     expect(
       thumb.offCentre,
@@ -153,7 +151,7 @@ async function expectGlyphContrast(
 }
 
 for (const theme of ["light", "dark"]) {
-  test(`difficulty keeps continuous selected borders and speed keeps its thumb in ${theme}`, async ({
+  test(`difficulty keeps continuous selected borders in ${theme}`, async ({
     page,
   }, info) => {
     await page.addInitScript((mode) => {
@@ -190,6 +188,17 @@ for (const theme of ["light", "dark"]) {
       path: info.outputPath(`difficulty-${theme}.png`),
       animations: "disabled",
     });
+  });
+
+  test(`speed keeps its thumb and toolbar controls maintain contrast in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.addInitScript((mode) => {
+      localStorage.clear();
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+    }, theme);
+    await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.locator(".gameStage .facilities")).toBeVisible();
     await page.mouse.move(0, 0);

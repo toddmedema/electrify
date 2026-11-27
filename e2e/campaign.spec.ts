@@ -1,7 +1,7 @@
 import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import path from "path";
 import "../src/Store";
-import { test, expect } from "./fixtures";
+import { test, expect, type Page } from "./fixtures";
 import { openBuild, openPane } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { installLeaderboardFixture } from "./leaderboard-fixture";
@@ -35,26 +35,30 @@ import { buildStorySnapshot } from "../src/helpers/Story";
 
 const REVIEW_PROJECTS = ["desktop-chromium", "mobile-390px", "mobile-360px"];
 
+async function setCampaignPreferences(page: Page, theme: "light" | "dark") {
+  await page.addInitScript(
+    ({ mode, key, journal }) => {
+      localStorage.clear();
+      localStorage.setItem(key, JSON.stringify(journal));
+      localStorage.setItem("theme", mode);
+      localStorage.setItem("audioEnabled", "false");
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-11-02" }],
+        }),
+      );
+    },
+    { mode: theme, key: DIFFICULTY_STORAGE_KEY, journal: unlockedJournal },
+  );
+}
+
 for (const theme of ["light", "dark"] as const) {
-  test(`campaign entry, historical builds, and saved CEO handover work in ${theme}`, async ({
+  test(`campaign catalogue and setup navigation work in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
-    await page.addInitScript(
-      ({ mode, key, journal }) => {
-        localStorage.clear();
-        localStorage.setItem(key, JSON.stringify(journal));
-        localStorage.setItem("theme", mode);
-        localStorage.setItem("audioEnabled", "false");
-        localStorage.setItem(
-          "plays",
-          JSON.stringify({
-            plays: [{ scenarioId: 0, timesPlayed: 1, date: "2026-11-02" }],
-          }),
-        );
-      },
-      { mode: theme, key: DIFFICULTY_STORAGE_KEY, journal: unlockedJournal },
-    );
+    await setCampaignPreferences(page, theme);
     await page.goto("/");
     await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(
@@ -170,6 +174,24 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     await expect(page).not.toHaveURL(/campaign=legacy/);
     await page.getByRole("button", { name: "View legacy campaign" }).click();
+    await expect(
+      difficulty.getByRole("button", {
+        name: DIFFICULTY_LABELS.Manager,
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test(`historical builds and the saved first CEO handover work in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!REVIEW_PROJECTS.includes(info.project.name));
+    await setCampaignPreferences(page, theme);
+    await page.goto("/?campaign=legacy");
+    await page
+      .getByRole("group", { name: "Difficulty", exact: true })
+      .getByRole("button", { name: DIFFICULTY_LABELS.Manager, exact: true })
+      .click();
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();
@@ -370,6 +392,26 @@ for (const theme of ["light", "dark"] as const) {
     expect(successor?.customerRate).toBe(closed?.customerRate);
     expect(successor?.dollarsPerkWh).toBe(closed?.dollarsPerkWh);
     expect(successor?.timeline[0].cash).toBe(closed?.timeline[0].cash);
+  });
+
+  test(`the saved preview for the ninth campaign term wraps and advances in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!REVIEW_PROJECTS.includes(info.project.name));
+    await setCampaignPreferences(page, theme);
+    await page.goto("/?campaign=legacy");
+    await page
+      .getByRole("group", { name: "Difficulty", exact: true })
+      .getByRole("button", { name: DIFFICULTY_LABELS.Manager, exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Start campaign", exact: true })
+      .click();
+    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await page
+      .getByRole("button", { name: "pause", exact: true })
+      .first()
+      .click();
 
     // A protocol fixture reaches the longest incoming term. Full campaign balance has separate
     // real-action simulation coverage; this checks goal wrapping, scrolling, and saved previews.
