@@ -576,10 +576,11 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   const build2 = p2.getByRole("dialog", { name: "Build", exact: true });
   await expect(build1).toBeVisible();
   await expect(build2).toBeVisible();
+  // Both opening sites must support the project, including a mountain's 25 MW limit.
   const sizeSolar = (build: Locator) =>
     build
       .getByRole("slider", { name: /^Capacity / })
-      .fill(String(wToSliderTick(50e6)));
+      .fill(String(wToSliderTick(20e6)));
   await Promise.all([sizeSolar(build1), sizeSolar(build2)]);
   const review1 = build1.getByRole("button", {
     name: "Review purchase of Solar",
@@ -589,12 +590,14 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     name: "Review purchase of Solar",
     exact: true,
   });
+  await expect(review1).toBeEnabled();
+  await expect(review2).toBeEnabled();
   // Each document retains its own real focus; both devices confirm in the same sample.
   await review1.focus();
   await review2.focus();
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
-  const purchase1 = p1.getByRole("dialog", { name: "Build 50MW Solar?" });
-  const purchase2 = p2.getByRole("dialog", { name: "Build 50MW Solar?" });
+  const purchase1 = p1.getByRole("dialog", { name: "Build 20MW Solar?" });
+  const purchase2 = p2.getByRole("dialog", { name: "Build 20MW Solar?" });
   await expect(purchase1).toBeVisible();
   await expect(purchase2).toBeVisible();
   await purchase1
@@ -690,9 +693,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   // A purchase review remains usable while the partner's real forecast/chart is open.
   await couch.input({ "101": ["build"] });
   await sizeSolar(build1);
-  await build1
-    .getByRole("button", { name: "Review purchase of Solar", exact: true })
-    .focus();
+  await expect(review1).toBeEnabled();
+  await review1.focus();
   await couch.input({ "101": ["confirm"] });
   await expect(purchase1).toBeVisible();
   await expect(
