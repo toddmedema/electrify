@@ -78,6 +78,7 @@ test("Mission 1 · inspect the 3D map, read Fleet and keep a full day supplied",
 test("Mission 2 · buy two generators on the map and find construction", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startMission(page, 1);
   await goal(page, "Build a gas peaker");
   await buildTutorialProject(page, "Natural Gas Peaker");
@@ -115,6 +116,7 @@ test("Mission 2 · buy two generators on the map and find construction", async (
 test("Mission 3 · move Coal above storage and cover the daily peak with a battery", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startMission(page, 2);
   const touch = await page.evaluate(
     () => matchMedia("(pointer: coarse)").matches,

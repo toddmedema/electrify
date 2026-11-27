@@ -114,7 +114,14 @@ export async function buildTutorialProject(
     () => matchMedia("(pointer: coarse)").matches,
   );
   if (touch) await (await reachableTutorialTile(page, sites)).tap();
-  else await sites.first().press("Enter");
+  else {
+    // The project dialog takes focus when it opens. Let it finish before a
+    // keyboard user moves focus to a site and presses Enter.
+    await expect(
+      map.locator(".tileWorkspaceProject").getByRole("heading"),
+    ).toBeFocused();
+    await sites.first().press("Enter");
+  }
   const loan = map.getByRole("button", {
     name: "Loan",
     exact: true,

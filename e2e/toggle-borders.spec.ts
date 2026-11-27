@@ -127,7 +127,7 @@ async function expectHeldSpeedContrast(button: Locator) {
 async function expectGlyphContrast(
   button: Locator,
   supportsHover: boolean,
-  blue?: string,
+  expectedFill?: string,
 ) {
   const glyph = button.locator("svg").first();
   const label = await button.getAttribute("aria-label");
@@ -138,14 +138,14 @@ async function expectGlyphContrast(
       );
     });
   await settle();
-  if (blue) await expect(glyph).toHaveCSS("fill", blue);
+  if (expectedFill) await expect(glyph).toHaveCSS("fill", expectedFill);
   expect
     .soft(await foregroundContrast(glyph), `${label} glyph at rest`)
     .toBeGreaterThanOrEqual(3);
   if (supportsHover) {
     await button.hover();
     await settle();
-    if (blue) await expect(glyph).toHaveCSS("fill", blue);
+    if (expectedFill) await expect(glyph).toHaveCSS("fill", expectedFill);
     expect
       .soft(await foregroundContrast(glyph), `${label} glyph on hover`)
       .toBeGreaterThanOrEqual(3);
@@ -219,7 +219,14 @@ for (const theme of ["light", "dark"]) {
           exact: true,
         });
         await expect(pause).toHaveAttribute("aria-pressed", "false");
-        await expectGlyphContrast(pause, supportsHover, blue);
+        const otherGlyph = speeds
+          .getByRole("button", { name: "fast speed", exact: true })
+          .locator("svg path")
+          .first();
+        const inactiveInk = await otherGlyph.evaluate(
+          (path) => getComputedStyle(path).stroke,
+        );
+        await expectGlyphContrast(pause, supportsHover, inactiveInk);
         if (supportsHover) {
           await expectHeldSpeedContrast(button);
           await expectHeldSpeedContrast(pause);
