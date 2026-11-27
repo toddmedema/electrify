@@ -1031,7 +1031,7 @@ test("quick touch swipes scroll the enlarged dock without opening a tool", async
   await startGame(page, "light", 100, 2);
   const dock = page.locator("#navfooter");
   const box = (await dock.boundingBox())!;
-  // The compact dock overflows by about 90 px at the maximum scale on a 390 px viewport.
+  // Maximum interface scale gives the compact dock a horizontal scroll range.
   expect(
     await dock.evaluate((element) => element.scrollWidth - element.clientWidth),
   ).toBeGreaterThan(50);

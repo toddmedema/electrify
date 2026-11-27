@@ -43,6 +43,7 @@ test("regional map presents the city and plants while Fleet and intertie builds 
     name: "San Francisco",
     exact: true,
   });
+  await expect(cityDetails).toContainText("Illustrative grid");
   await expect(
     cityDetails.getByText("Grid demand", { exact: true }),
   ).toBeVisible();
@@ -61,6 +62,7 @@ test("regional map presents the city and plants while Fleet and intertie builds 
       exact: true,
     });
     await expect(plantDetails.locator(".tileFacilityStatus")).toBeVisible();
+    await expect(plantDetails).not.toContainText("Pacific Gas and Electric");
     const pausePlant = plantDetails.getByRole("button", {
       name: `Pause ${plantName}`,
       exact: true,

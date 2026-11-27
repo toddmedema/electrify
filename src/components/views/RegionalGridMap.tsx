@@ -92,7 +92,9 @@ export default function RegionalGridMap({
             facility?.name ?? tile.city?.name ?? TERRAIN_LABELS[tile.terrain]
           }
           titleIconSrc={facility && facilityIconSrc(facility)}
-          subtitle={view.ownerKey && view.ownerName}
+          subtitle={
+            tile.city ? `${view.ownerName} · Illustrative grid` : undefined
+          }
           focusKey={`${inspected}:${facility?.id ?? "terrain"}`}
           returnFocusSelector={`[data-map-target="${inspected}"]`}
           wide={!!(facility || tile.city)}
