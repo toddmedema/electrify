@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`build pauses survive browser lifecycle events in ${theme}`, async ({
@@ -32,10 +32,7 @@ for (const theme of ["light", "dark"]) {
       ),
     );
     await expect(slow).toHaveAttribute("aria-pressed", "true");
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     // Browsers use visibilitychange when a tab or mobile app is backgrounded.
     // Keep it independently exercised from the pagehide/pageshow fallback above.
     const visibility = async (state: "hidden" | "visible") => {

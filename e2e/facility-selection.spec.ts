@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 
@@ -16,8 +16,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    const nav = page.getByRole("button", { name: "Facilities", exact: true });
-    await openPane(pane, nav);
+    await openFleet(page);
     const original = await editSavedGame(page, (save) => {
       const templates = save.game.facilities;
       save.game.facilities = Array.from({ length: 5 }, (_, i) => ({
@@ -31,7 +30,7 @@ for (const theme of ["light", "dark"]) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await expect(page.locator("#menuCard")).toBeHidden();
-    await openPane(pane, nav);
+    await openFleet(page);
     const rows = pane.locator(".facilityRow");
     const heading = pane.locator("#dispatch-order");
     await expect(heading).toContainText("Generating");
@@ -389,10 +388,7 @@ test("selling an open facility collapses its row before removing it", async ({
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const pane = page.locator(".facilities:visible");
-  await openPane(
-    pane,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   const row = pane.locator(".facilityRow").first();
   const id = (await row.getAttribute("data-facility-id"))!;
   const sold = pane.locator(`.facilityRow[data-facility-id="${id}"]`);

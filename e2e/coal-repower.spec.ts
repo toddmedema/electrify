@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expectDialogToFit } from "./dialog-layout";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
@@ -10,10 +10,7 @@ const quantifiedMargin =
 
 async function openCoalDetails(page: Page) {
   const fleet = page.locator(".facilities:visible");
-  await openPane(
-    fleet,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   const coal = fleet.getByRole("button", {
     name: "Inspect Coal",
     exact: true,

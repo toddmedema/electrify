@@ -5,10 +5,10 @@ import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
 import {
   openBuild,
-  openPane,
   returnToTerritoryMap,
   setMapProjectCapacity,
   sortBuildCatalog,
+  openFleet,
 } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { purchaseTerms } from "../src/helpers/Financials";
@@ -519,10 +519,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=103");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     for (const kind of ["Generator", "Storage"]) {
       await page.locator(".button-buildFacility").click();
       await page.locator(`.button-build${kind}`).click();
@@ -1013,10 +1010,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const battery = page.locator(".buildOption").filter({

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
+import { openFleet } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 import {
   exitSettingsWithBodyArrow,
@@ -374,7 +375,7 @@ test("global shortcuts keep shifted fleet actions and manual typing separate", a
 }) => {
   await page.goto("/?scenario=111");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await openFleet(page);
   await page.keyboard.press("0");
   const paused = page
     .getByRole("group", { name: "game speed", exact: true })

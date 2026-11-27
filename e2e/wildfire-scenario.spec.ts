@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
@@ -78,10 +78,7 @@ for (const theme of ["light", "dark"] as const) {
         fullPage: true,
       });
     }
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const line = page.locator(".transmissionLine").filter({
       has: page.getByRole("button", { name: /Inspect Northern intertie/ }),
     });

@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, test, type Locator } from "./fixtures";
-import { openBuild, openPane, sortBuildCatalog } from "./layout";
+import { openBuild, openPane, sortBuildCatalog, openFleet } from "./layout";
 import { chartScale } from "../src/components/base/UPlotHelpers";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { MINUTES_PER_MONTH } from "../src/helpers/DateTime";
@@ -187,10 +187,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.reload();
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       const fleet = page.locator(".facilities");
-      await openPane(
-        fleet,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
       const nuclear = fleet.locator('.facilityRow[data-fuel="Uranium"]');
       await expect(nuclear.locator(".facilityStatus")).toContainText(
         "0/300 294MW",
@@ -655,10 +652,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })
       .click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const battery = page.locator('.facilityRow[data-facility="Battery"]');
     await expect(battery.locator(".MuiAvatar-root")).toHaveCSS(
       "border-radius",
@@ -709,10 +703,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities:visible"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const line = page.locator(".transmissionLine").first();
     const icon = line.locator(".transmissionIcon");
     const badge = icon.locator(".facilityActivity");

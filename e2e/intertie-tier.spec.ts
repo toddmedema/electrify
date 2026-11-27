@@ -1,7 +1,7 @@
 import { startIntertieBuildFixture } from "./intertie-build-fixture";
 import { expect, test } from "./fixtures";
 import path from "path";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`build a larger intertie tier in ${theme}`, async ({
@@ -13,11 +13,7 @@ for (const theme of ["light", "dark"] as const) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await startIntertieBuildFixture(page);
-    const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openBuild(page);
     const controlGeometry = () =>
       page.locator(".constructionControls").evaluate((element) => {

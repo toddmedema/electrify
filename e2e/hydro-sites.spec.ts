@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`Hydro site maxima and purchase details reflow in ${theme}`, async ({
@@ -11,10 +11,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=103");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildGenerator").click();
     const hydro = page.locator(".buildOption").filter({
@@ -110,10 +107,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.getByRole("region", { name: "About Hydro" })).toHaveCount(
       0,
     );
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const plant = page
       .locator(".facilityRow")
       .filter({ has: page.locator(".facilityName", { hasText: /^Hydro$/ }) });

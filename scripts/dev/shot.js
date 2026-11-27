@@ -12,6 +12,7 @@ const { alive, coordinationRoot, readOwner } = require("./coordination");
 
 const VIEWS = [
   "facilities",
+  "map",
   "build",
   "programs",
   "insights",

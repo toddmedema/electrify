@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 import { readSavedGame } from "./save-fixture";
 import path from "path";
 
@@ -55,7 +55,7 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(page.locator(".facilities"), page.locator("#faciltiesNav"));
+    await openFleet(page);
     const chart = page.locator("#chartSupplyDemand");
     await expect(chart.locator("canvas")).toBeVisible();
     const before = await baselinePixels(chart);

@@ -1,5 +1,5 @@
 import { reviewScreenshot } from "./review-screenshot";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openFleet, openPane } from "./layout";
 import { expect, Page, test } from "./fixtures";
 import path from "node:path";
 import { editSavedGame } from "./save-fixture";
@@ -25,6 +25,7 @@ async function startGame(
   );
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
+  if (scenarioId !== 116) await openFleet(page);
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
   await page.keyboard.press("0");
   await expect(page.locator(".facilities > .paneHeader")).toHaveCount(0);

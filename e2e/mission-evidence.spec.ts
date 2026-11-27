@@ -1,7 +1,7 @@
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openPane, openBuild, openFleet } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 
 const reviewProjects = new Set([
@@ -314,6 +314,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByRole("button", { name: "Scenario", exact: true }),
     ).toBeFocused();
+    await openFleet(page);
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
@@ -332,13 +333,9 @@ for (const theme of ["light", "dark"]) {
       await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     }
     if (info.project.name.startsWith("mobile")) {
-      // Facilities is the base layer: closing the open tool returns to it.
-      for (const nav of ["Insights", "Events", "Facilities"]) {
-        if (nav === "Facilities")
-          await openPane(
-            page.locator(".facilities"),
-            page.locator("#faciltiesNav"),
-          );
+      // Closing the open tool returns to the selected Fleet view.
+      for (const nav of ["Insights", "Events", "Fleet"]) {
+        if (nav === "Fleet") await openFleet(page);
         else await page.getByRole("button", { name: nav, exact: true }).click();
         await settle(page);
         await expect(page.locator(".missionSummary:visible")).toContainText(

@@ -1,6 +1,6 @@
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openPane, openBuild, openFleet } from "./layout";
 
 test("California players can build and understand an intertie", async ({
   page,
@@ -16,10 +16,7 @@ test("California players can build and understand an intertie", async ({
 
   await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   const projects = page.getByRole("tabpanel", { name: "Interties" });
@@ -194,10 +191,7 @@ test("island grids do not offer interties or power exchange", async ({
 
   await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
   const facilities = page.locator(".facilities:visible");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await expect(facilities.getByRole("tab", { name: "Interties" })).toHaveCount(
     0,
   );
@@ -280,10 +274,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
@@ -364,11 +355,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
-    const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     // Corridor cards are build cards now, so the heading and Review button come from

@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
@@ -14,11 +14,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    const navigation = page.getByRole("button", {
-      name: "Facilities",
-      exact: true,
-    });
-    await openPane(pane, navigation);
+    await openFleet(page);
     // A real saved fleet makes overflow independent of the scenario's starting row count.
     await editSavedGame(page, (save) => {
       const templates = [...save.game.facilities];
@@ -32,7 +28,7 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(pane, navigation);
+    await openFleet(page);
     await expect(page.locator("main.base_main")).toHaveCount(1);
     await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     const list = pane.locator(".unifiedFacilitiesList");

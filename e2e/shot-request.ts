@@ -12,7 +12,13 @@ export interface ShotRequest {
   /** Start the game from the route and open `view`; false photographs the route as loaded. */
   game: boolean;
   view:
-    "facilities" | "build" | "programs" | "insights" | "events" | "scenario";
+    | "facilities"
+    | "map"
+    | "build"
+    | "programs"
+    | "insights"
+    | "events"
+    | "scenario";
   /** `label` names the project and the file; `height` overrides the e2e project's. */
   viewports: { width: number; height?: number; label: string }[];
   themes: ("light" | "dark")[];

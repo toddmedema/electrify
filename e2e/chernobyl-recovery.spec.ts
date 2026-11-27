@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { readSavedGame } from "./save-fixture";
 
@@ -58,11 +58,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const appbar = page.locator("#appbar:visible").first();
     await expect(appbar).toContainText("Mar 1986");
-    const fleet = page.locator(".facilities");
-    await openPane(
-      fleet,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const unitFour = page.locator(
       '.facilityRow[data-facility="Chernobyl Unit 4"]',
     );
@@ -126,10 +122,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       await events.evaluate((el) => el.scrollWidth - el.clientWidth),
     ).toBeLessThanOrEqual(1);
-    await openPane(
-      fleet,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await expect(unitFour.locator(".facilityDisclosure")).toBeVisible();
     await expect(unitFour.locator(".facilityDisclosure")).toContainText(
       "0/1 0GW · 0% · paused",

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet, openPane } from "./layout";
 import path from "path";
 
 async function scrollPlotIntoView(plot: Locator) {
@@ -338,6 +338,7 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();
+    await openFleet(page);
     const chart = page.locator("#chartSupplyDemand [role=img]");
     const plot = chart.locator(".u-over");
     await scrollPlotIntoView(plot);
@@ -425,6 +426,7 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();
+    await openFleet(page);
     // The initial forecast adds the announced event to the mobile header and resizes the plot.
     await expect(
       page.getByRole("button", { name: /^Upcoming:/ }),

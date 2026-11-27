@@ -14,7 +14,7 @@
 import { CDPSession, expect, Page, test, TestInfo } from "./fixtures";
 import fs from "fs";
 import path from "path";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 
 const BASELINES = path.join(
   __dirname,
@@ -314,11 +314,7 @@ test("B3/B4 commit, mutation and dispatch census at FAST", async ({
   // Build catalog: open it once to load its code, then census a second, warm opening
   await pause.click();
   await settle(page);
-  const facilities = page.locator(".facilities");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   const build = page.locator(".button-buildFacility:visible").first();
   const catalog = page.getByRole("tab", { name: "Generators", exact: true });
   const openCatalog = async (samples: Sample[] = []) => {

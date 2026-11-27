@@ -2,7 +2,7 @@ import { startIntertieBuildFixture } from "./intertie-build-fixture";
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie purchase keeps forecasts in build details in ${theme}`, async ({
@@ -14,11 +14,7 @@ for (const theme of ["light", "dark"] as const) {
       localStorage.setItem("audioEnabled", "false");
     }, theme);
     await startIntertieBuildFixture(page);
-    const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     const review = page.getByRole("button", {

@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 // Heatwave + Drought starts with hydro, storage and a mixed fleet, and a new build adds a row
 // under construction, so every kind of status line the list can show is on screen at once.
@@ -15,10 +15,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const pane = page.locator(".facilities:visible");
-  await openPane(
-    pane,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await openBuild(page);
   await page.locator(".button-buildGenerator").click();
   await page
@@ -29,10 +26,7 @@ test("facility rows keep readings untruncated when narrow details reflow", async
     .getByRole("dialog")
     .getByRole("button", { name: "Pay cash" })
     .click();
-  await openPane(
-    pane,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
 
   const rows = pane.locator(".facilityRow");
   await expect(rows.getByText(/^Building \d+%/)).toBeVisible();
@@ -91,10 +85,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     const hydro = pane.locator('.facilityRow[data-fuel="Hydro"]');
     const subtitle = hydro.locator(".MuiListItemText-secondary");

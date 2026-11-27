@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`event selection and history filters in ${theme}`, async ({
@@ -58,10 +58,7 @@ for (const theme of ["light", "dark"] as const) {
       "background-color",
       "rgba(0, 0, 0, 0)",
     );
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openPane(
       page.locator(".eventLog"),
       page.getByRole("button", { name: "Events", exact: true }),

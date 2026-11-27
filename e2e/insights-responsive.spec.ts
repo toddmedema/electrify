@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test, type Locator } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 
 const REVIEW_VIEWPORTS = new Set([
   "mobile-360px",
@@ -599,10 +599,7 @@ test("the compact dock's Build action stays touch-sized and clear of the chart",
   await page.getByRole("button", { name: "Start game", exact: true }).click();
 
   const facilities = page.locator(".facilities");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   const chart = facilities.locator("#chartSupplyDemand");
   await expect(chart).toBeVisible();
   const chartBox = (await chart.boundingBox())!;

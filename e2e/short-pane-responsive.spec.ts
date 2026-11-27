@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openPane, openBuild, openFleet } from "./layout";
 
 test("a live resize switches tablet, foldable and desktop game controls", async ({
   page,
@@ -88,10 +88,7 @@ for (const theme of ["light", "dark"] as const) {
       // The compositor debounces viewport changes for 100ms before mounting the new layout.
       await page.waitForTimeout(150);
       await expect(page.locator(".cardTransitions > main")).toHaveCount(1);
-      await openPane(
-        facilities,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
       const trading = facilities.getByRole("combobox", {
         name: "Buying",
       });

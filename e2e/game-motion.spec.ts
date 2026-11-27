@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openPane, openBuild, openFleet } from "./layout";
 import { editSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"]) {
@@ -18,10 +18,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openBuild(page);
     await page
       .getByRole("button", { name: /^Review purchase of / })
@@ -49,10 +46,7 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await expect(pane.locator(".facilityReadyLabel")).toHaveCount(0);
     await expect(page.locator("html")).not.toHaveAttribute(
       "data-motion-seen",
@@ -97,11 +91,7 @@ test("exchange direction stays readable on narrow screens and with reduced motio
   });
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  const fleet = page.locator(".facilities:visible");
-  await openPane(
-    fleet,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await page

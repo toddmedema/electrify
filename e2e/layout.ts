@@ -343,6 +343,21 @@ export async function openBuild(page: Page): Promise<Locator> {
   return build;
 }
 
+/** Select Fleet when the game opens on its map, then bring the fleet into view. */
+export async function openFleet(page: Page): Promise<Locator> {
+  const fleet = page.locator("#facilitiesPane");
+  const action = page.getByRole("button", { name: "Fleet", exact: true });
+  await expect(fleet.or(action).first()).toBeAttached();
+  if (!(await fleet.isVisible()) && (await action.isVisible())) {
+    await action.click();
+    await expect(fleet).toBeAttached();
+  }
+  if (await page.locator('[data-persistent-map="true"]').count())
+    await expect(fleet).toBeVisible();
+  else await openPane(fleet, action);
+  return fleet;
+}
+
 /**
  * Show a game tool, opening it from the dock when it is closed.
  * Returns whether the nav button was clicked.
