@@ -6274,7 +6274,7 @@ $homeSmokeCycle: 5.6s;
 .base_main .facilityRowHeader > :not(.outputProgressBar) {
   z-index: 1;
 }
-.facilityDisclosure .constructionProgress {
+.constructionProgress {
   display: block;
   position: absolute;
   left: 0;
@@ -6284,7 +6284,7 @@ $homeSmokeCycle: 5.6s;
   background: var(--border-subtle);
 }
 // Neutral at every fuel: identity stays in the icon, and the fill reads as one progress grammar.
-.facilityDisclosure .constructionProgressFill {
+.constructionProgressFill {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -7736,7 +7736,7 @@ img[src$="/transmission.svg"] {
 }
 
 // A faint sweep stays inside the completed portion of each construction track.
-.facilityDisclosure .constructionProgressFill::before {
+.constructionProgressFill::before {
   content: "";
   position: absolute;
   top: 0;
@@ -7772,7 +7772,7 @@ img[src$="/transmission.svg"] {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
-  .facilityDisclosure .constructionProgressFill::before {
+  .constructionProgressFill::before {
     animation: none;
     display: none;
   }

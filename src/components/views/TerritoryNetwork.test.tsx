@@ -474,10 +474,12 @@ it("starts construction on exactly the inspected tile and keeps building locked"
   expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
   expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
-  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(surface()).toHaveTextContent(
+    `Constructing transmission lines · ${quote.buildMonths} ${quote.buildMonths === 1 ? "month" : "months"} left`,
+  );
   expect(
-    within(surface()).queryByRole("button", { name: "Build here" }),
-  ).not.toBeInTheDocument();
+    within(surface()).getByRole("button", { name: "Build here" }),
+  ).toBeDisabled();
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });
@@ -714,7 +716,7 @@ it.each([undefined, 1280])(
       );
     });
     expect(
-      await within(surface()).findByText(/Connection under construction/),
+      await within(surface()).findByText(/Constructing transmission lines/),
     ).toBeVisible();
     expect(
       within(surface()).queryByRole("button", { name: "Cash" }),
@@ -996,13 +998,22 @@ it("retains the inspected site while a desktop connection is being built", async
   inspect(site.id);
   fireEvent.click(within(surface()).getByRole("button", { name: /Connect/ }));
   expect(ownsTerritoryTile(store.getState().game, site.id)).toBe(true);
+  const inspector = within(surface());
   expect(
-    within(surface()).queryByRole("tab", { name: "Generators" }),
+    inspector.getByText(/Constructing transmission lines/),
+  ).not.toHaveAttribute("role");
+  expect(
+    inspector.getByRole("button", { name: "Build here" }),
+  ).toHaveAccessibleDescription(/Constructing transmission lines.*0% complete/);
+  expect(
+    inspector.queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
   await openProjectPlanner(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(within(surface()).getByRole("status")).toHaveTextContent(
+    /Constructing transmission lines/,
+  );
   expect(
     within(surface()).queryByRole("button", { name: "Cash" }),
   ).not.toBeInTheDocument();

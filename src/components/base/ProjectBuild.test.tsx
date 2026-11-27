@@ -202,7 +202,7 @@ it("locks repeated Connect and requires a separate payment after energization", 
     );
   });
   expect(
-    await screen.findByText(/Connection under construction/),
+    await screen.findByText(/Constructing transmission lines/),
   ).toBeVisible();
   expect(
     screen.queryByRole("button", { name: "Cash" }),

@@ -494,8 +494,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator("#appStartup")).toHaveCount(0);
     const play = page.getByRole("button", { name: "Play", exact: true });
     await expect(play).toBeVisible();
-    // Selection follows focus; with focus outside the menu the default action carries the fill.
-    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    // Inspect the first-load selection before moving focus.
     const filled = page.locator(
       "#menuCard .mainActions .MuiButton-root:not([data-main-action])",
     );
