@@ -10,7 +10,15 @@ import { writeFile } from "node:fs/promises";
 // Let the real audio clock run before the first gesture in headless Chromium.
 // These tests exercise playback continuity rather than browser autoplay permission.
 test.use({
-  launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
+  launchOptions: async ({ launchOptions }, use) => {
+    await use({
+      ...launchOptions,
+      args: [
+        ...(launchOptions.args ?? []),
+        "--autoplay-policy=no-user-gesture-required",
+      ],
+    });
+  },
 });
 // Allow the soundtrack to decode and the real 29-second intro to finish on CI.
 test.setTimeout(120000);

@@ -2,10 +2,10 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { browserLaunchOptions } = require("./browser-launch");
 
-test("only Windows changes Chromium networking and keeps all existing disabled features", () => {
-  for (const platform of ["darwin", "linux"]) {
-    assert.deepEqual(browserLaunchOptions(platform), {});
-  }
+test("all test browsers deny Firebase and Windows preserves the existing disabled features", () => {
+  const { args } = browserLaunchOptions("linux");
+  assert.ok(args.includes("--no-proxy-server"));
+  assert.deepEqual(browserLaunchOptions("darwin"), { args });
   const { server } = require("playwright-core/lib/coreBundle");
   const chromium = server.createPlaywright({
     sdkLanguage: "javascript",
@@ -25,6 +25,6 @@ test("only Windows changes Chromium networking and keeps all existing disabled f
   assert.equal(featureSwitches[0], original + ",TcpPortRandomizationWin");
   assert.deepEqual(
     effective.filter((arg) => !featureSwitches.includes(arg)),
-    defaults.filter((arg) => arg !== original),
+    [...defaults.filter((arg) => arg !== original), ...args],
   );
 });

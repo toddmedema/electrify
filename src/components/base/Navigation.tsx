@@ -1,84 +1,34 @@
 import * as React from "react";
 import { Badge, Button, IconButton, Tooltip } from "@mui/material";
-import HistoryIcon from "@mui/icons-material/History";
-import InsertChartIcon from "@mui/icons-material/InsertChart";
-import FactoryIcon from "@mui/icons-material/Factory";
-import HandshakeIcon from "@mui/icons-material/Handshake";
 import ErrorIcon from "@mui/icons-material/Error";
+import HistoryIcon from "@mui/icons-material/History";
 import { useAppSelector, useAppDispatch } from "../../Store";
-import {
-  CardNameType,
-  CardType,
-  GameToolType,
-  MapWorkspaceView,
-} from "../../Types";
+import { CardNameType, CardType } from "../../Types";
 import { navigate, selectCardName } from "../../reducers/Card";
 import { getScenario } from "../../data/Scenarios";
-import ConceptIcon from "./ConceptIcon";
+import {
+  GAME_TOOLS,
+  MAP_VIEWS,
+  type GameTool,
+  type MapPanelView,
+} from "./GameNavigation";
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 
+export {
+  GAME_TOOLS,
+  MAP_VIEWS,
+  type GameTool,
+  type MapPanelView,
+} from "./GameNavigation";
+
 export interface StateProps {
   card: CardType;
 }
 export interface Props extends StateProps {}
-export type GameTool = GameToolType;
-export type MapPanelView = Exclude<MapWorkspaceView, "FACILITIES">;
-export const GAME_TOOLS: {
-  id: GameTool;
-  label: string;
-  triggerId: string;
-  icon: React.ReactElement;
-}[] = [
-  {
-    id: "BUILD_GENERATORS",
-    label: "Build",
-    triggerId: "buildNav",
-    icon: <ConceptIcon concept="build" />,
-  },
-  {
-    id: "PROGRAMS",
-    label: "Programs",
-    triggerId: "programsNav",
-    icon: <ConceptIcon concept="customers" />,
-  },
-  {
-    id: "INSIGHTS",
-    label: "Insights",
-    triggerId: "insightsNav",
-    icon: <InsertChartIcon />,
-  },
-  {
-    id: "EVENTS",
-    label: "Events",
-    triggerId: "eventsNav",
-    icon: <HistoryIcon />,
-  },
-  {
-    id: "SCENARIO",
-    label: "Scenario",
-    triggerId: "scenarioNav",
-    icon: <ConceptIcon concept="goal" />,
-  },
-];
-export const MAP_VIEWS: {
-  id: MapPanelView;
-  label: string;
-  triggerId: string;
-  icon: React.ReactElement;
-}[] = [
-  { id: "FLEET", label: "Fleet", triggerId: "fleetNav", icon: <FactoryIcon /> },
-  {
-    id: "AGREEMENTS",
-    label: "Agreements",
-    triggerId: "agreementsNav",
-    icon: <HandshakeIcon />,
-  },
-];
-
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
     ? "BUILD_GENERATORS"

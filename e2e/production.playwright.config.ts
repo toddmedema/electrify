@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import path from "node:path";
-import base from "./playwright.config";
+import base, { expectedErrorReporter } from "./playwright.config";
 
 const port = process.env.E2E_PORT || "3100";
 const outputDir =
@@ -13,6 +13,7 @@ export default defineConfig({
   testIgnore: [...(base.testIgnore as string[]), "mods.spec.ts"],
   outputDir,
   reporter: [
+    [expectedErrorReporter],
     [process.env.GITHUB_ACTIONS === "true" ? "github" : "list"],
     [
       "json",

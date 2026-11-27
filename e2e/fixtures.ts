@@ -1,27 +1,45 @@
-import { BrowserContext, Request, test as base } from "@playwright/test";
+import {
+  Browser,
+  BrowserContext,
+  Request,
+  test as base,
+} from "@playwright/test";
+import { isolateFirebase } from "./firebase-isolation";
 
 export * from "@playwright/test";
 
 /** Tests must never report usage to the production Analytics stream. Page routes can supply
  * a local Google tag stub when a spec needs observable analytics behavior. */
-export async function isolateAnalytics(context: BrowserContext): Promise<void> {
+async function isolateAnalytics(context: BrowserContext): Promise<void> {
   await context.route(
     /^https:\/\/(?:[^/]+\.)?(?:googletagmanager|google-analytics)\.com\//,
     (route) => route.abort(),
   );
 }
 
+export type NewIsolatedContext = Browser["newContext"];
+
 export const test = base.extend<{
   showCloudSaveInvitation: boolean;
   cloudSaveInvitationSetup: void;
   networkDiagnostics: void;
-  analyticsIsolation: void;
+  newIsolatedContext: NewIsolatedContext;
 }>({
   showCloudSaveInvitation: [false, { option: true }],
-  analyticsIsolation: [
-    async ({ context }, use) => {
-      await isolateAnalytics(context);
-      await use();
+  newIsolatedContext: [
+    async ({ browser, context }, use) => {
+      const checks: (() => void)[] = [];
+      const isolate = async (target: BrowserContext) => {
+        await isolateAnalytics(target);
+        checks.push(await isolateFirebase(target));
+      };
+      await isolate(context);
+      await use(async (options) => {
+        const additional = await browser.newContext(options);
+        await isolate(additional);
+        return additional;
+      });
+      for (const check of checks) check();
     },
     { auto: true },
   ],

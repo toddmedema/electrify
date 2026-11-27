@@ -233,9 +233,10 @@ test.describe("challenge data integrity", () => {
 
   test("mismatched market bytes cannot start a challenge", async ({ page }) => {
     let alteredRequests = 0;
-    await page.route("**/data/EconomyRaw.csv", async (route) => {
+    await page.route("/data/EconomyRaw.csv", async (route) => {
       alteredRequests += 1;
-      const response = await route.fetch();
+      const response = await route.fetch({ maxRedirects: 0 });
+      expect(response.ok()).toBe(true);
       await route.fulfill({ response, body: `${await response.text()}\n` });
     });
     await page.goto(link());

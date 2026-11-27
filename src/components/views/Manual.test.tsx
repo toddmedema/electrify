@@ -100,6 +100,7 @@ describe("Manual", () => {
       ["megawatt", MANUAL_ENTRY.POWER_AND_ENERGY],
       ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
       ["scoring", MANUAL_ENTRY.SCORE],
+      ["set it in programs", MANUAL_ENTRY.PRICING],
     ]) {
       search(term);
       expect(
@@ -125,16 +126,30 @@ describe("Manual", () => {
     ).toBeVisible();
   });
 
+  it.each([
+    [MANUAL_ENTRY.CAPACITY_FACTOR, /Build uses\b/],
+    [MANUAL_ENTRY.RAMP_RATE, /Build estimates\b/],
+  ])("renders a spaced Build label in %s", (title, phrase) => {
+    renderManual(title);
+    const entry = screen.getByRole("region", { name: title });
+    const build = within(entry).getByText("Build", { selector: "strong" });
+    expect(build).toContainHTML('data-concept="build"');
+    expect(entry).toHaveTextContent(phrase);
+  });
+
   it("includes every shared game symbol in the symbol guide", async () => {
     renderManual();
     await userEvent.click(entryHeader(MANUAL_ENTRY.SYMBOLS));
-    const legend = screen.getByTestId("concept-legend");
-    expect(within(legend).getByText("Severe weather")).toBeInTheDocument();
-    CONCEPT_NAMES.forEach((concept) => {
-      expect(
-        within(legend).getByLabelText(CONCEPT_LABELS[concept]),
-      ).toHaveAttribute("data-concept", concept);
-    });
+    const guide = screen.getByRole("region", { name: MANUAL_ENTRY.SYMBOLS });
+    const items = within(guide).getAllByRole("listitem");
+    expect(items).toHaveLength(CONCEPT_NAMES.length);
+    for (const concept of CONCEPT_NAMES) {
+      const item = within(guide).getByText(CONCEPT_LABELS[concept], {
+        selector: "li",
+      });
+      expect(item).toContainHTML(`data-concept="${concept}"`);
+    }
+    expect(within(guide).queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("expands and highlights search matches, then lets the player collapse them", async () => {
