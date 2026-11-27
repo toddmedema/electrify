@@ -67,14 +67,22 @@ test("the Firebase guard rejects an unmocked request and reports the endpoint", 
   }
 });
 
-test("the shared fixture flags an unmocked Firebase request at teardown", async ({
-  page,
-}) => {
-  await expect(page.goto(authProbe)).rejects.toThrow(
-    "net::ERR_BLOCKED_BY_CLIENT",
-  );
-  test.fail(true, "The Firebase guard must fail fixture teardown");
-});
+test(
+  "the shared fixture flags an unmocked Firebase request at teardown",
+  {
+    annotation: {
+      type: "expected-error",
+      description: `Error: Unexpected Firebase request blocked. Add a local Playwright mock or use an emulator.
+GET ${authProbe}`,
+    },
+  },
+  async ({ page }) => {
+    await expect(page.goto(authProbe)).rejects.toThrow(
+      "net::ERR_BLOCKED_BY_CLIENT",
+    );
+    test.fail(true, "The Firebase guard must fail fixture teardown");
+  },
+);
 
 test("Chromium blocks a Firebase request continued past the Playwright guard", async ({
   browser,

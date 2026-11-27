@@ -13,6 +13,7 @@ export default defineConfig({
   testIgnore: [...(base.testIgnore as string[]), "mods.spec.ts"],
   outputDir,
   reporter: [
+    ["./expected-error.reporter.ts"],
     [process.env.GITHUB_ACTIONS === "true" ? "github" : "list"],
     [
       "json",

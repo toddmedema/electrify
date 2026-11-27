@@ -23,7 +23,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  reporter: [
+    ["./expected-error.reporter.ts"],
+    [process.env.CI ? "github" : "list"],
+  ],
   use: {
     launchOptions:
       require("../scripts/ci/browser-launch").browserLaunchOptions(),
