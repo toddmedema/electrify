@@ -50,10 +50,12 @@ export default function MapWorkspace({
   const multiplayerTerritory = useAppSelector(
     (state) => !!state.game.multiplayer?.territorial,
   );
+  const companyEnded = useAppSelector(
+    (state) => !!state.game.multiplayer?.ending,
+  );
   const territoryNetwork = useAppSelector((state) =>
     hasTerritoryNetwork(state.game),
   );
-  const territorial = multiplayerTerritory || territoryNetwork;
   const [agreementPeer, setAgreementPeer] = React.useState<string>();
   const candidate = gameToolForCard(card.name);
   const building = candidate === "BUILD_GENERATORS";
@@ -66,10 +68,6 @@ export default function MapWorkspace({
     if (building) setBuildCategory(card.name);
   }, [building, card.name]);
   const [projectBusy, setProjectBusy] = React.useState(false);
-  const requestedProject = territorial && building;
-  const requestedPanel = requestedProject ? undefined : candidate;
-  const destination = projectBusy ? undefined : requestedPanel;
-  const panelTools = territorial ? TERRITORIAL_PANELS : GAME_TOOLS;
   const localMemory = React.useRef(new Map<string, unknown>());
   const memory = sharedMemory ?? localMemory.current;
   const workspace = React.useRef<HTMLDivElement>(null);
@@ -84,6 +82,13 @@ export default function MapWorkspace({
   const controllerInput = useControllerInput();
   const floating =
     desktopMap && !controllerInput && window.electrifyCouch?.role !== "seat";
+  const usesMapProject = multiplayerTerritory
+    ? !floating || companyEnded
+    : territoryNetwork;
+  const requestedProject = usesMapProject && building;
+  const requestedPanel = requestedProject ? undefined : candidate;
+  const destination = projectBusy ? undefined : requestedPanel;
+  const panelTools = usesMapProject ? TERRITORIAL_PANELS : GAME_TOOLS;
   const tileClose = React.useRef<() => void>();
   const projectClose = React.useRef<() => void>();
   const [projectOpen, setProjectOpen] = React.useState(false);
@@ -237,8 +242,15 @@ export default function MapWorkspace({
       raise,
     ],
   );
-  const catalogueRail = floating && !territoryNetwork;
-  const openBuild = openPanels.includes("BUILD_GENERATORS") || projectOpen;
+  const catalogueRail = floating && (multiplayerTerritory || !territoryNetwork);
+  const openBuild = openPanels.includes("BUILD_GENERATORS");
+  const clearBuildSelection = React.useCallback(
+    (selection: FacilityShoppingType) =>
+      setBuildSelection((current) =>
+        current === selection ? undefined : current,
+      ),
+    [],
+  );
   const openCatalogue = React.useCallback(
     () => toggleTool("BUILD_GENERATORS"),
     [toggleTool],
@@ -329,7 +341,6 @@ export default function MapWorkspace({
         : undefined,
       projectRequested: !projectBusy && requestedProject,
       buildCategory,
-      buildSelection,
       buildCatalogue: catalogueRail
         ? { open: openBuild, onOpen: openCatalogue, onChoose: chooseBuild }
         : undefined,
@@ -339,7 +350,6 @@ export default function MapWorkspace({
     }),
     [
       buildCategory,
-      buildSelection,
       catalogueRail,
       chooseBuild,
       floating,
@@ -468,6 +478,7 @@ export default function MapWorkspace({
                                   <BuildFacilities
                                     category={buildCategory}
                                     railSelection={buildSelection}
+                                    onRailSelectionApplied={clearBuildSelection}
                                   />
                                 </GameBuildCompleteContext.Provider>
                               )}
@@ -494,7 +505,7 @@ export default function MapWorkspace({
                   (!territoryNetwork || multiplayerTerritory || !desktopMap)
                 }
                 showEventStatus={!desktopMap}
-                buildDestination={territorial ? undefined : buildCategory}
+                buildDestination={usesMapProject ? undefined : buildCategory}
                 openTools={[
                   ...openPanels,
                   ...(projectOpen ? (["BUILD_GENERATORS"] as const) : []),

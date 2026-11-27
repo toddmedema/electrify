@@ -8,6 +8,7 @@ import gameReducer from "../../reducers/Game";
 import settingsReducer, { initialSettings } from "../../reducers/Settings";
 import type { SettingsType } from "../../Types";
 import { createGame } from "../../testing/Simulator";
+import { createMultiplayerTerritory } from "../../helpers/MultiplayerTerritory";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
 import MapWorkspace from "./MapWorkspace";
 
@@ -87,16 +88,32 @@ function resize(width: number) {
   fireEvent(window, new Event("resize"));
 }
 
-function setup(width = 390, settings: Partial<SettingsType> = {}, map = false) {
+function setup(
+  width = 390,
+  settings: Partial<SettingsType> = {},
+  map: boolean | "multiplayer" = false,
+) {
   resize(width);
-  const game = {
+  const solo = {
     ...gameReducer(undefined, { type: "workspace-test/init" }),
     inGame: true,
-    scenarioId: map ? 116 : 100,
-    territoryNetwork: map
-      ? createGame({ scenarioId: 116, seed: 188 }).territoryNetwork
-      : undefined,
+    scenarioId: map === true ? 116 : 100,
+    territoryNetwork:
+      map === true
+        ? createGame({ scenarioId: 116, seed: 188 }).territoryNetwork
+        : undefined,
   };
+  const game =
+    map === "multiplayer"
+      ? createMultiplayerTerritory(
+          {
+            ...createGame({ scenarioId: 100, seed: 188 }),
+            multiplayer: { seat: "1" },
+          },
+          0,
+          2,
+        )
+      : solo;
   const store = configureStore({
     reducer: {
       card: cardReducer,
@@ -162,6 +179,22 @@ it.each([390, 1280])(
     expect(notes).toHaveValue("Keep the map state");
   },
 );
+
+it("keeps Fleet open beside the territorial multiplayer desktop Build catalogue", async () => {
+  const app = setup(1280, {}, "multiplayer");
+  await app.user.click(app.action("Fleet"));
+  const fleet = screen.getByRole("region", { name: "Fleet" });
+  await app.user.click(screen.getByRole("button", { name: /^Build$/ }));
+  const build = screen.getByRole("region", { name: "Build" });
+  expect(build).toHaveAttribute("data-resizable", "true");
+  expect(fleet).toBeVisible();
+  await app.user.click(
+    within(build).getByRole("button", { name: "Close Build" }),
+  );
+  expect(build).not.toBeInTheDocument();
+  expect(fleet).toBeVisible();
+  expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
+});
 
 it.each([360, SIDE_TOOL_MIN_WIDTH - 1])(
   "keeps the map mounted beneath exactly one compact panel at %ipx",

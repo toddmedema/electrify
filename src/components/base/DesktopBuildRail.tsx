@@ -218,7 +218,7 @@ export default function DesktopBuildRail({
   const previewId = React.useId();
   const previewHintId = React.useId();
   const sizingId = React.useId();
-  const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
+  const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}|${game.multiplayer?.territorial?.claims.length ?? 0}`;
   const options = React.useMemo<FacilityShoppingType[]>(
     () =>
       withTerritoryCatalogueLimits(game, [
@@ -570,11 +570,7 @@ export default function DesktopBuildRail({
             aria-label="Build"
             aria-keyshortcuts="B"
             aria-expanded={catalogue.open}
-            aria-controls={
-              catalogue.open && !game.multiplayer?.territorial
-                ? "tool-BUILD_GENERATORS"
-                : undefined
-            }
+            aria-controls={catalogue.open ? "tool-BUILD_GENERATORS" : undefined}
             disabled={busy}
             onClick={catalogue.onOpen}
             startIcon={<ConceptIcon concept="build" />}

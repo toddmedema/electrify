@@ -41,12 +41,14 @@ export default function BuildFacilities({
   mapCatalogue = false,
   lockedTileId,
   railSelection,
+  onRailSelectionApplied,
 }: {
   category?: string;
   onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
   mapCatalogue?: boolean;
   lockedTileId?: TerritoryTileId;
   railSelection?: FacilityShoppingType;
+  onRailSelectionApplied?: (selection: FacilityShoppingType) => void;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const closeTool = React.useContext(GameToolCloseContext);
@@ -78,6 +80,14 @@ export default function BuildFacilities({
         ([name]) =>
           name === (localCategory ? projectCategory : (category ?? card)),
       )?.[0] || "BUILD_GENERATORS";
+  React.useEffect(() => {
+    if (!railSelection) return;
+    const category = isStorage(railSelection)
+      ? "BUILD_STORAGE"
+      : "BUILD_GENERATORS";
+    if (active === category || introductoryChoices)
+      onRailSelectionApplied?.(railSelection);
+  }, [active, introductoryChoices, onRailSelectionApplied, railSelection]);
   const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
   const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
   const gesture = React.useRef<{ id: number; x: number; y: number } | null>(

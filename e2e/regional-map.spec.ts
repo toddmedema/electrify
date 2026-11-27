@@ -148,6 +148,12 @@ test("the regional desktop rail selects a capacity for the real construction rev
   await expect(purchase).toHaveCount(0);
   await expect(build).toBeVisible();
 
+  const capacity = build.getByRole("slider", { name: /^Capacity/ });
+  await capacity.fill("10");
+  await build.getByRole("tab", { name: "Storage", exact: true }).click();
+  await build.getByRole("tab", { name: "Generators", exact: true }).click();
+  await expect(capacity).toHaveValue("10");
+
   const buildEntry = rail.getByRole("button", { name: "Build", exact: true });
   await build.getByRole("button", { name: "Close Build", exact: true }).click();
   await page.keyboard.press("Shift+s");
