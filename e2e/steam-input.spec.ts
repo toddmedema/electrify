@@ -182,6 +182,21 @@ async function select(
   ).toBeFocused();
 }
 
+async function openControllerFleet(page: Page) {
+  const fleet = page.locator("#facilitiesPane");
+  if (!(await fleet.isVisible())) {
+    await select(
+      page,
+      page.getByRole("button", { name: "Fleet", exact: true }),
+    );
+    await input(page, "confirm");
+  }
+  await expect(fleet).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Map", exact: true }),
+  ).toBeVisible();
+}
+
 /** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
 async function selectMapTile(page: Page, id: TerritoryTileId) {
   const target = page.locator(`[data-map-target="${id}"]`);
@@ -725,8 +740,8 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   }
   await expect(build).toHaveCount(0);
 
-  await openControllerFleet(page);
   // Confirm lifts a reorder handle; directions must move the row rather than leave it.
+  await openControllerFleet(page);
   const rows = page.locator(".facilities:visible .facilityRow");
   const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
   const grip = rows.first().getByRole("button", { name: /^Reorder / });
@@ -788,10 +803,16 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
       animations: "disabled",
     });
   }
-  // Programs → Insights → Events → Scenario → map closes every retained side pane.
+  // Programs → Insights → Events → Scenario → Fleet closes every retained side pane.
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  await select(page, page.getByRole("button", { name: "Map", exact: true }));
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("button", { name: "Fleet", exact: true }),
+  ).toBeVisible();
   const charts = page.locator(
     '#facilitiesPane .accessibleChart > [role="img"][tabindex="0"]',
   );
@@ -1815,18 +1836,6 @@ test("TV maximum custom setup gives location and select values enough room", asy
   }
   await captureTvPage(page, info, "custom-fields");
 });
-
-async function openControllerFleet(page: Page) {
-  const fleet = page.locator("#facilitiesPane");
-  if (!(await fleet.isVisible())) {
-    await select(
-      page,
-      page.getByRole("button", { name: "Fleet", exact: true }),
-    );
-    await input(page, "confirm");
-  }
-  await expect(fleet).toBeVisible();
-}
 
 async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
   test.skip(

@@ -555,25 +555,31 @@ it.each(["aria-hidden", "hidden", "inert"])(
 );
 
 it.each([
-  ["PROGRAMS", "nextChart"],
-  ["PROGRAMS", "previousChart"],
-  ["EVENTS", "nextChart"],
-  ["EVENTS", "previousChart"],
-  ["FACILITIES", "nextChart"],
-  ["FACILITIES", "previousChart"],
+  ["PROGRAMS", "nextChart", undefined, "FACILITIES"],
+  ["PROGRAMS", "previousChart", undefined, "FACILITIES"],
+  ["EVENTS", "nextChart", undefined, "FACILITIES"],
+  ["EVENTS", "previousChart", undefined, "FACILITIES"],
+  ["FACILITIES", "nextChart", "FACILITIES", "FLEET"],
+  ["FACILITIES", "previousChart", "FACILITIES", "FLEET"],
+  ["PROGRAMS", "nextChart", "FACILITIES", "FLEET"],
+  ["PROGRAMS", "nextChart", "FLEET", "FLEET"],
 ] as const)(
-  "%s %s reveals hidden fleet charts before focusing them in a single-tool workspace",
-  async (tool, action) => {
+  "%s %s reveals charts when the remembered regional base is %s",
+  async (tool, action, baseView, destination) => {
     store.dispatch(delta({ inGame: true }));
     store.dispatch(navigate(tool));
-    const fromMap = tool === "FACILITIES";
-    const destination = fromMap ? "FLEET" : "FACILITIES";
     function Surface() {
       const card = useAppSelector((state) => state.card.name);
       return (
         <main className="base_main">
           <div className="gameWorkspace">
-            {fromMap && <button id="fleetNav">Fleet</button>}
+            {baseView && (
+              <nav className="gameActionDock">
+                <button data-game-base-view={baseView}>
+                  {baseView === "FACILITIES" ? "Fleet" : "Map"}
+                </button>
+              </nav>
+            )}
             <div className="gameStage" data-layout="single">
               <div className="gameFleet" hidden={card !== destination}>
                 <div className="accessibleChart">
@@ -584,7 +590,7 @@ it.each([
               <section
                 className="gameToolPanel"
                 data-game-tool={tool}
-                hidden={fromMap || card === destination}
+                hidden={tool === "FACILITIES" || card === destination}
               >
                 <button>Close tool</button>
               </section>
@@ -610,6 +616,45 @@ it.each([
         name: action === "nextChart" ? "Supply chart" : "Demand chart",
       }),
     ).toHaveFocus();
+  },
+);
+
+it.each(["FACILITIES", "FLEET"] as const)(
+  "pane cycling returns to regional %s and leaves its view toggle to the dock",
+  async (baseView) => {
+    store.dispatch(delta({ inGame: true }));
+    store.dispatch(navigate("SCENARIO"));
+    const toggleView = jest.fn();
+    render(
+      <div className="appFrame">
+        <main className="base_main" aria-hidden="true">
+          <nav className="gameActionDock">
+            <button data-game-base-view="FLEET">Previous workspace</button>
+          </nav>
+        </main>
+        <main className="base_main">
+          <div className="gameWorkspace">
+            <nav className="gameActionDock">
+              <button data-game-base-view={baseView} onClick={toggleView}>
+                {baseView === "FACILITIES" ? "Fleet" : "Map"}
+              </button>
+              <button aria-controls="tool-BUILD_GENERATORS">Build</button>
+              <button aria-controls="tool-SCENARIO">Scenario</button>
+            </nav>
+          </div>
+        </main>
+      </div>,
+    );
+    const f = bridge();
+    stop = startDesktopInput(store, f.desktop);
+    await Promise.resolve();
+    f.emit({ actions: ["nextPane"] });
+    expect(store.getState().card.name).toBe(baseView);
+    f.emit({ actions: ["nextPane"] });
+    expect(store.getState().card.name).toBe("BUILD_GENERATORS");
+    f.emit({ actions: ["previousPane"] });
+    expect(store.getState().card.name).toBe(baseView);
+    expect(toggleView).not.toHaveBeenCalled();
   },
 );
 

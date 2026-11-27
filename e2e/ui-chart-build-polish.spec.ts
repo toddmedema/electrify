@@ -551,7 +551,7 @@ async function expectFullRowFocus(row: Locator) {
   expect(header.x + header.width).toBeLessThanOrEqual(pane.x + pane.width);
 }
 
-async function openConstructionCatalogue(page: Page, theme: "light" | "dark") {
+async function openConstructionCatalog(page: Page, theme: "light" | "dark") {
   await page.addInitScript((mode) => {
     localStorage.clear();
     localStorage.setItem("theme", mode);
@@ -559,6 +559,7 @@ async function openConstructionCatalogue(page: Page, theme: "light" | "dark") {
   }, theme);
   await page.goto("/?scenario=100");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
   return openBuild(page);
 }
 
@@ -566,7 +567,7 @@ for (const theme of ["light", "dark"] as const) {
   test(`construction cards share spacing and icon silhouettes in ${theme}`, async ({
     page,
   }, info) => {
-    const build = await openConstructionCatalogue(page, theme);
+    const build = await openConstructionCatalog(page, theme);
     const layouts = [];
     const colors = [];
     for (const category of ["Generators", "Storage", "Interties"]) {
@@ -641,13 +642,8 @@ for (const theme of ["light", "dark"] as const) {
   test(`purchased interties and storage keep their Fleet icons and focus in ${theme}`, async ({
     page,
   }, info) => {
-    const build = await openConstructionCatalogue(page, theme);
-    await build.getByRole("tab", { name: "Storage", exact: true }).click();
-    await build
-      .getByRole("button", { name: "Use max size", exact: true })
-      .click();
+    const build = await openConstructionCatalog(page, theme);
     await build.getByRole("tab", { name: "Interties", exact: true }).click();
-    // Check the silhouettes and edge-to-edge focus after buying both kinds of project.
     await build
       .getByRole("button", {
         name: "Review purchase of Pacific Northwest intertie",
@@ -659,12 +655,17 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
+    const reviewBattery = page.getByRole("button", {
+      name: "Review purchase of Lithium Battery",
+      exact: true,
+    });
     await build
-      .getByRole("button", {
-        name: "Review purchase of Lithium Battery",
-        exact: true,
-      })
+      .getByRole("listitem")
+      .filter({ has: reviewBattery })
+      .getByRole("button", { name: "Use max size", exact: true })
       .click();
+    await expect(reviewBattery).toBeEnabled();
+    await reviewBattery.click();
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })

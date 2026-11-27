@@ -190,6 +190,12 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeVisible();
     await expect(page).not.toHaveURL(/campaign=legacy/);
     await page.getByRole("button", { name: "View legacy campaign" }).click();
+    await expect(
+      difficulty.getByRole("button", {
+        name: DIFFICULTY_LABELS.Manager,
+        exact: true,
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();

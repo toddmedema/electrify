@@ -62,6 +62,12 @@ export function startDesktopInput(
   const gameplay = () =>
     !!document.querySelector(".base_main:not([inert]) .gameWorkspace");
   const controls = () => visibleControls(inputScope());
+  const primaryView = (availableControls: readonly HTMLElement[]) =>
+    availableControls.some(
+      (control) => control.dataset.gameBaseView === "FLEET",
+    )
+      ? "FLEET"
+      : "FACILITIES";
   const speedButtons = () =>
     // A roving group exposes one tab stop; semantic speed actions address every option.
     visibleControls(inputScope(), { tabStopsOnly: false }).filter((button) =>
@@ -172,9 +178,11 @@ export function startDesktopInput(
   const pane = (delta: number) => {
     if (mapFocusFrame !== undefined) cancelAnimationFrame(mapFocusFrame);
     mapFocusFrame = undefined;
-    const buttons = controls().filter(
+    const availableControls = controls();
+    const buttons = availableControls.filter(
       (button) =>
         button.matches(".gameActionDock button") &&
+        button.dataset.gameBaseView === undefined &&
         button.dataset.gameDestination !== "FACILITIES" &&
         // The map's Build action starts project selection. Bumpers cycle the map and its tools.
         !button.matches(
@@ -191,7 +199,9 @@ export function startDesktopInput(
     const current = opened + 1;
     const next = (current + delta + buttons.length + 1) % (buttons.length + 1);
     if (next === 0) {
-      store.dispatch(navigate("FACILITIES"));
+      const view = primaryView(availableControls);
+      store.dispatch(navigate(view));
+      if (view === "FLEET") return;
       mapFocusFrame = requestAnimationFrame(() => {
         mapFocusFrame = undefined;
         if (!live || !foreground || store.getState().card.name !== "FACILITIES")
@@ -214,19 +224,19 @@ export function startDesktopInput(
     }
   };
   const chart = (delta: number) => {
-    const charts = controls().filter((element) =>
+    const availableControls = controls();
+    const charts = availableControls.filter((element) =>
       element.matches('.accessibleChart > [role="img"][tabindex="0"]'),
     );
     if (!charts.length) {
-      const regionalFleet = document.querySelector("#fleetNav, #mapNav");
-      const destination = regionalFleet ? "FLEET" : "FACILITIES";
-      const covered = document.querySelector(
+      const regional = availableControls.some(
+        (control) => control.dataset.gameBaseView !== undefined,
+      );
+      const destination = regional ? "FLEET" : "FACILITIES";
+      const covered = inputScope().querySelector(
         '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
       );
-      if (
-        (regionalFleet || covered) &&
-        store.getState().card.name !== destination
-      ) {
+      if ((regional || covered) && store.getState().card.name !== destination) {
         store.dispatch(navigate(destination));
         if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
         chartFrame = requestAnimationFrame(() => {

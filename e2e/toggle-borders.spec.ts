@@ -1,4 +1,4 @@
-import { expect, Locator, type Page, test } from "./fixtures";
+import { expect, Locator, test, type Page } from "./fixtures";
 import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import { reviewScreenshot } from "./review-screenshot";
 import { contrastRatio, foregroundContrast } from "./contrast";
@@ -45,33 +45,31 @@ async function speedGlyphPaint(button: Locator): Promise<"fill" | "stroke"> {
 async function expectThumbUnder(button: Locator, blue: string) {
   await expect(button).toHaveAttribute("aria-pressed", "true");
   await button.scrollIntoViewIfNeeded();
+  const paint = await speedGlyphPaint(button);
   // The thumb glides and the label's colour eases in behind it, so read until both settle.
   await expect(async () => {
-    const thumb = await button.evaluate(
-      (element, property) => {
-        const group = element.closest(".speedToggles")!;
-        const style = getComputedStyle(group, "::before");
-        const box = element.getBoundingClientRect();
-        const centre =
-          group.getBoundingClientRect().left +
-          parseFloat(style.left) +
-          new DOMMatrix(style.transform).m41 +
-          parseFloat(style.width) / 2;
-        const glyph = element.querySelector(".speedLabel svg path");
-        return {
-          background: style.backgroundColor,
-          label: glyph
-            ? getComputedStyle(glyph)[property]
-            : getComputedStyle(element).color,
-          offCentre: Math.abs(centre - (box.left + box.width / 2)),
-          // The thumb sits beneath the segment, so the label is what a tap lands on.
-          labelOnTop: element.contains(
-            document.elementFromPoint(box.left + box.width / 2, box.top + 8),
-          ),
-        };
-      },
-      await speedGlyphPaint(button),
-    );
+    const thumb = await button.evaluate((element, property) => {
+      const group = element.closest(".speedToggles")!;
+      const style = getComputedStyle(group, "::before");
+      const box = element.getBoundingClientRect();
+      const centre =
+        group.getBoundingClientRect().left +
+        parseFloat(style.left) +
+        new DOMMatrix(style.transform).m41 +
+        parseFloat(style.width) / 2;
+      const glyph = element.querySelector(".speedLabel svg path");
+      return {
+        background: style.backgroundColor,
+        label: glyph
+          ? getComputedStyle(glyph)[property]
+          : getComputedStyle(element).color,
+        offCentre: Math.abs(centre - (box.left + box.width / 2)),
+        // The thumb sits beneath the segment, so the label is what a tap lands on.
+        labelOnTop: element.contains(
+          document.elementFromPoint(box.left + box.width / 2, box.top + 8),
+        ),
+      };
+    }, paint);
     expect(thumb.background, "the thumb uses the logo blue").toBe(blue);
     expect(
       thumb.offCentre,
@@ -175,6 +173,17 @@ async function unlockDifficulty(page: Page) {
   );
 }
 
+async function startToolbarGame(page: Page, theme: "light" | "dark") {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const difficulty = await openDifficulty(page, theme);
+  await expect(difficulty).toBeVisible();
+  await unlockDifficulty(page);
+  await difficulty.getByRole("button", { name: "Medium", exact: true }).click();
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await expect(page.locator(".gameStage .facilities")).toBeVisible();
+  await page.mouse.move(0, 0);
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`difficulty keeps continuous selected borders in ${theme}`, async ({
     page,
@@ -200,27 +209,11 @@ for (const theme of ["light", "dark"] as const) {
     });
   });
 
-  test(`game speed keeps its thumb and readable glyphs in ${theme}`, async ({
+  test(`speed keeps its thumb centred and readable in ${theme}`, async ({
     page,
   }, info) => {
-    const difficulty = await openDifficulty(page, theme);
-    await expect(difficulty).toBeVisible();
-    await unlockDifficulty(page);
-    await difficulty
-      .getByRole("button", { name: "Medium", exact: true })
-      .click();
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(page.locator(".gameStage .facilities")).toBeVisible();
-    await page.mouse.move(0, 0);
+    await startToolbarGame(page, theme);
     const blue = theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)";
-    const supportsHover = await page.evaluate(
-      () => matchMedia("(hover: hover) and (pointer: fine)").matches,
-    );
-    const build = page
-      .getByRole("navigation", { name: "Game actions" })
-      .getByRole("button", { name: "Build", exact: true });
-    await expect(build).toHaveAttribute("aria-expanded", "false");
-    await expectGlyphContrast(build, supportsHover, blue);
     const speeds = page.getByRole("group", { name: "game speed", exact: true });
     for (const name of [
       "pause",
@@ -232,31 +225,52 @@ for (const theme of ["light", "dark"] as const) {
       const button = speeds.getByRole("button", { name, exact: true });
       await button.click();
       await expectThumbUnder(button, blue);
-      if (name === "slow speed") {
-        const pause = speeds.getByRole("button", {
-          name: "pause",
-          exact: true,
-        });
-        await expect(pause).toHaveAttribute("aria-pressed", "false");
-        const otherGlyph = speeds
-          .getByRole("button", { name: "fast speed", exact: true })
-          .locator("svg path")
-          .first();
-        const inactiveInk = await otherGlyph.evaluate(
-          (path) => getComputedStyle(path).stroke,
-        );
-        await expectGlyphContrast(pause, supportsHover, inactiveInk);
-        if (supportsHover) {
-          await expectHeldSpeedContrast(button);
-          await expectHeldSpeedContrast(pause);
-        }
-      }
     }
     await page.mouse.move(0, 0);
     await reviewScreenshot(page, {
       path: info.outputPath(`speed-${theme}.png`),
       animations: "disabled",
     });
+  });
+
+  test(`toolbar glyphs maintain contrast at rest, while hovered and while held in ${theme}`, async ({
+    page,
+  }) => {
+    await startToolbarGame(page, theme);
+    const blue = theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)";
+    const supportsHover = await page.evaluate(
+      () => matchMedia("(hover: hover) and (pointer: fine)").matches,
+    );
+    const build = page
+      .getByRole("navigation", { name: "Game actions" })
+      .getByRole("button", { name: "Build", exact: true });
+    await expect(build).toHaveAttribute("aria-expanded", "false");
+    await expectGlyphContrast(build, supportsHover, blue);
+    const speeds = page.getByRole("group", { name: "game speed", exact: true });
+    const slow = speeds.getByRole("button", {
+      name: "slow speed",
+      exact: true,
+    });
+    await slow.click();
+    await expectThumbUnder(slow, blue);
+    const pause = speeds.getByRole("button", {
+      name: "pause",
+      exact: true,
+    });
+    await expect(pause).toHaveAttribute("aria-pressed", "false");
+    const otherGlyph = speeds
+      .getByRole("button", { name: "fast speed", exact: true })
+      .locator("svg path")
+      .first();
+    const inactiveInk = await otherGlyph.evaluate(
+      (path) => getComputedStyle(path).stroke,
+    );
+    await expectGlyphContrast(pause, supportsHover, inactiveInk);
+    if (supportsHover) {
+      await expectHeldSpeedContrast(slow);
+      await expectHeldSpeedContrast(pause);
+    }
+    await pause.click();
     await build.click();
     await expect(build).toHaveAttribute("aria-expanded", "true");
     await page.mouse.move(0, 0);
