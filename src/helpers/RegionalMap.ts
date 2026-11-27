@@ -173,7 +173,8 @@ function layoutFor(
         terrain: geography.terrainAt(coordinates),
       };
       cells.set(tileId(extra), extra);
-      ordinary.push(extra);
+      if (land(extra)) ordinary.push(extra);
+      if (freshwater(extra)) reservoirs.push(extra);
     }
     return ordinary;
   };

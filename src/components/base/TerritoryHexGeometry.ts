@@ -1,4 +1,4 @@
-import { HEX_NEIGHBORS } from "../../helpers/HexNeighbors";
+import { closestHexEdge, HEX_NEIGHBORS } from "../../helpers/HexNeighbors";
 
 /** Shared board projection for the scene and its HTML and SVG overlays. */
 export const HEX_WIDTH = 128;
@@ -76,18 +76,31 @@ export function hexWires<T extends HexPosition>(
     );
 }
 
-/** Neighboring rivers use reciprocal ports; lakes stay enclosed. */
-export function riverPorts<T extends HexPosition & { terrain: string }>(
-  tile: T,
-  tiles: readonly T[],
+/** Shore openings use the same edge on both tiles. At a map edge a river
+ * continues across an exposed edge. */
+export function waterPorts(
+  tile: Pick<HexPosition, "q" | "r"> & { terrain: string },
+  terrainAt: ReadonlyMap<string, string>,
 ): number[] {
-  const water = new Set(
-    tiles
-      .filter((other) => other.terrain === "river" || other.terrain === "ocean")
-      .map(key),
+  const neighbors = HEX_NEIGHBORS.map(([dq, dr]) =>
+    terrainAt.get(key({ q: tile.q + dq, r: tile.r + dr })),
   );
-  const ports = HEX_NEIGHBORS.flatMap(([dq, dr], edge) =>
-    water.has(key({ q: tile.q + dq, r: tile.r + dr })) ? [edge] : [],
-  );
-  return ports.length ? ports : [0, 3];
+  const edges = (matches: (terrain: string | undefined) => boolean) =>
+    neighbors.flatMap((terrain, index) => (matches(terrain) ? [index] : []));
+  const rivers = edges((terrain) => terrain === "river");
+  if (tile.terrain === "lake") return rivers;
+
+  const lakes = edges((terrain) => terrain === "lake");
+  const coast = edges((terrain) => terrain === "ocean");
+  const opposite = ((rivers[0] ?? 3) + 3) % HEX_NEIGHBORS.length;
+  const mouth = closestHexEdge(coast, opposite);
+  const ports = [...rivers, ...lakes, ...(mouth === undefined ? [] : [mouth])];
+  if (ports.length === 1 && !lakes.length && mouth === undefined) {
+    const exit = closestHexEdge(
+      edges((terrain) => terrain === undefined),
+      opposite,
+    );
+    if (exit !== undefined) ports.push(exit);
+  }
+  return ports.sort((a, b) => a - b);
 }

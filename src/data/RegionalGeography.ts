@@ -1,5 +1,5 @@
 import type { LocationType, TerrainType } from "../Types";
-import { HEX_NEIGHBORS } from "../helpers/HexNeighbors";
+import { closestHexEdge, HEX_NEIGHBORS } from "../helpers/HexNeighbors";
 import { cos } from "../helpers/Libm";
 import type { DataCenterCustomerSources } from "./DataCenterCustomers";
 import { territoryCoordinateHash } from "./Territories";
@@ -328,37 +328,183 @@ function routeRivers(water: Map<string, TerrainType>) {
     return seen.size - longest;
   }
 
-  for (;;) {
-    const crowded = [...rivers]
-      .map((id) => ({ id, triangles: trianglesAt(id) }))
-      .filter(({ triangles }) => triangles > 0)
-      .sort(
-        (a, b) =>
-          b.triangles - a.triangles ||
-          riverRoutingCells.get(b.id)!.radius -
-            riverRoutingCells.get(a.id)!.radius,
-      );
-    if (crowded.length === 0) break;
-    if (crowded.some(({ id }) => removeRedundant(id))) continue;
-    if (crowded.some(({ id }) => moveJunction(id))) continue;
+  function thinRivers() {
+    for (;;) {
+      const crowded = [...rivers]
+        .map((id) => ({ id, triangles: trianglesAt(id) }))
+        .filter(({ triangles }) => triangles > 0)
+        .sort(
+          (a, b) =>
+            b.triangles - a.triangles ||
+            riverRoutingCells.get(b.id)!.radius -
+              riverRoutingCells.get(a.id)!.radius,
+        );
+      if (crowded.length === 0) break;
+      if (crowded.some(({ id }) => removeRedundant(id))) continue;
+      if (crowded.some(({ id }) => moveJunction(id))) continue;
 
-    // There may be no room for a confluence. Favor the longest connected reach
-    // and leave a gap to the smaller branch.
-    const cuts = crowded.map(({ id }) => ({
-      id,
-      mouth: outlet(id) && !neighbors(id).some(outlet),
-      severed: severedLength(id),
-    }));
-    cuts.sort(
-      (a, b) => Number(a.mouth) - Number(b.mouth) || a.severed - b.severed,
-    );
-    rivers.delete(cuts[0].id);
+      // There may be no room for a confluence. Favor the longest connected reach
+      // and leave a gap to the smaller branch.
+      const cuts = crowded.map(({ id }) => ({
+        id,
+        mouth: outlet(id) && !neighbors(id).some(outlet),
+        severed: severedLength(id),
+      }));
+      cuts.sort(
+        (a, b) => Number(a.mouth) - Number(b.mouth) || a.severed - b.severed,
+      );
+      rivers.delete(cuts[0].id);
+    }
   }
+
+  const boundary = (id: string) =>
+    riverRoutingCells.get(id)!.radius === REGIONAL_MAP_RADIUS;
+  const dry = (id: string) =>
+    id !== "0:0" &&
+    riverRoutingCells.has(id) &&
+    !rivers.has(id) &&
+    water.get(id) !== "ocean" &&
+    water.get(id) !== "lake";
+
+  function joinNearbyReaches() {
+    for (const end of rivers) {
+      if (boundary(end) || outlet(end) || neighbors(end).length > 1) continue;
+      const own = component(end);
+      const bridge = ring(end).find(
+        (next) => dry(next) && neighbors(next).some((other) => !own.has(other)),
+      );
+      if (bridge) rivers.add(bridge);
+    }
+  }
+
+  function extendToOutlet(starts: readonly string[]) {
+    const path = [...starts];
+    const previous = new Map<string, string | undefined>(
+      starts.map((id) => [id, undefined]),
+    );
+    for (const id of path) {
+      if (!rivers.has(id) && (boundary(id) || outlet(id))) {
+        for (
+          let step: string | undefined = id;
+          step && !rivers.has(step);
+          step = previous.get(step)
+        )
+          rivers.add(step);
+        return true;
+      }
+      // Leave room around an extension so it joins the starting reach only.
+      const contacts = rivers.has(id) ? 1 : 0;
+      for (const next of ring(id)) {
+        if (
+          previous.has(next) ||
+          !dry(next) ||
+          neighbors(next).length !== contacts
+        )
+          continue;
+        previous.set(next, id);
+        path.push(next);
+      }
+    }
+    return false;
+  }
+
+  function completeReaches() {
+    const visited = new Set<string>();
+    for (const id of [...rivers]) {
+      if (visited.has(id)) continue;
+      const reach = [...component(id)];
+      for (const tile of reach) visited.add(tile);
+      if (reach.length === 1 && !outlet(id)) {
+        // A lone sample that failed to join a reach is usually a clipped bend.
+        rivers.delete(id);
+        continue;
+      }
+      const ends = reach.filter((tile) => neighbors(tile).length <= 1);
+      if (reach.some(outlet) || ends.some(boundary)) continue;
+      if (extendToOutlet(ends.length ? ends : reach)) continue;
+      // Where the board can't fit a route to the edge, form a receiving lake.
+      const basin = ends[0] ?? id;
+      rivers.delete(basin);
+      water.set(basin, "lake");
+    }
+  }
+
+  thinRivers();
+  joinNearbyReaches();
+  thinRivers();
+  completeReaches();
 
   for (const [id, terrain] of water)
     if (terrain === "river" && riverRoutingCells.has(id) && !rivers.has(id))
       water.delete(id);
   for (const id of rivers) water.set(id, "river");
+}
+
+type RiverExit = HexCoordinate & { dq: number; dr: number };
+
+const cross = (aq: number, ar: number, bq: number, br: number) =>
+  aq * br - ar * bq;
+
+function exitsTouch(a: RiverExit, b: RiverExit) {
+  const determinant = cross(a.dq, a.dr, b.dq, b.dr);
+  return [[0, 0], ...HEX_NEIGHBORS].some(([dq, dr]) => {
+    const q = b.q + dq - a.q;
+    const r = b.r + dr - a.r;
+    if (determinant) {
+      const alongA = cross(q, r, b.dq, b.dr) / determinant;
+      const alongB = cross(q, r, a.dq, a.dr) / determinant;
+      return (
+        alongA >= 1 &&
+        alongB >= 1 &&
+        Number.isInteger(alongA) &&
+        Number.isInteger(alongB)
+      );
+    }
+    if (cross(q, r, a.dq, a.dr) !== 0) return false;
+    // Parallel lines can meet after any number of rings. Opposing lines meet
+    // only if there is room to take at least one step from each start.
+    return (
+      (a.dq === b.dq && a.dr === b.dr) || (a.dq ? q / a.dq : r / a.dr) >= 2
+    );
+  });
+}
+
+// Keep edge channels going when the board grows beyond the sampled region.
+function riverExits(water: ReadonlyMap<string, TerrainType>) {
+  const exits: RiverExit[] = [];
+  const tileAt = ({ q, r }: HexCoordinate) => water.get(`${q}:${r}`);
+  for (const cell of coreHexes) {
+    if (hexRadius(cell) !== REGIONAL_MAP_RADIUS || tileAt(cell) !== "river")
+      continue;
+    const around = HEX_NEIGHBORS.map(([dq, dr]) => ({
+      q: cell.q + dq,
+      r: cell.r + dr,
+    }));
+    const wet = around.flatMap((next, edge) =>
+      tileAt(next) === "river" ? [edge] : [],
+    );
+    if (
+      wet.length !== 1 ||
+      around.some((next) => tileAt(next) === "ocean" || tileAt(next) === "lake")
+    )
+      continue;
+    const exposed = around.flatMap((next, edge) => {
+      if (hexRadius(next) <= REGIONAL_MAP_RADIUS) return [];
+      const attached = HEX_NEIGHBORS.filter(
+        ([dq, dr]) => tileAt({ q: next.q + dq, r: next.r + dr }) === "river",
+      );
+      const [dq, dr] = HEX_NEIGHBORS[edge];
+      return attached.length === 1 &&
+        !exits.some((other) => exitsTouch({ ...cell, dq, dr }, other))
+        ? [edge]
+        : [];
+    });
+    const exit = closestHexEdge(exposed, (wet[0] + 3) % HEX_NEIGHBORS.length);
+    if (exit === undefined) continue;
+    const [dq, dr] = HEX_NEIGHBORS[exit];
+    exits.push({ ...cell, dq, dr });
+  }
+  return exits;
 }
 
 type GeographicPoint = Pick<LocationType, "lat" | "long">;
@@ -473,6 +619,7 @@ export function getRegionalGeography(
     }
   }
   routeRivers(water);
+  const exits = riverExits(water);
   // Texture between landmarks is schematic and fixed to the location, across starts and saves.
   const treeChance =
     region?.treeCover === "wooded"
@@ -484,6 +631,16 @@ export function getRegionalGeography(
     if (q === 0 && r === 0) return "plains";
     const wet = water.get(`${q}:${r}`);
     if (wet) return wet;
+    const beyondAtlas = hexRadius({ q, r }) - REGIONAL_MAP_RADIUS;
+    if (
+      beyondAtlas > 0 &&
+      exits.some(
+        (exit) =>
+          q === exit.q + beyondAtlas * exit.dq &&
+          r === exit.r + beyondAtlas * exit.dr,
+      )
+    )
+      return "river";
     const roll = territoryCoordinateHash(q, r, salt) % 100;
     for (const [centerQ, centerR, width] of region?.relief ?? []) {
       const distance = hexRadius({ q: q - centerQ, r: r - centerR });

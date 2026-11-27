@@ -1,5 +1,5 @@
 import type { TerrainType } from "../../../Types";
-import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
+import { HEX_NEIGHBORS, waterPorts } from "../TerritoryHexGeometry";
 import { GROUND_RADIUS, tilePosition3D } from "./Projection";
 import { getTerrainModel } from "./TerrainModels";
 import type { MapMesh, MapModel, ModelPart, Vec3 } from "./Types";
@@ -348,54 +348,72 @@ it("keeps opaque water level, lake water enclosed and ocean water continuous at 
   expect(getTerrainModel("lake").height).toBeGreaterThan(0.02);
 });
 
-it("opens precisely the requested river edges for every bounded port mask", () => {
-  for (let mask = 0; mask < 64; mask++) {
-    const ports = [0, 1, 2, 3, 4, 5].filter((edge) => mask & (1 << edge));
-    const model = getTerrainModel("river", { ports });
-    const dryLand = triangles(model.parts[0].mesh).filter((face) =>
-      face.every(([, y]) => y === 0),
-    );
-    expect(
-      [...dryLand, ...waterTriangles(model)].reduce(
-        (area, face) => area + projectedArea(face),
-        0,
-      ),
-    ).toBeCloseTo(Math.sqrt(3) / 2, 6);
-    for (let edge = 0; edge < 6; edge++) {
-      const section = edgeWater(model, edge);
-      expect(section).toHaveLength(mask & (1 << edge) ? 2 : 0);
-      const width = section.length
-        ? Math.hypot(
-            section[0][0] - section[1][0],
-            section[0][2] - section[1][2],
-          )
-        : 0;
-      expect(width).toBeCloseTo(mask & (1 << edge) ? 0.29 : 0, 6);
+it.each(["river", "lake"] as const)(
+  "opens precisely the requested %s edges for every bounded port mask",
+  (terrain) => {
+    for (let mask = 0; mask < 64; mask++) {
+      const ports = [0, 1, 2, 3, 4, 5].filter((edge) => mask & (1 << edge));
+      const model = getTerrainModel(terrain, { ports });
+      const dryLand = triangles(model.parts[0].mesh).filter((face) =>
+        face.every(([, y]) => y === 0),
+      );
+      expect(
+        [...dryLand, ...waterTriangles(model)].reduce(
+          (area, face) => area + projectedArea(face),
+          0,
+        ),
+      ).toBeCloseTo(Math.sqrt(3) / 2, 6);
+      for (let edge = 0; edge < 6; edge++) {
+        const section = edgeWater(model, edge);
+        expect(section).toHaveLength(mask & (1 << edge) ? 2 : 0);
+        const width = section.length
+          ? Math.hypot(
+              section[0][0] - section[1][0],
+              section[0][2] - section[1][2],
+            )
+          : 0;
+        expect(width).toBeCloseTo(mask & (1 << edge) ? 0.29 : 0, 6);
+      }
     }
-  }
-});
+  },
+);
 
-it("joins the actual reciprocal river ports at identical world-space water cross-sections", () => {
-  for (const [edge, [q, r]] of HEX_NEIGHBORS.entries()) {
-    const a = { id: "a", q: 0, r: 0, terrain: "river" };
-    const b = { id: "b", q, r, terrain: "river" };
-    const offset = tilePosition3D(b);
-    const first = edgeWater(
-      getTerrainModel("river", { ports: riverPorts(a, [a, b]) }),
-      edge,
-    );
-    const second = edgeWater(
-      getTerrainModel("river", { ports: riverPorts(b, [a, b]) }),
-      (edge + 3) % 6,
-    );
-    const rounded = (points: Vec3[], translation: Vec3) =>
-      points
-        .map((p) =>
-          p.map((v, i) => Number((v + translation[i]).toFixed(6))).join(","),
-        )
-        .sort();
-    expect(rounded(first, [0, 0, 0])).toEqual(rounded(second, offset));
-  }
+it.each(["river", "lake"] as const)(
+  "joins a river to a %s at identical world-space water cross-sections",
+  (terrain) => {
+    for (const [edge, [q, r]] of HEX_NEIGHBORS.entries()) {
+      const a = { id: "a", q: 0, r: 0, terrain: "river" };
+      const b = { id: "b", q, r, terrain };
+      const terrainAt = new Map([
+        ["0,0", a.terrain],
+        [`${q},${r}`, b.terrain],
+      ]);
+      const offset = tilePosition3D(b);
+      const first = edgeWater(
+        getTerrainModel("river", { ports: waterPorts(a, terrainAt) }),
+        edge,
+      );
+      const second = edgeWater(
+        getTerrainModel(terrain, { ports: waterPorts(b, terrainAt) }),
+        (edge + 3) % 6,
+      );
+      const rounded = (points: Vec3[], translation: Vec3) =>
+        points
+          .map((p) =>
+            p.map((v, i) => Number((v + translation[i]).toFixed(6))).join(","),
+          )
+          .sort();
+      expect(rounded(first, [0, 0, 0])).toEqual(rounded(second, offset));
+    }
+  },
+);
+
+it("draws three feeder streams inside an inland headwater", () => {
+  const mesh = getTerrainModel("river", { ports: [1] });
+  const banks = waterTriangles(mesh)
+    .flat()
+    .filter(([x]) => Math.abs(x + 0.19) < EPSILON);
+  expect(new Set(banks.map(([, , z]) => z.toFixed(5))).size).toBe(6);
 });
 
 it("keeps a river crossing open even at the lowest water level", () => {
@@ -449,8 +467,8 @@ it("canonicalizes repeated options into a bounded cache without leaking tile var
   expect(getTerrainModel("river")).toBe(
     getTerrainModel("river", { ports: [3, 0, 3, -1, 6, 0.5, NaN] }),
   );
-  expect(getTerrainModel("lake", { ports: [1] })).toBe(
-    getTerrainModel("lake", { ports: [2, 5] }),
+  expect(getTerrainModel("lake", { ports: [1, 1, -1] })).toBe(
+    getTerrainModel("lake", { ports: [1] }),
   );
   const models = new Set<MapModel>();
   for (const terrain of TERRAINS)
@@ -459,7 +477,7 @@ it("canonicalizes repeated options into a bounded cache without leaking tile var
         const ports = [0, 1, 2, 3, 4, 5].filter((edge) => mask & (1 << edge));
         models.add(getTerrainModel(terrain, { footprint, ports }));
       }
-  expect(models.size).toBe(282);
+  expect(models.size).toBe(534);
   expect(
     getTerrainModel("mountain", { adjacentEdges: 65, footprint: 0.27 }),
   ).toBe(getTerrainModel("mountain", { adjacentEdges: 1, footprint: 0.67 }));

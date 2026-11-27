@@ -76,31 +76,37 @@ it("uses the drawn water direction and keeps local references distinct from fall
   ).toBe("Example City model grid");
 });
 
-it("keeps the Colorado River connected from the Hill Country past Austin", () => {
-  const { terrainAt } = getRegionalGeography(cities.Austin, 2017, 107);
-  const upstream = { q: -5, r: 1 };
-  const river = [upstream];
-  const seen = new Set(["-5,1"]);
-  for (const { q, r } of river) {
-    for (const [dq, dr] of HEX_NEIGHBORS) {
-      const next = { q: q + dq, r: r + dr };
-      const key = `${next.q},${next.r}`;
-      if (seen.has(key) || terrainAt(next) !== "river") continue;
-      seen.add(key);
-      river.push(next);
+it.each([
+  { city: "Austin", upstream: { q: -5, r: 1 }, downstream: { q: 3, r: 2 } },
+  { city: "Paris", upstream: { q: -3, r: -2 }, downstream: { q: 5, r: -1 } },
+  { city: "Madrid", upstream: { q: 0, r: -5 }, downstream: { q: -2, r: 5 } },
+])(
+  "keeps the main river connected across $city",
+  ({ city, upstream, downstream }) => {
+    const { terrainAt } = getRegionalGeography(cities[city], 2026, 999);
+    const river = [upstream];
+    const seen = new Set([`${upstream.q},${upstream.r}`]);
+    for (const { q, r } of river) {
+      for (const [dq, dr] of HEX_NEIGHBORS) {
+        const next = { q: q + dq, r: r + dr };
+        const key = `${next.q},${next.r}`;
+        if (
+          seen.has(key) ||
+          hexRadius(next) > REGIONAL_MAP_RADIUS ||
+          terrainAt(next) !== "river"
+        )
+          continue;
+        seen.add(key);
+        river.push(next);
+      }
     }
-  }
-  expect(terrainAt(upstream)).toBe("river");
-  expect(river).toEqual(
-    expect.arrayContaining([
-      { q: 0, r: 1 },
-      { q: 3, r: 2 },
-    ]),
-  );
-});
+    expect(terrainAt(upstream)).toBe("river");
+    expect(river).toContainEqual(downstream);
+  },
+);
 
-it("leaves a dry tile between river arms in every sampled region", () => {
-  const cells = regionalHexes(REGIONAL_MAP_RADIUS);
+it("leaves room between river arms through the sampled region and expanded board", () => {
+  const cells = regionalHexes(REGIONAL_MAP_RADIUS + 4);
   const crowded: { city: string; q: number; r: number }[] = [];
   for (const [city, location] of Object.entries(cities)) {
     const { terrainAt } = getRegionalGeography(location, 2026, 999);
@@ -118,6 +124,39 @@ it("leaves a dry tile between river arms in every sampled region", () => {
     }
   }
   expect(crowded).toEqual([]);
+});
+
+it("gives each river reach in the sampled regions an outlet", () => {
+  const cells = regionalHexes(REGIONAL_MAP_RADIUS);
+  const stranded: { city: string; q: number; r: number }[] = [];
+  for (const [city, location] of Object.entries(cities)) {
+    const { terrainAt } = getRegionalGeography(location, 2026, 999);
+    const remaining = new Set(
+      cells
+        .filter((cell) => terrainAt(cell) === "river")
+        .map(({ q, r }) => `${q},${r}`),
+    );
+    for (const root of cells) {
+      if (!remaining.delete(`${root.q},${root.r}`)) continue;
+      const reach = [root];
+      let outlet = false;
+      for (const { q, r } of reach) {
+        for (const [dq, dr] of HEX_NEIGHBORS) {
+          const next = { q: q + dq, r: r + dr };
+          const terrain = terrainAt(next);
+          if (
+            terrain === "lake" ||
+            terrain === "ocean" ||
+            (terrain === "river" && hexRadius(next) > REGIONAL_MAP_RADIUS)
+          )
+            outlet = true;
+          if (remaining.delete(`${next.q},${next.r}`)) reach.push(next);
+        }
+      }
+      if (!outlet) stranded.push({ city, ...root });
+    }
+  }
+  expect(stranded).toEqual([]);
 });
 
 it("keeps the three rivers connected at Pittsburgh's confluence", () => {

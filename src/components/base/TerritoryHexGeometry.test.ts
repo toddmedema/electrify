@@ -1,4 +1,4 @@
-import { hexWires, riverPorts } from "./TerritoryHexGeometry";
+import { hexWires, waterPorts } from "./TerritoryHexGeometry";
 const center = { id: "center", q: 0, r: 0, developed: true, owner: "you" };
 const around = [
   [1, -1],
@@ -68,10 +68,27 @@ it("does not connect across a company boundary or to undeveloped land", () => {
   ).toEqual([]);
   expect(hexWires([center, other], (tile) => tile.id === "center")).toEqual([]);
 });
-it("joins river ports reciprocally without opening an enclosed lake", () => {
+it("opens reciprocal ports where a river reaches a lake", () => {
   const river = { ...center, terrain: "river" };
   const next = { ...around[0], terrain: "river" };
   const lake = { ...around[1], terrain: "lake" };
-  expect(riverPorts(river, [river, next, lake])).toEqual([0]);
-  expect(riverPorts(next, [river, next, lake])).toEqual([3]);
+  const terrain = new Map<string, string>([
+    ["0,0", river.terrain],
+    ["1,-1", next.terrain],
+    ["1,0", lake.terrain],
+  ]);
+  expect(waterPorts(river, terrain)).toEqual([0, 1]);
+  expect(waterPorts(lake, terrain)).toEqual([4, 5]);
+});
+
+it("opens a river across the exposed board edge and keeps inland headwaters contained", () => {
+  const terrain = new Map<string, string>(
+    around.map(({ q, r }) => [`${q},${r}`, "plains"]),
+  );
+  terrain.set("0,0", "river");
+  terrain.set("1,-1", "river");
+  const river = { ...center, terrain: "river" };
+  expect(waterPorts(river, terrain)).toEqual([0]);
+  terrain.delete("-1,1");
+  expect(waterPorts(river, terrain)).toEqual([0, 3]);
 });

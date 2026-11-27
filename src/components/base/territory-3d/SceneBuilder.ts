@@ -19,7 +19,7 @@ import {
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
-import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
+import { HEX_NEIGHBORS, waterPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
 import { hailModel } from "./Hailstones";
 import { getTowerConstructionModel } from "./StructureModels";
@@ -309,7 +309,9 @@ export class SceneBuilder {
                 ? terrainArtHash(tile.q, tile.r) >>> 30
                 : undefined,
           ports:
-            tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
+            tile.terrain === "river" || tile.terrain === "lake"
+              ? waterPorts(tile, this.terrainAt)
+              : undefined,
           ...(tile.terrain === "mountain" || tile.terrain === "forest"
             ? {
                 adjacentEdges: HEX_NEIGHBORS.reduce(
