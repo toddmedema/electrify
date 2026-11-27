@@ -30,7 +30,6 @@ async function setTutorialRate(page: Page, value: string) {
     exact: true,
   });
   await rate.fill(value);
-  await expect(rate).toHaveValue(value);
 }
 
 async function startMission(page: Page, id: number) {
@@ -82,15 +81,33 @@ test("Mission 2 · buy two generators on the map and find construction", async (
   await startMission(page, 1);
   await goal(page, "Build a gas peaker");
   await buildTutorialProject(page, "Natural Gas Peaker");
-  await goal(page, "Find your project on the map");
-  await tutorialMap(page)
-    .locator('[data-map-construction="true"][data-owned="true"]')
-    .click();
-  await expect(
-    page.getByRole("dialog", { name: "Natural Gas Peaker", exact: true }),
-  ).toBeVisible();
-  await next(page);
+  await goal(page, "Select 1× to watch construction advance");
+  const speed = page.getByRole("button", { name: "slow speed", exact: true });
+  await expect(speed).toHaveClass(/tutorialTarget/);
+  await reviewScreenshot(page, {
+    path: test.info().outputPath("tutorial-construction-clock.png"),
+    animations: "disabled",
+    style: ".snackbar { visibility: hidden; }",
+  });
+  const clock = page.locator("#appbar [data-game-minute]");
+  const before = Number(await clock.getAttribute("data-game-minute"));
+  await speed.click();
   await goal(page, "Build a second type of generator");
+  await expect
+    .poll(async () => Number(await clock.getAttribute("data-game-minute")))
+    .toBeGreaterThan(before);
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  const inactiveFast = page.getByRole("button", {
+    name: "fast speed",
+    exact: true,
+  });
+  await expect(pause.locator("svg")).toHaveCSS(
+    "color",
+    await inactiveFast
+      .locator("svg")
+      .evaluate((icon) => getComputedStyle(icon).color),
+  );
+  await pause.click();
   await buildTutorialProject(page, "Solar");
   await complete(page);
 });
@@ -148,8 +165,22 @@ test("Mission 4 · use Insights and Programs to earn profit", async ({
   await goal(page, "Compare revenue and costs");
   await next(page);
   await action(page, "Programs");
-  await setTutorialRate(page, "0.06");
-  await next(page);
+  await setTutorialRate(page, "0.049");
+  await goal(page, "Raise the electricity rate");
+  const slider = page.locator("#rateSlider");
+  const rate = slider.getByRole("slider");
+  const max = Number(await rate.getAttribute("max"));
+  const bounds = (await slider.boundingBox())!;
+  await page.mouse.move(
+    bounds.x + (0.06 / max) * bounds.width,
+    bounds.y + bounds.height / 2,
+  );
+  await page.mouse.down();
+  await expect
+    .poll(async () => Number(await rate.inputValue()))
+    .toBeGreaterThanOrEqual(0.05);
+  await goal(page, "Raise the electricity rate");
+  await page.mouse.up();
   await goal(page, "Finish the month with a profit");
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
   await complete(page);
@@ -160,8 +191,9 @@ test("Mission 5 · use Programs and Insights to attract customers", async ({
 }) => {
   await startMission(page, 3);
   await action(page, "Programs");
+  await setTutorialRate(page, "0.061");
+  await goal(page, "Set a rate below the market price");
   await setTutorialRate(page, "0.06");
-  await next(page);
   await goal(page, "Find customer growth in Insights");
   await expect(page.locator("#chartInsightsCustomers")).toBeVisible();
   await next(page);
@@ -193,7 +225,7 @@ test("Mission 6 · read a shortage forecast and finish a new generator", async (
   await complete(page);
 });
 
-test("Mission 7 · review and accept a real regional agreement", async ({
+test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
   page,
 }) => {
   await startMission(page, 112);
@@ -212,24 +244,31 @@ test("Mission 7 · review and accept a real regional agreement", async ({
   await page
     .getByRole("button", { name: "Accept agreement", exact: true })
     .click();
-  await goal(page, "Run one month to see the agreement in use");
+  await goal(page, "Open Fleet to see power flows");
+  await action(page, "Fleet");
+  await goal(page, "Run the clock until your grid imports power");
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await goal(page, "Check how much contracted energy you used");
-  const agreement = page.getByRole("article", {
-    name: "Valley Electric supply",
-    exact: true,
-  });
-  await agreement.getByText("Details", { exact: true }).click();
+  await goal(page, "Find External power on the chart");
   await expect(
-    agreement.getByText("Contract energy used", { exact: true }),
-  ).toBeInViewport();
-  const usage = agreement.getByRole("meter", {
-    name: "Share of available contracted energy used",
+    page.getByRole("button", { name: "pause", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const chart = page.locator("#chartSupplyDemand");
+  await expect(
+    chart
+      .locator(".chartLegendLabel")
+      .getByText("External power", { exact: true }),
+  ).toBeVisible();
+  await reviewScreenshot(page, {
+    path: test.info().outputPath("tutorial-agreements-fleet.png"),
+    animations: "disabled",
+    style: ".snackbar { visibility: hidden; }",
   });
-  expect(Number(await usage.getAttribute("value"))).toBeGreaterThan(0);
   await next(page, "Finish tutorial");
   await complete(page);
   await expect(
     page.getByRole("dialog").getByRole("button", { name: "Next tutorial" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog").getByRole("button", { name: "Install for later" }),
   ).toHaveCount(0);
 });

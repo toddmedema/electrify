@@ -145,7 +145,6 @@ export function changeTutorialStep(
   const scenario = getScenario(scenarioId);
   dispatch({ type: "game/completeTutorial" });
   const completion = tutorialCompleteDialog({
-    scenarioId,
     title: scenario?.endTitle || "Tutorial complete!",
     message:
       leaving?.capstone?.successMessage ||
@@ -237,7 +236,10 @@ export const tutorialGateMiddleware: Middleware =
           api.dispatch(
             dialogOpen({
               title: "Final challenge needs another try",
-              message: failureMessage,
+              message:
+                typeof failureMessage === "function"
+                  ? failureMessage(state)
+                  : failureMessage,
               open: true,
               notCancellable: true,
               secondaryLabel: "Exit tutorial",

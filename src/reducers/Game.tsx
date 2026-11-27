@@ -4324,9 +4324,7 @@ export function tutorialCompleteDialog({
   title,
   message,
   nextTutorial,
-  scenarioId,
 }: {
-  scenarioId: number;
   title: string;
   message?: string;
   nextTutorial?: ScenarioType;
@@ -4354,8 +4352,6 @@ export function tutorialCompleteDialog({
     // Keep completion explicit; practice is available through Keep playing.
     notCancellable: true,
     tutorialComplete: true,
-    offerInstall:
-      TUTORIALS.findIndex((tutorial) => tutorial.id === scenarioId) >= 2,
     tertiaryLabel: "Keep playing",
     tertiaryAction: () => getStore().dispatch(dialogClose()),
     secondaryLabel: "Main menu",
@@ -5189,7 +5185,6 @@ export function* tickStatePhases(
             setTimeout(() => {
               return getStore().dispatch(
                 tutorialCompleteDialog({
-                  scenarioId: scoredScenarioId,
                   title: endTitle || "Mission complete!",
                   message: endMessage,
                   nextTutorial,

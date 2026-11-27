@@ -5,6 +5,7 @@ import { officialRetentionMetadata } from "./OfficialScenarioRules";
 import {
   prepareStorageReorder,
   tutorialInspectedMapFacility,
+  tutorialRateCommitted,
 } from "../reducers/GameActions";
 import * as React from "react";
 import CustomerGrowthChallenge from "../components/base/CustomerGrowthChallenge";
@@ -83,17 +84,31 @@ const financesCapstoneSucceeded = (state: AppStateType) =>
   (latestMonthProfit(state) || 0) > 0 &&
   !hasBlackout(state);
 
-const pricingCapstoneSucceeded = (state: AppStateType) => {
-  const now = getTimeFromTimeline(state.game.date.minute, state.game.timeline);
-  const startingCustomers = state.game.customerMarketSize / 2;
-  return !!(
-    now &&
-    state.game.date.monthsElapsed >= 6 &&
-    state.game.dollarsPerkWh < 0.07 &&
-    now.customers >= startingCustomers * 1.05 &&
-    (latestMonthProfit(state) || 0) > 0 &&
-    !hasBlackout(state)
-  );
+const pricingReachedCustomerTarget = ({ game }: AppStateType) =>
+  (getTimeFromTimeline(game.date.minute, game.timeline)?.customers ?? 0) >=
+  (game.customerMarketSize / 2) * 1.05;
+
+const pricingCapstoneSucceeded = (state: AppStateType) =>
+  state.game.date.monthsElapsed >= 6 &&
+  state.game.dollarsPerkWh < 0.07 &&
+  pricingReachedCustomerTarget(state) &&
+  (latestMonthProfit(state) ?? 0) > 0 &&
+  !hasBlackout(state);
+
+const pricingCapstoneFailure = (state: AppStateType) => {
+  if (hasBlackout(state))
+    return "A blackout occurred. Add enough supply to serve your customers.";
+  const missedTarget = !pricingReachedCustomerTarget(state);
+  const unprofitable = (latestMonthProfit(state) ?? 0) <= 0;
+  if (missedTarget && unprofitable)
+    return "You missed the customer target, and the last month was unprofitable. Try a rate that attracts customers and covers costs.";
+  if (missedTarget)
+    return "You missed the customer target. Try lowering your rate to attract more customers.";
+  if (unprofitable)
+    return state.game.dollarsPerkWh >= 0.07
+      ? "Your last month was unprofitable. Reduce costs so you can make a profit below 7¢ per kWh."
+      : "Your last month was unprofitable. Try raising your rate to cover costs.";
+  return "Your final rate was too high. Finish below 7¢ per kWh.";
 };
 
 const isForecastingProject = (facility: GameType["facilities"][number]) =>
@@ -110,17 +125,16 @@ const forecastingCapstoneSucceeded = (state: AppStateType) =>
 const acceptedAgreement = (s: AppStateType) =>
   (s.game.transmission?.acceptedAgreements?.length ?? 0) > 0;
 
-const hasAgreementDeliveryMonth = ({ game }: AppStateType) =>
-  game.transmission?.acceptedAgreements?.some(({ blockId, cycle }) =>
-    game.transmission?.agreementAccounts?.some(
-      (account) =>
-        account.agreementId === `${blockId}:${cycle}` &&
-        account.months.some(
-          (month) =>
-            month.month < game.date.monthsElapsed && month.availableMWh > 0,
-        ),
-    ),
-  ) ?? false;
+const hasImportedFromAgreement = ({ game }: AppStateType) => {
+  const now = getTimeFromTimeline(game.date.minute, game.timeline);
+  return (
+    (now?.importedW ?? 0) > 0 &&
+    !!game.transmission?.acceptedAgreements?.some(
+      ({ blockId, cycle }) =>
+        (now?.agreementUsefulMWh?.[`${blockId}:${cycle}`] ?? 0) > 0,
+    )
+  );
+};
 
 // Order sets the menu and tutorial sequence; ids are persisted, so never renumber them
 export const SCENARIOS: ScenarioType[] = [
@@ -271,10 +285,16 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FACILITIES",
-        target: '[data-map-construction="true"]',
-        action: "Find your project on the map",
+        target: SLOW_CLOCK,
+        advanceOn: ({ game }) =>
+          game.speed === "SLOW" &&
+          game.facilities.some(
+            ({ name, minuteCreated }) =>
+              name === "Natural Gas Peaker" && game.date.minute > minuteCreated,
+          ),
+        action: "Select 1× to watch construction advance",
         content: (
-          <TutorialPrompt text="Select the building site to see its progress. Construction moves when the clock runs. Only finished plants supply power." />
+          <TutorialPrompt text="Watch your peaker’s progress on the map. It will supply power once construction finishes." />
         ),
       },
       {
@@ -329,9 +349,10 @@ export const SCENARIOS: ScenarioType[] = [
       {
         skipBeacon: true,
         card: "FACILITIES",
-        target: `${BUILD_DOCK}, #tab-BUILD_STORAGE, ${projectTarget('[aria-label="Pick site for Lithium Battery"]')}`,
+        target: `${BUILD_DOCK}, #tab-BUILD_STORAGE, [aria-label="Pick site for Lithium Battery"]:not([aria-disabled="true"])`,
         desktop: {
-          target: projectTarget('[aria-label="Choose sites for Battery"]'),
+          target:
+            '[aria-label="Choose sites for Battery"]:not([aria-disabled="true"])',
           content: (
             <TutorialPrompt text="Choose Battery in the build rail, then pick a highlighted connected site. Storage saves spare electricity for busier hours." />
           ),
@@ -358,7 +379,7 @@ export const SCENARIOS: ScenarioType[] = [
         onNext: () => prepareStorageReorder(),
         action: "Find Pumped Hydro’s charge level",
         content: (
-          <TutorialPrompt text="The charge bar shows how much energy is stored. The dispatch order determines which plants get called on first." />
+          <TutorialPrompt text="The vertical bar shows how much energy is stored. The dispatch order determines which plants serve first." />
         ),
       },
       {
@@ -383,19 +404,14 @@ export const SCENARIOS: ScenarioType[] = [
         nextLabel: "Start final challenge",
         action: "Try a grid with only coal",
         content: (
-          <TutorialPrompt text="The challenge starts fresh. Use storage to save spare power and cover the daily peak." />
+          <TutorialPrompt text="Use storage to save spare power and cover the daily peak." />
         ),
       },
       {
         card: "FACILITIES",
         action: "Cover peak demand with storage",
-        desktop: {
-          content: (
-            <TutorialPrompt text="Set Energy to 200 MWh in the build rail. Build a battery at a connected site and run time until it covers the daily peak." />
-          ),
-        },
         content: (
-          <TutorialPrompt text="Try a 200 MWh battery. Set its size in Build, choose a connected site, then run time until it covers the daily peak." />
+          <TutorialPrompt text="Build a big enough battery and fast-forward time until it covers the daily peak." />
         ),
         capstone: {
           checkpoint: {
@@ -474,9 +490,11 @@ export const SCENARIOS: ScenarioType[] = [
       {
         card: "PROGRAMS",
         target: "#rateSlider",
+        advanceOnAction: (action, s) =>
+          tutorialRateCommitted.match(action) && s.game.dollarsPerkWh >= 0.05,
         action: "Raise the electricity rate",
         content: (
-          <TutorialPrompt text="Try 6¢ per kWh. Charging more for each unit of electricity helps cover fuel and plant costs." />
+          <TutorialPrompt text="Set at least 5¢ per kWh. Charging more helps cover fuel and plant costs." />
         ),
       },
       {
@@ -537,15 +555,17 @@ export const SCENARIOS: ScenarioType[] = [
         advanceOn: (s) => s.card.name === "PROGRAMS",
         action: "Open Programs",
         content: (
-          <TutorialPrompt text="Customers can switch to your company when your electricity costs less than the market rate." />
+          <TutorialPrompt text="More customers switch to your company when you have lower rates." />
         ),
       },
       {
         card: "PROGRAMS",
         target: "#rateSlider",
+        advanceOnAction: (action, s) =>
+          tutorialRateCommitted.match(action) && s.game.dollarsPerkWh <= 0.06,
         action: "Set a rate below the market price",
         content: (
-          <TutorialPrompt text="Start around 6¢ per kWh. Lower prices attract customers, but you still need to cover costs." />
+          <TutorialPrompt text="Set 6¢ per kWh or less. Your rate still needs to cover costs." />
         ),
       },
       {
@@ -568,8 +588,7 @@ export const SCENARIOS: ScenarioType[] = [
             (s.game.date.monthsElapsed >= 6 && !pricingCapstoneSucceeded(s)),
           successMessage:
             "You attracted more customers and kept the grid profitable.",
-          failureMessage:
-            "Try a rate that attracts customers while covering costs. Watch demand as your customer base grows.",
+          failureMessage: pricingCapstoneFailure,
         },
       },
     ],
@@ -671,7 +690,7 @@ export const SCENARIOS: ScenarioType[] = [
   },
   {
     id: 112,
-    name: "Mission 7: Interties",
+    name: "Mission 7: Agreements",
     icon: "transmission",
     summary: "Buy backup power from a neighbor",
     locationId: "BurlingtonVT",
@@ -700,7 +719,7 @@ export const SCENARIOS: ScenarioType[] = [
         advanceOn: (s) => s.card.name === "AGREEMENTS",
         action: "Open Agreements",
         content: (
-          <TutorialPrompt text="An intertie connects two grids. A purchase agreement reserves some of the electricity that can travel across it." />
+          <TutorialPrompt text="Valley and Ridge share a border with your territory. Look for a shared border when making an agreement with a neighboring utility." />
         ),
       },
       {
@@ -712,34 +731,39 @@ export const SCENARIOS: ScenarioType[] = [
         advanceOn: acceptedAgreement,
         action: "Review and accept a power agreement",
         content: (
-          <TutorialPrompt text="Try Valley Electric. Compare price, maximum supply, and minimum payment. You pay the minimum even if you use less power." />
+          <TutorialPrompt text="Try Valley Electric. Check the price and minimum payment. You can have one agreement at a time with each neighboring utility." />
         ),
       },
       {
         card: "AGREEMENTS",
-        action: "Run one month to see the agreement in use",
+        target: "#fleetNav",
+        advanceOn: (s) => s.card.name === "FLEET",
+        action: "Open Fleet to see power flows",
         content: (
-          <TutorialPrompt text="Start the clock. Agreements can help cover demand while you build local backup." />
+          <TutorialPrompt text="The chart in Fleet shows live imports and exports." />
+        ),
+      },
+      {
+        card: "FLEET",
+        target: "#speedChangeButtons",
+        action: "Run the clock until your grid imports power",
+        content: (
+          <TutorialPrompt text="Your agreement can cover demand when your own plants fall short." />
         ),
         capstone: {
           preserveProgress: true,
-          success: hasAgreementDeliveryMonth,
-          successMessage:
-            "Your first power agreement is active. In a scenario, use Agreements to track delivery and plan for contracts ending.",
-          failureMessage:
-            "Keep the agreement active and run the clock for one month.",
+          success: hasImportedFromAgreement,
+          successMessage: "Your grid drew power from a neighboring utility.",
+          failureMessage: "Keep the agreement active and run the clock.",
         },
       },
       {
-        card: "AGREEMENTS",
-        target: [
-          '.powerAgreementDetails[aria-label$="supply details"]:not([open]) > summary',
-          '.powerAgreementDetails[aria-label$="supply details"][open] .powerAgreementUsage',
-        ].join(", "),
+        card: "FLEET",
+        target: "#chartSupplyDemand",
         nextLabel: "Finish tutorial",
-        action: "Check how much contracted energy you used",
+        action: "Find External power on the chart",
         content: (
-          <TutorialPrompt text="Open Details on your new agreement and find Contract energy used. It shows how much of the available energy your grid drew." />
+          <TutorialPrompt text="The patterned External power band shows imports in the supply stack. When you sell power, exports appear above the Demand line." />
         ),
       },
     ],

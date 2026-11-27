@@ -894,7 +894,7 @@ export interface TutorialStepType {
     success: (state: AppStateType) => boolean;
     failure?: (state: AppStateType) => boolean;
     successMessage: string;
-    failureMessage: string;
+    failureMessage: string | ((state: AppStateType) => string);
   };
   // Optional wording or target for a genuinely different desktop control. The action dock
   // itself is shared across widths, so navigation lessons use the same target everywhere.
@@ -1808,7 +1808,6 @@ export interface DialogType {
   notCancellable?: boolean;
   closeText?: string;
   // A milestone worth celebrating, where offering to install the app lands well
-  offerInstall?: boolean;
   tutorialComplete?: boolean;
   allTutorialsCompleted?: boolean;
   open: boolean;

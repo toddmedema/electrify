@@ -30,11 +30,12 @@ test("Pricing preserves the chosen rate while switching to Insights and starting
   await startTutorialMission(page, 3);
   await page.getByRole("button", { name: "Programs", exact: true }).click();
   const rate = page.locator("#rateSlider input");
+  await rate.fill("0.061");
   await rate.press("ArrowLeft");
-  const chosenRate = await rate.inputValue();
+  const chosenRate = "0.06";
   const hud = page.locator(".tutorialHud");
   const next = hud.getByRole("button", { name: "Next", exact: true });
-  await next.click();
+  await expect(hud).toContainText("Find customer growth in Insights");
   for (const width of [390, 768, 884, 1280]) {
     await page.setViewportSize({ width, height: 1024 });
     await expect(page.locator("#chartInsightsCustomers")).toHaveClass(

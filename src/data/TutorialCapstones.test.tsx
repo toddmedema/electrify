@@ -279,14 +279,24 @@ describe("authored tutorial capstones", () => {
     expect(objective.success(appState(lossMaking))).toBe(false);
   });
 
-  it("rewards profitable customer growth and rejects an unsustainable discount", () => {
+  it("rewards profitable customer growth and explains why different rates fail", () => {
     const objective = capstone(3);
     const balanced = createGame({ scenarioId: 3, dollarsPerkWh: 0.06 });
-    const tooCheap = createGame({ scenarioId: 3, dollarsPerkWh: 0.02 });
+    const tooCheap = createGame({ scenarioId: 3, dollarsPerkWh: 0 });
+    const tooExpensive = createGame({ scenarioId: 3, dollarsPerkWh: 0.1 });
+    const feedback = objective.failureMessage as (
+      state: AppStateType,
+    ) => string;
 
     expect(tickUntil(balanced, objective.success, 700)).toBe(true);
     expect(tickUntil(tooCheap, objective.failure!, 700)).toBe(true);
+    expect(feedback(appState(tooCheap))).toMatch(/last month was unprofitable/);
     expect(objective.success(appState(tooCheap))).toBe(false);
+    expect(tickUntil(tooExpensive, objective.failure!, 700)).toBe(true);
+    expect(feedback(appState(tooExpensive))).toMatch(
+      /missed the customer target/,
+    );
+    expect(objective.success(appState(tooExpensive))).toBe(false);
   });
 
   it("lets timely capacity prevent Mission 6's forecast shortage", () => {
@@ -363,7 +373,7 @@ describe("authored tutorial capstones", () => {
     });
   });
 
-  it("requires a signed agreement and a completed delivery month in Mission 7", () => {
+  it("requires recorded imports from a signed agreement in Mission 7", () => {
     const objective = capstone(112);
     const unsigned = createGame({ scenarioId: 112 });
     const quote = powerAgreementQuote(unsigned, "valley-purchase", 3)!;
@@ -386,6 +396,8 @@ describe("authored tutorial capstones", () => {
       ),
     ).toBe(true);
     expect(objective.success(appState(unsignedAfterMonth))).toBe(false);
-    expect(tickUntil(cloneDeep(signed), objective.success, 120)).toBe(true);
+    const importing = cloneDeep(signed);
+    expect(tickUntil(importing, objective.success, 120)).toBe(true);
+    expect(importing.date.monthsElapsed).toBe(0);
   });
 });

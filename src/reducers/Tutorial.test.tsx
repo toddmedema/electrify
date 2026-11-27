@@ -15,7 +15,7 @@ import {
   TUTORIALS,
 } from "../data/Scenarios";
 import cardReducer from "./Card";
-import gameReducer, { tutorialCompleteDialog } from "./Game";
+import gameReducer from "./Game";
 import settingsReducer from "./Settings";
 import {
   changeTutorialStep,
@@ -310,7 +310,6 @@ describe("tutorialGateMiddleware", () => {
       expect.objectContaining({
         open: true,
         notCancellable: true,
-        offerInstall: false,
         secondaryLabel: "Main menu",
       }),
     );
@@ -345,7 +344,8 @@ describe("tutorialGateMiddleware", () => {
           success: () => false,
           failure: (state) => state.game.dollarsPerkWh < 0.07,
           successMessage: "Capacity arrived before the peak.",
-          failureMessage: "Construction finished after the forecast peak.",
+          failureMessage: ({ game }) =>
+            `The failed rate was ${game.dollarsPerkWh}.`,
         },
       },
     ];
@@ -359,7 +359,7 @@ describe("tutorialGateMiddleware", () => {
       expect.objectContaining({
         open: true,
         title: "Final challenge needs another try",
-        message: "Construction finished after the forecast peak.",
+        message: "The failed rate was 0.06.",
         actionLabel: "Retry final challenge",
         secondaryLabel: "Exit tutorial",
       }),
@@ -482,13 +482,3 @@ describe("selectTutorialHiddenUi", () => {
     expect(selectTutorialHiddenUi(state)).toEqual([]);
   });
 });
-
-it.each(TUTORIALS.map((scenario, index) => [scenario.id, index >= 2] as const))(
-  "offers installation only from the third tutorial onward (id=%s)",
-  (scenarioId, eligible) => {
-    expect(
-      tutorialCompleteDialog({ scenarioId, title: "Complete" }).payload
-        .offerInstall,
-    ).toBe(eligible);
-  },
-);

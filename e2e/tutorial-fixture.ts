@@ -104,6 +104,12 @@ export async function buildTutorialProject(
   else await choose.click();
   const map = openMap ?? tutorialMap(page);
   const sites = map.locator('[data-project-site="owned"]:visible');
+  if (storage) {
+    await expect(sites.first()).toBeVisible();
+    await expect(
+      map.locator('[data-project-site="owned"].tutorialTarget'),
+    ).toHaveCount(0);
+  }
   const touch = await page.evaluate(
     () => matchMedia("(pointer: coarse)").matches,
   );

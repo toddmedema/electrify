@@ -469,6 +469,10 @@ it("reveals finance evidence temporarily and lets explicit selection own saved l
     <Insights {...props} evidenceRequest={request} />,
   );
   expect(screen.getByLabelText("Finance details evidence")).toBeInTheDocument();
+  const table = within(screen.getByRole("table"));
+  expect(table.getByRole("cell", { name: "Revenue" })).toBeVisible();
+  expect(table.queryByRole("cell", { name: "Demand" })).toBeNull();
+  expect(table.queryByRole("cell", { name: "Customers" })).toBeNull();
   expect(props.onEvidenceReady).toHaveBeenCalledWith(
     request,
     screen.getByLabelText("Finance details evidence"),

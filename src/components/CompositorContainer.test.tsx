@@ -294,9 +294,7 @@ it.each(TUTORIALS)("keeps the completed $name setup playable", (scenario) => {
       speed: "PAUSED",
     }),
   );
-  store.dispatch(
-    tutorialCompleteDialog({ scenarioId: scenario.id, title: "Complete" }),
-  );
+  store.dispatch(tutorialCompleteDialog({ title: "Complete" }));
   const before = store.getState().game;
   const completion = store.getState().ui.dialog;
   expect(completion.tertiaryLabel).toBe("Keep playing");

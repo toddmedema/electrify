@@ -34,7 +34,6 @@ import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import FeedbackDialog from "./base/FeedbackDialog";
-import InstallAppButton from "./base/InstallAppButton";
 import TutorialHud, { type TutorialHudProps } from "./base/TutorialHud";
 import DataCenterGuide from "./base/DataCenterGuide";
 import LowCashWarning from "./base/LowCashWarning";
@@ -818,16 +817,6 @@ export default class Compositor extends React.Component<Props, {}> {
               >
                 Feedback
               </Button>
-            )}
-            {ui.dialog.offerInstall && (
-              <InstallAppButton
-                label={compactTutorialActions ? "Install" : "Install for later"}
-                aria-label={
-                  compactTutorialActions ? "Install for later" : undefined
-                }
-                afterMilestone
-                showIcon={false}
-              />
             )}
             {ui.dialog.secondaryAction && (
               <Button

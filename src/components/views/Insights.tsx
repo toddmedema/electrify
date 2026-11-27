@@ -1372,7 +1372,9 @@ export default class Insights extends React.Component<Props, State> {
         )}
         <Table size="small" className="insightsSummaryTable">
           <TableBody>
-            {HISTORY_METRIC_KEYS.map((key) => {
+            {HISTORY_METRIC_KEYS.filter(
+              (key) => key !== "demandWh" && key !== "customers",
+            ).map((key) => {
               const metadata = metrics[key];
               const value =
                 key === "interestRate"
