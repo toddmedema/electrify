@@ -194,11 +194,15 @@ export function startDesktopInput(
         mapFocusFrame = undefined;
         if (!live || !foreground || store.getState().card.name !== "FACILITIES")
           return;
-        controls()
-          .find((control) =>
-            control.matches(".territoryMapBuyToggle, .territoryMapLayerToggle"),
-          )
-          ?.focus({ preventScroll: true });
+        const mapControls = controls();
+        const entry =
+          mapControls.find((control) =>
+            control.matches(".territoryMapBuyToggle"),
+          ) ??
+          mapControls.find((control) =>
+            control.matches(".territoryMapLayerToggle"),
+          );
+        entry?.focus({ preventScroll: true });
       });
     } else {
       const button = buttons[next - 1];

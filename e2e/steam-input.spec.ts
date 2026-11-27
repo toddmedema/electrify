@@ -823,6 +823,10 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await expect(paused).toHaveAttribute("aria-pressed", "true");
 
   await input(page, "back");
+  await expect(
+    page.getByRole("region", { name: "Fleet", exact: true }),
+  ).toBeHidden();
+  await input(page, "back");
   const quit = page.getByRole("menuitem", { name: "Save & Quit", exact: true });
   await select(page, quit);
   await input(page, "confirm");
