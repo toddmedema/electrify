@@ -25,6 +25,8 @@ import {
 import { ownsTerritoryTile } from "../../helpers/TerritoryTiles";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
 import type { TerritoryTileId } from "../../Types";
+import { TICK_MINUTES } from "../../Constants";
+import type { MapFrame } from "../base/territory-3d/Types";
 import {
   TerritoryTilePurchasesProvider,
   useTerritoryTilePurchases,
@@ -50,8 +52,10 @@ jest.mock("../base/territory-3d/TerritoryScene3D", () => {
   return {
     __esModule: true,
     default: function MockScene({
+      frame,
       onState,
     }: {
+      frame: Pick<MapFrame, "cityService">;
       onState: (state: RendererState) => void;
     }) {
       React.useEffect(() => {
@@ -60,7 +64,14 @@ jest.mock("../base/territory-3d/TerritoryScene3D", () => {
       }, [onState]);
       if (mockSceneError) throw new Error("3D chunk unavailable");
       if (mockSceneGate) throw mockSceneGate;
-      return <div data-testid="map-scene" />;
+      return (
+        <meter
+          data-testid="map-scene"
+          min={0}
+          max={1}
+          value={frame.cityService}
+        />
+      );
     },
   };
 });
@@ -218,6 +229,46 @@ function show(
     },
   };
 }
+it("updates the mounted map from the current tick as service falls and returns", async () => {
+  const restore = enable3D();
+  try {
+    const { store } = show();
+    const game = store.getState().game;
+    const start = game.date.minute;
+    const timeline = game.timeline.map((tick) => {
+      if (tick.minute === start + TICK_MINUTES)
+        return { ...tick, supplyW: tick.demandW / 2 };
+      return { ...tick, supplyW: tick.demandW };
+    });
+    act(() => {
+      store.dispatch(delta({ timeline }));
+    });
+    const scene = await screen.findByTestId("map-scene");
+    expect(scene).toHaveAttribute("value", "1");
+
+    act(() => {
+      store.dispatch(
+        delta({
+          date: getDateFromMinute(start + TICK_MINUTES, game.startingYear),
+        }),
+      );
+    });
+    expect(scene).toHaveAttribute("value", "0.5");
+
+    act(() => {
+      store.dispatch(
+        delta({
+          date: getDateFromMinute(start + 2 * TICK_MINUTES, game.startingYear),
+        }),
+      );
+    });
+    expect(scene).toHaveAttribute("value", "1");
+    expect(screen.getByTestId("map-scene")).toBe(scene);
+  } finally {
+    restore();
+  }
+});
+
 function idOf(button: HTMLButtonElement) {
   return button.dataset.mapTarget as TerritoryTileId;
 }

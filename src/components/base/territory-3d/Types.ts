@@ -16,6 +16,7 @@ export interface ModelPart {
   material?:
     | "facility-surface"
     | "facility-window"
+    | "city-window"
     | "water"
     | "watershed-water"
     | "mountain"
@@ -94,6 +95,8 @@ export interface MapInstance {
   frost?: boolean;
   /** Measured generation/discharge only; charging may be active without producing. */
   producing?: boolean;
+  /** City windows use the local grid reading only for cities this player serves. */
+  onPlayerGrid?: true;
   /** Fraction of the actual reservoir capacity; undefined when no level is disclosed. */
   waterLevel?: number;
   /** Actual facility identity: changing speed or rebuilding batches must not reset phase. */
@@ -105,6 +108,7 @@ export interface MapLighting {
   direction: Vec3;
   color: RGB;
   ambient: number;
+  night: number;
   shadow: number;
 }
 export interface MapFrame {
@@ -117,6 +121,8 @@ export interface MapFrame {
   scale: number;
   background: RGB;
   lighting: MapLighting;
+  /** Fraction of the player grid's demand served by the current tick. */
+  cityService: number;
   weather?: MapWeather;
   /** At slower speeds, distribute a simulated lighting step across the next tick interval. */
   lightingTransitionMs?: number;
