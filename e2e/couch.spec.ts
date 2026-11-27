@@ -702,29 +702,21 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expect(
     p2.getByRole("region", { name: "Insights", exact: true }),
   ).toBeVisible();
-  for (const seat of [p1, p2]) {
-    const dismiss = seat.getByRole("button", {
-      name: "Dismiss notification",
-      exact: true,
-    });
-    if (await dismiss.isVisible()) await dismiss.click();
-    await expect(dismiss).toHaveCount(0);
-  }
   if (process.env.REVIEW_SCREENSHOT_DIR) {
-    await p1.screenshot({
-      path: path.join(
-        process.env.REVIEW_SCREENSHOT_DIR,
-        `couch-p1-${info.project.name}.png`,
-      ),
-      animations: "disabled",
-    });
-    await p2.screenshot({
-      path: path.join(
-        process.env.REVIEW_SCREENSHOT_DIR,
-        `couch-p2-${info.project.name}.png`,
-      ),
-      animations: "disabled",
-    });
+    // A toast can expire during a click. Hide it only in the capture and leave both seats intact.
+    for (const [id, seat] of [
+      ["p1", p1],
+      ["p2", p2],
+    ] as const) {
+      await seat.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `couch-${id}-${info.project.name}.png`,
+        ),
+        animations: "disabled",
+        style: ".snackbar { visibility: hidden !important; }",
+      });
+    }
   }
   await couch.input({ "101": ["back"] });
   await expect(purchase1).toHaveCount(0);
