@@ -126,3 +126,27 @@ test("regional fleet and map details remain reachable without WebGL2", async ({
     page.locator("#facilitiesPane .facilityDisclosure").first(),
   ).toBeVisible();
 });
+
+test("a new custom grid starts on the 3D map for the selected city", async ({
+  page,
+}) => {
+  await page.goto("/?customEvent=100");
+  const start = page.getByRole("button", { name: "Start game", exact: true });
+  await expect(start).toBeEnabled();
+  const search = page.getByRole("combobox", { name: "Search playable cities" });
+  await search.fill("Paris");
+  await page
+    .getByRole("option", { name: "Paris, France", exact: true })
+    .click();
+  await expect(start).toBeEnabled();
+  await start.click();
+
+  const map = regionalMap(page);
+  await expect(map.locator("canvas.territory3DCanvas")).toHaveAttribute(
+    "data-renderer",
+    "ready",
+  );
+  await expect(
+    map.getByRole("button", { name: "Inspect Paris on map", exact: true }),
+  ).toBeVisible();
+});
