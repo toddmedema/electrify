@@ -418,9 +418,21 @@ for (const theme of ["light", "dark"] as const) {
     const expand = insights.getByRole("button", {
       name: "Expand Fuel Prices chart",
     });
+    // uPlot can replace its plot as fonts or dimensions settle. Each poll
+    // measures the current plot and retries missing or unmeasurable geometry.
+    const plotHeight = (plot: Locator) =>
+      plot.evaluateAll((plots) =>
+        plots.length === 1 ? plots[0].getBoundingClientRect().height : 0,
+      );
     const compact = insights.locator("#chartForecastFuelPrices .uplot");
     await expect(compact).toBeVisible();
-    const compactHeight = (await compact.boundingBox())!.height;
+    let compactHeight = 0;
+    await expect
+      .poll(async () => {
+        compactHeight = await plotHeight(compact);
+        return compactHeight;
+      })
+      .toBeGreaterThan(0);
     const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
     const capture = async (name: string) => {
       if (!reviewDir) return;
@@ -484,12 +496,13 @@ for (const theme of ["light", "dark"] as const) {
       expect(box.width).toBe(size);
       expect(box.height).toBe(size);
     }
-    await expect(dialog.locator(".uplot")).toBeVisible();
+    const expanded = dialog.locator(".uplot");
+    await expect(expanded).toBeVisible();
     await expectChartAxesInView(dialog);
     await expectMobileFuelLegend(dialog, page);
-    expect(
-      (await dialog.locator(".uplot").boundingBox())!.height,
-    ).toBeGreaterThan(compactHeight);
+    await expect
+      .poll(() => plotHeight(expanded))
+      .toBeGreaterThan(compactHeight);
     const span = async () =>
       Number(await chart.getAttribute("data-viewport-max")) -
       Number(await chart.getAttribute("data-viewport-min"));
