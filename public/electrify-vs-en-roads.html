@@ -131,12 +131,11 @@
       <section class="hero hero--illustrated" aria-labelledby="page-title">
         <div class="hero__inner">
           <div class="hero__copy">
-            <p class="eyebrow">Energy and climate learning</p>
             <h1 id="page-title">Electrify vs En-ROADS</h1>
             <p class="hero__lede">
-              Electrify is a strategy game about running an electric utility.
-              En-ROADS is a simulator for exploring global climate solutions.
-              Both help you explore the energy transition, at different scales.
+              In Electrify, you run one utility and decide how to meet tonight’s
+              demand. In En-ROADS, you try climate policies and see how they
+              could change global temperatures by 2100.
             </p>
             <div class="hero__actions">
               <a class="button button--primary" href="/">Play Electrify</a>
@@ -161,12 +160,10 @@
 
       <div class="page-content comparison-content">
         <section class="panel" aria-labelledby="comparison-title">
-          <h2 id="comparison-title">How do they compare?</h2>
-          <p>
-            In Electrify, you make decisions for a utility and live with the
-            results. In En-ROADS, you adjust policies and assumptions to compare
-            possible futures.
-          </p>
+          <h2 id="comparison-title">
+            What you control and what you can measure
+          </h2>
+
           <table
             class="comparison-table"
             role="table"
@@ -287,10 +284,10 @@
             </tbody>
           </table>
           <p class="comparison-note">
-            Model details:
+            Read about the models in
             <a
               href="https://github.com/toddmedema/electrify/blob/master/docs/demand-model.md"
-              >Electrify’s demand model</a
+              >Electrify’s demand documentation</a
             >,
             <a
               href="https://docs.climateinteractive.org/projects/en-roads/en/latest/"
@@ -306,32 +303,24 @@
         </section>
 
         <section class="panel" aria-labelledby="choose-title">
-          <h2 id="choose-title">Start with the question you want to explore</h2>
+          <h2 id="choose-title">Which question are you asking?</h2>
           <div class="comparison-columns">
             <div>
               <h3>How do I keep the lights on?</h3>
               <p>
-                Start with Electrify if you want to build and operate an
-                electricity grid. Try different power plants, storage, imports,
-                and demand policies. See how weather, construction delays, and
-                growing demand affect your ability to deliver power and pay the
-                bills.
-              </p>
-              <p>
-                The learning comes from making tradeoffs: affordable
-                electricity, reliable supply, and lower emissions all need
-                attention. A cleaner grid still has to meet demand when the sun
-                goes down.
+                Try Electrify. Suppose the sun is setting, demand is rising, and
+                your new power plant is still under construction. Can you cover
+                the shortfall with storage or imports? What will that do to your
+                utility’s finances?
               </p>
             </div>
             <div>
               <h3>How could we limit global warming?</h3>
               <p>
-                Start with En-ROADS if you want to explore combinations of
-                climate solutions. Compare energy choices with transport,
-                buildings, industry, agriculture, forests, and carbon removal.
-                Adjust a policy and inspect how the modeled global outcomes
-                change.
+                Try En-ROADS. What happens to warming if cars and buildings
+                switch to electricity? Try the same changes with a cleaner power
+                supply, then see what forests, agriculture, or carbon removal
+                could contribute.
               </p>
             </div>
           </div>
@@ -340,23 +329,23 @@
         <section class="panel" aria-labelledby="limits-title">
           <h2 id="limits-title">What each model can show</h2>
           <p>
-            Both tools model energy costs and storage. In Electrify, individual
-            storage assets have power and energy limits: a battery can run out
-            while your grid still needs electricity. En-ROADS represents storage
-            requirements and costs as wind and solar generation grows. Its
+            Both tools model storage. In Electrify, a battery has a maximum
+            power output and a limited charge. It can run flat while your
+            customers still need electricity. En-ROADS models how much storage a
+            growing wind and solar fleet needs and what it costs. Its
             <a
               href="https://support.climateinteractive.org/support/solutions/articles/47001149653-how-do-i-simulate-energy-storage-for-wind-and-solar-"
               rel="nofollow"
               >storage assumptions</a
             >
-            affect renewable adoption through costs, rather than directly
-            limiting renewable use.
+            affect renewable adoption through cost. The model sets no direct
+            limit on renewable use from storage.
           </p>
           <p>
-            Both also let you explore data-center demand. Electrify offers an
-            <a href="/data-centers.html">example local grid</a> where you can
-            try meeting extra electricity demand. En-ROADS models data centers
-            globally; its
+            In Electrify, you can add a
+            <a href="/data-centers.html">data center to a local grid</a> and see
+            how much spare power you have when it opens. En-ROADS models
+            data-center demand worldwide. Its
             <a
               href="https://support.climateinteractive.org/support/solutions/articles/47001302307-data-centers-and-artificial-intelligence-ai-faqs"
               rel="nofollow"
@@ -366,25 +355,25 @@
             prices are outside its scope.
           </p>
           <p>
-            Electrify tracks emissions without calculating their effect on
-            global temperature. En-ROADS models global scenarios rather than a
-            particular utility; its
+            Electrify tracks your utility’s emissions. To explore changes in
+            global temperature, use En-ROADS. Its
             <a
               href="https://docs.climateinteractive.org/projects/en-roads/en/latest/guide/baseline.html"
               rel="nofollow"
-              >baseline is a starting scenario</a
-            >.
+              >baseline scenario</a
+            >
+            gives you a starting point for comparing policies.
           </p>
         </section>
 
         <section class="panel" aria-labelledby="together-title">
-          <h2 id="together-title">Use both to connect the scales</h2>
+          <h2 id="together-title">Try both with a class</h2>
           <p>
-            Try this learning exercise on your own or with a class. In En-ROADS,
-            explore electrification alongside cleaner electricity. Then play
-            Electrify and try supplying a growing electricity load while
-            managing reliability, costs, and emissions. Return to En-ROADS to
-            discuss how electricity fits into the broader climate picture.
+            Start in En-ROADS. Electrify more transport and buildings, then see
+            what happens when you add cleaner electricity. Switch to Electrify
+            and try to supply a growing city with lower-emission power. Where
+            did you need another plant or more storage? Bring that question back
+            to the class.
           </p>
           <p>
             The
@@ -394,8 +383,8 @@
               >En-ROADS dynamics guide</a
             >
             explains why cleaner electricity and electrification work together.
-            This is a suggested learning sequence; the two tools run separate
-            models and do not exchange results.
+            The tools run independently. Results from one don’t carry over to
+            the other.
           </p>
           <div class="panel__actions">
             <a class="button button--primary" href="/">Play Electrify</a>
@@ -410,23 +399,18 @@
 
         <section class="panel" aria-labelledby="faq-title">
           <h2 id="faq-title">Common questions</h2>
-          <h3>Is Electrify an alternative to En-ROADS?</h3>
-          <p>
-            Choose Electrify for a game about utility management and En-ROADS
-            for global climate-policy exploration. They can complement each
-            other, but Electrify does not replace En-ROADS’ climate
-            calculations.
-          </p>
+
           <h3>Which simulator is more accurate?</h3>
           <p>
-            The tools answer different questions at different scales. Use their
-            documented assumptions to decide whether a result addresses your
-            question.
+            It depends on what you want to measure. Electrify can tell you when
+            your simulated grid runs short of power. En-ROADS can estimate
+            warming under a set of global policies. Each result depends on the
+            assumptions in that model.
           </p>
           <h3>Are Electrify and En-ROADS affiliated?</h3>
           <p>
-            Electrify is a separate project. For the simulator’s own
-            explanation, see the
+            No. Electrify is an independent project. You can read more about
+            En-ROADS in its
             <a
               href="https://www.climateinteractive.org/en-roads/"
               rel="nofollow"
@@ -439,13 +423,8 @@
 
     <footer class="site-footer">
       <div class="site-footer__inner">
-        <p>
-          Looking at other tools?
-          <a href="/energy-simulators.html"
-            >Compare four energy and climate simulators</a
-          >.
-        </p>
         <nav aria-label="Footer navigation">
+          <a href="/energy-simulators.html">Compare simulators</a>
           <a href="/data-centers.html">Data centers</a>
           <a href="/electrify-vs-en-roads.html">Electrify and En-ROADS</a>
           <a href="/classroom.html">For teachers</a>
