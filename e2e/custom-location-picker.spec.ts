@@ -1,22 +1,5 @@
 import { expect, Locator, Page, test } from "./fixtures";
-
-async function openCustomSetup(page: Page) {
-  await page.addInitScript(() => {
-    window.localStorage.clear();
-    window.localStorage.setItem(
-      "plays",
-      JSON.stringify({
-        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
-      }),
-    );
-  });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.getByRole("button", { name: "View Custom Game details" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Custom setup" }),
-  ).toBeVisible();
-}
+import { openCustomSetup } from "./layout";
 
 async function activateFocusedNeighbor(
   page: Page,
