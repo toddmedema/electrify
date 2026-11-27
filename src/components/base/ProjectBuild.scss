@@ -53,6 +53,18 @@
     font-size: 13px;
   }
 }
+.projectConnectActions {
+  align-items: center;
+  justify-content: space-between;
+  .projectPaymentMethods {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    .MuiFormControlLabel-root {
+      min-height: 44px;
+      margin: 0 4px 0 -4px;
+    }
+  }
+}
 .tileWorkspaceProject .tileWorkspaceBody {
   display: flex;
   flex-direction: column;
@@ -81,6 +93,9 @@
   }
   .projectCandidateActions button {
     flex: 1;
+  }
+  .projectConnectActions button {
+    white-space: nowrap;
   }
 }
 

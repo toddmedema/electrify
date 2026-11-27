@@ -1500,7 +1500,9 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       }),
     ).toBeEnabled();
-    await surface.getByRole("button", { name: /^Connect \(/ }).click();
+    await surface
+      .getByRole("button", { name: /^Connect(?: only)? \(/ })
+      .click();
     await expect(surface).toContainText("Connection under construction");
     await expect(surface.locator(".tileWorkspaceHeading h3")).toBeFocused();
     const owned = (await readSavedGame(page))!;
@@ -1572,7 +1574,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await inspectTile(page, neighbor);
     await expect(
-      surface.getByRole("button", { name: /^Connect \(/ }),
+      surface.getByRole("button", { name: /^Connect(?: only)? \(/ }),
     ).toBeEnabled();
   });
 
@@ -1831,7 +1833,7 @@ for (const theme of ["light", "dark"] as const) {
     await target.click();
     const surface = tileSurface(page);
     await expect(
-      surface.getByRole("button", { name: /^Connect \(/ }),
+      surface.getByRole("button", { name: /^Connect(?: only)? \(/ }),
     ).toBeDisabled();
     await expect(surface.getByRole("status")).toContainText("more cash needed");
     expect(currentTick((await readSavedGame(page))!)!.cash).toBe(1);
@@ -1996,7 +1998,9 @@ for (const theme of ["light", "dark"] as const) {
         await openMap(page);
       }
       const surface = await inspectTile(page, tile);
-      await surface.getByRole("button", { name: /^Connect \(/ }).click();
+      await surface
+        .getByRole("button", { name: /^Connect(?: only)? \(/ })
+        .click();
       await waitForTileConnection(page, tile.id);
       await openLockedBuild(surface);
       const plant = await reviewTileBuild(page, resource.name);

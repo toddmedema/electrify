@@ -29,6 +29,7 @@ export default function TerritoryTileMenu({
   onClose,
   onChooseSite,
   onBuild,
+  onPlan,
   onExpand,
   onAcquire,
 }: {
@@ -42,6 +43,7 @@ export default function TerritoryTileMenu({
   onClose: () => void;
   onChooseSite: () => void;
   onBuild: () => void;
+  onPlan: () => void;
   onExpand: () => void;
   onAcquire: (id: UtilityAcquisitionId) => void;
 }) {
@@ -69,6 +71,15 @@ export default function TerritoryTileMenu({
     !view.reserved &&
     !view.facility &&
     tileHasConstructionTechnology(tile);
+  const canPlan = !!(
+    !projectSite &&
+    quote &&
+    tile &&
+    view &&
+    !view.reserved &&
+    !view.facility &&
+    tileHasConstructionTechnology(tile)
+  );
   const tileActions: ContextMenuAction[] = [];
   if (projectSite) {
     tileActions.push({
@@ -88,8 +99,16 @@ export default function TerritoryTileMenu({
       onSelect: () => onAcquire(acquisitionId),
     });
   } else if (quote) {
+    if (canPlan) {
+      tileActions.push({
+        label: "Plan project here",
+        icon: <ConceptIcon concept="build" fontSize="small" decorative />,
+        disabled: busy || pendingIds.size > 0,
+        onSelect: onPlan,
+      });
+    }
     tileActions.push({
-      label: `Connect (${formatPurchasePrice(quote.price)})`,
+      label: `${canPlan ? "Connect only" : "Connect"} (${formatPurchasePrice(quote.price)})`,
       detail:
         quote.price > availableCash
           ? `${formatMoneyConcise(quote.price - availableCash)} more cash needed.`

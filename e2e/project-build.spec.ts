@@ -15,6 +15,7 @@ import { reviewScreenshot } from "./review-screenshot";
 import { loadSimData } from "../src/testing/SimData";
 import {
   projectCatalogue,
+  projectReview,
   projectSiteCapitalCost,
   projectSiteQuote,
   selectProject,
@@ -143,9 +144,10 @@ for (const theme of ["light", "dark"] as const) {
       surface.getByRole("heading", { name: projectTitle, exact: true }),
     ).toBeVisible();
     for (const label of [
-      "Connection",
-      "Estimated build cost",
-      "Expected output",
+      "Transmission connection",
+      "Facility construction",
+      "Total project cost",
+      "Estimated online",
     ])
       await expect(surface.getByText(label, { exact: true })).toBeVisible();
     await expect(
@@ -156,6 +158,9 @@ for (const theme of ["light", "dark"] as const) {
     expect(explored.territoryNetwork!.tilePurchases).toEqual(
       before.territoryNetwork!.tilePurchases,
     );
+    const confirm = surface.getByRole("button", { name: /^Connect & build ·/ });
+    await expect(confirm).toBeEnabled();
+    await expect(confirm).toBeInViewport();
     if (page.viewportSize()!.width < 741) {
       const sheet = (await surface.boundingBox())!;
       const map = (await network.locator(".territoryMap").boundingBox())!;
@@ -167,13 +172,16 @@ for (const theme of ["light", "dark"] as const) {
     await reviewScreenshot(network, {
       path: testInfo.outputPath(`project-candidate-${theme}.png`),
     });
-    const connect = surface.getByRole("button", { name: /^Connect ·/ });
-    await expect(connect).toBeEnabled();
-    await expect(connect).toBeInViewport();
-    await connect.click();
-    await expect(
-      surface.getByText(/Connection under construction/),
-    ).toBeVisible();
+    const review = projectReview(before, connectionQuote, true);
+    const loan = surface.getByRole("radio", { name: "Loan", exact: true });
+    await expect(loan).toBeInViewport();
+    await loan.check();
+    await expect(confirm).toHaveAccessibleName(
+      `Connect & build · ${formatPurchasePrice(review.required)}`,
+    );
+    await confirm.click();
+    await expect(surface).toContainText(/Connection under construction/);
+    await expect(surface).toContainText(/Under construction · .* left/);
     const wireCount = () =>
       network.locator("canvas.territory3DCanvas").evaluate(
         (canvas: MapCanvas) =>
@@ -186,29 +194,59 @@ for (const theme of ["light", "dark"] as const) {
             ).length,
       );
     await expect.poll(wireCount).toBe(0);
-    const pending = (await readSavedGame(page))!;
-    expect(pending.facilities).toHaveLength(before.facilities.length);
-    expect(pending.territoryNetwork!.tilePurchases).toHaveLength(
-      before.territoryNetwork!.tilePurchases!.length + 1,
-    );
-    await reviewScreenshot(network, {
-      path: testInfo.outputPath(`connection-construction-${theme}.png`),
-    });
-    await waitForTileConnection(page, "green-uplands:site-1");
-    await expect.poll(wireCount).toBeGreaterThan(0);
-    const confirm = surface.getByRole("button", { name: "Loan", exact: true });
-    await expect(confirm).toBeEnabled();
-    await expect(confirm).toBeInViewport();
-    await confirm.click();
-    await expect(surface).toHaveCount(0);
     const built = (await readSavedGame(page))!;
     const facility = built.facilities.find(
       (facility) => facility.tileId === "green-uplands:site-1",
     );
-    expect(facility).toMatchObject({ name: "Wind", peakW });
+    expect(facility).toMatchObject({
+      name: "Wind",
+      peakW,
+      minuteCreated: before.date.minute,
+    });
     expect(facility?.loanAmountLeft).toBeGreaterThan(0);
     expect(built.territoryNetwork!.tilePurchases).toHaveLength(
       before.territoryNetwork!.tilePurchases!.length + 1,
     );
+    expect(built.territoryNetwork!.tilePurchases!.at(-1)).toMatchObject({
+      tileId: "green-uplands:site-1",
+      minute: before.date.minute,
+      connectionMinute: connectionQuote.connection!.connectionMinute,
+    });
+    expect(currentTick(built)!.cash).toBeCloseTo(
+      currentTick(before)!.cash - review.required,
+      5,
+    );
+    await reviewScreenshot(network, {
+      path: testInfo.outputPath(`project-construction-${theme}.png`),
+    });
+    await waitForTileConnection(page, "green-uplands:site-1");
+    await expect.poll(wireCount).toBeGreaterThan(0);
+    await expect(surface).toContainText(/Under construction · .* left/);
   });
 }
+
+test("plans a project from a disconnected tile inspector", async ({ page }) => {
+  const network = await start(page, "light");
+  const tile = getTerritoryTile("green-uplands:site-1")!;
+  await selectTerritoryMapTile(page, tile);
+  const surface = network.locator(".tileWorkspaceSurface");
+  await expect(
+    surface.getByRole("button", { name: /^Connect only/ }),
+  ).toBeVisible();
+  await surface.getByRole("button", { name: "Plan project here" }).click();
+  const rail = network.getByRole("complementary", { name: "Build facilities" });
+  const catalogue = (await rail.isVisible()) ? rail : surface;
+  await setMapProjectCapacity(catalogue, false, "10");
+  await catalogue
+    .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
+    .click();
+  await expect(
+    surface.getByRole("heading", { name: "Wind · 20MW" }),
+  ).toBeVisible();
+  await expect(
+    surface.getByRole("button", { name: /^Connect & build ·/ }),
+  ).toBeVisible();
+  await expect(
+    network.locator(`[data-map-target="${tile.id}"]`),
+  ).toHaveAttribute("aria-pressed", "true");
+});
