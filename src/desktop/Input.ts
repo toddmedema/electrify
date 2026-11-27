@@ -218,19 +218,23 @@ export function startDesktopInput(
       element.matches('.accessibleChart > [role="img"][tabindex="0"]'),
     );
     if (!charts.length) {
+      const regionalFleet = document.querySelector("#fleetNav, #mapNav");
+      const destination = regionalFleet ? "FLEET" : "FACILITIES";
+      const covered = document.querySelector(
+        '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
+      );
       if (
-        document.querySelector(
-          '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
-        )
+        (regionalFleet || covered) &&
+        store.getState().card.name !== destination
       ) {
-        store.dispatch(navigate("FACILITIES"));
+        store.dispatch(navigate(destination));
         if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
         chartFrame = requestAnimationFrame(() => {
           chartFrame = undefined;
           if (
             live &&
             foreground &&
-            store.getState().card.name === "FACILITIES" &&
+            store.getState().card.name === destination &&
             !overlay(inputScope())
           )
             chart(delta);

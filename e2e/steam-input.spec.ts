@@ -792,12 +792,12 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
-  await input(page, "nextPane");
   const charts = page.locator(
     '#facilitiesPane .accessibleChart > [role="img"][tabindex="0"]',
   );
-  await expect(charts.first()).toBeVisible();
+  await expect(charts.first()).toBeHidden();
   await input(page, "nextChart");
+  await expect(charts.first()).toBeVisible();
   const chart = charts.and(page.locator(":focus"));
   await expect(chart).toBeFocused();
   await input(page, "confirm");
@@ -1956,6 +1956,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     });
     await select(page, inspect);
     await input(page, "confirm");
+    await expect(inspect).toHaveAttribute("aria-expanded", "true");
     await capture("fleet-expanded");
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });
