@@ -65,6 +65,7 @@ import {
   EvidenceRequestType,
   MapWorkspaceView,
 } from "../../Types";
+import { AWAITING_TILE_CONNECTION } from "../../helpers/TerritoryConnections";
 import { facilityPermanentlyShutdown } from "../../helpers/Financials";
 import { storyOutputMultiplier } from "../../helpers/Story";
 import {
@@ -271,6 +272,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     )
   );
   const underConstruction = facility.yearsToBuildLeft > 0;
+  const waitingForGrid = facility.yearsToBuildLeft === AWAITING_TILE_CONNECTION;
   const permanentlyShutdown = facilityPermanentlyShutdown(
     facility,
     game.date.minute,
@@ -371,14 +373,18 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
     formatWattsOfPeak(outputW, facility.peakW)
   );
   const repowerPercent = Math.floor(builtFraction * 100);
-  const activityLabel = repowering
-    ? `construction of ${COAL_REPOWER_OPTIONS[project.upgrade].name}, ${repowerPercent}% complete`
-    : partialUpgrade
-      ? "installing winterization, 90% capacity available"
-      : undefined;
+  const activityLabel = waitingForGrid
+    ? "waiting for grid connection"
+    : repowering
+      ? `construction of ${COAL_REPOWER_OPTIONS[project.upgrade].name}, ${repowerPercent}% complete`
+      : partialUpgrade
+        ? "installing winterization, 90% capacity available"
+        : undefined;
   let reading: React.ReactNode = "";
   let detail: React.ReactNode = null;
-  if (underConstruction) {
+  if (waitingForGrid) {
+    reading = "Waiting for grid connection";
+  } else if (underConstruction) {
     ({ reading, detail } = constructionStatus(
       builtFraction,
       facility.yearsToBuildLeft,
@@ -574,7 +580,7 @@ function FacilityListItem(props: FacilityListItemProps): React.JSX.Element {
                 (hazardStatus && !underConstruction
                   ? `, ${hazardStatusText(hazardStatus).spoken}`
                   : "") +
-                (storage ? `, ${status}` : "") +
+                (storage || waitingForGrid ? `, ${status}` : "") +
                 (facility.expansionInProgress
                   ? `, capacity upgrading, ${formatBuildMonths(facility.expansionInProgress.yearsToBuildLeft, "long")} left`
                   : "")

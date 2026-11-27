@@ -279,6 +279,15 @@ function TileNetwork(props: Props) {
     !tile.city &&
     !view.facility
   );
+  const canPlanHere = !!(
+    buildAllowed &&
+    tile &&
+    view &&
+    quote &&
+    !view.reserved &&
+    !view.facility &&
+    tileHasConstructionTechnology(tile)
+  );
   const buildConnection =
     buildAllowed &&
     view?.owned &&
@@ -457,6 +466,23 @@ function TileNetwork(props: Props) {
       setRailFocusRequest((value) => value + 1);
     }
   };
+  const planAtSite = (key: TerritoryMapTileKey) => {
+    if (!buildAllowed || projectBusy.current || pendingIds.size > 0) return;
+    const site = views.find(({ tile }) => territoryMapTileKey(tile) === key);
+    if (!site?.connectable) return;
+    if (desktopRail) {
+      inspect(key, true, "build");
+      setRailSite(site.tile.id);
+      setRailFocusRequest((value) => value + 1);
+    } else {
+      panel?.returnToMap();
+      setSelected(key);
+      setInspected(undefined);
+      setCandidate(site.tile.id);
+      setCatalogue(true);
+      setPlanning(true);
+    }
+  };
   const title = tile
     ? operatingFacility
       ? operatingFacility.name
@@ -568,6 +594,7 @@ function TileNetwork(props: Props) {
             ? () => menu && inspect(menu.key, true, "build")
             : undefined
         }
+        onPlan={buildAllowed ? () => menu && planAtSite(menu.key) : undefined}
         onExpand={() => menu && inspect(menu.key, true, "expand")}
         onAcquire={setReview}
       />
@@ -584,8 +611,7 @@ function TileNetwork(props: Props) {
                 if (projectBusy.current) return;
                 setProject(selection);
                 setCatalogue(false);
-                setCandidate(undefined);
-                setSelected(undefined);
+                if (!candidate) setSelected(undefined);
               }}
               onUpdateProject={
                 desktopRail
@@ -595,6 +621,13 @@ function TileNetwork(props: Props) {
                   : undefined
               }
               onClose={closeProject}
+              onConnectedBuild={({ tile }) => {
+                const key = territoryMapTileKey(tile);
+                close();
+                lastTile.current = key;
+                setSelected(key);
+                setInspected(key);
+              }}
               onBusy={(busy) => {
                 projectBusy.current = busy;
                 setProjectPending(busy);
@@ -641,6 +674,21 @@ function TileNetwork(props: Props) {
               {view.disaster.condition}
             </Typography>
           )}
+          {view.connection &&
+            !buildConnection &&
+            (view.facility ? (
+              <TileConnectionBuildStatus
+                connection={view.connection}
+                minute={game.date.minute}
+                paused={game.speed === "PAUSED"}
+                announce
+                showBuildButton={false}
+              />
+            ) : (
+              <Typography role="status" variant="body2">
+                {tileConnectionStatus(view.connection, game)}
+              </Typography>
+            ))}
           <TransitionGroup
             key={inspected}
             component={null}
@@ -732,13 +780,7 @@ function TileNetwork(props: Props) {
                     paused={game.speed === "PAUSED"}
                   />
                 </div>
-              ) : (
-                view.connection && (
-                  <Typography role="status" variant="body2">
-                    {tileConnectionStatus(view.connection, game)}
-                  </Typography>
-                )
-              )}
+              ) : null}
               {tile.city ? (
                 <div className="tileCityMetrics">
                   <div>
@@ -794,8 +836,17 @@ function TileNetwork(props: Props) {
                 !view.owned &&
                 !view.acquisitionId && (
                   <div className="tilePurchaseSummary">
+                    {canPlanHere && (
+                      <Button
+                        variant="contained"
+                        disabled={pendingIds.size > 0}
+                        onClick={() => planAtSite(inspected)}
+                      >
+                        Plan project here
+                      </Button>
+                    )}
                     <Button
-                      variant="contained"
+                      variant={canPlanHere ? "outlined" : "contained"}
                       disabled={
                         !quote ||
                         pendingIds.size > 0 ||
@@ -806,7 +857,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `Connect ${formatPurchasePrice(quote.price)}`
+                          ? `${canPlanHere ? "Connect only" : "Connect"} ${formatPurchasePrice(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
                     {quote && (

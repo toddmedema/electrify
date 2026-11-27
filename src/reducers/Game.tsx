@@ -1,3 +1,7 @@
+import {
+  projectReview,
+  withProjectSiteOwnership,
+} from "../helpers/ProjectBuild";
 import { expandFacility, cancelFacilityExpansion } from "./GameActions";
 import {
   facilityExpansionQuote,
@@ -8,16 +12,25 @@ import {
   recordAcquiredExpansion,
 } from "../helpers/FacilityExpansion";
 import { pooledPeerExportEmissions } from "../helpers/PeerExportEmissions";
-import { assignTerritoryTiles } from "../helpers/TerritoryTiles";
+import {
+  getTerritoryTile,
+  assignTerritoryTiles,
+} from "../helpers/TerritoryTiles";
 import {
   hasTerritoryNetwork,
   territoryBuildAvailability,
   legacyTerritoryConnections,
   purchaseLand,
   purchaseTile,
+  tilePurchaseQuote,
+  transferTerritorySites,
   energizeTileCustomers,
 } from "../helpers/Territories";
-import { pendingTileConnections } from "../helpers/TerritoryConnections";
+import {
+  AWAITING_TILE_CONNECTION,
+  facilityBuildConnectionMinute,
+  pendingTileConnections,
+} from "../helpers/TerritoryConnections";
 import { isTerritoryId } from "../data/Territories";
 import type { TerritoryId } from "../Types";
 import { getTerrainWindOutputFactor } from "../helpers/TerrainModifiers";
@@ -456,6 +469,8 @@ interface BuildFacilityAction {
   financed: boolean;
   territoryId?: TerritoryId;
   tileId?: import("../Types").TerritoryTileId;
+  reviewKey?: string;
+  connectionQuoteKey?: string;
 }
 
 interface ReprioritizeAction {
@@ -3083,13 +3098,30 @@ function applyBuildFacility(
   )
     return false;
   if (payload.tileId !== undefined && !hasTerritoryNetwork(state)) return false;
+  const connection =
+    payload.connectionQuoteKey !== undefined && payload.tileId
+      ? tilePurchaseQuote(state, payload.tileId)
+      : undefined;
+  if (
+    payload.connectionQuoteKey !== undefined &&
+    (!connection || connection.quoteKey !== payload.connectionQuoteKey)
+  )
+    return false;
+  const placementGame = connection
+    ? withProjectSiteOwnership(state, connection)
+    : state;
   const placement = hasTerritoryNetwork(state)
-    ? territoryBuildAvailability(state, requested, territoryId, payload.tileId)
+    ? territoryBuildAvailability(
+        placementGame,
+        requested,
+        territoryId,
+        payload.tileId,
+      )
     : undefined;
   if (placement && !placement.buildable) return false;
   if (placement) {
     const priced = getMatchingBuildFacilityQuote(
-      state,
+      placementGame,
       requested,
       territoryId,
       placement.tileId,
@@ -3100,7 +3132,7 @@ function applyBuildFacility(
   if (isLegacyCampaignScenario(state.scenarioId) && !state.customScenario) {
     // Era/date limits belong to the command owner as well as the shopping UI.
     if (isStorage(requested)) {
-      const legal = STORAGE(state, requested.peakWh).find(
+      const legal = STORAGE(placementGame, requested.peakWh).find(
         (quote) => quote.name === requested.name,
       );
       if (
@@ -3113,7 +3145,7 @@ function applyBuildFacility(
       const bounds = getLegacyBuildBounds(state);
       if (bounds && requested.peakW < bounds.minW) return false;
       const legal = GENERATORS(
-        state,
+        placementGame,
         requested.peakW,
         state.timeline.map((tick) => tick.windKph),
         state.timeline.map((tick) => tick.solarIrradianceWM2),
@@ -3157,7 +3189,7 @@ function applyBuildFacility(
   const hydro = isConventionalHydro(requested);
   const hydroSite = hydro
     ? getHydroAvailability(
-        state,
+        placementGame,
         requested.peakW,
         territoryId,
         placement?.tileId,
@@ -3176,7 +3208,7 @@ function applyBuildFacility(
   );
   // The dialog's quote can be stale by the time an action lands (or an import can be
   // malformed). Never let a purchase drive cash below zero merely because the UI once enabled it.
-  if (!now || now.cash < amountDue) {
+  if (!now || now.cash < amountDue + (connection?.price ?? 0)) {
     return false;
   }
   const viableLocationsRemaining = getViableLocationsRemaining(
@@ -3194,6 +3226,23 @@ function applyBuildFacility(
   ) {
     return false;
   }
+  if (connection) {
+    const tile = getTerritoryTile(connection.tileId, placementGame)!;
+    const review = projectReview(
+      state,
+      {
+        facility: built,
+        tile,
+        connection,
+      },
+      payload.financed,
+    );
+    if (
+      payload.reviewKey !== review.buildKey ||
+      !transferTerritorySites(state, { ...connection, customers: 0 })
+    )
+      return false;
+  }
   const existingIds = new Set(state.facilities.map(({ id }) => id));
   logGameEvent(state, "BUILD", buildStartedMessage(built), {
     importance: "NOTABLE",
@@ -3207,7 +3256,7 @@ function applyBuildFacility(
     added.tileId = placement?.tileId;
   }
   // Book this loan at the quoted rate, then price the next one against the new debt and cash.
-  if (payload.financed) refreshInterestRate(state, now.cash);
+  if (payload.financed || connection) refreshInterestRate(state, now.cash);
   if (isMaterialCapacityDecision(state, added.peakW)) {
     recordMeaningfulDecision(state, {
       lever: `asset-build:${added.id}`,
@@ -5903,7 +5952,12 @@ function* supplyFacilitiesFinancesPhases(
         f.yearsToBuildLeft - YEARS_PER_TICK * tickScale,
       );
       if (f.yearsToBuildLeft === 0) {
-        f.minuteOperational = now.minute;
+        const connects = facilityBuildConnectionMinute(state, f);
+        if (connects !== undefined && connects > settlementEndMinute) {
+          f.yearsToBuildLeft = AWAITING_TILE_CONNECTION;
+          return;
+        }
+        f.minuteOperational = Math.max(now.minute, connects ?? now.minute);
         if (
           isConventionalHydro(f) &&
           f.hydroSiteId &&

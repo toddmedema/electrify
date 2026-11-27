@@ -352,22 +352,22 @@ function IntertieBuildItem(props: {
         <>
           <BuildMetric
             label="Import capacity"
-            entry={MANUAL_ENTRY.INTERTIES}
+            entry={MANUAL_ENTRY.AGREEMENTS}
             value={formatWatts(props.importCapacityW)}
           />
           <BuildMetric
             label="Export capacity"
-            entry={MANUAL_ENTRY.INTERTIES}
+            entry={MANUAL_ENTRY.AGREEMENTS}
             value={formatWatts(props.exportCapacityW)}
           />
           <BuildMetric
             label="Build time"
-            entry={MANUAL_ENTRY.INTERTIES}
+            entry={MANUAL_ENTRY.AGREEMENTS}
             value={formatBuildMonths(corridor.yearsToBuild)}
           />
           <BuildMetric
             label="Total cost"
-            entry={MANUAL_ENTRY.INTERTIES}
+            entry={MANUAL_ENTRY.AGREEMENTS}
             value={formatPurchasePrice(corridor.buildCost)}
           />
           {market && (
@@ -412,7 +412,7 @@ function IntertieBuildItem(props: {
                 <BuildDetailRow
                   label="At your peak"
                   value={`~${formatForecastWatts(outlook.atPeak * outlook.importCapacityW)}`}
-                  entry={MANUAL_ENTRY.INTERTIES}
+                  entry={MANUAL_ENTRY.AGREEMENTS}
                 />
                 <BuildDetailRow
                   label="Typical import price"
@@ -430,7 +430,7 @@ function IntertieBuildItem(props: {
                       )}
                     </>
                   }
-                  entry={MANUAL_ENTRY.INTERTIES}
+                  entry={MANUAL_ENTRY.AGREEMENTS}
                 />
               </>
             )}
@@ -1589,7 +1589,10 @@ export default function TransmissionPanel({
         </Typography>
       )}
       {projectsOnly && (
-        <ManualLink entry={MANUAL_ENTRY.INTERTIES} text="How interties work" />
+        <ManualLink
+          entry={MANUAL_ENTRY.AGREEMENTS}
+          text="How power trading works"
+        />
       )}
       {cancelLine && (
         <ConfirmDialog

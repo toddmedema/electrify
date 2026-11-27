@@ -1,14 +1,26 @@
 import * as React from "react";
 import { useStore } from "react-redux";
-import { Alert, Checkbox, Button, FormControlLabel } from "@mui/material";
+import {
+  Alert,
+  Checkbox,
+  Button,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
+} from "@mui/material";
 import type { RootState } from "../../Store";
 import { useAppDispatch } from "../../Store";
 import { isStorage, type GameType, type TerritoryTileId } from "../../Types";
 import { facilityLoanMonths } from "../../helpers/Financials";
-import { formatWatts, formatWattHours } from "../../helpers/Format";
+import {
+  formatBuildMonths,
+  formatWatts,
+  formatWattHours,
+} from "../../helpers/Format";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
 import {
   projectReview,
+  projectSiteCapitalCost,
   projectSiteQuote,
   selectProject,
   type ProjectSelection,
@@ -19,7 +31,6 @@ import {
   resilienceSelection,
   withResilienceOptions,
 } from "../../helpers/Hazards";
-import { formatConnectionDuration } from "../../helpers/TerritoryConnections";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
 import { territoryMapLabel, territoryTileLabel } from "./TerritoryMapLayout";
 import { signature } from "./DeferredProjection";
@@ -42,6 +53,7 @@ export default function ProjectBuild({
   onUpdateProject,
   onClose,
   onBusy,
+  onConnectedBuild,
 }: {
   game: GameType;
   project?: ProjectSelection;
@@ -53,15 +65,16 @@ export default function ProjectBuild({
   onUpdateProject?: (project: ProjectSelection) => void;
   onClose: () => void;
   onBusy: (busy: boolean) => void;
+  onConnectedBuild: (site: ReadyProjectSite) => void;
 }) {
   const dispatch = useAppDispatch();
   const store = useStore<RootState>();
-  const { purchase, availableCash, readAvailableCash } =
-    useTerritoryTilePurchases();
+  const { availableCash, readAvailableCash } = useTerritoryTilePurchases();
   const { formatMoneyConcise: money, formatPurchasePrice: price } = useMoney();
   const forecast = useBuildForecast(game);
   const [message, setMessage] = React.useState("");
   const [progress, setProgress] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState<"cash" | "loan">();
   const lock = React.useRef(false);
   const alive = React.useRef(true);
   React.useEffect(() => {
@@ -72,6 +85,7 @@ export default function ProjectBuild({
   }, []);
   React.useEffect(() => {
     setMessage("");
+    setPaymentMethod(undefined);
   }, [candidate, project, catalogue]);
   const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
   const quote = React.useMemo(
@@ -85,7 +99,7 @@ export default function ProjectBuild({
   );
   const ready = quote?.facility ? (quote as ReadyProjectSite) : undefined;
   const connection = ready?.connection;
-  const payment = ready?.owned && {
+  const payment = ready && {
     cash: projectReview(game, ready, false, availableCash),
     loan: projectReview(game, ready, true, availableCash),
   };
@@ -94,33 +108,19 @@ export default function ProjectBuild({
     : project
       ? `${project.name} · ${formatWatts(project.peakW)}`
       : "Build";
-  const confirm = async (financed?: boolean) => {
+  const confirm = async (financed: boolean) => {
     if (lock.current || !project || !candidate) return;
     const shown = payment && (financed ? payment.loan : payment.cash);
     const initial = store.getState();
     const latest = projectSiteQuote(initial.game, project, candidate);
-    const details =
-      financed !== undefined && latest.facility
-        ? projectReview(
-            initial.game,
-            latest as ReadyProjectSite,
-            financed,
-            readAvailableCash(),
-          )
-        : undefined;
-    if (financed === undefined) {
-      if (!connection || latest.connection?.quoteKey !== connection.quoteKey) {
-        setMessage(
-          "Connection changed. Check the updated costs before paying.",
-        );
-        return;
-      }
-    } else if (
+    const details = latest.facility
+      ? projectReview(initial.game, latest, financed, readAvailableCash())
+      : undefined;
+    if (
       !shown ||
       !details ||
       details.key !== shown.key ||
-      details.remaining < 0 ||
-      !latest.owned
+      details.remaining < 0
     ) {
       setMessage("Project changed. Check the updated costs before paying.");
       return;
@@ -138,14 +138,7 @@ export default function ProjectBuild({
       );
     };
     try {
-      if (financed === undefined && latest.connection) {
-        setProgress("Connecting…");
-        const result = await purchase(candidate, latest.connection.quoteKey);
-        if (sameRun() && result.status !== "started")
-          setMessage(result.message);
-        return;
-      }
-      if (financed === undefined || !latest.facility || !details) return;
+      if (!latest.facility) return;
       setProgress("Starting construction…");
       const result = await dispatch(
         purchaseFacility(
@@ -154,12 +147,14 @@ export default function ProjectBuild({
           latest.tile.territoryId,
           candidate,
           details.buildKey,
+          latest.connection?.quoteKey,
         ),
       );
       if (!sameRun()) return;
       if (result.status === "accepted") {
         onBusy(false);
-        onClose();
+        if (latest.connection) onConnectedBuild(latest);
+        else onClose();
       } else setMessage(result.message);
     } finally {
       lock.current = false;
@@ -188,6 +183,8 @@ export default function ProjectBuild({
             : "Estimating…";
   const loanLeads =
     !!payment && payment.cash.remaining < 0 && payment.loan.remaining >= 0;
+  const combinedMethod = paymentMethod ?? (loanLeads ? "loan" : "cash");
+  const combinedPayment = payment?.[combinedMethod];
   return (
     <MapProjectPanel
       catalogue={catalogue}
@@ -232,60 +229,85 @@ export default function ProjectBuild({
               candidate &&
               !ready && <Alert severity="info">{quote?.reason}</Alert>
             )}
-            {ready && connection && (
-              <dl className="projectFacts">
-                <div>
-                  <dt>Connection</dt>
-                  <dd>
-                    {price(connection.price)} ·{" "}
-                    {formatConnectionDuration(connection.buildMonths)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Estimated build cost</dt>
-                  <dd>{price(ready.facility.buildCost)}</dd>
-                </div>
-                <div>
-                  <dt>Expected output</dt>
-                  <dd>{output}</dd>
-                </div>
-              </dl>
-            )}
             {ready && payment && (
               <>
                 <dl className="projectFacts">
-                  <div>
-                    <dt>Cash purchase</dt>
-                    <dd>{price(payment.cash.required)} now</dd>
-                  </div>
-                  <div>
-                    <dt>Loan option</dt>
-                    <dd>
-                      {price(payment.loan.required)} now +{" "}
-                      <span className="projectMonthlyPayment">
-                        {money(payment.loan.terms.monthlyPayment)}/mo
-                      </span>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Connection</dt>
-                    <dd>Connected</dd>
-                  </div>
-                  <div>
-                    <dt>Build cost</dt>
-                    <dd>{price(ready.facility.buildCost)}</dd>
-                  </div>
+                  {connection && (
+                    <>
+                      <div>
+                        <dt>Estimated online</dt>
+                        <dd>
+                          {payment.cash.online.month} {payment.cash.online.year}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Total project cost</dt>
+                        <dd>{price(projectSiteCapitalCost(ready))}</dd>
+                      </div>
+                      <div>
+                        <dt>Facility construction</dt>
+                        <dd>
+                          {price(ready.facility.buildCost)} ·{" "}
+                          {formatBuildMonths(
+                            ready.facility.yearsToBuild,
+                            "long",
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Transmission connection</dt>
+                        <dd>
+                          {price(connection.price)} ·{" "}
+                          {payment.cash.connects?.month}{" "}
+                          {payment.cash.connects?.year}
+                        </dd>
+                      </div>
+                    </>
+                  )}
+                  {!connection && (
+                    <>
+                      <div>
+                        <dt>Cash purchase</dt>
+                        <dd>{price(payment.cash.required)} now</dd>
+                      </div>
+                      <div>
+                        <dt>Loan option</dt>
+                        <dd>
+                          {price(payment.loan.required)} now +{" "}
+                          <span className="projectMonthlyPayment">
+                            {money(payment.loan.terms.monthlyPayment)}/mo
+                          </span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Connection</dt>
+                        <dd>Connected</dd>
+                      </div>
+                      <div>
+                        <dt>Build cost</dt>
+                        <dd>{price(ready.facility.buildCost)}</dd>
+                      </div>
+                    </>
+                  )}
                   <div className="projectOutput">
                     <dt>Expected output</dt>
                     <dd>{output}</dd>
                   </div>
-                  <div>
-                    <dt>Estimated online</dt>
-                    <dd>
-                      {payment.cash.online.month} {payment.cash.online.year}
-                    </dd>
-                  </div>
+                  {!connection && (
+                    <div>
+                      <dt>Estimated online</dt>
+                      <dd>
+                        {payment.cash.online.month} {payment.cash.online.year}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
+                {connection && (
+                  <p className="projectLoanTerms">
+                    Both start together. The facility comes online when both are
+                    ready.
+                  </p>
+                )}
                 {!isStorage(ready.facility) && onUpdateProject && (
                   <div
                     className="projectBuildOptions"
@@ -327,11 +349,13 @@ export default function ProjectBuild({
                   </div>
                 )}
                 <p className="projectLoanTerms">
+                  {connection &&
+                    `Loan: ${price(payment.loan.required)} now + ${money(payment.loan.terms.monthlyPayment)}/mo. `}
                   {(game.interestRate * 100).toFixed(2)}% annual interest for{" "}
                   {facilityLoanMonths(ready.facility.lifespanYears) / 12}{" "}
                   years.{" "}
                 </p>
-                {payment.cash.remaining < 0 && (
+                {!connection && payment.cash.remaining < 0 && (
                   <p role="status">
                     {payment.loan.remaining < 0
                       ? `${money(-payment.loan.remaining)} more cash needed for a loan.`
@@ -346,19 +370,45 @@ export default function ProjectBuild({
               </Alert>
             )}
           </div>
-          {connection && (
-            <div className="projectCandidateActions">
+          {connection && combinedPayment && (
+            <div className="projectCandidateActions projectConnectActions">
+              <RadioGroup
+                className="projectPaymentMethods"
+                aria-label="Project payment"
+                value={combinedMethod}
+                onChange={(_, method) =>
+                  setPaymentMethod(method === "loan" ? "loan" : "cash")
+                }
+              >
+                <FormControlLabel
+                  value="cash"
+                  control={<Radio size="small" />}
+                  label="Cash"
+                  disabled={!!progress}
+                />
+                <FormControlLabel
+                  value="loan"
+                  control={<Radio size="small" />}
+                  label="Loan"
+                  disabled={!!progress}
+                />
+              </RadioGroup>
               {progress && <span role="status">{progress}</span>}
+              {!progress && combinedPayment.remaining < 0 && (
+                <span role="status">
+                  {money(-combinedPayment.remaining)} more cash needed.
+                </span>
+              )}
               <Button
                 variant="contained"
-                disabled={!!progress || connection.price > availableCash}
-                onClick={() => void confirm()}
+                disabled={!!progress || combinedPayment.remaining < 0}
+                onClick={() => void confirm(combinedMethod === "loan")}
               >
-                Connect · {price(connection.price)}
+                Connect &amp; build · {price(combinedPayment.required)}
               </Button>
             </div>
           )}
-          {payment && (
+          {!connection && payment && (
             <div className="projectCandidateActions">
               {progress && <span role="status">{progress}</span>}
               <Button
