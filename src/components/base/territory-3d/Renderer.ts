@@ -36,7 +36,7 @@ const CAMERA_OVERSCAN = HEX_WIDTH / 2;
 const FOG_MIX = [0, 0.15, 0.35, 0.6];
 const FOG_SATURATION = [1, 0.8, 0.45, 0.15];
 const CITY_WINDOW_MATERIAL = 5;
-const NIGHT_BACKGROUND: Vec3 = [0.043, 0.063, 0.09];
+const NIGHT_BACKGROUND: Vec3 = [0.022, 0.032, 0.047];
 const VERTEX = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -164,7 +164,7 @@ void main() {
     glint *= glint;
     lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
   }
-  lit *= mix(1.0, 0.48, uNight);
+  lit *= mix(1.0, 0.40, uNight);
   if (cityWindow) {
     lit = mix(lit, vec3(1.0, 0.78, 0.40), vMaterial.x * (0.10 + uNight * 0.83));
   } else {

@@ -23,6 +23,7 @@ import { getTerrainModel } from "../src/components/base/territory-3d/TerrainMode
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { TICK_MINUTES, YEARS_PER_TICK } from "../src/Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
+import { currentTick } from "../src/helpers/GameSelectors";
 import {
   COLD_DEFINITION_ID,
   HAIL_DEFINITION_ID,
@@ -98,43 +99,90 @@ for (const theme of ["light", "dark"] as const) {
       await editSavedGame(page, ({ game }) => {
         game.date = getDateFromMinute(minute, game.startingYear);
         game.speed = "PAUSED";
-        for (const tick of game.timeline) tick.supplyW = tick.demandW * served;
+        const tick = currentTick(game)!;
+        tick.supplyW = tick.demandW * served;
       });
       await page.goto("/");
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       const map = await returnToTerritoryMap(page);
       const canvas = map.locator("canvas.territory3DCanvas");
       await expect(canvas).toHaveAttribute("data-renderer", "ready");
-      const screenshot = await canvas.screenshot({ scale: "css" });
-      return page.evaluate(async (base64) => {
-        const png = Uint8Array.from(atob(base64), (byte) => byte.charCodeAt(0));
-        const bitmap = await createImageBitmap(
-          new Blob([png], { type: "image/png" }),
-        );
-        const context = new OffscreenCanvas(
-          bitmap.width,
-          bitmap.height,
-        ).getContext("2d")!;
-        context.drawImage(bitmap, 0, 0);
-        const pixels = context.getImageData(
-          0,
-          0,
-          bitmap.width,
-          bitmap.height,
-        ).data;
-        bitmap.close();
-        let warm = 0;
-        let brightness = 0;
-        for (let i = 0; i < pixels.length; i += 4) {
-          const r = pixels[i],
-            g = pixels[i + 1],
-            b = pixels[i + 2];
-          brightness += (r + g + b) / 3;
-          // Count bright amber from illuminated panes, including partially covered pixels.
-          if (r > 155 && r - g > 20 && g - b > 35) warm++;
-        }
-        return { warm, brightness: brightness / (pixels.length / 4) };
-      }, screenshot.toString("base64"));
+      const { scene } = await readyDiagnostics(canvas, true);
+      const { width, height } = (await canvas.boundingBox())!;
+      const camera = await readTerritoryMapCamera(
+        map.locator(".territoryMapViewport"),
+      );
+      const frame = {
+        width,
+        height,
+        cameraX: camera.x,
+        cameraY: camera.y,
+        scale: camera.scale,
+      };
+      const cities = ["champlain:city", "valley-electric:city"].map((city) => {
+        const { min, max } = scene!.find(
+          ({ id }) => id === `structure:${city}`,
+        )!;
+        const topLeft = projectPoint([min[0], max[1], min[2]], frame);
+        const bottomRight = projectPoint([max[0], min[1], max[2]], frame);
+        return {
+          left: Math.max(0, Math.floor(topLeft.x)),
+          top: Math.max(0, Math.floor(topLeft.y)),
+          right: Math.min(width, Math.ceil(bottomRight.x)),
+          bottom: Math.min(height, Math.ceil(bottomRight.y)),
+        };
+      });
+      const screenshot = await canvas.screenshot({
+        scale: "css",
+        animations: "disabled",
+      });
+      return canvas.evaluate(
+        async (element: HTMLCanvasElement, { base64, cities }) => {
+          const png = Uint8Array.from(atob(base64), (byte) =>
+            byte.charCodeAt(0),
+          );
+          const bitmap = await createImageBitmap(
+            new Blob([png], { type: "image/png" }),
+          );
+          const { width, height } = bitmap;
+          const context = new OffscreenCanvas(width, height).getContext("2d")!;
+          context.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          const pixels = context.getImageData(0, 0, width, height).data;
+          let brightness = 0;
+          for (let i = 0; i < pixels.length; i += 4)
+            brightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+          const [owned, neighbor] = cities.map(
+            ({ left, top, right, bottom }) => {
+              let warm = 0;
+              for (let y = top; y < bottom; y++) {
+                for (let x = left; x < right; x++) {
+                  const i = (y * width + x) * 4;
+                  const r = pixels[i],
+                    g = pixels[i + 1],
+                    b = pixels[i + 2];
+                  // Bright amber panes remain distinct even through the neighbor's fog.
+                  if (r > 120 && r - g > 12 && g - b > 25) warm++;
+                }
+              }
+              return warm;
+            },
+          );
+          // Read the WebGL backdrop separately from the overlaid weather illustration.
+          const gl = element.getContext("webgl2")!;
+          const [red, green, blue] = gl.getParameter(
+            gl.COLOR_CLEAR_VALUE,
+          ) as Float32Array;
+          const backdrop = red + green + blue;
+          return {
+            owned,
+            neighbor,
+            backdrop,
+            brightness: brightness / (width * height),
+          };
+        },
+        { base64: screenshot.toString("base64"), cities },
+      );
     }
 
     const daytime = await resumeAt(720, 1);
@@ -142,18 +190,24 @@ for (const theme of ["light", "dark"] as const) {
     const partial = await resumeAt(0, 0.5);
     await reviewScreenshot(page, {
       path: info.outputPath("partial-service.png"),
+      animations: "disabled",
     });
     const restored = await resumeAt(0, 1);
-    await reviewScreenshot(page, { path: info.outputPath("full-service.png") });
+    await reviewScreenshot(page, {
+      path: info.outputPath("full-service.png"),
+      animations: "disabled",
+    });
 
     expect(dark.brightness).toBeLessThan(daytime.brightness * 0.65);
-    expect(restored.warm).toBeGreaterThan(dark.warm + 12);
-    expect(
-      (partial.warm - dark.warm) / (restored.warm - dark.warm),
-    ).toBeGreaterThan(0.25);
-    expect(
-      (partial.warm - dark.warm) / (restored.warm - dark.warm),
-    ).toBeLessThan(0.75);
+    expect(dark.backdrop).toBeLessThan(daytime.backdrop);
+    expect(restored.owned).toBeGreaterThan(dark.owned + 12);
+    const proportion =
+      (partial.owned - dark.owned) / (restored.owned - dark.owned);
+    expect(proportion).toBeGreaterThan(0.25);
+    expect(proportion).toBeLessThan(0.75);
+    expect(dark.neighbor).toBeGreaterThan(0);
+    expect(partial.neighbor).toBe(dark.neighbor);
+    expect(restored.neighbor).toBe(dark.neighbor);
   });
 }
 
