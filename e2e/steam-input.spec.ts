@@ -801,6 +801,11 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
   await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  await select(page, page.getByRole("button", { name: "Map", exact: true }));
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("button", { name: "Fleet", exact: true }),
+  ).toBeVisible();
   await input(page, "nextChart");
   const chart = page.locator(
     '.accessibleChart > [role="img"][tabindex="0"]:focus',
@@ -1950,6 +1955,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     });
     await select(page, inspect);
     await input(page, "confirm");
+    await expect(inspect).toHaveAttribute("aria-expanded", "true");
     await capture("fleet-expanded");
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });

@@ -229,20 +229,22 @@ export function startDesktopInput(
       element.matches('.accessibleChart > [role="img"][tabindex="0"]'),
     );
     if (!charts.length) {
-      if (
-        document.querySelector(
-          '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
-        )
-      ) {
-        const view = primaryView(availableControls);
-        store.dispatch(navigate(view));
+      const regional = availableControls.some(
+        (control) => control.dataset.gameBaseView !== undefined,
+      );
+      const destination = regional ? "FLEET" : "FACILITIES";
+      const covered = inputScope().querySelector(
+        '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
+      );
+      if ((regional || covered) && store.getState().card.name !== destination) {
+        store.dispatch(navigate(destination));
         if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
         chartFrame = requestAnimationFrame(() => {
           chartFrame = undefined;
           if (
             live &&
             foreground &&
-            store.getState().card.name === view &&
+            store.getState().card.name === destination &&
             !overlay(inputScope())
           )
             chart(delta);

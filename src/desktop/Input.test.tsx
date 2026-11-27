@@ -555,14 +555,17 @@ it.each(["aria-hidden", "hidden", "inert"])(
 );
 
 it.each([
-  ["PROGRAMS", "nextChart", "FACILITIES"],
-  ["PROGRAMS", "previousChart", "FACILITIES"],
-  ["EVENTS", "nextChart", "FACILITIES"],
-  ["EVENTS", "previousChart", "FACILITIES"],
-  ["PROGRAMS", "nextChart", "FLEET"],
+  ["PROGRAMS", "nextChart", undefined, "FACILITIES"],
+  ["PROGRAMS", "previousChart", undefined, "FACILITIES"],
+  ["EVENTS", "nextChart", undefined, "FACILITIES"],
+  ["EVENTS", "previousChart", undefined, "FACILITIES"],
+  ["FACILITIES", "nextChart", "FACILITIES", "FLEET"],
+  ["FACILITIES", "previousChart", "FACILITIES", "FLEET"],
+  ["PROGRAMS", "nextChart", "FACILITIES", "FLEET"],
+  ["PROGRAMS", "nextChart", "FLEET", "FLEET"],
 ] as const)(
-  "%s %s reveals hidden %s charts before focusing them in a single-tool workspace",
-  async (tool, action, baseView) => {
+  "%s %s reveals charts when the remembered regional base is %s",
+  async (tool, action, baseView, destination) => {
     store.dispatch(delta({ inGame: true }));
     store.dispatch(navigate(tool));
     function Surface() {
@@ -570,13 +573,15 @@ it.each([
       return (
         <main className="base_main">
           <div className="gameWorkspace">
-            {baseView === "FLEET" && (
+            {baseView && (
               <nav className="gameActionDock">
-                <button data-game-base-view={baseView}>Map</button>
+                <button data-game-base-view={baseView}>
+                  {baseView === "FACILITIES" ? "Fleet" : "Map"}
+                </button>
               </nav>
             )}
             <div className="gameStage" data-layout="single">
-              <div className="gameFleet" hidden={card !== baseView}>
+              <div className="gameFleet" hidden={card !== destination}>
                 <div className="accessibleChart">
                   <div role="img" aria-label="Supply chart" tabIndex={0} />
                   <div role="img" aria-label="Demand chart" tabIndex={0} />
@@ -585,7 +590,7 @@ it.each([
               <section
                 className="gameToolPanel"
                 data-game-tool={tool}
-                hidden={card === baseView}
+                hidden={tool === "FACILITIES" || card === destination}
               >
                 <button>Close tool</button>
               </section>
@@ -604,7 +609,7 @@ it.each([
     await Promise.resolve();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     f.emit({ actions: [action] });
-    expect(store.getState().card.name).toBe(baseView);
+    expect(store.getState().card.name).toBe(destination);
     act(() => jest.advanceTimersByTime(20));
     expect(
       screen.getByRole("img", {
