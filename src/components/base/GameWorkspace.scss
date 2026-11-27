@@ -400,7 +400,10 @@ html:has(
     display: flex;
     z-index: 5;
   }
-  .gameStage[data-panel-count="0"] .gameToolTray {
+  // Floating windows need the tray dimensions on their first render.
+  &:not([data-map-windows="true"])
+    .gameStage[data-panel-count="0"]
+    .gameToolTray {
     display: none;
   }
   .gameToolPanel {
