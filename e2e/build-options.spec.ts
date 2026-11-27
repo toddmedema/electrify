@@ -109,7 +109,18 @@ test("ordinary starting hills offer general technologies and retain special-site
       name: "Choose sites for Nuclear",
       exact: true,
     });
-    await expect(nuclear).toBeEnabled();
+    // Nuclear fits the hill, but the starting budget cannot cover its down payment.
+    await expect(nuclear).toBeDisabled();
+    await expect(nuclear).toHaveAttribute("title", /Insufficient cash/);
+    await nuclear.focus();
+    const nuclearPreview = rail.getByRole("region", {
+      name: "Nuclear technology preview",
+      exact: true,
+    });
+    await expect(nuclearPreview.getByRole("table")).toBeVisible();
+    await expect(nuclearPreview).not.toContainText(
+      "Not buildable on this tile",
+    );
     await expect(
       rail.getByRole("button", {
         name: "Choose sites for Offshore Wind",
@@ -132,14 +143,15 @@ test("ordinary starting hills offer general technologies and retain special-site
         preview.getByRole("button", { name: /^Review purchase of/ }),
       ).toHaveCount(0);
     }
-    // Site planning is available when a connection is affordable. The already
-    // connected hill still requires the usual construction down payment.
-    await nuclear.click();
-    const project = page.getByRole("dialog", { name: /^Nuclear ·/ });
+    // A buildable and affordable technology can enter review at the connected hill.
+    await rail
+      .getByRole("button", { name: "Choose sites for Solar", exact: true })
+      .click();
+    const project = page.getByRole("dialog", { name: /^Solar ·/ });
     await expect(project.getByText("Connected", { exact: true })).toBeVisible();
     await expect(
       project.getByRole("button", { name: "Loan", exact: true }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     return;
   }
   const tile = getAuthoredTerritoryTile("champlain:site-12")!;

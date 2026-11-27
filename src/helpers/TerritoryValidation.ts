@@ -434,23 +434,38 @@ export function validTerritoryNetwork(
           state.tilePurchases?.find(
             (receipt) => receipt.tileId === facility.tileId,
           );
-        if (
-          !tile ||
-          !ownsTerritoryTile(game, tile) ||
-          !purchase ||
-          facility.minuteCreated <
-            ("connectionMinute" in purchase
-              ? (purchase.connectionMinute ?? purchase.minute)
-              : purchase.minute)
-        )
-          return true;
+        if (!tile || !ownsTerritoryTile(game, tile) || !purchase) return true;
+        if (facility.minuteCreated < purchase.minute) return true;
+        const connects =
+          "connectionMinute" in purchase
+            ? purchase.connectionMinute
+            : undefined;
+        if (connects !== undefined && facility.minuteCreated < connects) {
+          // A bundled facility starts with the line and cannot operate until it energizes.
+          if (facility.minuteCreated !== purchase.minute) return true;
+          if (facility.minuteOperational !== undefined) {
+            if (
+              facility.minuteOperational < connects ||
+              facility.minuteOperational > game.date.minute
+            )
+              return true;
+          } else if (
+            !(facility.yearsToBuildLeft > 0) ||
+            facility.currentW !== 0
+          ) {
+            return true;
+          }
+        }
       }
       const provenance = Object.values(UTILITY_AREAS).find((area) =>
         area.facilities.some(
           ({ assetId }) => assetId === facility.startingAssetId,
         ),
       );
-      return !owned.includes(id) || (!!provenance && provenance.id !== id);
+      return (
+        (!isLandTerritoryId(id) && !owned.includes(id)) ||
+        (!!provenance && provenance.id !== id)
+      );
     })
   )
     return false;

@@ -13,11 +13,13 @@ export default function TileConnectionBuildStatus({
   minute,
   paused,
   announce = false,
+  showBuildButton = true,
 }: {
   connection: TileConnection;
   minute: number;
   paused: boolean;
   announce?: boolean;
+  showBuildButton?: boolean;
 }) {
   const status = React.useId();
   const progress = tileConnectionProgress(connection, minute);
@@ -26,13 +28,15 @@ export default function TileConnectionBuildStatus({
   );
   return (
     <div className="tileConnectionBuild">
-      <Button
-        variant="contained"
-        disabled
-        aria-describedby={`${status} ${status}-progress`}
-      >
-        Build here
-      </Button>
+      {showBuildButton && (
+        <Button
+          variant="contained"
+          disabled
+          aria-describedby={`${status} ${status}-progress`}
+        >
+          Build here
+        </Button>
+      )}
       <Typography
         id={status}
         component="p"

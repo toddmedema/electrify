@@ -3,6 +3,7 @@ import { STORAGE } from "../data/Facilities";
 import { LOCATIONS, TICK_MINUTES } from "../Constants";
 import { getScenarioLocation } from "../helpers/Locations";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
+import { projectReview, projectSiteQuote } from "../helpers/ProjectBuild";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   assignTerritoryTiles,
@@ -16,6 +17,7 @@ import {
   createWorld,
   checkpointWorld,
   restoreWorld,
+  roomView,
   stepWorld,
 } from "./World";
 import type { StorageOperatingType } from "../Types";
@@ -123,6 +125,63 @@ it("host reserves the requested physical cell and rejects competing placements b
   );
   expect(build(restored, tile.id)).toMatch(/already/i);
 });
+it("host commits both jobs and rejects a stale or repeated project order atomically", () => {
+  const world = ready();
+  const game = roomView(world, "0").game!;
+  const request = { name: "Wind" as const, fuel: "Wind" as const, peakW: 20e6 };
+  const quote = projectSiteQuote(game, request, "green-uplands:site-1");
+  if (!quote.facility || !quote.connection) throw new Error(quote.reason);
+  const review = projectReview(game, quote, true);
+  const connectionQuoteKey = quote.connection.quoteKey;
+  const submit = (reviewKey: string) =>
+    applyCommand(world, "0", {
+      matchId: world.matchId,
+      epoch: world.epoch,
+      sequence: (world.sequences["0"] ?? 0) + 1,
+      command: {
+        kind: "action",
+        name: "buildFacility",
+        payload: {
+          facility: { name: request.name, peakW: request.peakW },
+          financed: true,
+          territoryId: quote.tile.territoryId,
+          tileId: quote.tile.id,
+          connectionQuoteKey,
+          reviewKey,
+        },
+      },
+    });
+  const cash = currentTick(game)!.cash;
+  expect(submit("expired")).toMatch(/terms changed/i);
+  expect(world.grids[0].territoryNetwork?.tilePurchases).toHaveLength(0);
+  expect(currentTick(world.grids[0])!.cash).toBe(cash);
+  expect(submit(review.buildKey)).toBeUndefined();
+  expect(world.grids[0].facilities).toContainEqual(
+    expect.objectContaining({
+      name: request.name,
+      peakW: request.peakW,
+      tileId: quote.tile.id,
+      minuteCreated: game.date.minute,
+    }),
+  );
+  expect(world.grids[0].territoryNetwork?.tilePurchases).toEqual([
+    expect.objectContaining({
+      tileId: quote.tile.id,
+      minute: game.date.minute,
+    }),
+  ]);
+  expect(currentTick(world.grids[0])!.cash).toBeCloseTo(
+    cash - review.required,
+    5,
+  );
+  expect(submit(review.buildKey)).toMatch(/terms changed/i);
+  expect(world.grids[0].territoryNetwork?.tilePurchases).toHaveLength(1);
+  expect(currentTick(world.grids[0])!.cash).toBeCloseTo(
+    cash - review.required,
+    5,
+  );
+});
+
 it.each([
   "champlain:city",
   "valley-electric:site-1",

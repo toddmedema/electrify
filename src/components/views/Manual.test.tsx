@@ -101,6 +101,8 @@ describe("Manual", () => {
       ["megawatt-hour", MANUAL_ENTRY.POWER_AND_ENERGY],
       ["scoring", MANUAL_ENTRY.SCORE],
       ["set it in programs", MANUAL_ENTRY.PRICING],
+      ["connect & build", MANUAL_ENTRY.PROJECT_SITES],
+      ["monthly energy minimum", MANUAL_ENTRY.AGREEMENTS],
     ]) {
       search(term);
       expect(
