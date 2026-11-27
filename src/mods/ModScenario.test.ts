@@ -18,7 +18,7 @@ import {
   modRuntimeDigest,
   modSetupDigest,
 } from "../helpers/ScenarioMod";
-import { standardCustomRate } from "../helpers/CustomScenarioEvents";
+import { standardCustomRate } from "../helpers/CustomSetup";
 import { policyTotalCost } from "../helpers/Policies";
 import { serializeSave, parseSave } from "../SaveGame";
 import { getStore } from "../StoreRegistry";

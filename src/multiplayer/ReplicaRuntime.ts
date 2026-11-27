@@ -92,7 +92,9 @@ export class ReplicaRuntime {
         if (request.kind === "baseline")
           await this.install(request, generation);
         else if (request.kind === "views-applied") {
+          if (!this.viewPending) return;
           this.viewPending = false;
+          this.publication.consumed(this.now());
           this.requestViews();
         } else if (this.state === "live") this.apply(request);
       } catch (error) {

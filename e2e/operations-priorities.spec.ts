@@ -133,24 +133,9 @@ test("all upcoming events stay accessible above history in a short pane", async 
       }),
     );
   });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.getByRole("button", { name: "View Custom Game details" }).click();
-  await page
-    .getByRole("combobox", { name: "Scenario events", exact: true })
-    .click();
-  for (const name of [
-    "Data Center Boom",
-    "Heatwave + Drought",
-    "Sudden Nuclear Shutdown",
-  ]) {
-    await page.getByRole("option", { name, exact: true }).click();
-  }
-  await page.keyboard.press("Escape");
-  await page
-    .locator(".customSetupActions")
-    .getByRole("button", { name: "Start game", exact: true })
-    .click();
+  // Heatwave + Drought opens with several events ahead of it.
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
   await page
     .locator("#navfooter")
     .getByRole("button", { name: "Events", exact: true })

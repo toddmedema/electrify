@@ -29,7 +29,6 @@ export function configureDataCenterGrowth(
     );
   return {
     ...scenario,
-    eventScenarioIds: [],
     durationMonths: Math.max(
       16 * 12,
       (arrivalYear - scenario.startingYear + 10) * 12,
@@ -83,7 +82,6 @@ export function createDataCenterScenario(
     durationMonths: 16 * 12,
     cash: inEraMoney(scale * 800, startingYear),
     facilities: regionalStartingFleet(location, startingYear, scale * 2500),
-    eventScenarioIds: [],
   };
   return configureDataCenterGrowth(
     scenario,
@@ -97,7 +95,6 @@ export function withoutDataCenterGrowth(scenario: ScenarioType): ScenarioType {
   return {
     ...scenario,
     name: "Your community without added data centers",
-    eventScenarioIds: [],
     loadAdditions: scenario.loadAdditions?.map((load) => ({
       ...load,
       peakW: load.demandType === "Data Centers" ? 0 : load.peakW,

@@ -323,3 +323,20 @@ test("the HTTPS request is cancelled only for the specified renderer request ID"
   assert.deepEqual(await pending, { ok: false, code: "cancelled" });
   await api.dispose();
 });
+
+test("only a finished match may ask to reopen its campaign lobby", () => {
+  assert.equal(validateCrossplayRequest("room/unlock", { roomId }), true);
+  assert.equal(
+    validateCrossplayRequest("room/unlock", { roomId, finished: true }),
+    true,
+  );
+  for (const finished of [false, "yes", 1])
+    assert.equal(
+      validateCrossplayRequest("room/unlock", { roomId, finished }),
+      false,
+    );
+  assert.equal(
+    validateCrossplayRequest("room/unlock", { roomId, extra: true }),
+    false,
+  );
+});

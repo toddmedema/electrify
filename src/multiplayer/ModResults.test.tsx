@@ -59,7 +59,8 @@ function show(results: CompanyResultType[]) {
         hostName="Grace"
         selfId="hedy"
         onWatch={jest.fn()}
-        onBackToLobby={jest.fn()}
+        onRestart={jest.fn()}
+        onReturnToLobby={jest.fn()}
         onLeave={jest.fn()}
       />
     </Provider>,

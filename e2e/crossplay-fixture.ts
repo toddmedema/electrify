@@ -960,7 +960,16 @@ export function crossplayFixture() {
     );
   }
 
-  function savedCheckpoint(id = roomId()) {
+  /**
+   * The campaign's room is the newest one that holds a save. A player who opens a lobby only to
+   * load a save leaves a newer room behind that has none.
+   */
+  function campaignRoomId() {
+    const ids = [...rooms.keys()];
+    return ids.findLast((id) => rooms.get(id)?.head) ?? ids.at(-1);
+  }
+
+  function savedCheckpoint(id = campaignRoomId()) {
     const room = id ? rooms.get(id) : undefined;
     const manifest = room?.head;
     const object =

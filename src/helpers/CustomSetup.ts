@@ -1,50 +1,34 @@
 import { SCENARIOS } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
-import { inEraMoney } from "../data/FuelPrices";
 import { inEraRate } from "../data/RetailRates";
 import { ScenarioType } from "../Types";
 import { getScenarioLocation } from "./Locations";
 import { relocateOfficialArcMonth } from "./ScenarioArcTiming";
 
-export const CUSTOM_EVENT_SCENARIOS = SCENARIOS.filter(
-  (scenario) => !scenario.tutorialSteps && scenario.id !== 111,
-);
-
-export function validCustomEventIds(value: unknown): boolean {
-  return validEventIds(value, CUSTOM_EVENT_SCENARIOS);
-}
+const OFFICIAL_ARCS = SCENARIOS.filter((scenario) => !scenario.tutorialSteps);
 
 /** Community packages can select every current official arc. */
 export function validOfficialArcIds(value: unknown): boolean {
-  return validEventIds(
-    value,
-    SCENARIOS.filter((scenario) => !scenario.tutorialSteps),
-  );
-}
-
-function validEventIds(
-  value: unknown,
-  scenarios: readonly ScenarioType[],
-): boolean {
   return (
     value === undefined ||
     (Array.isArray(value) &&
-      value.length <= scenarios.length &&
+      value.length <= OFFICIAL_ARCS.length &&
       new Set(value).size === value.length &&
-      value.every((id) => scenarios.some((scenario) => scenario.id === id)))
+      value.every((id) => OFFICIAL_ARCS.some((scenario) => scenario.id === id)))
   );
 }
 
-export function validCustomEventScenario(scenario?: ScenarioType): boolean {
-  return validEventScenario(scenario, !!scenario?.mod);
+/** A saved game's setup. A modded game's arcs are checked against the official catalog. */
+export function validSavedCustomScenario(scenario?: ScenarioType): boolean {
+  return validScenario(scenario, !!scenario?.mod);
 }
 
 /** Fresh community resolution runs before the validated runtime snapshot has been attached. */
 export function validOfficialArcScenario(scenario?: ScenarioType): boolean {
-  return validEventScenario(scenario, true);
+  return validScenario(scenario, true);
 }
 
-function validEventScenario(
+function validScenario(
   scenario: ScenarioType | undefined,
   community: boolean,
 ): boolean {
@@ -54,9 +38,10 @@ function validEventScenario(
     value === undefined ||
     (typeof value === "number" && Number.isFinite(value) && value > 0);
   return (
-    (community ? validOfficialArcIds : validCustomEventIds)(
-      scenario.eventScenarioIds,
-    ) &&
+    // Only a community package can carry official arcs; a custom game has no scenario events.
+    (community
+      ? validOfficialArcIds(scenario.eventScenarioIds)
+      : !scenario.eventScenarioIds?.length) &&
     (community ||
       (scenario.startingInterties === undefined &&
         scenario.startingIntertieAccess === undefined)) &&
@@ -71,29 +56,16 @@ function validEventScenario(
   );
 }
 
-/** Grid size, rather than the source city's population, sets an imported event's budget. */
-export function customEventContext(scenario?: ScenarioType) {
-  if (!scenario || scenario.id !== 999) return undefined;
-  const demand =
-    (scenario.startingCustomers ||
-      getStartingCustomers(getScenarioLocation(scenario))) *
-    (scenario.startingDemandScale || 1);
-  return CUSTOM_EVENT_SCENARIOS.filter((source) =>
-    scenario.eventScenarioIds?.includes(source.id),
-  ).map((source) => ({
-    scenarioId: source.id,
-    moneyScale:
-      (demand /
-        ((source.startingCustomers ||
-          getStartingCustomers(getScenarioLocation(source))) *
-          (source.startingDemandScale || 1))) *
-      inEraMoney(1, scenario.startingYear, source.startingYear),
-  }));
-}
-
+/**
+ * The opening rate is automatic: an official location's authored tariff when there is one, or the
+ * custom-game default, either way re-quoted through the retail-rate index for the starting year.
+ */
 export function standardCustomRate(scenario: ScenarioType): number {
-  const source = CUSTOM_EVENT_SCENARIOS.find(
-    (candidate) => candidate.locationId === scenario.locationId,
+  const source = SCENARIOS.find(
+    (candidate) =>
+      !candidate.tutorialSteps &&
+      candidate.id !== 111 &&
+      candidate.locationId === scenario.locationId,
   );
   return source
     ? inEraRate(
@@ -104,13 +76,33 @@ export function standardCustomRate(scenario: ScenarioType): number {
     : inEraRate(0.07, scenario.startingYear);
 }
 
+/**
+ * What the custom setup screen shows for a stored or shared setup: the automatic opening rate,
+ * and none of the scenario events or event-derived loads that older setups could carry.
+ */
+export function prepareCustomSetup(scenario: ScenarioType): ScenarioType {
+  const {
+    eventScenarioIds: _events,
+    loadAdditions: _loads,
+    ...setup
+  } = scenario;
+  return { ...setup, dollarsPerkWh: standardCustomRate(scenario) };
+}
+
+/** Wildfire Emergency depends on its authored starting intertie, so its loads and term are not imported. */
+const IMPORTED_ARC_SOURCES = OFFICIAL_ARCS.filter(
+  (scenario) => scenario.id !== 111,
+);
+
 /** Absolute campus/mine loads scale with the receiving grid and retain the source lead time. */
-export function prepareCustomScenario(scenario: ScenarioType): ScenarioType {
+export function prepareOfficialArcScenario(
+  scenario: ScenarioType,
+): ScenarioType {
   const demand =
     (scenario.startingCustomers ||
       getStartingCustomers(getScenarioLocation(scenario))) *
     (scenario.startingDemandScale || 1);
-  const sources = CUSTOM_EVENT_SCENARIOS.filter((source) =>
+  const sources = IMPORTED_ARC_SOURCES.filter((source) =>
     scenario.eventScenarioIds?.includes(source.id),
   );
   const additions = sources.flatMap((source) =>

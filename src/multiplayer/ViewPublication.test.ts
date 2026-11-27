@@ -43,6 +43,26 @@ test("ordinary updates publish the newest revision at five Hz", () => {
   expect(build).toHaveBeenCalledTimes(10);
 });
 
+test("slow view consumption leaves input time while clock changes and recovery stay prompt", () => {
+  const { world, publication, build } = fixture();
+  world.revision++;
+  // A cheap frame leaves the ordinary five-Hz cadence intact.
+  publication.consumed(20);
+  expect(publication.request(world, 20)).toBe(180);
+  publication.take(world, 200);
+  world.revision++;
+  publication.consumed(350);
+  expect(publication.request(world, 350)).toBe(150);
+  expect(publication.request(world, 350, { urgent: true })).toBe(0);
+  publication.take(world, 350);
+  world.revision++;
+  // A resumed renderer doesn't inherit a multi-second cooldown.
+  publication.consumed(5000);
+  expect(publication.request(world, 5000)).toBe(200);
+  expect(publication.request(world, 5000, { force: true })).toBe(0);
+  expect(build).toHaveBeenCalledTimes(4);
+});
+
 test("command bursts coalesce before cloning, preserve both receipts, and deliver within 100 ms", () => {
   const { world, publication, build } = fixture();
   world.revision++;

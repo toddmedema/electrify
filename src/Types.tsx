@@ -1028,7 +1028,7 @@ export interface ScenarioType {
   rules?: CompiledScenarioRules;
   /** Immutable mod effects; installed updates never mutate a running game. */
   mod?: ScenarioModType;
-  /** Opt-in official event arcs for a custom run; location and starting fleet stay custom. */
+  /** The official event arcs a community package imports; a custom game never carries any. */
   eventScenarioIds?: number[];
   hydroInventoryKey?: string;
   // Persisted in scores, completion and shared links; append new ids rather than renumbering
@@ -1085,7 +1085,7 @@ export interface ScenarioType {
   endMessage?: string;
   feePerKgCO2e: number;
   /** Custom setup follows the location blend until the player edits the fleet. */
-  startingFleetSource?: "regional";
+  startingFleetSource?: "regional" | "manual";
   facilities: ScenarioFacilityType[];
 }
 

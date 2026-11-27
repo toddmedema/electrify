@@ -30,6 +30,7 @@ import { restoreMenuFocus } from "./base/useMenuKeys";
 import DeferredSnackbar from "./base/DeferredSnackbar";
 import { focusInitialDialogAction } from "./base/dialogFocus";
 import { isBlackoutToast } from "../helpers/BlackoutToast";
+import { listenForDropdownKeys } from "./base/DropdownKeys";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
 import FeedbackDialog from "./base/FeedbackDialog";
@@ -404,6 +405,7 @@ const tutorialCompletionSx = {
 export default class Compositor extends React.Component<Props, {}> {
   private workspaceMemory = { run: -1, values: new Map<string, unknown>() };
   private removeShortcuts?: () => void;
+  private removeDropdownKeys?: () => void;
   private removeToolInput?: () => void;
   private resizeTimeout: ReturnType<typeof setTimeout> | undefined;
   private snackbarContentRef = React.createRef<HTMLDivElement>();
@@ -438,6 +440,7 @@ export default class Compositor extends React.Component<Props, {}> {
   public componentDidMount() {
     this.removeToolInput = rememberToolInput(() => this.workspaceMemory.values);
     this.removeShortcuts = listenForShortcuts(keyMap, shortcutHandlers);
+    this.removeDropdownKeys = listenForDropdownKeys();
     window.addEventListener("resize", this.handleResize);
   }
 
@@ -465,6 +468,7 @@ export default class Compositor extends React.Component<Props, {}> {
   public componentWillUnmount() {
     this.removeToolInput?.();
     this.removeShortcuts?.();
+    this.removeDropdownKeys?.();
     window.removeEventListener("resize", this.handleResize);
     clearTimeout(this.resizeTimeout);
     clearTimeout(this.snackbarDismissTimeout);

@@ -1,5 +1,4 @@
 import {
-  customEventFromSearch,
   campaignSetupUrl,
   isLegacyCampaignSearch,
   isDataCenterSetupSearch,
@@ -51,29 +50,6 @@ describe("scenario URLs", () => {
 
   it("clears guided setup when navigating to the game catalog or a challenge", () => {
     const location = { pathname: "/", search: "?dataCenters=1&campaign=fall" };
-    expect(scenarioListUrl(location)).toBe("/?campaign=fall");
-    expect(scenarioDetailsUrl(111, location)).toBe(
-      "/?campaign=fall&scenario=111",
-    );
-  });
-  it("accepts only supported custom event ids", () => {
-    expect(customEventFromSearch("?customEvent=106")).toBe(106);
-    for (const search of [
-      "",
-      "?customEvent=0",
-      "?customEvent=999",
-      "?customEvent=106oops",
-      "?customEvent=-106",
-    ]) {
-      expect(customEventFromSearch(search)).toBeUndefined();
-    }
-  });
-
-  it("clears the custom event when leaving its setup route", () => {
-    const location = {
-      pathname: "/",
-      search: "?customEvent=106&campaign=fall",
-    };
     expect(scenarioListUrl(location)).toBe("/?campaign=fall");
     expect(scenarioDetailsUrl(111, location)).toBe(
       "/?campaign=fall&scenario=111",

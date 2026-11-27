@@ -13,6 +13,7 @@ interface PublicationRequest {
 export class ViewPublication {
   private published?: string;
   private lastSent = -Infinity;
+  private nextOrdinaryView = -Infinity;
   private urgent = false;
   private force = false;
   private receipts = new Map<string, NonNullable<RoomView["receipt"]>>();
@@ -28,6 +29,13 @@ export class ViewPublication {
       world.reason,
       world.ready,
     ]);
+  }
+
+  /** Leave the renderer time for input after consuming a costly grid. A stalled or hidden
+   * renderer can add at most one ordinary interval once it resumes. */
+  consumed(now: number) {
+    this.nextOrdinaryView =
+      now + Math.min(now - this.lastSent, VIEW_INTERVAL_MS);
   }
 
   /** Undefined means nothing changed. Otherwise return the delay before the latest state
@@ -48,14 +56,11 @@ export class ViewPublication {
       this.urgent = false;
       return;
     }
-    return this.force
-      ? 0
-      : Math.max(
-          0,
-          this.lastSent +
-            (this.urgent ? CONTROL_VIEW_INTERVAL_MS : VIEW_INTERVAL_MS) -
-            now,
-        );
+    if (this.force) return 0;
+    const due = this.urgent
+      ? this.lastSent + CONTROL_VIEW_INTERVAL_MS
+      : Math.max(this.lastSent + VIEW_INTERVAL_MS, this.nextOrdinaryView);
+    return Math.max(0, due - now);
   }
 
   take(world: World, now: number, seatIds?: readonly string[]) {

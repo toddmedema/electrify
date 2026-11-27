@@ -30,11 +30,23 @@ function visible(element: HTMLElement): boolean {
   );
 }
 
+function activePopup(popup: HTMLElement): boolean {
+  if (!visible(popup)) return false;
+  if (!popup.matches('[role="listbox"].MuiMenu-list')) return true;
+  // MUI Select restores focus and removes aria-controls when closing, while its listbox
+  // can remain visible during the exit transition.
+  return Array.from(
+    document.querySelectorAll(
+      '[role="combobox"][aria-expanded="true"][aria-controls]',
+    ),
+  ).some((owner) => owner.getAttribute("aria-controls") === popup.id);
+}
+
 /** The top popup owns input even when it has no available actions. */
 export function inputScope(): HTMLElement {
   const popups = Array.from(
     document.querySelectorAll<HTMLElement>(popupSelector),
-  ).filter(visible);
+  ).filter(activePopup);
   if (popups.length) return popups[popups.length - 1];
   const screens = Array.from(
     document.querySelectorAll<HTMLElement>(".base_main:not([inert])"),

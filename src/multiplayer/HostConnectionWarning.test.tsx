@@ -108,7 +108,7 @@ test("a checkpoint-only interruption offers only the main menu route", async () 
     name: "Multiplayer session ended",
   });
   expect(dialog).toHaveAccessibleDescription(
-    /Play with friends → Multiplayer saves.*Changes since that save will be lost/,
+    /Play with friends, then choose Load multiplayer save.*Changes since that save will be lost/,
   );
   expect(
     screen.getByRole("button", { name: "Return to main menu" }),

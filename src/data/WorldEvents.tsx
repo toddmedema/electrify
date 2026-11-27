@@ -45,7 +45,6 @@ export interface StoryContextType {
   completedMonths?: number;
   startingRateDollarsPerKWh?: number;
   endingRateDollarsPerKWh?: number;
-  customEvents?: Array<{ scenarioId: number; moneyScale: number }>;
   seed: number;
   scenarioId: number;
   difficulty: DifficultyType;
@@ -417,19 +416,15 @@ export function combineStoryEffects(
 /** Catalog setup and the caller's actual run context select shared plain compiled rules. */
 function storyRules(context: StoryContextType): CompiledScenarioRules[] {
   if (context.rules) return [context.rules];
-  const ids =
-    context.scenarioId === 999
-      ? (context.customEvents?.map((event) => event.scenarioId) ?? [])
-      : [context.scenarioId];
-  return ids.flatMap((id) => {
-    const source = getScenario(id);
-    if (!source || source.tutorialSteps) return [];
-    const rules = officialScenarioRules(source, context, {
-      startingYear:
-        context.date.year - Math.floor(context.date.monthsElapsed / 12),
-    });
-    return rules ? [rules] : [];
+  // A custom game's rules always arrive with it; only an official scenario is looked up here.
+  if (context.scenarioId === 999) return [];
+  const source = getScenario(context.scenarioId);
+  if (!source || source.tutorialSteps) return [];
+  const rules = officialScenarioRules(source, context, {
+    startingYear:
+      context.date.year - Math.floor(context.date.monthsElapsed / 12),
   });
+  return rules ? [rules] : [];
 }
 
 /** Live, forecast, headless and custom historical arcs share one interpreter. */

@@ -292,6 +292,7 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
     timeout: 20000,
   });
 
+  await expect(outlook).toContainText("Demand covered");
   const startingPlants = page
     .getByRole("region", { name: "Facilities", exact: true })
     .locator(".startingFacility:not([inert])")
@@ -528,6 +529,33 @@ test("pointer, touch, pinch, and wheel interactions stay within the map", async 
     .toBe(before);
 });
 
+test("moving to another place sizes a starting fleet that is viable there", async ({
+  page,
+}) => {
+  await openCustomSetup(page);
+
+  const play = page
+    .locator(".customSetupActions")
+    .getByRole("button", { name: "Start game", exact: true });
+  // San Francisco's blend includes the geothermal plant its region has.
+  await expect(play).toBeEnabled({ timeout: 30000 });
+  const geothermal = page.getByRole("button", { name: "Remove Geothermal" });
+  await expect(geothermal).toHaveCount(1);
+
+  // Paris has no geothermal resource: its fleet is made again from its own grid rather than
+  // carrying plants it cannot build, and Play waits for that fleet.
+  const search = page.getByRole("combobox", { name: "Search playable cities" });
+  await search.fill("Paris");
+  await page.getByRole("option", { name: "Paris, France" }).click();
+  await expect(play).toBeDisabled();
+
+  await expect(play).toBeEnabled({ timeout: 30000 });
+  await expect(geothermal).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^Remove / }).first(),
+  ).toBeVisible();
+});
+
 test("location constraints keep Play valid only where the starting fleet is viable", async ({
   page,
 }) => {
@@ -536,7 +564,7 @@ test("location constraints keep Play valid only where the starting fleet is viab
   const play = page
     .locator(".customSetupActions")
     .getByRole("button", { name: "Start game", exact: true });
-  await expect(play).toBeEnabled();
+  await expect(play).toBeEnabled({ timeout: 30000 });
   await page.getByRole("combobox", { name: "Facility type" }).click();
   await page.getByRole("option", { name: "Geothermal" }).click();
   await page.getByRole("button", { name: "Add facility" }).click();
@@ -555,7 +583,7 @@ test("location constraints keep Play valid only where the starting fleet is viab
   await page.getByRole("option", { name: "Paris, France" }).click();
   await expect(play).toBeDisabled();
   await page.getByRole("button", { name: "Use regional fleet" }).click();
-  await expect(play).toBeEnabled();
+  await expect(play).toBeEnabled({ timeout: 30000 });
   await expect(
     page.getByRole("button", { name: "Remove Nuclear" }),
   ).toBeVisible();

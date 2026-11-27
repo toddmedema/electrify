@@ -1,23 +1,20 @@
 import type { AppStateType } from "../Types";
 import { hostSelection } from "./Choosing";
 
-it("mirrors the unlocked host difficulty used for launch while preserving an allowed choice", () => {
+it("mirrors the host's difficulty without holding it back for single-player unlocks", () => {
   const state = {
     card: { name: "NEW_GAME_DETAILS" },
     game: { difficulty: "CEO" },
     ui: { scenarioPreview: 101 },
   } as AppStateType;
-  expect(hostSelection(state, "Intern")).toMatchObject({
+  expect(hostSelection(state)).toMatchObject({
     scenarioId: 101,
-    difficulty: "Intern",
-  });
-  expect(hostSelection(state, "Employee")).toMatchObject({
-    difficulty: "Employee",
+    difficulty: "CEO",
   });
   expect(
-    hostSelection(
-      { ...state, ui: { ...state.ui, previewDifficulty: "Intern" } },
-      "Employee",
-    ),
+    hostSelection({
+      ...state,
+      ui: { ...state.ui, previewDifficulty: "Intern" },
+    }),
   ).toMatchObject({ difficulty: "Intern" });
 });

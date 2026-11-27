@@ -141,26 +141,24 @@ export function onlineCheckpoints(
       });
       return (await decodeSnapshot(result)) as World;
     },
-    async export(id) {
+    async export() {
       const { roomId, seatId } = scope();
-      const target = id ?? roomId;
-      if (!target)
+      if (!roomId)
         throw new Error("There is no multiplayer campaign to export.");
       let world: unknown;
       let filename = "electrify-multiplayer-campaign.json";
       try {
         world = await decodeSnapshot(
           await api.request<EncodedSnapshot>("save/download", {
-            roomId: target,
+            roomId,
           }),
         );
       } catch (error) {
-        const local =
-          !id && seatId
-            ? await browserCheckpoints(seatId)
-                .read()
-                .catch(() => null)
-            : null;
+        const local = seatId
+          ? await browserCheckpoints(seatId)
+              .read()
+              .catch(() => null)
+          : null;
         if (!local || scope().roomId !== roomId || scope().seatId !== seatId)
           throw error;
         if (

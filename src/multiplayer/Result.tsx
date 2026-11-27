@@ -37,22 +37,27 @@ export default function CoopResult({
   host,
   hostName,
   selfId,
-  online = false,
+  working = false,
   onWatch,
-  onBackToLobby,
+  onRestart,
+  onReturnToLobby,
   onLeave,
 }: {
   /** This player's own ending, if their company's run has ended. */
   ending?: CompanyOutcomeType;
   /** Every company has finished. */
   complete: boolean;
-  online?: boolean;
   host: boolean;
   hostName: string;
   /** Marks this player's own company in the table. */
   selfId?: string;
+  /** The host is already restarting or returning everyone to the lobby. */
+  working?: boolean;
   onWatch: () => void;
-  onBackToLobby: () => void;
+  /** The host plays the same game again with the same players. */
+  onRestart: () => void;
+  /** The host brings everyone back to the custom game setup to choose a new game. */
+  onReturnToLobby: () => void;
   onLeave: () => void;
 }) {
   const { currency, formatMoneyConcise } = useMoney();
@@ -155,15 +160,15 @@ export default function CoopResult({
             <KeepModCopy scenario={scenario} />
           </Box>
         )}
-        {complete && !host && !online && (
+        {complete && !host && (
           <Typography role="status" sx={{ mt: 2 }}>
             Waiting for {hostName} to choose the next game.
           </Typography>
         )}
       </DialogContent>
       <DialogActions>
-        {/* Beside the host's Back to lobby, "Leave lobby" would read as the same thing. */}
-        <Button onClick={onLeave}>
+        {/* Beside the host's Return to lobby, "Leave lobby" would read as the same thing. */}
+        <Button onClick={onLeave} disabled={working}>
           {!complete ? "Leave" : host ? "Main menu" : "Leave lobby"}
         </Button>
         {!complete && (
@@ -172,9 +177,14 @@ export default function CoopResult({
           </Button>
         )}
         {complete && host && (
-          <Button variant="contained" onClick={onBackToLobby}>
-            {online ? "Save and leave campaign" : "Back to lobby"}
-          </Button>
+          <>
+            <Button onClick={onReturnToLobby} disabled={working}>
+              Return to lobby
+            </Button>
+            <Button variant="contained" onClick={onRestart} disabled={working}>
+              Restart
+            </Button>
+          </>
         )}
       </DialogActions>
     </Dialog>

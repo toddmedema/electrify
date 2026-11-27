@@ -1,6 +1,4 @@
 /* eslint-disable testing-library/prefer-screen-queries -- Playwright owns browser queries. */
-import { readFile } from "node:fs/promises";
-import { unlockAllDifficulties } from "./difficulty-fixture";
 import { expect, type NewIsolatedContext, type Page } from "./fixtures";
 import { test } from "./advance-world";
 import { crossplayFixture } from "./crossplay-fixture";
@@ -80,7 +78,6 @@ class V2Campaign {
     const page = await context.newPage();
     this.players.push(page);
     page.on("pageerror", (error) => this.errors.push(error.message));
-    await unlockAllDifficulties(page);
     await this.fixture.install(page, "steam", { name, installBridge: false });
 
     let mods = structuredClone(this.installedMods[index] ?? []);
@@ -257,8 +254,8 @@ class V2Campaign {
       const load = name
         ? library
             .getByRole("article", { name, exact: true })
-            .getByRole("button", { name: "Load save", exact: true })
-        : library.getByRole("button", { name: "Load save", exact: true });
+            .getByRole("button", { name: "Load", exact: true })
+        : library.getByRole("button", { name: "Load", exact: true });
       await load.click();
     }
     const resume = lobby(host).getByRole("button", {
@@ -343,10 +340,12 @@ async function saveAndQuit(page: Page) {
   await expect(entry(page)).toBeVisible();
 }
 
+/** Saves are reached from the custom setup of a lobby that this player hosts. */
 async function openCampaignSaves(page: Page) {
   await entry(page).click();
-  await lobby(page)
-    .getByRole("button", { name: "Multiplayer saves", exact: true })
+  await lobby(page).getByRole("button", { name: "Host a game" }).click();
+  await page
+    .getByRole("button", { name: "Load multiplayer save", exact: true })
     .click();
   return page.getByRole("dialog", { name: "Multiplayer saves", exact: true });
 }
@@ -701,68 +700,31 @@ test(
   },
 );
 
-test("V2 saves export the confirmed campaign and require confirmation to withdraw", async ({
+test("V2 saves are named for their players and Delete removes one at once", async ({
   newIsolatedContext,
 }) => {
   const campaign = await startCustom(newIsolatedContext, 2, false);
   const [host, guest] = campaign.players;
-  const before = (await captureState(host)).facilities!;
-  await host.locator(".button-buildFacility").click();
-  await host
-    .getByRole("button", { name: "Review purchase of Wind", exact: true })
-    .click();
-  await host.getByRole("button", { name: "Take loan", exact: true }).click();
-  await expect
-    .poll(async () => (await captureState(host)).facilities)
-    .toBe(before + 1);
   await saveAndQuit(guest);
   await saveAndQuit(host);
   const confirmed = await campaign.fixture.checkpoint();
   await guest.setViewportSize({ width: 360, height: 640 });
   const library = await openCampaignSaves(guest);
+  // Every multiplayer save is the same scenario, so a save is named for who played it.
+  // (The dialog's own title is also a level-2 heading, so match the save's name.)
+  await expect(
+    library.getByRole("heading", { level: 2, name: /\S+, \S+/ }),
+  ).toHaveCount(1);
+  await expect(library.getByText("Custom Game")).toHaveCount(0);
   const actions = library.getByRole("button", { name: /^Actions for / });
   await actions.click();
-  const download = guest.waitForEvent("download");
-  await guest
-    .getByRole("menuitem", { name: "Download confirmed save", exact: true })
-    .click();
-  const file = await download;
-  expect(file.suggestedFilename()).toBe("electrify-multiplayer-campaign.json");
-  const exported = JSON.parse(await readFile((await file.path())!, "utf8"));
-  expect(exported).toMatchObject({
-    format: "electrify-multiplayer",
-    world: { matchId: confirmed!.matchId, seats: confirmed!.seats },
-  });
-
-  expect(exported.world.grids[0].facilities).toHaveLength(before + 1);
-
-  const requestWithdrawal = async () => {
-    await actions.click();
-    await guest
-      .getByRole("menuitem", { name: "Withdraw from campaign", exact: true })
-      .click();
-  };
-  const confirm = guest.getByRole("dialog", {
-    name: "Withdraw from this campaign?",
-    exact: true,
-  });
-  const cancel = confirm.getByRole("button", { name: "Cancel", exact: true });
-  await requestWithdrawal();
-  await expect(cancel).toBeFocused();
-  await guest.keyboard.press("Escape");
-  await expect(confirm).toBeHidden();
-  await expect(actions).toBeFocused();
-  await expect(
-    library.getByRole("button", { name: "Load save" }),
-  ).toBeVisible();
-
-  await requestWithdrawal();
-  await confirm.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await expect(guest.getByRole("menuitem")).toHaveText(["Delete"]);
+  await guest.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  // No confirmation or explanation: the save is gone from this account's list.
   await expect(library.getByText("No multiplayer saves yet")).toBeVisible();
+  await expect(guest.getByRole("dialog", { name: /Delete/ })).toHaveCount(0);
   const hostLibrary = await openCampaignSaves(host);
-  await expect(
-    hostLibrary.getByRole("button", { name: "Load save" }),
-  ).toBeVisible();
+  await expect(hostLibrary.getByRole("button", { name: "Load" })).toBeVisible();
   expect(await campaign.fixture.checkpoint()).toEqual(confirmed);
   expect(campaign.errors).toEqual([]);
 });
@@ -791,7 +753,7 @@ test(
       exact: true,
     });
     await expect(warning).toHaveAccessibleDescription(
-      /(?:waiting for the host|connection .* was interrupted).*Reconnect to continue this session.*won't create a new save.*Play with friends → Multiplayer saves/i,
+      /(?:waiting for the host|connection .* was interrupted).*Reconnect to continue this session.*won't create a new save.*Play with friends, then choose Load multiplayer save/i,
     );
     const reconnect = warning.getByRole("button", {
       name: "Reconnect",
@@ -891,7 +853,7 @@ test(
       campaign.fixture.seatId(guest),
     );
     await expect(ended).toHaveAccessibleDescription(
-      /Play with friends → Multiplayer saves.*Changes since that save will be lost/,
+      /Play with friends, then choose Load multiplayer save.*Changes since that save will be lost/,
     );
     await expect(guest.getByRole("dialog")).toHaveCount(1);
     await expect(ended.getByRole("button")).toHaveCount(1);
@@ -942,7 +904,7 @@ test(
     campaign.fixture.restoreAuthority(guest);
 
     const saves = await openCampaignSaves(guest);
-    await saves.getByRole("button", { name: "Load save", exact: true }).click();
+    await saves.getByRole("button", { name: "Load", exact: true }).click();
     await expect(
       lobby(guest).getByRole("button", {
         name: "Resume campaign",
@@ -958,9 +920,7 @@ test(
       .getByRole("button", { name: "Return to main menu", exact: true })
       .click();
     const hostSaves = await openCampaignSaves(host);
-    await hostSaves
-      .getByRole("button", { name: "Load save", exact: true })
-      .click();
+    await hostSaves.getByRole("button", { name: "Load", exact: true }).click();
     const resume = lobby(guest).getByRole("button", {
       name: "Resume campaign",
       exact: true,
