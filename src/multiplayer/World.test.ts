@@ -23,6 +23,7 @@ import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { DIFFICULTY_IDS } from "../Constants";
 import { validBrowseState } from "./Browse";
 import { SAVE_SCHEMA_VERSION } from "../SaveSchema";
+import publishedOnlineRules from "./PublishedOnlineRules.json";
 
 beforeAll(() => {
   loadSimData("SF");
@@ -577,11 +578,9 @@ const publishedCoopIdentities = [
     24,
     "coop-2-70cc82f8acaacdd1aed5daf5fe8c078bccdf2873eeecdc58b7bcdb1973aa9bc7",
   ],
-  // Master 76a4d72f shipped the first online TURN campaigns.
-  [
-    27,
-    "coop-2-de9ea918f8428eb38ff0526c7510eaa62f1ec291f40f82033b8f1f69062ddf76",
-  ],
+  ...Object.entries(publishedOnlineRules).map(
+    ([rules, schema]) => [schema, rules] as const,
+  ),
 ] as const;
 
 test.each(publishedCoopIdentities)(
@@ -594,6 +593,7 @@ test.each(publishedCoopIdentities)(
     const restored = restoreWorld(raw, "published-schema");
     expect(restored.gameSchema).toBe(SAVE_SCHEMA_VERSION);
     expect(restored.rules).toBe(world.rules);
+    expect(restored.spec.territorialVersion).toBeUndefined();
     expect(
       restored.grids.every((grid) => grid.territoryWeather === undefined),
     ).toBe(true);
