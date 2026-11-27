@@ -1,5 +1,10 @@
 import "../Store";
-import { TICK_MINUTES, TICKS_PER_DAY, YEARS_PER_TICK } from "../Constants";
+import {
+  COOP_CUSTOM_FACILITY_LIMIT,
+  TICK_MINUTES,
+  TICKS_PER_DAY,
+  YEARS_PER_TICK,
+} from "../Constants";
 import type { FrontierTerritoryId } from "../Types";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
 import { peerCorridorId } from "../data/Multiplayer";
@@ -26,6 +31,27 @@ import {
 } from "./World";
 
 beforeAll(() => loadSimData("SF"));
+
+test("rejects an oversized territorial opening fleet before generating the board", () => {
+  const opening = COOP_TEST_SPEC.customScenario!;
+  expect(() =>
+    createWorld(
+      {
+        ...COOP_TEST_SPEC,
+        territorialVersion: 1,
+        customScenario: {
+          ...opening,
+          facilities: Array(COOP_CUSTOM_FACILITY_LIMIT + 1).fill(
+            opening.facilities[0],
+          ),
+        },
+      },
+      coopSeats(4),
+      "oversized-fleet",
+      "opening",
+    ),
+  ).toThrow(/Choose a scenario or custom game/);
+});
 
 function create(count = 2) {
   return createWorld(

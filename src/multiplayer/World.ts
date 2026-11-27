@@ -22,6 +22,7 @@ import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import { currencyForLocation } from "../helpers/Currency";
 import { formatMoneyFull } from "../helpers/Format";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import { validCoopCustomScenario } from "./Browse";
 import {
   MULTIPLAYER_LINK_BUDGET_FRACTION,
   MULTIPLAYER_LINK_BUILD_COST_PER_W,
@@ -291,8 +292,7 @@ export function matchScenario(spec: MatchSpec): {
     (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined) ||
     (spec.territorialVersion !== undefined &&
       (spec.territorialVersion !== 1 ||
-        scenario.id !== CUSTOM_SCENARIO_ID ||
-        scenario.mod !== undefined)) ||
+        !validCoopCustomScenario(spec.customScenario))) ||
     (spec.scenarioId === CUSTOM_SCENARIO_ID) !== !!spec.customScenario ||
     !DIFFICULTY_IDS.includes(spec.difficulty) ||
     !isValidLocation(location)
