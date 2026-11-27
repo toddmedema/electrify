@@ -25,6 +25,12 @@ import {
   territoryBuildAvailability,
 } from "../helpers/Territories";
 import { currentTick } from "../helpers/GameSelectors";
+import {
+  multiplayerBuildAvailability,
+  multiplayerClaimQuote,
+  multiplayerTerritoryTile,
+} from "../helpers/MultiplayerTerritory";
+import { isPeerCorridorId } from "../data/Multiplayer";
 import { getBuildFacilityQuote } from "../data/Facilities";
 import {
   requestedFacilitySize,
@@ -41,7 +47,7 @@ import {
   coalRepowerPurchaseTerms,
   coalRepowerQuote,
 } from "../helpers/CoalRepower";
-import type { FacilityShoppingType, GameType } from "../Types";
+import type { FacilityShoppingType, GameType, TerritoryTileId } from "../Types";
 import type { gameSlice } from "../reducers/Game";
 import type * as GameActions from "../reducers/GameActions";
 
@@ -58,7 +64,11 @@ const facility: Validator = (game, payload) =>
 const line: Validator = (game, payload) =>
   !hasTerritoryNetwork(game) &&
   Number.isSafeInteger(payload) &&
-  game.transmission?.lines.some((l) => l.id === payload)
+  game.transmission?.lines.some(
+    (l) =>
+      l.id === payload &&
+      !(game.multiplayer?.territorial && isPeerCorridorId(l.corridorId)),
+  )
     ? { payload }
     : { error: "Connection not found" };
 
@@ -87,7 +97,11 @@ const peerLine: Validator = (game, payload) => {
     ) ||
     typeof target.financed !== "boolean"
     ? { error: "Choose another player's intertie" }
-    : { payload };
+    : game.multiplayer?.territorial
+      ? {
+          payload: { corridorId: target.corridorId, financed: target.financed },
+        }
+      : { payload };
 };
 
 /** Existing outside assets belong to one company; shared links still require both owners. */
@@ -129,14 +143,16 @@ const buildFacility: Validator = (game, payload) => {
   const territoryId = isTerritoryId(build.territoryId)
     ? build.territoryId
     : "champlain";
+  const territorial = game.multiplayer?.territorial;
   if (
     build.tileId !== undefined &&
-    (!hasTerritoryNetwork(game) || !isTerritoryTileId(build.tileId, game))
+    (territorial
+      ? typeof build.tileId !== "string"
+      : !hasTerritoryNetwork(game) || !isTerritoryTileId(build.tileId, game))
   )
     return { error: "Choose a valid tile for this build" };
-  const tileId = isTerritoryTileId(build.tileId, game)
-    ? build.tileId
-    : undefined;
+  // The territorial placement helper verifies actual membership and ownership below.
+  const tileId = build.tileId as TerritoryTileId | undefined;
   const requested = build.facility;
   const size = requestedFacilitySize(requested);
   if (size === undefined || size > 1e12)
@@ -153,22 +169,30 @@ const buildFacility: Validator = (game, payload) => {
   if (!isStorage(quote) && requested.resilience)
     quote = withResilienceOptions(quote, game, requested.resilience);
   let selectedTileId = tileId;
-  if (hasTerritoryNetwork(game)) {
-    const availability = territoryBuildAvailability(
-      game,
-      quote,
-      territoryId,
-      tileId,
-    );
+  if (territorial || hasTerritoryNetwork(game)) {
+    const availability = territorial
+      ? multiplayerBuildAvailability(game, quote, tileId)
+      : territoryBuildAvailability(game, quote, territoryId, tileId);
     if (!availability.buildable)
       return {
         error: availability.reason ?? "That territory cannot host this build",
       };
     selectedTileId = availability.tileId;
   }
+  if (territorial && selectedTileId !== tileId) {
+    const selectedQuote = getBuildFacilityQuote(
+      game,
+      requested,
+      territoryId,
+      selectedTileId,
+    );
+    if (!selectedQuote)
+      return { error: "That build is unavailable at this site" };
+    quote = selectedQuote;
+  }
   if (build.reviewKey !== undefined) {
     const selectedQuote =
-      selectedTileId !== tileId
+      !territorial && selectedTileId !== tileId
         ? getBuildFacilityQuote(game, requested, territoryId, selectedTileId)
         : quote;
     if (
@@ -190,9 +214,8 @@ const buildFacility: Validator = (game, payload) => {
     payload: {
       facility: quote,
       financed: build.financed,
-      ...(hasTerritoryNetwork(game)
-        ? { territoryId, tileId: selectedTileId }
-        : {}),
+      ...(hasTerritoryNetwork(game) ? { territoryId } : {}),
+      ...(selectedTileId ? { tileId: selectedTileId } : {}),
     },
   };
 };
@@ -200,6 +223,26 @@ const buildFacility: Validator = (game, payload) => {
 /** The co-op allowlist: every game action a player may send, with its payload check. */
 const GAME_COMMAND_VALIDATORS = {
   acquireTile: (game, payload) => {
+    if (game.multiplayer?.territorial) {
+      const request = payload as {
+        tileId?: unknown;
+        quoteKey?: unknown;
+      } | null;
+      const tile = multiplayerTerritoryTile(game, request?.tileId);
+      const owner = tile && game.multiplayer.tileOwners?.[tile.id];
+      if (owner && owner.seat !== game.multiplayer.seat)
+        return { error: `This land tile is already owned by ${owner.name}` };
+      const quote = multiplayerClaimQuote(game, request?.tileId);
+      if (!quote || quote.quoteKey !== request?.quoteKey)
+        return {
+          error: "This land tile is unavailable or its quote has changed",
+        };
+      if ((currentTick(game)?.cash ?? -1) < quote.price)
+        return {
+          error: "This land tile is unaffordable with your current cash",
+        };
+      return { payload: { tileId: quote.tileId, quoteKey: quote.quoteKey } };
+    }
     const tile = getTerritoryTile(
       (payload as { tileId?: unknown } | null)?.tileId,
       game,

@@ -1,6 +1,7 @@
 import type {
   CompanyOutcomeType,
   DifficultyType,
+  FrontierTerritoryId,
   GameType,
   ScenarioType,
   SpeedType,
@@ -15,6 +16,12 @@ export interface MatchSpec {
   scenarioId: number;
   difficulty: DifficultyType;
   customScenario?: ScenarioType;
+  /** New launches stamp the world rules. Old checkpoints keep their opening layout. */
+  territorialVersion?: 1;
+}
+export interface BorderConnection {
+  a: FrontierTerritoryId;
+  b: FrontierTerritoryId;
 }
 export interface Edge {
   disabled?: boolean;
@@ -28,6 +35,9 @@ export interface Edge {
   /** Positive from a to b. */
   flowW: number;
   approval?: string;
+  /** Ordered by edge endpoint. A proposal reserves the crossing until both owners sign. */
+  crossing?: BorderConnection;
+  proposal?: { seat: string; financed: boolean; minute: number };
 }
 export type Command =
   | { kind: "pause" }
