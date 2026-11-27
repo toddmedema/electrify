@@ -73,6 +73,7 @@ import { store } from "../Store";
 import LazyViewBoundary, { lazyView } from "./base/LazyViewBoundary";
 import { loadSavedGames } from "./views/SavedGamesLoader";
 import SavedGamesShell from "./views/SavedGamesShell";
+import { WorkspaceMapRendering } from "./base/WorkspaceMapRendering";
 const MapWorkspace = lazyView(() => import("./base/MapWorkspace"));
 const DataCenterSetupContainer = lazyView(
   () => import("./views/DataCenterSetupContainer"),
@@ -565,7 +566,11 @@ export default class Compositor extends React.Component<Props, {}> {
     if (this.workspaceMemory.run !== run)
       this.workspaceMemory = { run, values: new Map() };
     if (isGameCard(this.props.card.name))
-      return <MapWorkspace key={run} memory={this.workspaceMemory.values} />;
+      return (
+        <WorkspaceMapRendering key={run}>
+          <MapWorkspace memory={this.workspaceMemory.values} />
+        </WorkspaceMapRendering>
+      );
     switch (this.props.card.name) {
       case "SETTINGS":
         return <SettingsContainer />;

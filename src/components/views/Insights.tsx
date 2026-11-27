@@ -104,6 +104,7 @@ import ConceptIcon from "../base/ConceptIcon";
 import { MANUAL_SECTION, ManualSectionTitleType } from "../base/ManualEntries";
 import FuelFilter from "../base/FuelFilter";
 import { ExpandedChartPresentation } from "../base/ChartPresentationContext";
+import { SuspendCoveredMap } from "../base/WorkspaceMapRendering";
 import ChartForecastFuelPrices from "../base/ChartForecastFuelPrices";
 import ChartForecastPowerExchange from "../base/ChartForecastPowerExchange";
 import ChartForecastStorage from "../base/ChartForecastStorage";
@@ -2613,6 +2614,7 @@ export default class Insights extends React.Component<Props, State> {
                   aria-labelledby="expanded-chart-title"
                   onClose={() => this.setState({ expandedLayer: undefined })}
                 >
+                  <SuspendCoveredMap />
                   <DialogTitle
                     id="expanded-chart-heading"
                     className="expandedChartTitle"

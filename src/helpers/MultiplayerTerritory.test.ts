@@ -6,7 +6,7 @@ import { getBuildFacilityQuote } from "../data/Facilities";
 import { frontierCoordinates, frontierTerritoryId } from "../data/Territories";
 import { loadSimData } from "../testing/SimData";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
-import { createWorld } from "../multiplayer/World";
+import { applyCommand, createWorld } from "../multiplayer/World";
 import type { FrontierTerritoryId, GameType } from "../Types";
 import { currentCash } from "./GameSelectors";
 import { HEX_NEIGHBORS } from "./HexNeighbors";
@@ -89,6 +89,53 @@ test("a full opening fleet retains a disjoint board and two normal construction 
     }
   }
 });
+
+test.each([2, 3, 4])(
+  "every company in a %i-player territorial match can build twice without buying a connection",
+  (count) => {
+    const world = createWorld(
+      { ...COOP_TEST_SPEC, territorialVersion: 1 },
+      coopSeats(count),
+      "board",
+      "epoch",
+    );
+    const project = { name: "Solar", fuel: "Sun", peakW: 1e6 } as const;
+    for (const [index, seat] of world.seats.entries()) {
+      const opening = world.grids[index];
+      const owned = new Set(multiplayerOwnedTileIds(opening));
+      const occupied = new Set(opening.facilities.map(({ tileId }) => tileId));
+      const sites = multiplayerTerritoryTiles(opening)
+        .filter((tile) => owned.has(tile.id) && !occupied.has(tile.id))
+        .filter((tile) => tileFitsFacility(tile, project))
+        .slice(0, 2);
+      expect(sites).toHaveLength(2);
+      for (const [slot, { id }] of sites.entries()) {
+        const facility = getBuildFacilityQuote(
+          world.grids[index],
+          project,
+          undefined,
+          id,
+        )!;
+        expect(
+          applyCommand(world, seat.id, {
+            matchId: world.matchId,
+            epoch: world.epoch,
+            sequence: slot + 1,
+            command: {
+              kind: "action",
+              name: "buildFacility",
+              payload: { facility, financed: false, tileId: id },
+            },
+          }),
+        ).toBeUndefined();
+        expect(world.grids[index].facilities).toContainEqual(
+          expect.objectContaining({ tileId: id, name: project.name }),
+        );
+      }
+      expect(world.grids[index].multiplayer!.territorial!.claims).toEqual([]);
+    }
+  },
+);
 
 test("the reducer debits verified adjacent claims and enforces occupancy for real construction", () => {
   const game = createMultiplayerTerritory(initial, 0, 2);
