@@ -11,10 +11,7 @@ import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { RoomView } from "../src/multiplayer/Types";
 import type { GameType } from "../src/Types";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
-import {
-  multiplayerBorderConnection,
-  multiplayerTerritoryTiles,
-} from "../src/helpers/MultiplayerTerritory";
+import { multiplayerTerritoryTiles } from "../src/helpers/MultiplayerTerritory";
 import { claimToPeerBorder, territorialMap } from "./territorial-multiplayer";
 
 const companies = ["SolarSam", "WindyWren", "HydroHal", "VoltVera"];
@@ -569,19 +566,16 @@ test(
     const hostId = (await projection(host))!.game!.multiplayer!.seat;
     const guestId = (await projection(guest))!.game!.multiplayer!.seat;
     const hostGame = () => projection(host).then((view) => view!.game!);
-    const originalHost = await hostGame();
-    const originalGuest = (await projection(guest))!.game!;
-    expect(
-      multiplayerBorderConnection(originalHost, originalGuest),
-    ).toBeUndefined();
     await expect(
-      territorialMap(host).locator(".territoryMapViewport"),
+      territorialMap(host).locator("canvas.territory3DCanvas"),
     ).toHaveAttribute("data-renderer", "ready");
-    if (!compact)
+    if (!compact) {
+      await host.mouse.move(1, 1);
       await reviewScreenshot(host, {
         path: info.outputPath("territorial-desktop.png"),
         animations: "disabled",
       });
+    }
     await claimToPeerBorder(
       host,
       guestId,

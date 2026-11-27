@@ -5,6 +5,7 @@ import { HEX_NEIGHBORS } from "../src/helpers/HexNeighbors";
 import {
   multiplayerClaimQuote,
   multiplayerOwnedTileIds,
+  multiplayerTerritoryClaimable,
   multiplayerTerritoryTiles,
 } from "../src/helpers/MultiplayerTerritory";
 import { closeTileSurface, selectTerritoryMapTile } from "./layout";
@@ -50,7 +51,7 @@ export async function claimToPeerBorder(
         !tile ||
         owner ||
         parents.has(neighbor) ||
-        !["plains", "forest", "hills", "mountain"].includes(tile.terrain)
+        !multiplayerTerritoryClaimable(tile)
       )
         continue;
       parents.set(neighbor, id);
@@ -58,7 +59,15 @@ export async function claimToPeerBorder(
     }
     if (path) break;
   }
-  if (!path) throw new Error(`No neutral land route to ${peerId}`);
+  if (!path)
+    throw new Error(`No claimable route to ${peerId} on seed ${opening.seed}`);
+  if (!path.length) {
+    const available = [...tiles.values()].find((tile) =>
+      multiplayerClaimQuote(opening, tile.id),
+    );
+    if (!available) throw new Error("No neighboring neutral land to claim");
+    path.push(available.id);
+  }
 
   const map = territorialMap(page);
   const surface = page.locator(".tileWorkspaceInspector:visible");
