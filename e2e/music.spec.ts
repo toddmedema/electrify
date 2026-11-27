@@ -4,6 +4,7 @@ import {
   waitForGameplayLoop,
 } from "./music-audit";
 import { expect, Page, test } from "./fixtures";
+import { tutorialCoal } from "./tutorial-fixture";
 import { writeFile } from "node:fs/promises";
 
 // Let the real audio clock run before the first gesture in headless Chromium.
@@ -68,9 +69,11 @@ async function expectContinuousMusic(
   page: Page,
   before: Awaited<ReturnType<typeof playbackSnapshot>>,
 ) {
+  expect(before.active.length).toBeGreaterThan(0);
+  let after = before;
   // A document reload would reset the probe and could otherwise make source counts look equal.
   await expect(async () => {
-    const after = await playbackSnapshot(page);
+    after = await playbackSnapshot(page);
     expect(after.document).toBe(before.document);
     expect(after.starts).toEqual(before.starts);
     expect(after.active.map((entry) => entry.id)).toEqual(
@@ -83,7 +86,7 @@ async function expectContinuousMusic(
       );
     }
   }).toPass({ timeout: 5000 });
-  return playbackSnapshot(page);
+  return after;
 }
 
 async function expectMenuMusic(page: Page) {
@@ -298,6 +301,7 @@ test("first tutorial keeps its sources through the real native song boundary", a
   const playback = await expectContinuousMusic(page, before);
   for (const stem of playback.active)
     expect(stem.position).toBeGreaterThan(durations[0] + 0.3);
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expectContinuousMusic(page, before);
+  await tutorialCoal(page).click();
+  await expect(page.locator(".tutorialHudAction")).toHaveText("Open Fleet");
+  await expectContinuousMusic(page, playback);
 });
