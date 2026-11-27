@@ -570,7 +570,23 @@ test(
       territorialMap(host).locator("canvas.territory3DCanvas"),
     ).toHaveAttribute("data-renderer", "ready");
     await host.mouse.move(1, 1);
-    if (!compact) {
+    if (!compact && process.env.REVIEW_SCREENSHOT_DIR) {
+      const viewport = territorialMap(host).locator(".territoryMapViewport");
+      const openingScale = Number(
+        await viewport.getAttribute("data-camera-scale"),
+      );
+      const bounds = (await viewport.boundingBox())!;
+      await host.mouse.move(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2,
+      );
+      await host.mouse.wheel(0, 340);
+      await expect
+        .poll(async () =>
+          Number(await viewport.getAttribute("data-camera-scale")),
+        )
+        .toBeLessThan(openingScale);
+      await host.mouse.move(1, 1);
       await reviewScreenshot(host, {
         path: info.outputPath("territorial-desktop.png"),
         animations: "disabled",

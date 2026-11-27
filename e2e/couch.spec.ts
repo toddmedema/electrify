@@ -15,6 +15,7 @@ import {
   MINUTES_PER_MONTH,
 } from "../src/helpers/DateTime";
 import { peerCorridorId } from "../src/data/Multiplayer";
+import { wToSliderTick } from "../src/helpers/BuildSizing";
 import { createCouchFixture, readCouchRoomView } from "./couch-fixture";
 import type { CouchFixture } from "./couch-fixture";
 import { claimToPeerBorder } from "./territorial-multiplayer";
@@ -127,12 +128,18 @@ async function startCouch<Actor extends Page | Frame>(
   await page.getByRole("option", { name: "Carbon Fee", exact: true }).click();
   await page.keyboard.press("Escape");
   await expect(duration).toContainText("12 years");
-  // The default peaker covers the whole month by itself, so pausing an extra
-  // coal plant never creates the future shortfall these specs assert.
-  // Replace it with a small gas plant plus a larger coal plant.
-  await page
-    .getByRole("button", { name: "Remove Natural Gas Peaker", exact: true })
-    .click();
+  // Start with a controlled two-plant fleet so pausing Coal creates a shortfall.
+  const starterPlants = page
+    .locator(".startingFacility")
+    .getByRole("button", { name: /^Remove / });
+  for (
+    let remaining = await starterPlants.count();
+    remaining > 0;
+    remaining--
+  ) {
+    await starterPlants.first().click();
+    await expect(starterPlants).toHaveCount(remaining - 1);
+  }
   const facilityType = page.getByRole("combobox", {
     name: "Facility type",
     exact: true,
@@ -150,6 +157,8 @@ async function startCouch<Actor extends Page | Frame>(
   await page.getByRole("button", { name: "Add facility", exact: true }).click();
   await facilityType.click();
   await page.getByRole("option", { name: "Coal", exact: true }).click();
+  await facilitySize.click();
+  await page.getByRole("option", { name: "500MW", exact: true }).click();
   await page.getByRole("button", { name: "Add facility", exact: true }).click();
   const startForEveryone = page.getByRole("button", {
     name: "Start for everyone",
@@ -231,10 +240,10 @@ for (const nativeBindings of [false, true]) {
       await expect(menu).toHaveCount(0);
       await couch.input({ "202": ["build"] });
       await expect(
-        p2.getByRole("region", { name: "Build", exact: true }),
+        p2.getByRole("dialog", { name: "Build", exact: true }),
       ).toBeVisible();
       await expect(
-        p1.getByRole("region", { name: "Build", exact: true }),
+        p1.getByRole("dialog", { name: "Build", exact: true }),
       ).toHaveCount(0);
     } finally {
       clearTimeout(releaseTimer);
@@ -552,7 +561,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     await expect(seat.locator("#appbar:visible")).toBeVisible();
     await expect(seat.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "single",
+      "map",
     );
   }
   await expect(page.locator(".appFrameBody")).toBeHidden();
@@ -570,10 +579,15 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     .checkpoint()!
     .grids.map((grid) => grid.facilities.length);
   await couch.input({ "101": ["build"], "202": ["build"] });
-  const build1 = p1.getByRole("region", { name: "Build", exact: true });
-  const build2 = p2.getByRole("region", { name: "Build", exact: true });
+  const build1 = p1.getByRole("dialog", { name: "Build", exact: true });
+  const build2 = p2.getByRole("dialog", { name: "Build", exact: true });
   await expect(build1).toBeVisible();
   await expect(build2).toBeVisible();
+  const sizeSolar = (build: Locator) =>
+    build
+      .getByRole("slider", { name: /^Capacity / })
+      .fill(String(wToSliderTick(50e6)));
+  await Promise.all([sizeSolar(build1), sizeSolar(build2)]);
   const review1 = build1.getByRole("button", {
     name: "Review purchase of Solar",
     exact: true,
@@ -586,8 +600,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await review1.focus();
   await review2.focus();
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
-  const purchase1 = p1.getByRole("dialog");
-  const purchase2 = p2.getByRole("dialog");
+  const purchase1 = p1.getByRole("dialog", { name: /^Build Solar/ });
+  const purchase2 = p2.getByRole("dialog", { name: /^Build Solar/ });
   await expect(purchase1).toBeVisible();
   await expect(purchase2).toBeVisible();
   await purchase1
@@ -666,7 +680,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     }),
   ).toBeVisible();
   await expect(
-    p2.getByRole("region", { name: "Build", exact: true }),
+    p2.getByRole("dialog", { name: "Build", exact: true }),
   ).toHaveCount(0);
   await globalSettings
     .getByRole("button", { name: "Back", exact: true })
@@ -682,6 +696,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expect(p2.locator(".insights:visible .uplot").first()).toBeVisible();
   // A purchase review remains usable while the partner's real forecast/chart is open.
   await couch.input({ "101": ["build"] });
+  await sizeSolar(build1);
   await build1
     .getByRole("button", { name: "Review purchase of Solar", exact: true })
     .focus();
@@ -1097,7 +1112,7 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
     );
     await expect(seat.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "single",
+      "map",
     );
   }
 
@@ -1598,7 +1613,7 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
     await expect(clock(seat)).toHaveAttribute("data-active-speed", "PAUSED");
   await couch.input({ "101": ["build"] });
   await expect(
-    p1.getByRole("region", { name: "Build", exact: true }),
+    p1.getByRole("dialog", { name: "Build", exact: true }),
   ).toHaveCount(0);
   await expect(gameMenu).toBeVisible();
   if (process.env.REVIEW_SCREENSHOT_DIR)
@@ -1620,7 +1635,7 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
   for (const seat of [p1, p2])
     await expect(clock(seat)).toHaveAttribute("data-active-speed", "NORMAL");
   await expect(
-    p1.getByRole("region", { name: "Build", exact: true }),
+    p1.getByRole("dialog", { name: "Build", exact: true }),
   ).toHaveCount(0);
   await expect(
     p2.getByRole("region", { name: "Insights", exact: true }),
@@ -1676,7 +1691,7 @@ test("TV couch player toolbars own speed with edge-to-edge panes and global paus
     await expect(clock(seat)).toHaveAttribute("data-active-speed", "PAUSED");
   await couch.input({ "101": ["build"] });
   await expect(
-    p1.getByRole("region", { name: "Build", exact: true, includeHidden: true }),
+    p1.getByRole("dialog", { name: "Build", exact: true, includeHidden: true }),
   ).toHaveCount(0);
   await pointerTarget(
     page,
@@ -2328,14 +2343,14 @@ test("TV couch play controller binding recovery preserves the other company and 
   await expect(paused).toHaveCount(0);
   await couch.input({ "303": ["build"] });
   await expect(
-    p1.getByRole("region", { name: "Build", exact: true }),
+    p1.getByRole("dialog", { name: "Build", exact: true }),
   ).toBeVisible();
   await expect(
-    p2.getByRole("region", { name: "Build", exact: true }),
+    p2.getByRole("dialog", { name: "Build", exact: true }),
   ).toHaveCount(0);
   await couch.input({ "303": ["back"] });
   await expect(
-    p1.getByRole("region", { name: "Build", exact: true }),
+    p1.getByRole("dialog", { name: "Build", exact: true }),
   ).toHaveCount(0);
   const lost = couch.seats.get("local-p2")!;
   await page.evaluate(
@@ -2514,10 +2529,10 @@ for (const statusFailure of [false, true]) {
     const p2 = couch.seats.get("local-p2")!.page;
     await couch.input({ "404": ["build"] });
     await expect(
-      p2.getByRole("region", { name: "Build", exact: true }),
+      p2.getByRole("dialog", { name: "Build", exact: true }),
     ).toBeVisible();
     await expect(
-      p1.getByRole("region", { name: "Build", exact: true }),
+      p1.getByRole("dialog", { name: "Build", exact: true }),
     ).toHaveCount(0);
     expect(couch.nativeEvidence().topology["local-p2"]).toEqual(recoveredP2);
     expect(couch.nativeEvidence().calls.inputFrame).toBeGreaterThan(0);
@@ -2576,10 +2591,10 @@ test("TV couch keeps controller input usable when one backdrop capture stalls", 
     await expect(menu).toHaveCount(0);
     await couch.input({ "202": ["build"] });
     await expect(
-      p2.getByRole("region", { name: "Build", exact: true }),
+      p2.getByRole("dialog", { name: "Build", exact: true }),
     ).toBeVisible();
     await expect(
-      p1.getByRole("region", { name: "Build", exact: true }),
+      p1.getByRole("dialog", { name: "Build", exact: true }),
     ).toHaveCount(0);
   } finally {
     await stalledFont?.abort();
