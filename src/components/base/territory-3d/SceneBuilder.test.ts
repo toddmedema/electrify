@@ -309,7 +309,15 @@ test.each([
 test("gives ocean tiles their nearby land and coastal land a sea-facing trim", () => {
   const ocean: TerritoryTileView = {
     ...view(),
-    tile: { ...view().tile, q: 2, r: 1, terrain: "ocean", city: undefined },
+    tile: {
+      ...view().tile,
+      q: 2,
+      r: 1,
+      terrain: "ocean",
+      city: undefined,
+      siteKind: "wind",
+      maxPeakW: Infinity,
+    },
   };
   const shore = { ...view(1), tile: { ...view(1).tile, q: 3, r: 1 } };
   const tiles = [ocean.tile, shore.tile];

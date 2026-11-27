@@ -7,7 +7,11 @@ import {
 } from "./Hailstones";
 import { interpolateMapLighting } from "./Lighting";
 import { createMapProgram } from "./MapProgram";
-import { OCEAN_FRAGMENT, OCEAN_WATER_MATERIAL } from "./OceanShader";
+import {
+  OCEAN_FALLBACK_FRAGMENT,
+  OCEAN_FRAGMENT,
+  OCEAN_WATER_MATERIAL,
+} from "./OceanShader";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
 import {
   CAMERA_COS,
@@ -64,7 +68,8 @@ void main() {
     world.y += mix(${WATERSHED_LEVEL_OFFSETS[0]}, ${WATERSHED_LEVEL_OFFSETS[1]}, uWeather.z);
   }
   vSurfacePosition = world.xyz;
-  vLocal = aPosition.xz;
+  // Ocean shore masks are in world-axis ring order, around the instance origin.
+  vLocal = world.xz - aTransform[3].xz;
   if (uShadow) {
     vec2 reach = -uLight.xz * max(0.0, world.y - 0.003) / max(0.25, uLight.y);
     float distance = length(reach);
@@ -82,7 +87,7 @@ void main() {
     vMaterial.x = step(aColor.r, service);
   }
 }`;
-const FRAGMENT = `#version 300 es
+const fragment = (ocean: string) => `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
@@ -115,7 +120,7 @@ float surfaceNoise(vec2 point) {
     edge.y
   );
 }
-${OCEAN_FRAGMENT}
+${ocean}
 void main() {
   float fog = vStyle.x;
   if (uShadow) {
@@ -175,8 +180,8 @@ void main() {
       lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
     }
   }
-  lit *= mix(1.0, 0.40, uNight);
-  if (ocean) lit += vec3(0.018, 0.05, 0.085) * uNight;
+  // The ocean applies its own night response.
+  if (!ocean) lit *= mix(1.0, 0.40, uNight);
   // Preserve a blue-green surface in low light, before applying distance fog.
   if (riverWater) {
     float current = surfaceNoise(vSurfacePosition.xz * 7.0);
@@ -544,7 +549,17 @@ export class MapRenderer {
       const gl = this.gl;
       if (!gl || gl.getContextAttributes()?.stencil === false)
         throw new Error("Map requires WebGL2 with a stencil buffer");
-      const program = createMapProgram(gl, VERTEX, FRAGMENT);
+      let program: WebGLProgram;
+      try {
+        program = createMapProgram(gl, VERTEX, fragment(OCEAN_FRAGMENT));
+      } catch (_error) {
+        // Keep the map if one driver rejects the ocean shader: draw a flat sea instead.
+        program = createMapProgram(
+          gl,
+          VERTEX,
+          fragment(OCEAN_FALLBACK_FRAGMENT),
+        );
+      }
       this.program = program;
       this.uniforms = {
         projection: gl.getUniformLocation(program, "uProjection"),
