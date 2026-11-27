@@ -1,4 +1,5 @@
 import type { LocationType, TerrainType } from "../Types";
+import { HEX_NEIGHBORS } from "../helpers/HexNeighbors";
 import { cos } from "../helpers/Libm";
 import type { DataCenterCustomerSources } from "./DataCenterCustomers";
 import { territoryCoordinateHash } from "./Territories";
@@ -231,6 +232,135 @@ const waterEntries: Readonly<
   Partial<Record<string, readonly (string | number)[]>>
 > = waterAtlas.regions;
 const coreHexes = regionalHexes(REGIONAL_MAP_RADIUS);
+
+// Adjacent entries in each ring also border each other. Two consecutive river
+// neighbors would draw a tiny loop at the corner shared by all three tiles.
+const riverRoutingCells = new Map(
+  coreHexes.map((cell) => [
+    `${cell.q}:${cell.r}`,
+    {
+      radius: hexRadius(cell),
+      ring: HEX_NEIGHBORS.map(([dq, dr]) => `${cell.q + dq}:${cell.r + dr}`),
+    },
+  ]),
+);
+
+function routeRivers(water: Map<string, TerrainType>) {
+  const rivers = new Set(
+    Array.from(water).flatMap(([id, terrain]) =>
+      terrain === "river" && id !== "0:0" && riverRoutingCells.has(id)
+        ? [id]
+        : [],
+    ),
+  );
+  const ring = (id: string) => riverRoutingCells.get(id)!.ring;
+  const neighbors = (id: string) => ring(id).filter((next) => rivers.has(next));
+  const trianglesAt = (id: string) =>
+    ring(id).filter(
+      (next, edge, cells) =>
+        rivers.has(next) && rivers.has(cells[(edge + 1) % cells.length]),
+    ).length;
+  const outlet = (id: string) =>
+    ring(id).some(
+      (next) => water.get(next) === "ocean" || water.get(next) === "lake",
+    );
+
+  function component(start: string) {
+    const reached = new Set([start]);
+    // Set iteration visits appended entries in order, giving a breadth-first walk.
+    for (const id of reached)
+      for (const next of neighbors(id)) reached.add(next);
+    return reached;
+  }
+
+  function removeRedundant(id: string) {
+    const entries = neighbors(id);
+    if (outlet(id) && !entries.some(outlet)) return false;
+    rivers.delete(id);
+    const reached = component(entries[0]);
+    if (entries.every((entry) => reached.has(entry))) return true;
+    rivers.add(id);
+    return false;
+  }
+
+  function moveJunction(id: string) {
+    const entries = neighbors(id);
+    const original = component(id);
+    const triangles = trianglesAt(id);
+    const needsOutlet = outlet(id) && !entries.some(outlet);
+    const candidates = ring(id).filter(
+      (next) =>
+        next !== "0:0" &&
+        riverRoutingCells.has(next) &&
+        !rivers.has(next) &&
+        water.get(next) !== "ocean" &&
+        water.get(next) !== "lake",
+    );
+    rivers.delete(id);
+    for (const candidate of candidates) {
+      if (
+        trianglesAt(candidate) >= triangles ||
+        (needsOutlet && !outlet(candidate)) ||
+        neighbors(candidate).some((next) => !original.has(next))
+      )
+        continue;
+      rivers.add(candidate);
+      const reached = component(candidate);
+      if (entries.every((entry) => reached.has(entry))) return true;
+      rivers.delete(candidate);
+    }
+    rivers.add(id);
+    return false;
+  }
+
+  function severedLength(id: string) {
+    const entries = neighbors(id);
+    rivers.delete(id);
+    const seen = new Set<string>();
+    let longest = 0;
+    for (const entry of entries) {
+      if (seen.has(entry)) continue;
+      const branch = component(entry);
+      longest = Math.max(longest, branch.size);
+      for (const next of branch) seen.add(next);
+    }
+    rivers.add(id);
+    return seen.size - longest;
+  }
+
+  for (;;) {
+    const crowded = [...rivers]
+      .map((id) => ({ id, triangles: trianglesAt(id) }))
+      .filter(({ triangles }) => triangles > 0)
+      .sort(
+        (a, b) =>
+          b.triangles - a.triangles ||
+          riverRoutingCells.get(b.id)!.radius -
+            riverRoutingCells.get(a.id)!.radius,
+      );
+    if (crowded.length === 0) break;
+    if (crowded.some(({ id }) => removeRedundant(id))) continue;
+    if (crowded.some(({ id }) => moveJunction(id))) continue;
+
+    // There may be no room for a confluence. Favor the longest connected reach
+    // and leave a gap to the smaller branch.
+    const cuts = crowded.map(({ id }) => ({
+      id,
+      mouth: outlet(id) && !neighbors(id).some(outlet),
+      severed: severedLength(id),
+    }));
+    cuts.sort(
+      (a, b) => Number(a.mouth) - Number(b.mouth) || a.severed - b.severed,
+    );
+    rivers.delete(cuts[0].id);
+  }
+
+  for (const [id, terrain] of water)
+    if (terrain === "river" && riverRoutingCells.has(id) && !rivers.has(id))
+      water.delete(id);
+  for (const id of rivers) water.set(id, "river");
+}
+
 type GeographicPoint = Pick<LocationType, "lat" | "long">;
 const offshorePoints = Object.values(waterEntries).flatMap((entry) => {
   const lat = entry?.[3];
@@ -342,6 +472,7 @@ export function getRegionalGeography(
       if (!water.has(key) && [q, r, q + r][axis] === 1) water.set(key, "river");
     }
   }
+  routeRivers(water);
   // Texture between landmarks is schematic and fixed to the location, across starts and saves.
   const treeChance =
     region?.treeCover === "wooded"

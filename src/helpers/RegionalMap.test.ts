@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getRegionalGeography, regionalHexes } from "../data/RegionalGeography";
+import {
+  getRegionalGeography,
+  hexRadius,
+  regionalHexes,
+  REGIONAL_MAP_RADIUS,
+} from "../data/RegionalGeography";
 import { LEGACY_SCENARIOS } from "../data/LegacyCampaign";
 import { SCENARIOS } from "../data/Scenarios";
 import { CHERNOBYL_SCENARIO_ID } from "../data/ChernobylScenario";
@@ -92,6 +97,39 @@ it("keeps the Colorado River connected from the Hill Country past Austin", () =>
       { q: 3, r: 2 },
     ]),
   );
+});
+
+it("leaves a dry tile between river arms in every sampled region", () => {
+  const cells = regionalHexes(REGIONAL_MAP_RADIUS);
+  const crowded: { city: string; q: number; r: number }[] = [];
+  for (const [city, location] of Object.entries(cities)) {
+    const { terrainAt } = getRegionalGeography(location, 2026, 999);
+    for (const { q, r } of cells) {
+      if (terrainAt({ q, r }) !== "river") continue;
+      const arms = HEX_NEIGHBORS.filter(
+        ([dq, dr]) => terrainAt({ q: q + dq, r: r + dr }) === "river",
+      );
+      const sidesTouch = arms.some(([aq, ar], index) =>
+        arms
+          .slice(index + 1)
+          .some(([bq, br]) => hexRadius({ q: aq - bq, r: ar - br }) === 1),
+      );
+      if (sidesTouch) crowded.push({ city, q, r });
+    }
+  }
+  expect(crowded).toEqual([]);
+});
+
+it("keeps the three rivers connected at Pittsburgh's confluence", () => {
+  const { terrainAt } = getRegionalGeography(cities.PIT, 2026, 103);
+  const confluences = regionalHexes(REGIONAL_MAP_RADIUS).filter(
+    ({ q, r }) =>
+      terrainAt({ q, r }) === "river" &&
+      HEX_NEIGHBORS.filter(
+        ([dq, dr]) => terrainAt({ q: q + dq, r: r + dr }) === "river",
+      ).length === 3,
+  );
+  expect(confluences).toHaveLength(1);
 });
 
 it("uses researched utility names for the selected starting year", () => {
