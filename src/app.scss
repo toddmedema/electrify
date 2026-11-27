@@ -2264,6 +2264,11 @@ $pane_header_height: 48px;
     animation-iteration-count: 1 !important;
   }
 
+  // The drag library commits a reorder on transform transitionend. Snap to the drop position.
+  [data-reorder-drop] {
+    transition: transform 1ms step-end !important;
+  }
+
   // The blackout pulse carries its color *in* the animation, so stopping it would erase the
   // blackout signal rather than freeze it - pin it to the shade the pulse peaks at instead
   .blackout-pulsing:before {
