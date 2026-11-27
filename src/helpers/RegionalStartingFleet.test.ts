@@ -5,6 +5,7 @@ import {
 } from "../data/DataCenterPowerMix";
 import { DEFAULT_CUSTOM_SCENARIO, getScenario } from "../data/Scenarios";
 import { HYDRO_SITES } from "../data/HydroSites";
+import { generatorMaxPeakW } from "../data/FacilityCapacity";
 import { browseSpec, validBrowseState } from "../multiplayer/Browse";
 import { createWorld } from "../multiplayer/World";
 import { coopSeats } from "../testing/MultiplayerFixtures";
@@ -13,11 +14,14 @@ import {
   loadSimData,
   simLocationIds,
 } from "../testing/SimData";
+import { createGame } from "../testing/Simulator";
 import { forecastCustomGameYearOne } from "./CustomGameForecast";
+import { getDateFromMinute } from "./DateTime";
 import {
   regionalStartingFleet,
   withRegionalStartingFleet,
 } from "./RegionalStartingFleet";
+import { startingFacilitySearch } from "./StartingFacilities";
 
 it("generates a regional fleet for custom setups without admitting later technologies", () => {
   const recent = withRegionalStartingFleet(DEFAULT_CUSTOM_SCENARIO);
@@ -152,8 +156,25 @@ it("covers constrained opening capacity using local fuels or modeled backup", ()
   ).toBe(true);
   const { facilities: laos } = largeCustomSetup("Vientiane", 2010);
   expect(laos).toMatchObject([
-    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 4.5e9 },
+    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 2e9 },
+    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 2e9 },
+    { name: "Natural Gas Peaker", fuel: "Natural Gas", peakW: 0.5e9 },
   ]);
+});
+
+it.each([
+  ["SF", "Natural Gas Peaker", 2e9],
+  ["HNL", "Biomass", 50e6],
+])("initializes the capped %s plants at playable sizes", (id, name, capW) => {
+  const scenario = largeCustomSetup(id, 1980);
+  const game = createGame({ scenarioId: scenario.id, scenario });
+  const generators = game.facilities.filter(
+    (facility) => facility.name === name,
+  );
+
+  expect(game.facilities).toHaveLength(scenario.facilities.length);
+  expect(generators.length).toBeGreaterThan(1);
+  for (const plant of generators) expect(plant.peakW).toBeLessThanOrEqual(capW);
 });
 
 it("opens a nonempty co-op-ready fleet across the selectable location catalogue", () => {
@@ -161,6 +182,20 @@ it("opens a nonempty co-op-ready fleet across the selectable location catalogue"
     for (const year of [1980, 2000, 2010, 2020, 2050, 2100]) {
       const custom = largeCustomSetup(id, year);
       expect(custom.facilities.length).toBeGreaterThan(0);
+      const context = {
+        scenarioId: custom.id,
+        date: getDateFromMinute(0, year),
+      };
+      for (const facility of custom.facilities) {
+        const siteCapW = facility.hydroSiteId
+          ? HYDRO_SITES[facility.hydroSiteId].maxPeakW
+          : undefined;
+        const maximum = generatorMaxPeakW(context, facility.name!, siteCapW);
+        expect(facility.peakW).toBeLessThanOrEqual(maximum);
+        expect(startingFacilitySearch(facility).peakW).toBeLessThanOrEqual(
+          maximum,
+        );
+      }
       expect(
         validBrowseState({
           session: "regional-test",

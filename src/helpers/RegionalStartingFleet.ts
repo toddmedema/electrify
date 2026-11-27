@@ -6,6 +6,8 @@ import type {
 } from "../Types";
 import { COOP_CUSTOM_FACILITY_LIMIT } from "../Constants";
 import { getDataCenterPowerMix } from "../data/DataCenterPowerMix";
+import { generatorMaxPeakW } from "../data/FacilityCapacity";
+import { getViableLocationCount } from "../data/FacilitySites";
 import {
   HYDRO_SITES,
   offeredHydroSiteIds,
@@ -16,6 +18,8 @@ import {
   hasGeothermalResource,
 } from "../data/LocationProfiles";
 import { getStartingFacilityAge } from "../data/StartingFacilityAges";
+import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
+import { getDateFromMinute } from "./DateTime";
 import { getScenarioLocation } from "./Locations";
 
 const technologyForFuel: Record<
@@ -35,8 +39,138 @@ const technologyForFuel: Record<
 };
 type StartingGenerator = ScenarioFacilityType & {
   fuel: FuelNameType;
+  name: string;
   peakW: number;
 };
+
+interface GeneratorAllocation {
+  generator: StartingGenerator;
+  capacityPerPlant: number;
+  siteLimit: number;
+  plants: StartingGenerator[];
+}
+
+function managedStartingGenerators(
+  requested: readonly StartingGenerator[],
+  location: LocationType,
+  startingYear: number,
+): StartingGenerator[] {
+  const context = {
+    scenarioId: CUSTOM_SCENARIO_ID,
+    date: getDateFromMinute(0, startingYear),
+  };
+  const createAllocation = (
+    generator: StartingGenerator,
+  ): GeneratorAllocation => ({
+    generator,
+    capacityPerPlant: generatorMaxPeakW(context, generator.name),
+    siteLimit:
+      getViableLocationCount(location, generator.name) ??
+      COOP_CUSTOM_FACILITY_LIMIT,
+    plants: [],
+  });
+  const byName = new Map(
+    requested
+      .filter(({ fuel }) => fuel !== "Hydro")
+      .map((generator) => [generator.name, createAllocation(generator)]),
+  );
+  const allocations = [...byName.values()];
+  const hydroPlants = requested.filter(({ fuel }) => fuel === "Hydro").length;
+  let freeSlots = COOP_CUSTOM_FACILITY_LIMIT - hydroPlants;
+  let unallocatedW = allocations.reduce(
+    (sum, { generator }) => sum + generator.peakW,
+    0,
+  );
+  const addPlant = (allocation: GeneratorAllocation, peakW: number) => {
+    allocation.plants.push({ ...allocation.generator, peakW });
+    freeSlots--;
+    unallocatedW -= peakW;
+  };
+
+  // Preserve a representative plant for each fuel before assigning slots to large shares.
+  const extraPlants = allocations.flatMap((allocation) => {
+    const { generator, capacityPerPlant, siteLimit } = allocation;
+    if (!siteLimit || !capacityPerPlant) return [];
+    addPlant(allocation, Math.min(generator.peakW, capacityPerPlant));
+    return Array.from(
+      {
+        length:
+          Math.min(siteLimit, Math.ceil(generator.peakW / capacityPerPlant)) -
+          1,
+      },
+      (_, index) => ({
+        allocation,
+        peakW: Math.min(
+          capacityPerPlant,
+          generator.peakW - (index + 1) * capacityPerPlant,
+        ),
+      }),
+    );
+  });
+  extraPlants
+    .sort((a, b) => b.peakW - a.peakW)
+    .slice(0, freeSlots)
+    .forEach(({ allocation, peakW }) => addPlant(allocation, peakW));
+
+  // A small project or scarce site can leave capacity over. Fill headroom in observed fuels
+  // before adding projects for the residual so small facilities cannot crowd out the fleet.
+  const largestFirst = [...allocations].sort(
+    (a, b) => b.capacityPerPlant - a.capacityPerPlant,
+  );
+  for (const { plants, capacityPerPlant } of largestFirst) {
+    for (const plant of plants) {
+      const extraW = Math.min(capacityPerPlant - plant.peakW, unallocatedW);
+      plant.peakW += extraW;
+      unallocatedW -= extraW;
+    }
+  }
+  for (const allocation of largestFirst) {
+    while (
+      unallocatedW > 0 &&
+      freeSlots > 0 &&
+      allocation.capacityPerPlant &&
+      allocation.plants.length < allocation.siteLimit
+    ) {
+      addPlant(allocation, Math.min(unallocatedW, allocation.capacityPerPlant));
+    }
+  }
+
+  // When every observed fuel is at its limit, fill the remaining budget with modeled backup.
+  // Replacing the smallest plants only when the fleet is full preserves representation where possible.
+  const backupName = "Natural Gas Peaker";
+  const backup =
+    byName.get(backupName) ??
+    createAllocation({ name: backupName, fuel: "Natural Gas", peakW: 0 });
+  const replaceable = allocations
+    .flatMap((allocation) =>
+      allocation === backup
+        ? []
+        : [...allocation.plants]
+            .reverse()
+            .map((plant) => ({ allocation, plant })),
+    )
+    .sort((a, b) => a.plant.peakW - b.plant.peakW);
+  while (unallocatedW > 0) {
+    if (freeSlots === 0) {
+      const smallest = replaceable.shift();
+      if (!smallest || smallest.plant.peakW >= backup.capacityPerPlant) break;
+      const { allocation, plant } = smallest;
+      allocation.plants.splice(allocation.plants.indexOf(plant), 1);
+      freeSlots++;
+      unallocatedW += plant.peakW;
+    }
+    addPlant(backup, Math.min(unallocatedW, backup.capacityPerPlant));
+  }
+
+  return [
+    ...requested.flatMap((generator) =>
+      generator.fuel === "Hydro"
+        ? [generator]
+        : (byName.get(generator.name)?.plants ?? []),
+    ),
+    ...(byName.has(backupName) ? [] : backup.plants),
+  ];
+}
 
 function startingHydroFleet(
   location: LocationType,
@@ -139,7 +273,11 @@ export function regionalStartingFleet(
       peakW: remainingW,
     });
   }
-  return facilities.map((facility) => ({
+  const fleet =
+    mode === "custom"
+      ? managedStartingGenerators(facilities, location, startingYear)
+      : facilities;
+  return fleet.map((facility) => ({
     ...facility,
     initialAgeYears: getStartingFacilityAge(
       location,

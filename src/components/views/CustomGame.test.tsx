@@ -163,6 +163,37 @@ it("keeps Play available when the optional outlook fails", () => {
   expect(screen.getByRole("button", { name: "Start game" })).toBeEnabled();
 });
 
+it("starts a managed fleet with biomass below the manual picker minimum", () => {
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, startingFleetSource: "regional" }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Remove Biomass" })).toBeVisible();
+  fireEvent.mouseDown(setupCombobox("Facility type"));
+  expect(
+    screen.queryByRole("option", { name: "Biomass" }),
+  ).not.toBeInTheDocument();
+  fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+
+  const start = screen.getByRole("button", { name: "Start game" });
+  expect(start).toBeEnabled();
+  fireEvent.click(start);
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({
+      facilities: expect.arrayContaining([
+        expect.objectContaining({ name: "Biomass" }),
+      ]),
+    }),
+  );
+});
+
 it.each(["startup", "postMessage"])(
   "recovers from a synchronous forecast %s failure without blocking Play",
   (failure) => {

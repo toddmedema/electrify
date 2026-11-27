@@ -196,15 +196,7 @@ function technologiesFor(
       storage: true,
       maxSize: s.maxPeakWh,
     })),
-    // A technology can be available in a year and still cap out below the smallest plant on
-    // offer - batteries were 50MWh-scale in 2010 - which would leave nothing to pick
-  ].filter(
-    (t: TechnologyType) =>
-      t.maxSize >=
-      (t.name === "Hydro"
-        ? 1000000
-        : (t.storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W)[0]),
-  );
+  ];
 }
 
 function facilityName(facility: Partial<FacilityShoppingType>): string {
@@ -299,9 +291,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
     previewSeed.current = props.scenario.seed ?? previewSeed.current;
     setScenario(prepareCustomScenario(props.scenario));
   }, [guest, props.scenario]);
-  const technologies = React.useMemo(
+  const availableTechnologies = React.useMemo(
     () => technologiesFor(scenario, game.difficulty),
     [scenario, game.difficulty],
+  );
+  // The picker offers standard sizes. Inherited plants can be smaller than its smallest option.
+  const technologies = availableTechnologies.filter(
+    ({ name, storage, maxSize }) =>
+      maxSize >=
+      (name === "Hydro"
+        ? 1000000
+        : (storage ? STORAGE_SIZES_WH : GENERATOR_SIZES_W)[0]),
   );
   const adding = technologies.find((t) => t.name === addName);
   const hydroSetup = React.useMemo(() => {
@@ -418,7 +418,9 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const unavailable = scenario.facilities.filter(
     (f: Partial<FacilityShoppingType>) => {
       const name = facilityName(f);
-      if (!technologies.some((t) => t.name === name)) {
+      if (
+        !availableTechnologies.some((technology) => technology.name === name)
+      ) {
         return true;
       }
       if (name === "Hydro") return false;
