@@ -98,6 +98,17 @@
   font-weight: 700;
 }
 
+.scenario-related__heading .scenario-text-link {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-decoration-color: var(--brand);
+}
+
+.scenario-related__heading .scenario-text-link:hover {
+  color: var(--brand-hover);
+}
+
 .scenario-play-note {
   max-width: 36rem;
   margin: 20px 0 0;
@@ -701,9 +712,5 @@
   .scenario-site .site-footer__inner {
     align-items: start;
     gap: 12px;
-  }
-
-  .scenario-site .site-footer nav {
-    gap: 4px 16px;
   }
 }

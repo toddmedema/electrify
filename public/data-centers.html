@@ -10,7 +10,7 @@
     <title>Data centers and your local grid — Electrify</title>
     <meta
       name="description"
-      content="Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community."
+      content="How would a data center change your grid’s costs, emissions, and spare capacity? Compare two runs in Austin, then try a grid modeled on your area."
     />
     <meta name="theme-color" content="#0084f8" />
     <link rel="icon" href="/favicon.ico" />
@@ -29,7 +29,7 @@
     />
     <meta
       property="og:description"
-      content="Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community."
+      content="How would a data center change your grid’s costs, emissions, and spare capacity? Compare two runs in Austin, then try a grid modeled on your area."
     />
     <meta
       property="og:image"
@@ -50,7 +50,7 @@
     />
     <meta
       name="twitter:description"
-      content="Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community."
+      content="How would a data center change your grid’s costs, emissions, and spare capacity? Compare two runs in Austin, then try a grid modeled on your area."
     />
     <meta
       name="twitter:image"
@@ -67,7 +67,7 @@
         "@id": "https://electrifygame.com/data-centers.html#webpage",
         "url": "https://electrifygame.com/data-centers.html",
         "name": "Data centers and your local grid — Electrify",
-        "description": "Compare an example grid with and without new data-center demand. Try supplying the extra power, then bring better questions to your community.",
+        "description": "How would a data center change your grid’s costs, emissions, and spare capacity? Compare two runs in Austin, then try a grid modeled on your area.",
         "inLanguage": "en",
         "isPartOf": {
           "@type": "WebSite",
@@ -113,7 +113,7 @@
         </a>
         <nav class="topnav" aria-label="Primary navigation">
           <a href="/about.html">About</a>
-          <a class="topnav__play" href="/?dataCenters=1">Explore the impact</a>
+          <a class="topnav__play" href="/?dataCenters=1">Open simulator</a>
         </nav>
       </div>
     </header>
@@ -126,10 +126,10 @@
       <section class="hero hero--illustrated" aria-labelledby="page-title">
         <div class="hero__inner">
           <div class="hero__copy">
-            <h1 id="page-title">Can your grid keep up?</h1>
+            <h1 id="page-title">Can your grid power a data center?</h1>
             <p class="hero__lede">
-              Electrify can help you understand the impacts of potential data
-              center projects in your community.
+              Pick a city and a size for the proposed campus. Where will the
+              extra electricity come from, and what will it cost?
             </p>
             <div class="hero__actions">
               <a class="button button--primary" href="/?dataCenters=1"
@@ -155,10 +155,10 @@
           id="worked-example"
           aria-labelledby="example-title"
         >
-          <h2 id="example-title">An example: adding 500 MW</h2>
+          <h2 id="example-title">A 500 MW data center in Austin</h2>
           <p>
-            Here’s what happens if you add a 500 MW data center to Austin, TX in
-            2027 in Electrify:
+            We ran the same Austin grid twice in Electrify, once with a 500 MW
+            campus opening in 2027 and once without. Here’s how that year went.
           </p>
           <!-- Reproduction: base 31fa4daa, DATA_CENTER_SEED 1062026, CEO difficulty.
                calibrateDataCenterScenario(Austin, 2026, published customer profile),
@@ -199,14 +199,15 @@
                   <span class="comparison-table__label" aria-hidden="true"
                     >No new campus</span
                   >680 MW
-                  <span class="comparison-table__arrow" aria-hidden="true"
-                    >→</span
-                  >
                 </td>
                 <td role="cell" headers="margin-row growth-column">
                   <span class="comparison-table__label" aria-hidden="true"
                     >500 MW campus</span
-                  >180 MW
+                  >
+                  <span class="comparison-table__arrow" aria-hidden="true"
+                    >→</span
+                  >
+                  180 MW
                   <span class="comparison-table__change">(−73%)</span>
                 </td>
               </tr>
@@ -218,14 +219,15 @@
                   <span class="comparison-table__label" aria-hidden="true"
                     >No new campus</span
                   >$450 million
-                  <span class="comparison-table__arrow" aria-hidden="true"
-                    >→</span
-                  >
                 </td>
                 <td role="cell" headers="cost-row growth-column">
                   <span class="comparison-table__label" aria-hidden="true"
                     >500 MW campus</span
-                  >$520 million
+                  >
+                  <span class="comparison-table__arrow" aria-hidden="true"
+                    >→</span
+                  >
+                  $520 million
                   <span class="comparison-table__change">(+17%)</span>
                 </td>
               </tr>
@@ -237,14 +239,15 @@
                   <span class="comparison-table__label" aria-hidden="true"
                     >No new campus</span
                   >6.1 million tonnes CO₂e
-                  <span class="comparison-table__arrow" aria-hidden="true"
-                    >→</span
-                  >
                 </td>
                 <td role="cell" headers="emissions-row growth-column">
                   <span class="comparison-table__label" aria-hidden="true"
                     >500 MW campus</span
-                  >7.2 million tonnes CO₂e
+                  >
+                  <span class="comparison-table__arrow" aria-hidden="true"
+                    >→</span
+                  >
+                  7.2 million tonnes CO₂e
                   <span class="comparison-table__change">(+17%)</span>
                 </td>
               </tr>
@@ -265,8 +268,9 @@
               <strong>Start exploring</strong>.
             </li>
             <li>
-              Play until 2028 or later to see the impact, then
-              <strong>repeat with 500 MW</strong>.
+              Play through the end of 2027 without building anything. Then
+              <strong>repeat with 500 MW</strong> and compare your reserves,
+              costs, and emissions.
             </li>
           </ol>
         </section>
@@ -278,7 +282,9 @@
               Which power plants and grid upgrades must be ready when the campus
               opens?
             </li>
-            <li>Who will pay for the new infrastructure and expenses?</li>
+            <li>
+              Who pays for the upgrades and the extra cost of running the grid?
+            </li>
             <li>
               Where does the power come from on a windless night, and how does a
               clean-energy promise account for that?
