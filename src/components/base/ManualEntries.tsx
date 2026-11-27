@@ -316,9 +316,9 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <GameNavigationLabel destination="BUILD_GENERATORS">
             Build
           </GameNavigationLabel>
-          . Manage them in the facilities list, which opens from{" "}
+          . Select a plant on the map to inspect it, or open{" "}
           <GameNavigationLabel destination="FLEET">Fleet</GameNavigationLabel>{" "}
-          in map games.{" "}
+          to manage your dispatch order.{" "}
           <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
             Generators higher in the list run first
           </EntryLink>

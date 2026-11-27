@@ -2,11 +2,8 @@ import * as React from "react";
 import { Badge, Button, IconButton, Tooltip } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/Error";
 import HistoryIcon from "@mui/icons-material/History";
-import FactoryIcon from "@mui/icons-material/Factory";
-import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
-import { useAppSelector, useAppDispatch } from "../../Store";
-import { CardNameType, CardType } from "../../Types";
-import { navigate, selectCardName } from "../../reducers/Card";
+import { useAppSelector } from "../../Store";
+import { CardNameType } from "../../Types";
 import { getScenario } from "../../data/Scenarios";
 import {
   GAME_TOOLS,
@@ -17,7 +14,6 @@ import {
 import useDockLabels from "./useDockLabels";
 import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 import { useControllerInput } from "../../desktop/InputPresentation";
-import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { selectTutorialActions } from "../../reducers/Tutorial";
 
 export {
@@ -27,10 +23,6 @@ export {
   type MapPanelView,
 } from "./GameNavigation";
 
-export interface StateProps {
-  card: CardType;
-}
-export interface Props extends StateProps {}
 export function gameToolForCard(card: CardNameType): GameTool | undefined {
   return card.startsWith("BUILD_")
     ? "BUILD_GENERATORS"
@@ -109,29 +101,19 @@ export const MapEventStatus = React.memo(function MapEventStatus({
 export default function Navigation({
   openTools,
   onToggle,
-  destination,
-  openMapViews = [],
+  openMapViews,
   onToggleMapView,
-  regionalGridView,
-  showMapBuild = false,
+  showMapBuild,
   showEventStatus = true,
 }: {
-  openMapViews?: MapPanelView[];
-  onToggleMapView?: (view: MapPanelView) => void;
-  regionalGridView?: {
-    showingMap: boolean;
-    paneId: string;
-    onToggle: () => void;
-  };
-  showMapBuild?: boolean;
+  openMapViews: MapPanelView[];
+  onToggleMapView: (view: MapPanelView) => void;
+  showMapBuild: boolean;
   showEventStatus?: boolean;
-  openTools?: GameTool[];
-  onToggle?: (tool: GameTool) => void;
-  destination?: (tool: GameTool) => CardNameType;
+  openTools: GameTool[];
+  onToggle: (tool: GameTool) => void;
 }) {
-  const dispatch = useAppDispatch();
   const controllerInput = useControllerInput();
-  const cardName = useAppSelector(selectCardName);
   const { unreadEvents, emergency } = useEventStatus(showEventStatus);
   // Tutorials have no term goal or score to show; their own HUD carries the objective
   const hasScenarioDetails = useAppSelector(
@@ -139,28 +121,19 @@ export default function Navigation({
       !getScenario(state.game.scenarioId, state.game.customScenario)
         ?.tutorialSteps,
   );
-  const opened = openTools ?? [gameToolForCard(cardName)];
   const tutorialActions = useAppSelector(selectTutorialActions);
   const { labelId, fromTouch, buttonLabels, dockLabels } = useDockLabels();
-  const mapWorkspace = useAppSelector((state) =>
-    hasTerritoryNetwork(state.game),
+  const tutorialDock = !!tutorialActions;
+  const mapViews = MAP_VIEWS.filter(
+    (view) => !tutorialActions || tutorialActions.includes(view.id),
   );
-  const tutorialDock = mapWorkspace && !!tutorialActions;
-  const mapViews = mapWorkspace
-    ? MAP_VIEWS.filter(
-        (view) => !tutorialActions || tutorialActions.includes(view.id),
-      )
-    : [];
   const tools = GAME_TOOLS.filter(
     (tool) =>
       (hasScenarioDetails || tool.id !== "SCENARIO") &&
-      (!mapWorkspace || showMapBuild || tool.id !== "BUILD_GENERATORS") &&
+      (showMapBuild || tool.id !== "BUILD_GENERATORS") &&
       (!tutorialActions || tutorialActions.includes(tool.id)),
   );
-  if (!tools.length && !mapViews.length && !regionalGridView) return null;
-  const openFleet = regionalGridView?.showingMap;
-  const regionalViewLabel = openFleet ? "Fleet" : "Map";
-  const regionalViewTrigger = openFleet ? "fleetNav" : "mapNav";
+  if (!tools.length && !mapViews.length) return null;
   return (
     <nav
       id="navfooter"
@@ -169,29 +142,6 @@ export default function Navigation({
       aria-label="Game actions"
       {...dockLabels}
     >
-      {regionalGridView && (
-        <Tooltip
-          title={regionalViewLabel}
-          placement="top"
-          open={labelId === regionalViewTrigger}
-          disableHoverListener
-          disableFocusListener
-          disableTouchListener
-          disableInteractive
-        >
-          <Button
-            id={regionalViewTrigger}
-            {...buttonLabels}
-            className="gameDockAction"
-            aria-label={regionalViewLabel}
-            aria-controls={regionalGridView.paneId}
-            data-game-destination={openFleet ? "FLEET" : "FACILITIES"}
-            onClick={regionalGridView.onToggle}
-          >
-            <Badge>{openFleet ? <FactoryIcon /> : <MapOutlinedIcon />}</Badge>
-          </Button>
-        </Tooltip>
-      )}
       {mapViews.map((view) => {
         const open = openMapViews.includes(view.id);
         return (
@@ -213,11 +163,7 @@ export default function Navigation({
               aria-expanded={open}
               aria-controls={open ? `tool-${view.id}` : undefined}
               data-game-destination={view.id}
-              onClick={() =>
-                onToggleMapView
-                  ? onToggleMapView(view.id)
-                  : dispatch(navigate(open ? "FACILITIES" : view.id))
-              }
+              onClick={() => onToggleMapView(view.id)}
             >
               <Badge>{view.icon}</Badge>
               {tutorialDock && (
@@ -230,7 +176,7 @@ export default function Navigation({
         );
       })}
       {tools.map((tool) => {
-        const open = opened.includes(tool.id);
+        const open = openTools.includes(tool.id);
         return (
           <Tooltip
             key={tool.id}
@@ -264,12 +210,8 @@ export default function Navigation({
                   : undefined
               }
               aria-controls={open ? `tool-${tool.id}` : undefined}
-              data-game-destination={destination?.(tool.id)}
-              onClick={() =>
-                onToggle
-                  ? onToggle(tool.id)
-                  : dispatch(navigate(open ? "FACILITIES" : tool.id))
-              }
+              data-game-destination={tool.id}
+              onClick={() => onToggle(tool.id)}
             >
               <Badge
                 key={tool.id === "EVENTS" && emergency ? "emergency" : "unread"}

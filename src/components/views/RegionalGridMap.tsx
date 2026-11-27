@@ -22,7 +22,11 @@ import ExpandedFacilityDetails, {
   type FacilityDetailActions,
 } from "../base/ExpandedFacilityDetails";
 import { facilityOperatingStatus } from "../base/FacilityMapStatus";
-import { TileInspectionSurface } from "../base/TileWorkspaceSurface";
+import { MapWorkspacePanelContext } from "../base/GameWorkspaceContext";
+import {
+  findTileControl,
+  TileInspectionSurface,
+} from "../base/TileWorkspaceSurface";
 import TerritoryHexMap from "./TerritoryHexMap";
 
 /** The regional map projects the running grid through the shared terrain and plant renderer. */
@@ -34,6 +38,9 @@ export default function RegionalGridMap({
   facilityActions?: FacilityDetailActions;
 }) {
   const map = React.useRef<HTMLElement>(null);
+  const { open, returnToMap, showTile, hideTile, tileWindow } =
+    React.useContext(MapWorkspacePanelContext) ?? {};
+  const focusAfterClose = React.useRef<TerritoryMapTileKey>();
   const [sources, setSources] = React.useState<DataCenterCustomerSources>();
   const [selected, setSelected] = React.useState<TerritoryMapTileKey>();
   const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
@@ -53,12 +60,32 @@ export default function RegionalGridMap({
     setInspected(undefined);
     setSelected(undefined);
   }, []);
+  const closeInspection = React.useCallback(() => {
+    focusAfterClose.current = inspected;
+    close();
+  }, [close, inspected]);
+  const blocked = open && !tileWindow;
+  React.useEffect(() => {
+    if (blocked) close();
+  }, [blocked, close]);
+  React.useLayoutEffect(() => {
+    if (!inspected || blocked || !showTile) return;
+    showTile(closeInspection);
+    return hideTile;
+  }, [blocked, closeInspection, hideTile, inspected, showTile]);
+  React.useLayoutEffect(() => {
+    const key = focusAfterClose.current;
+    if (inspected || !key) return;
+    focusAfterClose.current = undefined;
+    findTileControl(map.current, key)?.focus({ preventScroll: true });
+  }, [inspected]);
   const views = React.useMemo(
     () => regionalMapViews(game, sources),
     [game, sources],
   );
   const view =
     inspected &&
+    !blocked &&
     views.find(({ tile }) => territoryMapTileKey(tile) === inspected);
   const tile = view && view.tile;
   const facility = view && view.operatingFacility;
@@ -78,10 +105,20 @@ export default function RegionalGridMap({
         inspected={view ? inspected : undefined}
         onSelect={(key, inspect) => {
           setSelected(key);
-          if (inspect) setInspected(key);
+          if (inspect) {
+            if (blocked) returnToMap?.();
+            setInspected(key);
+          }
         }}
         onDeselect={close}
-        onCloseInspection={view ? close : undefined}
+        onCloseInspection={view ? closeInspection : undefined}
+        inspectionWindow={
+          view && tileWindow
+            ? tileWindow.front
+              ? "front"
+              : "background"
+            : undefined
+        }
         dismissInspectionOnBlank={!!view}
       />
       {view && tile && inspected && (
@@ -98,7 +135,7 @@ export default function RegionalGridMap({
           focusKey={`${inspected}:${facility?.id ?? "terrain"}`}
           returnFocusSelector={`[data-map-target="${inspected}"]`}
           wide={!!(facility || tile.city)}
-          onClose={close}
+          onClose={closeInspection}
         >
           {facility && facilityActions ? (
             <ExpandedFacilityDetails

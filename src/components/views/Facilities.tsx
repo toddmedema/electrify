@@ -834,8 +834,6 @@ export interface DispatchProps extends FacilityCapacityUpgradeActions {
 
 export interface Props extends StateProps, DispatchProps {
   paneId?: string;
-  showRegionalMap?: boolean;
-  tutorialMap?: boolean;
   territoryView?: MapWorkspaceView;
   onTerritoryView?: (view: MapWorkspaceView) => void;
 }
@@ -1200,8 +1198,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       nextProps.game.speed !== this.props.game.speed ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.territoryView !== this.props.territoryView ||
-      nextProps.showRegionalMap !== this.props.showRegionalMap ||
-      nextProps.tutorialMap !== this.props.tutorialMap ||
       nextProps.arrivingFacilityId !== this.props.arrivingFacilityId ||
       nextProps.facilityDragActive !== this.props.facilityDragActive ||
       (nextProps.game.speed !== "FAST" && nextProps.game.speed !== "ULTRA") ||
@@ -1216,10 +1212,11 @@ export default class Facilities extends React.Component<Props, SelectionState> {
 
   public componentDidUpdate(previous: Props) {
     if (
-      (hasTerritoryNetwork(this.props.game) || this.props.showRegionalMap) &&
       this.props.selectedFacilityId !== previous.selectedFacilityId &&
       this.props.selectedFacilityId !== null &&
-      this.props.territoryView !== "FLEET"
+      (this.props.territoryView === "FACILITIES" ||
+        (this.props.territoryView === undefined &&
+          hasTerritoryNetwork(this.props.game)))
     )
       this.props.onTerritoryView?.("FLEET");
     this.resolveEvidence();
@@ -1252,9 +1249,9 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     const request = this.props.evidenceRequest;
     if (!request || this.dragging || this.props.facilityDragActive) return;
     if (
-      this.props.showRegionalMap ||
-      (hasTerritoryNetwork(this.props.game) &&
-        this.props.territoryView !== "FLEET")
+      this.props.territoryView
+        ? this.props.territoryView !== "FLEET"
+        : hasTerritoryNetwork(this.props.game)
     )
       return;
     if (request.target === "interties") {
@@ -1333,8 +1330,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       onBuyingRule,
       onSellingRule,
       selectedFacilityId,
-      showRegionalMap,
-      tutorialMap,
     } = this.props;
     const selection = game.facilities.filter((f) =>
       this.state.ids.includes(f.id),
@@ -1345,9 +1340,18 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       selectionEnabled && (this.state.modifierHeld || selectionMode);
     const facilitiesCount = game.facilities.length;
     const territoryNetwork = hasTerritoryNetwork(game);
-    const showFleet =
-      (!territoryNetwork && !showRegionalMap) ||
-      this.props.territoryView === "FLEET";
+    const territoryView =
+      this.props.territoryView ?? (territoryNetwork ? "FACILITIES" : "FLEET");
+    const showFleet = territoryView === "FLEET";
+    const facilityActions = {
+      onSell: this.sellFacility,
+      onPause,
+      onTogglePause,
+      onRetrofit: this.props.onRetrofit,
+      onExpand: this.props.onExpand,
+      onCancelExpansion: this.props.onCancelExpansion,
+      onCancelRetrofit: this.props.onCancelRetrofit,
+    };
     const intertiesAvailable = !!(
       game.transmission &&
       (game.multiplayer || corridorsForLocation(game.location).length)
@@ -1363,56 +1367,51 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     return (
       <GameCard
         className="facilities"
-        id={
-          this.props.paneId ?? (showRegionalMap ? "mapPane" : "facilitiesPane")
-        }
+        id={this.props.paneId ?? "facilitiesPane"}
       >
         <>
-          {showRegionalMap && (
-            <div className="territoryWorkspace">
-              <RegionalGridMap
-                game={game}
-                facilityActions={
-                  tutorialMap
-                    ? undefined
-                    : {
-                        onSell: this.sellFacility,
-                        onPause,
-                        onTogglePause,
-                        onRetrofit: this.props.onRetrofit,
-                        onExpand: this.props.onExpand,
-                        onCancelExpansion: this.props.onCancelExpansion,
-                        onCancelRetrofit: this.props.onCancelRetrofit,
-                      }
-                }
-              />
-            </div>
-          )}
-          {territoryNetwork && !showFleet && (
+          {!showFleet && (
             <div className="scrollable territoryWorkspace">
-              {this.props.territoryView !== "AGREEMENTS" ? (
-                <TerritoryNetwork
-                  game={game}
-                  onBuild={onTransmissionBuild}
-                  onUpgrade={onTransmissionUpgrade}
-                  onAcquire={this.props.onUtilityAcquire}
-                  onCancel={this.props.onTransmissionCancel}
-                  onPause={this.props.onTransmissionPause}
-                  onBuyingRule={onBuyingRule}
-                  onSellingRule={onSellingRule}
-                  facilityActions={{
-                    onSell: this.sellFacility,
-                    onPause,
-                    onTogglePause,
-                    onRetrofit: this.props.onRetrofit,
-                    onExpand: this.props.onExpand,
-                    onCancelExpansion: this.props.onCancelExpansion,
-                    onCancelRetrofit: this.props.onCancelRetrofit,
-                  }}
-                />
+              {territoryView === "FACILITIES" ? (
+                territoryNetwork ? (
+                  <TerritoryNetwork
+                    game={game}
+                    onBuild={onTransmissionBuild}
+                    onUpgrade={onTransmissionUpgrade}
+                    onAcquire={this.props.onUtilityAcquire}
+                    onCancel={this.props.onTransmissionCancel}
+                    onPause={this.props.onTransmissionPause}
+                    onBuyingRule={onBuyingRule}
+                    onSellingRule={onSellingRule}
+                    facilityActions={facilityActions}
+                  />
+                ) : (
+                  <RegionalGridMap
+                    game={game}
+                    facilityActions={facilityActions}
+                  />
+                )
               ) : (
                 <div className="territoryAgreements">
-                  {game.multiplayer && (
+                  {!territoryNetwork &&
+                    (intertiesAvailable ? (
+                      <section>
+                        <TradingControls
+                          game={game}
+                          onBuyingRule={onBuyingRule}
+                          onSellingRule={onSellingRule}
+                        />
+                        <Typography variant="body2">
+                          Open Fleet to manage existing interties or choose
+                          Interties in Build to add a connection.
+                        </Typography>
+                      </section>
+                    ) : (
+                      <Typography variant="body2">
+                        Interties are unavailable for this grid.
+                      </Typography>
+                    ))}
+                  {territoryNetwork && game.multiplayer && (
                     <section>
                       <Typography component="h3" variant="subtitle1">
                         Co-op power sharing
@@ -1424,21 +1423,24 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                       />
                     </section>
                   )}
-                  {(Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
-                    .filter((id) => utilityOwnedAt(game, id, game.date.minute))
-                    .map((id, index, portfolio) => (
-                      <section key={id} className="powerAgreementPortfolio">
-                        {portfolio.length > 1 && (
-                          <Typography component="h3" variant="subtitle2">
-                            {getTerritoryDefinition(id)?.name}
-                          </Typography>
-                        )}
-                        <PowerAgreements
-                          game={game}
-                          line={inheritedConnection(id, index + 1)}
-                        />
-                      </section>
-                    ))}
+                  {territoryNetwork &&
+                    (Object.keys(INHERITED_CONNECTIONS) as UtilityId[])
+                      .filter((id) =>
+                        utilityOwnedAt(game, id, game.date.minute),
+                      )
+                      .map((id, index, portfolio) => (
+                        <section key={id} className="powerAgreementPortfolio">
+                          {portfolio.length > 1 && (
+                            <Typography component="h3" variant="subtitle2">
+                              {getTerritoryDefinition(id)?.name}
+                            </Typography>
+                          )}
+                          <PowerAgreements
+                            game={game}
+                            line={inheritedConnection(id, index + 1)}
+                          />
+                        </section>
+                      ))}
                 </div>
               )}
             </div>

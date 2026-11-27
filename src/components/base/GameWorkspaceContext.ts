@@ -1,9 +1,6 @@
 import { createContext, useContext, type RefObject } from "react";
 import type { WorkspaceLayout } from "../../WorkspaceLayout";
 
-/** Prevent embedded game views from creating their own app bar and navigation. */
-export const GameWorkspaceContext = createContext(false);
-
 /** Close an embedded tool without clearing the other desktop rail. */
 export const GameToolCloseContext = createContext<(() => void) | undefined>(
   undefined,

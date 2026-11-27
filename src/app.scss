@@ -1281,27 +1281,6 @@ $topbar_height: 56px;
   }
 }
 
-// Short windows and large text must scroll the operating header with the body instead of
-// squeezing the charts and controls beneath a growing fixed status stack.
-@media (max-width: $tablet_width) and (max-height: 600px) {
-  #gameCard {
-    overflow-y: auto;
-    display: block;
-  }
-  #gameCard .scrollable {
-    overflow: visible;
-    // Size to content rather than the card's height. A sticky header can only pin within its
-    // parent's content box, and with the list at 100% height that box is shorter than its
-    // overflowing content - the header would release as soon as the list's box scrolled past
-    // the top of #gameCard
-    height: auto;
-  }
-  #gameCard #navfooter {
-    position: sticky;
-    bottom: 0;
-  }
-}
-
 .gridHealth {
   display: flex;
   align-items: center;
@@ -3748,24 +3727,6 @@ $pane_header_height: 48px;
     gap: 8px;
     padding: 8px;
     text-align: center;
-  }
-
-  #gameCard {
-    height: 100%;
-
-    & > div {
-      flex: 0 1 auto;
-    }
-
-    // The app bar and bottom nav are fixed chrome, not scrollable content -- only .scrollable
-    // (the pane's own body) should give up height when a pane overflows the card. Without this,
-    // a tall pane (e.g. Finances' expandable table) lets the flexbox shrink algorithm eat into
-    // BottomNavigation's automatic minimum size instead, which undercuts its real 56px height
-    // and left the nav a different height depending which pane happened to overflow.
-    & > #appbar,
-    & > #navfooter {
-      flex-shrink: 0;
-    }
   }
 
   .cardList {

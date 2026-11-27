@@ -87,7 +87,6 @@ import BuildGenerators from "./BuildGenerators";
 import BuildStorage from "./BuildStorage";
 import {
   GameBuildCompleteContext,
-  GameWorkspaceContext,
   GameWorkspaceLayoutContext,
   MapWorkspacePanelContext,
 } from "../base/GameWorkspaceContext";
@@ -675,41 +674,35 @@ function TileNetwork(props: Props) {
             )}
           </TransitionGroup>
           {showSiteCatalogue ? (
-            <GameWorkspaceContext.Provider value={true}>
-              <GameBuildCompleteContext.Provider value={closeSiteCatalogue}>
-                <TileTerrainModifiers terrain={tile.terrain} />
-                <Tabs
-                  className="tileBuildTabs"
-                  value={storageFits ? category : "generators"}
-                  variant="fullWidth"
-                  aria-label="Build type"
-                  onChange={(_event, value) => setCategory(value)}
-                >
-                  <Tab value="generators" label="Generators" />
-                  <Tab
-                    value="storage"
-                    label="Storage"
-                    disabled={!storageFits}
-                  />
-                </Tabs>
-                {category === "storage" && storageFits ? (
-                  <BuildStorage
-                    game={game}
-                    lockedTileId={tile.id}
-                    onBack={close}
-                    onBuildStorage={build}
-                  />
-                ) : (
-                  <BuildGenerators
-                    game={game}
-                    lockedTileId={tile.id}
-                    onBack={close}
-                    onSizeChange={sizeChanged}
-                    onBuildGenerator={build}
-                  />
-                )}
-              </GameBuildCompleteContext.Provider>
-            </GameWorkspaceContext.Provider>
+            <GameBuildCompleteContext.Provider value={closeSiteCatalogue}>
+              <TileTerrainModifiers terrain={tile.terrain} />
+              <Tabs
+                className="tileBuildTabs"
+                value={storageFits ? category : "generators"}
+                variant="fullWidth"
+                aria-label="Build type"
+                onChange={(_event, value) => setCategory(value)}
+              >
+                <Tab value="generators" label="Generators" />
+                <Tab value="storage" label="Storage" disabled={!storageFits} />
+              </Tabs>
+              {category === "storage" && storageFits ? (
+                <BuildStorage
+                  game={game}
+                  lockedTileId={tile.id}
+                  onBack={close}
+                  onBuildStorage={build}
+                />
+              ) : (
+                <BuildGenerators
+                  game={game}
+                  lockedTileId={tile.id}
+                  onBack={close}
+                  onSizeChange={sizeChanged}
+                  onBuildGenerator={build}
+                />
+              )}
+            </GameBuildCompleteContext.Provider>
           ) : building ? (
             <>
               <TileTerrainModifiers terrain={tile.terrain} />
