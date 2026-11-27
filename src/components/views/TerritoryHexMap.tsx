@@ -37,6 +37,7 @@ import {
   needsSubmergedCable,
 } from "../base/FacilityMapStatus";
 import useFacilityMapMotion from "../base/useFacilityMapMotion";
+import { useMapCovered } from "../base/WorkspaceMapRendering";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
 import { useToolState } from "../base/GameToolMemory";
@@ -186,7 +187,8 @@ export default function TerritoryHexMap({
     RendererState | "failed"
   >(webGLAvailable ? "loading" : "unavailable");
   const threeDReady = rendererState === "ready";
-  const motion = useFacilityMapMotion(game.speed);
+  const covered = useMapCovered();
+  const motion = useFacilityMapMotion(game.speed, covered);
   const weather = React.useMemo(() => readMapWeather(game), [game]);
   const now = currentTick(game);
   const cityService =
@@ -1357,7 +1359,7 @@ export default function TerritoryHexMap({
                   dpr: window.devicePixelRatio || 1,
                   background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
                   cityService,
-                  visible: size.width > 0 && size.height > 0,
+                  visible: !covered && size.width > 0 && size.height > 0,
                   motionAllowed: motion.allowed,
                   playbackRate: motion.rate,
                   weather,

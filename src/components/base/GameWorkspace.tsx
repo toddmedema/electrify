@@ -34,6 +34,7 @@ import {
   GameWorkspaceLayoutContext,
 } from "./GameWorkspaceContext";
 import MapWorkspace from "./MapWorkspace";
+import { WorkspaceMapRendering } from "./WorkspaceMapRendering";
 import "./GameWorkspace.scss";
 
 type ToolSide = "decision" | "intelligence";
@@ -104,7 +105,11 @@ export default function GameWorkspace({
     (state) =>
       !!state.game.multiplayer?.territorial || hasTerritoryNetwork(state.game),
   );
-  return map ? <MapWorkspace memory={memory} /> : <Workspace memory={memory} />;
+  return (
+    <WorkspaceMapRendering>
+      {map ? <MapWorkspace memory={memory} /> : <Workspace memory={memory} />}
+    </WorkspaceMapRendering>
+  );
 }
 
 function Workspace({

@@ -1,4 +1,5 @@
 import path from "path";
+import type { MapCanvas } from "../src/components/base/territory-3d/Types";
 import { expect, test, type Locator, type Page } from "./fixtures";
 import { openPane } from "./layout";
 
@@ -157,6 +158,58 @@ async function expectLegendLayout(container: Locator) {
     }
   }
 }
+
+test("full-screen Insights suspends the covered map until the chart closes", async ({
+  page,
+}, info) => {
+  test.skip(
+    info.project.name !== "desktop-chromium",
+    "The desktop map stays visible while the compact chart is open.",
+  );
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/?scenario=116");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const canvas = page.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const mapFrames = () =>
+    canvas.evaluate((element: MapCanvas) => element.map3DDiagnostics!().frames);
+  const insights = page.locator(".insights:visible");
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  const openingFrame = await mapFrames();
+  await expect.poll(mapFrames).toBeGreaterThan(openingFrame);
+
+  await insights
+    .getByRole("button", { name: "Expand Supply & Demand chart" })
+    .click();
+  const chart = page.getByRole("dialog", {
+    name: "Supply & Demand",
+    exact: true,
+  });
+  await expect(chart).toBeVisible();
+  const covered = await canvas.evaluate(async (element: MapCanvas) => {
+    const diagnostics = () => element.map3DDiagnostics!();
+    const first = diagnostics();
+    for (let frame = 0; frame < 4; frame++)
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+    return {
+      visible: diagnostics().visible,
+      frames: diagnostics().frames - first.frames,
+      lastFrame: diagnostics().frames,
+    };
+  });
+  expect(covered.visible).toBe(false);
+  expect(covered.frames).toBe(0);
+  await chart
+    .getByRole("button", { name: "Close Supply & Demand chart" })
+    .click();
+  await expect(chart).toHaveCount(0);
+  await expect.poll(mapFrames).toBeGreaterThan(covered.lastFrame);
+});
 
 for (const theme of ["light", "dark"] as const) {
   test(`chart legends align and wrap in ${theme} at 125% interface scale`, async ({
@@ -419,8 +472,15 @@ for (const theme of ["light", "dark"] as const) {
       name: "Expand Fuel Prices chart",
     });
     const compact = insights.locator("#chartForecastFuelPrices .uplot");
-    await expect(compact).toBeVisible();
-    const compactHeight = (await compact.boundingBox())!.height;
+    let compactHeight = 0;
+    await expect
+      .poll(async () => {
+        compactHeight = await compact.evaluateAll(
+          (plots) => plots[0]?.getBoundingClientRect().height ?? 0,
+        );
+        return compactHeight;
+      })
+      .toBeGreaterThan(0);
     const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
     const capture = async (name: string) => {
       if (!reviewDir) return;
@@ -452,13 +512,15 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toBeVisible();
     await expect
       .poll(async () => {
-        const box = (await dialog.boundingBox())!;
-        return {
-          x: Math.round(box.x),
-          y: Math.round(box.y),
-          width: Math.round(box.width),
-          height: Math.round(box.height),
-        };
+        const box = await dialog.boundingBox();
+        return (
+          box && {
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+          }
+        );
       })
       .toEqual({ x: 0, y: 0, ...page.viewportSize()! });
     const coal = dialog.getByRole("button", { name: "Coal", exact: true });
@@ -471,18 +533,27 @@ for (const theme of ["light", "dark"] as const) {
     const navigation = dialog.getByRole("region", {
       name: "Chart time navigation",
     });
-    const date = (await navigation
-      .getByLabel(/^Displayed date range:/)
-      .boundingBox())!;
-    for (const button of await navigation.getByRole("button").all()) {
-      const box = (await button.boundingBox())!;
+    const controls = await navigation.evaluate((element) => {
+      const date = element
+        .querySelector('[aria-label^="Displayed date range:"]')!
+        .getBoundingClientRect();
+      return {
+        center: date.y + date.height / 2,
+        targetSize: element.getBoundingClientRect().width <= 700 ? 44 : 40,
+        buttons: Array.from(element.querySelectorAll("button"), (button) => {
+          const { y, width, height } = button.getBoundingClientRect();
+          return { center: y + height / 2, width, height };
+        }),
+      };
+    });
+    expect(controls.buttons.length).toBeGreaterThan(0);
+    for (const button of controls.buttons) {
       expect(
-        Math.abs(box.y + box.height / 2 - date.y - date.height / 2),
+        Math.abs(button.center - controls.center),
         "date range and navigation buttons share one row",
       ).toBeLessThanOrEqual(1);
-      const size = (await navigation.boundingBox())!.width <= 700 ? 44 : 40;
-      expect(box.width).toBe(size);
-      expect(box.height).toBe(size);
+      expect(button.width).toBe(controls.targetSize);
+      expect(button.height).toBe(controls.targetSize);
     }
     await expect(dialog.locator(".uplot")).toBeVisible();
     await expectChartAxesInView(dialog);
@@ -490,9 +561,12 @@ for (const theme of ["light", "dark"] as const) {
     expect(
       (await dialog.locator(".uplot").boundingBox())!.height,
     ).toBeGreaterThan(compactHeight);
-    const span = async () =>
-      Number(await chart.getAttribute("data-viewport-max")) -
-      Number(await chart.getAttribute("data-viewport-min"));
+    const span = () =>
+      chart.evaluate(
+        (element) =>
+          Number(element.getAttribute("data-viewport-max")) -
+          Number(element.getAttribute("data-viewport-min")),
+      );
     const initialSpan = await span();
     await dialog.getByRole("button", { name: "Zoom in", exact: true }).click();
     await expect.poll(span).toBeLessThan(initialSpan);
@@ -512,12 +586,17 @@ for (const theme of ["light", "dark"] as const) {
       /Biomass.*Coal.*Natural Gas.*Oil.*Uranium/,
     );
     await capture("fuel-all-expanded");
-    for (const control of await dialog.getByRole("button").all()) {
-      const box = (await control.boundingBox())!;
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(
-        page.viewportSize()!.width + 1,
+    const controlBounds = await dialog
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const { left, right } = button.getBoundingClientRect();
+          return { left, right };
+        }),
       );
+    for (const { left, right } of controlBounds) {
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(right).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
     }
     expect(
       await dialog.evaluate(
