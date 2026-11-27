@@ -1,3 +1,4 @@
+import { AWAITING_TILE_CONNECTION } from "../../helpers/TerritoryConnections";
 import * as React from "react";
 import { Button, DialogContentText, Typography } from "@mui/material";
 import {
@@ -183,7 +184,9 @@ export default function ExpandedFacilityDetails({
         <Typography variant="body2" className="tileFacilityStatus">
           {status.label}
           {underConstruction
-            ? ` · ${formatBuildMonths(facility.yearsToBuildLeft, "long")} left`
+            ? facility.yearsToBuildLeft === AWAITING_TILE_CONNECTION
+              ? ""
+              : ` · ${formatBuildMonths(facility.yearsToBuildLeft, "long")} left`
             : isStorage(facility)
               ? ` · ${formatWattsOfPeak(facility.currentW, facility.peakW)} · ${formatWattHoursOfPeak(facility.currentWh, facility.peakWh)}`
               : ` · ${formatWattsOfPeak(facility.currentW, facility.peakW)}`}

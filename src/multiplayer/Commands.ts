@@ -39,6 +39,10 @@ import {
 } from "../helpers/BuildValidation";
 import { withResilienceOptions } from "../helpers/Hazards";
 import { facilityConstructionReview } from "../helpers/FacilityConstructionReview";
+import {
+  projectReview,
+  withProjectSiteOwnership,
+} from "../helpers/ProjectBuild";
 import { validPolicyChange } from "../helpers/Policies";
 import { validScenarioResponse } from "../helpers/ScenarioChoices";
 import { isCoalRepower, isStorage } from "../Types";
@@ -177,6 +181,7 @@ const buildFacility: Validator = (game, payload) => {
     territoryId?: unknown;
     tileId?: unknown;
     reviewKey?: unknown;
+    connectionQuoteKey?: unknown;
   };
   if (!build || !build.facility || typeof build.financed !== "boolean")
     return { error: "That build is unavailable" };
@@ -206,8 +211,20 @@ const buildFacility: Validator = (game, payload) => {
   const size = requestedFacilitySize(requested);
   if (size === undefined || size > 1e12)
     return { error: "Choose a valid facility size" };
+  const connection =
+    !territorial && build.connectionQuoteKey !== undefined && tileId
+      ? tilePurchaseQuote(game, tileId)
+      : undefined;
+  if (
+    build.connectionQuoteKey !== undefined &&
+    connection?.quoteKey !== build.connectionQuoteKey
+  )
+    return { error: "Project terms changed. Review the updated project." };
+  const pricingGame = connection
+    ? withProjectSiteOwnership(game, connection)
+    : game;
   let quote = getBuildFacilityQuote(
-    game,
+    pricingGame,
     { ...requested, resilience: undefined },
     territoryId,
     tileId,
@@ -216,12 +233,12 @@ const buildFacility: Validator = (game, payload) => {
   if (!validResilienceRecord(quote.fuel, requested.resilience))
     return { error: "Choose valid facility options" };
   if (!isStorage(quote) && requested.resilience)
-    quote = withResilienceOptions(quote, game, requested.resilience);
+    quote = withResilienceOptions(quote, pricingGame, requested.resilience);
   let selectedTileId = tileId;
   if (territorial || hasTerritoryNetwork(game)) {
     const availability = territorial
       ? multiplayerBuildAvailability(game, quote, tileId)
-      : territoryBuildAvailability(game, quote, territoryId, tileId);
+      : territoryBuildAvailability(pricingGame, quote, territoryId, tileId);
     if (!availability.buildable)
       return {
         error: availability.reason ?? "That territory cannot host this build",
@@ -239,30 +256,51 @@ const buildFacility: Validator = (game, payload) => {
       return { error: "That build is unavailable at this site" };
     quote = selectedQuote;
   }
-  if (build.reviewKey !== undefined) {
+  if (build.reviewKey !== undefined || connection) {
     const selectedQuote =
       !territorial && selectedTileId !== tileId
-        ? getBuildFacilityQuote(game, requested, territoryId, selectedTileId)
+        ? getBuildFacilityQuote(
+            pricingGame,
+            requested,
+            territoryId,
+            selectedTileId,
+          )
         : quote;
-    if (
-      !selectedQuote ||
-      build.reviewKey !==
-        facilityConstructionReview(
-          game,
-          selectedQuote,
-          build.financed,
-          selectedTileId,
-        ).key
-    )
+    const key =
+      selectedQuote &&
+      (connection
+        ? projectReview(
+            game,
+            {
+              facility: selectedQuote,
+              tile: getTerritoryTile(connection.tileId, game)!,
+              connection,
+            },
+            build.financed,
+          ).buildKey
+        : facilityConstructionReview(
+            game,
+            selectedQuote,
+            build.financed,
+            selectedTileId,
+          ).key);
+    if (!selectedQuote || !key || build.reviewKey !== key) {
       return {
         error: "Construction terms changed. Review the updated project.",
       };
+    }
     quote = selectedQuote;
   }
   return {
     payload: {
       facility: quote,
       financed: build.financed,
+      ...(connection
+        ? {
+            reviewKey: build.reviewKey,
+            connectionQuoteKey: connection.quoteKey,
+          }
+        : {}),
       ...(hasTerritoryNetwork(game) ? { territoryId } : {}),
       ...(selectedTileId ? { tileId: selectedTileId } : {}),
     },

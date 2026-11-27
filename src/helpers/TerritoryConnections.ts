@@ -18,6 +18,20 @@ export type TileConnection = {
   connectionMinute: number;
 };
 
+/** Keeps an installed facility in the construction state until its line energizes. */
+export const AWAITING_TILE_CONNECTION = Number.MIN_VALUE;
+
+export function facilityBuildConnectionMinute(
+  game: Pick<GameType, "territoryNetwork">,
+  facility: Pick<GameType["facilities"][number], "tileId" | "minuteCreated">,
+): number | undefined {
+  if (!facility.tileId) return undefined;
+  return game.territoryNetwork?.tilePurchases?.find(
+    ({ tileId, minute }) =>
+      tileId === facility.tileId && minute === facility.minuteCreated,
+  )?.connectionMinute;
+}
+
 export function pendingTileConnections(
   game: Pick<GameType, "date" | "difficulty" | "territoryNetwork">,
 ): ReadonlyMap<TerritoryTileId, TileConnection> {

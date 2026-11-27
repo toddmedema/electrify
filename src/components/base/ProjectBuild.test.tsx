@@ -1,5 +1,3 @@
-import cloneDeep from "lodash.clonedeep";
-import { runMonths } from "../../testing/SimulationTestHelpers";
 import * as React from "react";
 import {
   act,
@@ -25,7 +23,6 @@ import {
 } from "../../helpers/TerritoryTiles";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { registerMultiplayerRuntime } from "../../multiplayer/Registry";
-import { acquireTile } from "../../reducers/GameActions";
 import gameReducer, { buildFacility } from "../../reducers/Game";
 import cardReducer from "../../reducers/Card";
 import uiReducer from "../../reducers/UI";
@@ -60,6 +57,7 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
       defaults({ serializableCheck: false, immutableCheck: false }),
   });
   const close = jest.fn();
+  const onConnectedBuild = jest.fn();
   const onSelection = jest.fn();
   function Workspace() {
     const current = useSelector((state: { game: GameType }) => state.game);
@@ -100,6 +98,7 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
             setCatalogue(false);
           }}
           onClose={close}
+          onConnectedBuild={onConnectedBuild}
           onBusy={() => undefined}
         />
       </TerritoryTilePurchasesProvider>
@@ -121,7 +120,15 @@ function show(multiplayer = false, year?: number, compatibleSites = 2) {
     choose();
     fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
   };
-  return { game, store, close, choose, adjacent, onSelection };
+  return {
+    game,
+    store,
+    close,
+    choose,
+    adjacent,
+    onSelection,
+    onConnectedBuild,
+  };
 }
 function runtime(submit: (command: Command) => Promise<void>) {
   registerMultiplayerRuntime({
@@ -138,7 +145,7 @@ it("explores two sites with the selected size and spends with one cash action af
   expect(screen.getByRole("heading", { name: "Build" })).toBeVisible();
   choose();
   fireEvent.click(screen.getByRole("button", { name: "Adjacent site" }));
-  expect(screen.getByText("Estimated build cost")).toBeVisible();
+  expect(screen.getByText("Total project cost")).toBeVisible();
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Owned site" }));
   expect(screen.getByRole("heading", { name: "Wind · 20MW" })).toBeVisible();
@@ -174,8 +181,8 @@ it("rejects a payment when cash changed after the displayed quote", () => {
   );
   expect(screen.getByRole("button", { name: "Cash" })).toBeEnabled();
 });
-it("locks repeated Connect and requires a separate payment after energization", async () => {
-  const { store, adjacent, close, game } = show(true);
+it("locks repeated confirmation and starts both jobs with one host command", async () => {
+  const { store, adjacent, onConnectedBuild, game } = show(true);
   const commands: Command[] = [];
   runtime(async (command) => {
     commands.push(command);
@@ -185,46 +192,26 @@ it("locks repeated Connect and requires a separate payment after energization", 
       );
   });
   adjacent();
-  const confirm = screen.getByRole("button", { name: /^Connect ·/ });
+  const confirm = screen.getByRole("button", { name: /^Connect & build ·/ });
   fireEvent.click(confirm);
   fireEvent.click(confirm);
-  await act(async () => {
-    await Promise.resolve();
-  });
+  await waitFor(() => expect(onConnectedBuild).toHaveBeenCalledTimes(1));
   expect(commands).toHaveLength(1);
-  expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
-  const connect = commands[0];
-  if (connect.kind !== "action" || connect.name !== "acquireTile")
-    throw new Error("Expected connection command");
-  act(() => {
-    store.dispatch(
-      acquireTile(connect.payload as Parameters<typeof acquireTile>[0]),
-    );
+  const current = store.getState().game;
+  expect(current.facilities).toHaveLength(game.facilities.length + 1);
+  expect(
+    current.facilities.find(({ tileId }) => tileId === "green-uplands:site-1"),
+  ).toMatchObject({
+    name: "Wind",
+    peakW: 20e6,
+    minuteCreated: game.date.minute,
   });
-  expect(
-    await screen.findByText(/Constructing transmission lines/),
-  ).toBeVisible();
-  expect(
-    screen.queryByRole("button", { name: "Cash" }),
-  ).not.toBeInTheDocument();
-  expect(commands).toHaveLength(1);
-  const connected = cloneDeep(store.getState().game);
-  runMonths(connected, 2);
-  act(() => {
-    store.dispatch(replace(connected));
-  });
-  const pay = screen.getByRole("button", { name: "Cash" });
-  await waitFor(() => expect(pay).toBeEnabled());
-  fireEvent.click(pay);
-  await waitFor(() => expect(close).toHaveBeenCalledTimes(1));
-  expect(commands).toHaveLength(2);
-  expect(
-    store
-      .getState()
-      .game.facilities.find(
-        (facility) => facility.tileId === "green-uplands:site-1",
-      ),
-  ).toMatchObject({ name: "Wind", peakW: 20e6 });
+  expect(current.territoryNetwork?.tilePurchases).toEqual([
+    expect.objectContaining({
+      tileId: "green-uplands:site-1",
+      minute: game.date.minute,
+    }),
+  ]);
 });
 it("keeps a rejected connection unowned with the project available for review", async () => {
   const { store, adjacent } = show(true);
@@ -232,7 +219,7 @@ it("keeps a rejected connection unowned with the project available for review", 
     throw new Error("Another utility claimed this site.");
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: /^Connect ·/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Connect & build ·/ }));
   await waitFor(() =>
     expect(
       screen.getByText("Another utility claimed this site."),
@@ -263,19 +250,26 @@ it("shows a construction cash shortfall and charging requirements for storage", 
 it("cancels the pending project continuation when the run changes", async () => {
   const { store, adjacent, game } = show(true);
   const commands: Command[] = [];
+  let complete!: () => void;
   runtime(async (command) => {
     commands.push(command);
+    await new Promise<void>((resolve) => {
+      complete = resolve;
+    });
   });
   adjacent();
-  fireEvent.click(screen.getByRole("button", { name: /^Connect ·/ }));
+  fireEvent.click(screen.getByRole("button", { name: /^Connect & build ·/ }));
   await act(async () => {
     await Promise.resolve();
   });
   act(() => {
     store.dispatch(replace({ ...store.getState().game, seed: game.seed + 1 }));
+    complete();
   });
   await waitFor(() =>
-    expect(screen.queryByText("Connecting…")).not.toBeInTheDocument(),
+    expect(
+      screen.queryByText("Starting construction…"),
+    ).not.toBeInTheDocument(),
   );
   expect(commands).toHaveLength(1);
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
@@ -299,7 +293,9 @@ it("corrects an oversized technology to the map's terrain maximum before choosin
   ).not.toBeInTheDocument();
   expect(screen.getByRole("alert")).toHaveTextContent("No sites available");
   fireEvent.click(screen.getByRole("button", { name: "Ridge site" }));
-  expect(screen.getByRole("button", { name: /^Connect ·/ })).toBeEnabled();
+  expect(
+    screen.getByRole("button", { name: /^Connect & build ·/ }),
+  ).toBeEnabled();
   expect(currentTick(store.getState().game)!.cash).toBe(
     currentTick(game)!.cash,
   );

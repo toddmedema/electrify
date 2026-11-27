@@ -544,7 +544,10 @@ function applyCommandOnce(
     const buying =
       name === "acquireLand" ||
       name === "acquireTile" ||
-      name === "acquireUtility";
+      name === "acquireUtility" ||
+      (name === "buildFacility" &&
+        typeof (command.payload as { connectionQuoteKey?: unknown } | null)
+          ?.connectionQuoteKey === "string");
     // Quotes see the current host ledger, including claims made since the sender's last view.
     const quotingGame = buying ? territoryGameForWorld(world, index) : game;
     const validation = validateGameCommand(quotingGame, name, command.payload);
