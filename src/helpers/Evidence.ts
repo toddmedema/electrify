@@ -1,4 +1,5 @@
 import type { AppThunk } from "../Store";
+import { getTutorialStep } from "../data/Scenarios";
 import type {
   CardNameType,
   EvidenceRequestType,
@@ -22,12 +23,18 @@ export function evidenceCard(
 export const openEvidence =
   (target: EvidenceTargetType): AppThunk =>
   (dispatch, getState) => {
-    const name = evidenceCard(target);
-    if (name && (name !== getState().card.name || typeof target === "object")) {
+    const { card, game } = getState();
+    const destination = evidenceCard(target);
+    // Fleet holds the evidence anchors; choose it before issuing the focus request.
+    const name =
+      destination === "FACILITIES" && !getTutorialStep(game)
+        ? "FLEET"
+        : destination;
+    if (name && (name !== card.name || typeof target === "object")) {
       dispatch(
         navigate({
           name,
-          skipBrowserHistory: name === getState().card.name,
+          skipBrowserHistory: name === card.name,
           storyTarget: typeof target === "object" ? target : undefined,
         }),
       );

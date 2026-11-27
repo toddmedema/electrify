@@ -1251,9 +1251,14 @@ export default class Facilities extends React.Component<Props, SelectionState> {
   private resolveEvidence() {
     const request = this.props.evidenceRequest;
     if (!request || this.dragging || this.props.facilityDragActive) return;
+    if (
+      this.props.showRegionalMap ||
+      (hasTerritoryNetwork(this.props.game) &&
+        this.props.territoryView !== "FLEET")
+    )
+      return;
     if (request.target === "interties") {
-      if (this.props.showRegionalMap) this.props.onTerritoryView?.("FLEET");
-      else this.props.onEvidenceReady?.(request, this.intertiesAnchor.current);
+      this.props.onEvidenceReady?.(request, this.intertiesAnchor.current);
       return;
     }
     if (
@@ -1265,13 +1270,6 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       )
     )
       return;
-    if (
-      (hasTerritoryNetwork(this.props.game) || this.props.showRegionalMap) &&
-      this.props.territoryView !== "FLEET"
-    ) {
-      this.props.onTerritoryView?.("FLEET");
-      return;
-    }
     this.props.onEvidenceReady?.(request, this.evidenceAnchor.current);
   }
 
