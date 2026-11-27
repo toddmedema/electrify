@@ -21,7 +21,8 @@ test.describe("scenario pages without JavaScript", () => {
       await page.emulateMedia({ colorScheme: theme });
       await page.goto("/about.html");
       await page
-        .getByRole("link", { name: "Explore the official scenarios" })
+        .getByRole("main")
+        .getByRole("link", { name: "official scenarios", exact: true })
         .click();
       await expect(page).toHaveURL(/\/scenarios\.html$/);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -76,11 +77,19 @@ test.describe("scenario pages without JavaScript", () => {
         await expectReadableText(action);
         await page.mouse.move(0, 0);
       }
-      const guide = page.getByRole("link", {
-        name: "classroom guide",
-        exact: true,
-      });
-      await expect(guide).toHaveCSS("color", blue);
+      const guide = page
+        .getByRole("main")
+        .locator('p a[href="/classroom.html"]');
+      const prose = guide.locator("..");
+      const typography = (element: Element) => {
+        const { fontSize, fontWeight } = getComputedStyle(element);
+        return { fontSize, fontWeight };
+      };
+      expect(await guide.evaluate(typography)).toEqual(
+        await prose.evaluate(typography),
+      );
+      await expect(guide).toHaveCSS("text-decoration-line", "underline");
+      await expect(guide).toHaveCSS("text-decoration-color", blue);
       await expectReadableText(guide);
       await expectReadableText(page.locator(".hero .eyebrow"));
       await expectReadableText(page.locator(".scenario-entry__more").first());
@@ -92,8 +101,8 @@ test.describe("scenario pages without JavaScript", () => {
         page.locator(".scenario-decision-number").first(),
       );
       await expectReadableText(
-        page.getByRole("link", {
-          name: "power grid simulator guide",
+        page.getByRole("main").getByRole("link", {
+          name: "Learn how to play",
           exact: true,
         }),
       );
@@ -123,7 +132,7 @@ test.describe("scenario pages without JavaScript", () => {
         await expect(page.getByRole("main")).toContainText(scenario.setup[0]);
         await expect(
           page.getByRole("contentinfo").getByRole("link", {
-            name: "How to play",
+            name: "Learn how to play",
             exact: true,
           }),
         ).toBeVisible();

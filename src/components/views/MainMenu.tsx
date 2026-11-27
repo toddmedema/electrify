@@ -348,8 +348,8 @@ const MainMenu = (props: Props): React.JSX.Element => {
       <nav className="homeExplore" aria-label="Explore Electrify">
         {[
           ["/power-grid-simulator.html", "How to play"],
-          ["/scenarios.html", "Official scenarios"],
-          ["/classroom.html", "For teachers"],
+          ["/scenarios.html", "Scenarios"],
+          ["/classroom.html", "Classroom"],
           ["/data-centers.html", "Data centers"],
           ["/energy-simulators.html", "Compare simulators"],
           ["/about.html", "About"],

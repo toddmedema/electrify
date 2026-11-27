@@ -9229,7 +9229,7 @@ option {
 }
 
 // ============================================================================
-// DANGER: EVERY HOME-SCREEN BUTTON AND LINK, AND THE LOGO SMOKE, ARE THE LOGO BLUE.
+// DANGER: HOME BUTTONS, LINK UNDERLINES AND LOGO SMOKE USE THE LOGO BLUE.
 //
 // Never re-declare --interactive-blue here (this block used to, and it turned every
 // CTA and the smoke a different blue from the logo). Never add a "more legible",
@@ -9243,16 +9243,21 @@ option {
     flex: 0 0 auto;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0 16px;
-    padding: 8px 24px 16px;
+    column-gap: $space-2;
+    padding: $space-2 $space-4 $space-4;
   }
   .homeExplore a {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-width: 44px;
     min-height: 44px;
-    color: var(--interactive-blue);
-    font-size: 1.1875rem;
-    font-weight: 700;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body2);
+    font-weight: var(--font-weight-regular);
+    text-decoration: underline;
+    text-decoration-color: var(--interactive-blue);
+    text-underline-offset: 0.18em;
   }
 }
 
@@ -9271,7 +9276,9 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .homeExplore
   a:focus {
   background-color: var(--interactive-blue);
-  color: var(--interactive-contrast);
+  // Small type needs dark ink on the selected blue in both palettes.
+  color: #0a0a0a;
+  text-decoration-color: currentColor;
   outline: 2px solid var(--interactive-blue);
   outline-offset: 2px;
 }

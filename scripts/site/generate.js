@@ -143,7 +143,7 @@ function createContext(pages) {
         : "Scenarios — Electrify electricity strategy game",
       description: page
         ? page.description
-        : "Choose an Electrify grid challenge: run an island utility, prepare for extreme weather, or build a company across generations. Free in your browser.",
+        : "Run an island utility on imported oil or help Austin prepare for a freeze. Choose an Electrify scenario and play it free in your browser.",
       canonical: `${ORIGIN}${page ? scenarioPath(page) : "/scenarios.html"}`,
       image: `${ORIGIN}/images/gameplay-preview.png`,
     }),

@@ -20,10 +20,10 @@ function header(current) {
 function footer() {
   return `<footer class="site-footer">
       <div class="site-footer__inner">
-        <p>Electrify. Take charge of the power markets.</p>
+        <p>Electrify</p>
         <nav aria-label="Footer navigation">
           <a href="/scenarios.html">All scenarios</a>
-          <a href="/power-grid-simulator.html">How to play</a>
+          <a href="/power-grid-simulator.html">Learn how to play</a>
           <a href="/classroom.html">For teachers</a>
           <a href="/data-centers.html">Data centers</a>
           <a href="/energy-simulators.html">Compare simulators</a>
@@ -95,7 +95,7 @@ function entry(page, context, compact = false) {
         <p class="scenario-entry__meta">${e(page.location)} <span aria-hidden="true">·</span> ${e(page.startingYear)}</p>
         <h3>${e(page.name)}</h3>
         <p class="scenario-entry__dek">${e(page.dek)}</p>
-        <span class="scenario-entry__more">Explore scenario <span aria-hidden="true">↗</span></span>
+        <span class="scenario-entry__more">Scenario details <span aria-hidden="true">↗</span></span>
       </div>
     </a>
   </li>`;
@@ -105,9 +105,7 @@ function renderScenarioPage(page, context) {
   const e = context.escapeHtml;
   const metadata = context.metadata(page);
   const isCampaign = page.kind === "campaign";
-  const action = isCampaign
-    ? "Explore the Legacy campaign"
-    : `Play ${page.name}`;
+  const action = isCampaign ? "Open the Legacy campaign" : `Play ${page.name}`;
   const related = context.relatedPages(page);
   const schema = {
     "@context": "https://schema.org",
@@ -171,9 +169,9 @@ function renderScenarioPage(page, context) {
               <p class="hero__lede">${e(page.dek)}</p>
               <div class="hero__actions">
                 <a class="button button--primary" href="${e(context.playUrl(page))}">${e(action)}<span aria-hidden="true">↗</span></a>
-                <a class="scenario-text-link" href="#your-decisions">See what’s at stake <span aria-hidden="true">↓</span></a>
+                <a class="scenario-text-link" href="#your-decisions">Your decisions <span aria-hidden="true">↓</span></a>
               </div>
-              <p class="scenario-play-note">${isCampaign ? "Build one utility across nine generations. This chapter is part of that journey." : "Free to play in your browser. Choose your difficulty in the game."}</p>
+              <p class="scenario-play-note">${isCampaign ? "Play the chapters in order. You carry the same utility from one generation to the next." : "Choose your difficulty before you start. It’s free to play in your browser."}</p>
             </div>
             <aside class="scenario-brief" aria-label="Scenario at a glance">
               <img class="scenario-brief__icon" src="${e(context.iconUrl(page))}" alt="" width="192" height="192" />
@@ -184,19 +182,19 @@ function renderScenarioPage(page, context) {
       </section>
       <div class="page-content scenario-content">
         <section class="scenario-start" aria-labelledby="starting-title">
-          <div class="scenario-section-label"><p class="eyebrow">The situation</p><h2 id="starting-title">Your starting point</h2></div>
-          <div class="scenario-prose">${page.setup.map((paragraph) => `<p>${e(paragraph)}</p>`).join("\n")}<p>New to managing a utility? Read the <a href="/power-grid-simulator.html">power grid simulator guide</a> before trying your plan.</p></div>
+          <div class="scenario-section-label"><h2 id="starting-title">Your starting point</h2></div>
+          <div class="scenario-prose">${page.setup.map((paragraph) => `<p>${e(paragraph)}</p>`).join("\n")}<p><a href="/power-grid-simulator.html">Learn how to play</a></p></div>
         </section>
         <section class="scenario-decisions" aria-labelledby="your-decisions">
-          <div class="scenario-section-label"><p class="eyebrow">The choices</p><h2 id="your-decisions">What will you do?</h2></div>
+          <div class="scenario-section-label"><h2 id="your-decisions">Your decisions</h2></div>
           <ol class="scenario-decisions__list">${page.decisions.map((decision, index) => `<li><span class="scenario-decision-number" aria-hidden="true">0${index + 1}</span><div><h3>${e(decision.title)}</h3><p>${e(decision.body)}</p></div></li>`).join("\n")}</ol>
         </section>
         <section class="scenario-invitation" aria-labelledby="try-title">
-          <div><p class="eyebrow">Put your plan to the test</p><h2 id="try-title">${e(page.takeaway)}</h2>${isCampaign ? "<p>Open the campaign setup to begin, or continue your existing company. Later generations inherit the choices you made before them.</p>" : "<p>Build, watch what happens, and try a different approach. The grid is yours to run.</p>"}</div>
+          <div><h2 id="try-title">${e(page.takeaway)}</h2></div>
           <a class="button button--primary" href="${e(context.playUrl(page))}">${isCampaign ? "Open the campaign" : "Try this scenario"}<span aria-hidden="true">↗</span></a>
         </section>
         <section class="scenario-related" aria-labelledby="related-title">
-          <div class="scenario-related__heading"><div><p class="eyebrow">Keep exploring</p><h2 id="related-title">Related scenarios</h2></div><a class="scenario-text-link" href="/scenarios.html">All scenarios <span aria-hidden="true">→</span></a></div>
+          <div class="scenario-related__heading"><div><h2 id="related-title">Related scenarios</h2></div><a class="scenario-text-link" href="/scenarios.html">All scenarios <span aria-hidden="true">→</span></a></div>
           <ul class="scenario-entries">${related.map((other) => entry(other, context, true)).join("\n")}</ul>
         </section>
       </div>
@@ -206,13 +204,12 @@ function renderScenarioPage(page, context) {
 
 const themeIntroductions = {
   "Energy transition":
-    "Replace an aging fleet, cut emissions, and work out what keeps the lights on when the sun goes down.",
+    "What will cover the hours your old power plants used to run?",
   "Extreme weather":
-    "Make room for the days when demand rises and the power plants you counted on cannot deliver.",
-  "Rapid growth":
-    "More customers bring more revenue. They also need power before your next plant is ready.",
+    "Plan for the days when your customers need more power and your plants can deliver less.",
+  "Rapid growth": "A new customer wants power. How soon can you have it ready?",
   "Legacy campaign":
-    "Start a utility in 1882 and carry it through nine generations. Each chapter inherits the company you built.",
+    "Start with 100 customers in 1882. Each generation takes over the utility you built in the last one.",
 };
 
 function themeId(theme) {
@@ -269,17 +266,17 @@ function renderScenarioIndex(pages, context) {
           <div class="scenario-directory-hero__layout">
             <div class="hero__copy">
               <nav class="scenario-breadcrumb" aria-label="Breadcrumb"><a href="/">Electrify</a><span aria-hidden="true">/</span><span>Scenarios</span></nav>
-              <p class="eyebrow">The scenarios of Electrify</p>
-              <h1 id="page-title">A different grid.<br />A different problem.</h1>
-              <p class="hero__lede">An island running on imported oil. A city racing to supply new data centers. A utility with a century of decisions ahead of it. Where will you take charge?</p>
-              <div class="hero__actions"><a class="button button--primary" href="#scenario-catalog">Find your scenario <span aria-hidden="true">↓</span></a><a class="scenario-text-link" href="/power-grid-simulator.html">New here? See how it plays <span aria-hidden="true">→</span></a></div>
+              <p class="eyebrow">Electrify scenarios</p>
+              <h1 id="page-title">Which grid will you run?</h1>
+              <p class="hero__lede">Austin has four years to get ready for a freeze. In Hawaii, you have sun and wind, but no way to buy electricity from the mainland. Pick the problem you’d like to solve.</p>
+              <div class="hero__actions"><a class="button button--primary" href="#scenario-catalog">Browse scenarios <span aria-hidden="true">↓</span></a><a class="scenario-text-link" href="/power-grid-simulator.html">Learn how to play <span aria-hidden="true">→</span></a></div>
             </div>
-            <div class="scenario-directory-art" aria-hidden="true">${featured.map((page) => `<img src="${e(context.iconUrl(page))}" alt="" width="140" height="140" />`).join("\n")}<p>One grid.<br /><strong>Your decisions.</strong></p></div>
+            <div class="scenario-directory-art" aria-hidden="true">${featured.map((page) => `<img src="${e(context.iconUrl(page))}" alt="" width="140" height="140" />`).join("\n")}</div>
           </div>
         </div>
       </section>
       <div class="page-content scenario-catalog" id="scenario-catalog">
-        <div class="scenario-catalog__intro"><div><p class="eyebrow">Choose what matters to you</p><h2>Find a grid worth figuring out</h2></div><p>Every scenario puts reliability, costs, and emissions in your hands. Read the situation, pick your challenge, and try your plan. Teaching with Electrify? Start with the <a href="/classroom.html">classroom guide</a> before assigning a scenario.</p></div>
+        <div class="scenario-catalog__intro"><div><h2>Scenarios by theme</h2></div><p>Teaching with Electrify? The <a href="/classroom.html">classroom guide</a> has a 45-minute lesson and a printable student worksheet.</p></div>
         <nav class="scenario-theme-nav" aria-label="Browse scenarios by theme">${themes.map((theme) => `<a href="#${themeId(theme)}">${e(theme)}<span aria-hidden="true">↓</span></a>`).join("\n")}</nav>
         ${themes
           .map(
@@ -290,7 +287,7 @@ function renderScenarioIndex(pages, context) {
                 .join("\n")}</ul></section>`,
           )
           .join("\n")}
-        <section class="scenario-directory-ending" aria-labelledby="your-grid-title"><div><p class="eyebrow">Closer to home</p><h2 id="your-grid-title">What would you do with your own grid?</h2><p>Choose a location and explore the effect of new data-center demand in a custom game.</p></div><a class="button" href="/data-centers.html">Explore your local grid <span aria-hidden="true">→</span></a></section>
+        <section class="scenario-directory-ending" aria-labelledby="your-grid-title"><div><h2 id="your-grid-title">What if a data center moved to your town?</h2><p>Choose a location and see how much more power your utility would need.</p></div><a class="button" href="/data-centers.html">Read the data center guide <span aria-hidden="true">→</span></a></section>
       </div>
     </main>`;
   return documentShell(metadata, body, schema, context, true);
