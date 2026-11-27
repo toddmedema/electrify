@@ -182,6 +182,18 @@ missing file. See [run compatibility](docs/run-compatibility.md) for scope.
 - Reducer changes should have a reducer/helper test and should run `npm run sim -- --all`. UI flow,
   responsive layout, or tutorial changes may also need a Playwright spec.
 
+## 3D map migration
+
+- Start every playable mode on the 3D map, including tutorials and resumed games. Keep Fleet,
+  Build, and other management tools reachable from that workspace. Don't introduce a separate
+  Fleet-first tutorial path or use the old 2D-only experience as a routine fallback.
+- For overlapping map PRs, test the combined change before the second merge. Check the tutorial
+  opening and its first target on desktop, touch, and controller; a locked Build lesson must not
+  expose alternate project entry points.
+- Delete displaced routes, branches, styles, and tests after tracing their remaining callers.
+  Keep shared controls, save/replay compatibility, accessibility, and fallbacks that still have
+  a supported caller. Verify a saved game resumes and the moved controls still work in 3D.
+
 ## Interface design
 
 Before UI work, read and follow the [interface design guidance](docs/interface-design.md). It
