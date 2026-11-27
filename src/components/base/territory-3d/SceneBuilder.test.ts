@@ -306,6 +306,27 @@ test.each([
   },
 );
 
+test("gives ocean tiles their nearby land and coastal land a sea-facing trim", () => {
+  const ocean: TerritoryTileView = {
+    ...view(),
+    tile: { ...view().tile, q: 2, r: 1, terrain: "ocean", city: undefined },
+  };
+  const shore = { ...view(1), tile: { ...view(1).tile, q: 3, r: 1 } };
+  const tiles = [ocean.tile, shore.tile];
+  const scene = new SceneBuilder({
+    terrain: getTerrainModel,
+    structure: getStructureModel,
+  }).build([ocean, shore], tiles, [], 0, "run");
+  const byId = new Map(scene.map((instance) => [instance.id, instance]));
+  // The land tile is the ocean's second neighbour; the ocean is the land's fifth.
+  expect(byId.get(`terrain:${ocean.tile.id}`)!.shore).toBe(1 << 1);
+  expect(byId.get(`terrain:${shore.tile.id}`)!.shore).toBeUndefined();
+  expect(byId.has(`coast:${ocean.tile.id}`)).toBe(false);
+  const coast = byId.get(`coast:${shore.tile.id}`)!;
+  expect(coast.model.key).toMatch(/^coast:(beach|cliff):16(:|$)/);
+  expect(coast.position).toBe(byId.get(`terrain:${shore.tile.id}`)!.position);
+});
+
 test.each([undefined, "impact"] as const)(
   "keeps wires out of the solar panel racks from all six neighboring pylons (%s)",
   (hail) => {

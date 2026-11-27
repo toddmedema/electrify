@@ -2,6 +2,7 @@ import { hailModel, hailstoneRise } from "./Hailstones";
 import { TICK_MS } from "../../../Constants";
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
+import { OCEAN_WATER_MATERIAL } from "./OceanShader";
 import { projectPoint, tilePosition3D } from "./Projection";
 import { getStructureModel } from "./StructureModels";
 import { getTerrainModel } from "./TerrainModels";
@@ -1125,6 +1126,24 @@ it("uploads the frost material when cold starts and ends while keeping surface w
     expect(pose[23]).toBe(frost ? 1 : 0);
     expect(pose[47]).toBe(0);
     expect(renderer.diagnostics().meshCount).toBe(1);
+  }
+  renderer.dispose();
+});
+
+it("hands each ocean tile its shore mask instead of frost", () => {
+  const { renderer, gl } = setup();
+  const mesh = model.parts[0].mesh;
+  const sea: MapModel = {
+    ...model,
+    parts: [{ mesh, material: "ocean-water" }],
+  };
+  for (const shore of [0b110, 0b10_0000_0000_0001]) {
+    renderer.update([{ ...scene()[0], model: sea, frost: true, shore }], frame);
+    gl.bufferSubData.mockClear();
+    flush(0);
+    const pose = gl.bufferSubData.mock.calls[0][2] as Float32Array;
+    expect(pose[22]).toBe(OCEAN_WATER_MATERIAL);
+    expect(pose[23]).toBe(shore);
   }
   renderer.dispose();
 });

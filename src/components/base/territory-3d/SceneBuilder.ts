@@ -25,6 +25,8 @@ import { hailModel } from "./Hailstones";
 import { getTowerConstructionModel } from "./StructureModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
+import { coastEdges, oceanShoreMask } from "./Shoreline";
+import { coastStyle, coastTop, getCoastModel } from "./CoastModels";
 import { tilePosition3D } from "./Projection";
 import { surfaceHeight } from "./SurfaceHeight";
 import type {
@@ -45,6 +47,8 @@ interface TileScene {
   size?: FacilitySize;
   growth?: readonly CityGrowthSector[];
   terrain: MapInstance;
+  /** Beach or cliff trim along a land tile's sea-facing edges. */
+  coast?: MapInstance;
   model?: MapModel;
   construction?: { stage: FacilityConstructionStage; model: MapModel };
   gridJunction?: MapInstance;
@@ -299,6 +303,10 @@ export class SceneBuilder {
           ? this.factories.structure(kind, growth, size)
           : undefined;
         const position = tilePosition3D(tile);
+        const ports =
+          tile.terrain === "river" || tile.terrain === "lake"
+            ? waterPorts(tile, this.terrainAt)
+            : undefined;
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
           weather,
@@ -308,10 +316,7 @@ export class SceneBuilder {
               : tile.terrain === "mountain" || tile.terrain === "river"
                 ? terrainArtHash(tile.q, tile.r) >>> 30
                 : undefined,
-          ports:
-            tile.terrain === "river" || tile.terrain === "lake"
-              ? waterPorts(tile, this.terrainAt)
-              : undefined,
+          ports,
           ...(tile.terrain === "mountain" || tile.terrain === "forest"
             ? {
                 adjacentEdges: HEX_NEIGHBORS.reduce(
@@ -325,6 +330,12 @@ export class SceneBuilder {
               }
             : {}),
         });
+        // A river mouth keeps its open channel to the sea.
+        const shoreline =
+          tile.terrain === "ocean"
+            ? 0
+            : coastEdges(tile.q, tile.r, this.terrainAt) &
+              ~(ports ?? []).reduce((bits, port) => bits | (1 << port), 0);
         cell = {
           tile,
           weather,
@@ -339,6 +350,9 @@ export class SceneBuilder {
             active: false,
             frost,
             model: terrain,
+            ...(tile.terrain === "ocean" && {
+              shore: oceanShoreMask(tile.q, tile.r, this.terrainAt),
+            }),
             ...(burning && {
               wildfire: {
                 q: tile.q,
@@ -348,6 +362,24 @@ export class SceneBuilder {
               },
             }),
           },
+          coast: shoreline
+            ? {
+                id: `coast:${tileKey}`,
+                position,
+                fog: view.visibilityDistance,
+                active: false,
+                frost,
+                model: getCoastModel(
+                  coastStyle(
+                    tile.terrain,
+                    terrainArtHash(tile.q, tile.r),
+                    model?.footprint ?? 0,
+                  ),
+                  shoreline,
+                  coastTop(tile.terrain),
+                ),
+              }
+            : undefined,
           structure: model
             ? {
                 id: `structure:${tileKey}`,
@@ -362,11 +394,14 @@ export class SceneBuilder {
       }
       if (cell.terrain.frost !== frost)
         cell.terrain = { ...cell.terrain, frost };
+      if (cell.coast && cell.coast.frost !== frost)
+        cell.coast = { ...cell.coast, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
       const endpoint: WireEndpoint = { position };
       endpoints.set(tileKey, endpoint);
       instances.push(cell.terrain);
+      if (cell.coast) instances.push(cell.coast);
       if (!model) continue;
       const stage = size ? facilityConstructionStage(view.facility) : undefined;
       if (

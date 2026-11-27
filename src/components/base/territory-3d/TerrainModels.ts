@@ -62,7 +62,7 @@ function surface(builder: MeshBuilder, polygon: readonly Vec3[], color: RGB) {
 }
 
 function substrate(builder: MeshBuilder, water: boolean, riverPorts: number) {
-  const side = water ? PALETTE.deepWater : PALETTE.earthShade;
+  const side = water ? PALETTE.oceanFloor : PALETTE.earthShade;
   for (let i = 0; i < 6; i++) {
     const a = HEX[i],
       b = HEX[(i + 1) % 6];
@@ -554,7 +554,8 @@ function build(
       lake(floor, relief, water, clear, mask);
       break;
     case "ocean":
-      ground(water, PALETTE.water);
+      // The ocean shader derives depth, texture and foam from nearby land.
+      ground(water, PALETTE.oceanDeep);
       break;
     case "mountain":
       if (!sharedFloor) ground(floor, PALETTE.rock);
@@ -601,7 +602,7 @@ function build(
     mesh: surfaceWater,
     material:
       terrain === "ocean"
-        ? "water"
+        ? "ocean-water"
         : terrain === "river" || (terrain === "lake" && mask !== 0)
           ? "river-water"
           : "watershed-water",

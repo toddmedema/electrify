@@ -18,6 +18,7 @@ export interface ModelPart {
     | "facility-window"
     | "city-window"
     | "water"
+    | "ocean-water"
     | "watershed-water"
     | "river-water"
     | "mountain"
@@ -103,6 +104,8 @@ export interface MapInstance {
   waterLevel?: number;
   /** Actual facility identity: changing speed or rebuilding batches must not reset phase. */
   motionKey?: string;
+  /** Ocean tiles: bits for land within two rings, in SHORE_RING_OFFSETS order. */
+  shore?: number;
   /** Active wildfire on this terrain. The renderer joins only neighboring burning cells. */
   wildfire?: { q: number; r: number; clearance: number; forest: boolean };
 }

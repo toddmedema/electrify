@@ -81,6 +81,7 @@ function insidePad(triangle: readonly Vec3[], halfWidth: number) {
 function isWater({ material }: ModelPart) {
   return (
     material === "water" ||
+    material === "ocean-water" ||
     material === "watershed-water" ||
     material === "river-water"
   );
