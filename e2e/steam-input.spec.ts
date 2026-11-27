@@ -2295,13 +2295,13 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "confirm");
     await expect(sound).not.toBeChecked();
     await input(page, "back");
-    await expect(sound).toBeHidden();
+    // The exiting Settings screen owns input until the transition is finished.
+    await expect(page.locator("#gameCard")).toHaveCount(0);
     const manual = page.getByRole("menuitem", { name: "Manual", exact: true });
+    const menu = page.getByRole("button", { name: "menu", exact: true });
+    await expect(manual.or(menu).first()).toBeVisible();
     if (!(await manual.isVisible())) {
-      await select(
-        page,
-        page.getByRole("button", { name: "menu", exact: true }),
-      );
+      await select(page, menu);
       await input(page, "confirm");
     }
     await select(page, manual);
