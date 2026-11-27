@@ -272,6 +272,7 @@ test("mobile map tools leave even gutters around the live terrain", async ({
   page,
 }, info) => {
   test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const { canvas } = await startPausedMap(page);
   const dock = page.locator("#navfooter");
   const stage = page.locator(".gameStage");
@@ -294,6 +295,133 @@ test("mobile map tools leave even gutters around the live terrain", async ({
     expect(tool!.y - terrain!.y).toBeGreaterThanOrEqual(4);
     expect(actions!.y - (tool!.y + tool!.height)).toBeGreaterThanOrEqual(4);
   }
+});
+
+test("mobile map tools slide in and out and share the Build header", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await startPausedMap(page);
+  const dock = page.locator("#navfooter");
+  const programs = dock.getByRole("button", { name: "Programs", exact: true });
+  const panel = page.getByRole("region", { name: "Programs", exact: true });
+  // Capture the browser's keyframes before a busy renderer can skip the slide's
+  // frames and clear the animation before transitionstart is delivered.
+  const slides = await page.locator(".gameToolTray").evaluateHandle((tray) => {
+    const offsets: { from: number; to: number }[] = [];
+    const recorded = new WeakSet<Animation>();
+    const yOffset = (transform: unknown) => {
+      if (transform === "none") return 0;
+      return typeof transform === "string"
+        ? new DOMMatrix(transform).m42
+        : Number.NaN;
+    };
+    const observer = new MutationObserver(() => {
+      const wrapper = tray.querySelector("#tool-PROGRAMS")?.parentElement;
+      const slide = wrapper
+        ?.getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        );
+      if (!(slide?.effect instanceof KeyframeEffect) || recorded.has(slide))
+        return;
+      const [first, last] = slide.effect.getKeyframes();
+      recorded.add(slide);
+      offsets.push({
+        from: yOffset(first.transform),
+        to: yOffset(last.transform),
+      });
+    });
+    observer.observe(tray, {
+      subtree: true,
+      attributeFilter: ["class"],
+    });
+    return offsets;
+  });
+  await programs.click();
+  await expect.poll(async () => (await slides.jsonValue()).length).toBe(1);
+  const [entry] = await slides.jsonValue();
+  expect(entry.from).toBeGreaterThan(0);
+  expect(entry.to).toBe(0);
+  await expect(panel.locator("..")).toHaveCSS("transform", "none");
+  const programsHeader = panel.locator(":scope > header");
+  const headerStyle = (header: Locator) =>
+    header.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        element.className,
+        style.height,
+        style.backgroundColor,
+        style.padding,
+      ];
+    });
+  const expectedHeader = await headerStyle(programsHeader);
+  await programs.click();
+  await expect(panel).toHaveCount(0);
+  await expect(programs).toBeFocused();
+  await expect.poll(async () => (await slides.jsonValue()).length).toBe(2);
+  const [, exit] = await slides.jsonValue();
+  expect(exit.from).toBe(0);
+  expect(exit.to).toBeGreaterThan(0);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await programs.click();
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "Close Programs" }).click();
+  await expect(page.locator("#tool-PROGRAMS")).toHaveCount(0);
+  expect(await slides.jsonValue()).toHaveLength(2);
+  await slides.dispose();
+
+  const build = await openMapProjectCatalogue(page);
+  await expect(
+    build.getByRole("tab", { name: "Generators", exact: true }),
+  ).toBeVisible();
+  expect(await headerStyle(build.locator(":scope > header"))).toEqual(
+    expectedHeader,
+  );
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const buildTrigger = dock.getByRole("button", { name: "Build", exact: true });
+  // Reopen as soon as the browser creates the exit transition, while the same
+  // panel is still mounted and its controls are inert.
+  const reopen = await buildTrigger.evaluateHandle((button) => {
+    if (!(button instanceof HTMLButtonElement))
+      throw new Error("Expected the Build dock button");
+    const project = document.getElementById("tool-BUILD_GENERATORS")!;
+    const wrapper = project.parentElement!;
+    const result = { project, reopened: false };
+    const observer = new MutationObserver(() => {
+      const sliding = wrapper
+        .getAnimations()
+        .some(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        );
+      if (!wrapper.inert || !sliding) return;
+      observer.disconnect();
+      button.click();
+      result.reopened = true;
+    });
+    observer.observe(wrapper, { attributeFilter: ["class", "inert"] });
+    button.click();
+    return result;
+  });
+  await expect
+    .poll(() => reopen.evaluate(({ reopened }) => reopened))
+    .toBe(true);
+  await expect(
+    build.getByRole("heading", { name: "Build", exact: true }),
+  ).toBeFocused();
+  expect(
+    await reopen.evaluate(
+      ({ project }) => document.getElementById(project.id) === project,
+    ),
+  ).toBe(true);
+  await reopen.dispose();
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -1032,13 +1160,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
     const total = formatPurchasePrice(projectSiteCapitalCost(quote));
-    await expect(ownedMarker.locator("b")).toHaveText(`(${total})`);
+    await expect(ownedMarker.locator("b")).toHaveText(total);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost (${total}) · Already connected`,
+      `Total project cost ${total} · Already connected`,
     );
     await map.getByRole("button", { name: "Rapid connection mode" }).focus();
     await expect(map.getByRole("tooltip")).toHaveCount(0);
@@ -1047,7 +1175,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost (${total}) · Already connected`,
+      `Total project cost ${total} · Already connected`,
     );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {
@@ -1349,7 +1477,11 @@ test("map windows move, resize, stack and remember their bounds", async ({
   await expect
     .poll(() =>
       fleet.evaluate((element: HTMLElement) => {
-        const tray = element.parentElement!;
+        const tray = element.offsetParent;
+        if (!(tray instanceof HTMLElement))
+          throw new Error(
+            "Expected a containing layout box for the Fleet window",
+          );
         return {
           rightGap: tray.clientWidth - element.offsetLeft - element.offsetWidth,
           bottomGap:
