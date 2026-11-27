@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -15,10 +14,12 @@ import {
   Stack,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import { TransitionGroup } from "react-transition-group";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useAppDispatch, useAppSelector } from "../../Store";
-import { navigate, navigateBack } from "../../reducers/Card";
+import { navigate } from "../../reducers/Card";
 import { snackbarOpen } from "../../reducers/UI";
 import { reportSaveDeleteFailure } from "../../SaveDiagnostics";
 import { isResumableStatus, sortSaves } from "../../SaveModel";
@@ -35,6 +36,7 @@ import {
 import { difficultyLabel } from "../../Constants";
 import { SaveMetadata, SavedRunResult, SaveStatus } from "../../Types";
 import ScreenPage from "../base/ScreenPage";
+import RemovalCollapse from "../base/RemovalCollapse";
 import RenameSaveDialog from "../base/RenameSaveDialog";
 import SavedResultDialog from "../base/SavedResultDialog";
 import CloudSaveStatus from "../base/CloudSaveStatus";
@@ -42,6 +44,10 @@ import CloudSyncIndicator from "../base/CloudSyncIndicator";
 import ShareSaveDialog from "../base/ShareSaveDialog";
 import { isDesktopApp } from "../../Desktop";
 import { restoreMenuFocus } from "../base/useMenuKeys";
+import { takeShellFocus, useLeaveSavedGames } from "./SavedGamesShell";
+
+const SEARCH_COLLAPSE_ID = "saved-game-search";
+const collapseId = (id: string) => `saved-game-removal-${id}`;
 
 const STATUS_LABELS: Record<SaveStatus, string> = {
   inProgress: "In progress",
@@ -52,6 +58,15 @@ const STATUS_LABELS: Record<SaveStatus, string> = {
 
 export default function SavedGames(): React.JSX.Element {
   const dispatch = useAppDispatch();
+  const onBack = useLeaveSavedGames();
+  const page = React.useRef<HTMLDivElement>(null);
+  // Replacing the page shell must not drop focus the player had already put on Back.
+  React.useLayoutEffect(() => {
+    if (takeShellFocus())
+      page.current
+        ?.querySelector<HTMLElement>('button[aria-label="Back"]')
+        ?.focus({ preventScroll: true });
+  }, []);
   const saves = useAppSelector((state) => state.saves);
   const inGame = useAppSelector((state) => state.game.inGame);
   const [search, setSearch] = React.useState("");
@@ -59,7 +74,7 @@ export default function SavedGames(): React.JSX.Element {
   const [error, setError] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [menu, setMenu] = React.useState<{
-    anchor: HTMLElement;
+    anchor: HTMLButtonElement;
     save: SaveMetadata;
   }>();
   const [rename, setRename] = React.useState<{ id: string; name: string }>();
@@ -67,7 +82,15 @@ export default function SavedGames(): React.JSX.Element {
     id: string;
     name: string;
     pending?: boolean;
+    closing?: boolean;
   }>();
+  const [removal, setRemoval] = React.useState<{
+    id: string;
+    phase: "deleting" | "closing" | "collapsing";
+  }>();
+  const [deleted, setDeleted] = React.useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
   const [historical, setHistorical] = React.useState<{
     name: string;
     result: SavedRunResult;
@@ -75,8 +98,10 @@ export default function SavedGames(): React.JSX.Element {
   const [unavailable, setUnavailable] = React.useState<Record<string, string>>(
     {},
   );
+  const deleteTrigger = React.useRef<HTMLButtonElement>();
   const deleteCancel = React.useRef<HTMLButtonElement>(null);
   const deleteAttempt = React.useRef<AbortController>();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   React.useEffect(
     () => () => {
       deleteAttempt.current?.abort();
@@ -106,8 +131,42 @@ export default function SavedGames(): React.JSX.Element {
       setBusy(false);
     }
   };
+  const closeDeleteDialog = () => {
+    setDeleting((request) => request && { ...request, closing: true });
+  };
+  const deleteDialogExited = () => {
+    setDeleting(undefined);
+    const trigger = deleteTrigger.current;
+    deleteTrigger.current = undefined;
+    if (removal?.phase !== "closing") {
+      trigger?.focus({ preventScroll: true });
+      return;
+    }
+
+    const actions = Array.from(
+      page.current?.querySelectorAll<HTMLButtonElement>(
+        ".saveEntry button[aria-haspopup='menu']",
+      ) ?? [],
+    ).filter((button) => !button.closest("[inert]"));
+    const index = trigger ? actions.indexOf(trigger) : -1;
+    const next = actions[index + 1] ?? actions[index - 1];
+    (
+      next ??
+      page.current?.querySelector<HTMLButtonElement>(
+        "button[aria-label='Back']",
+      )
+    )?.focus({ preventScroll: true });
+    setRemoval({ ...removal, phase: "collapsing" });
+  };
+  const removalFinished = (id: string) => {
+    setRemoval((current) =>
+      current?.id === id && current.phase === "collapsing"
+        ? undefined
+        : current,
+    );
+  };
   const deleteGame = async () => {
-    if (!deleting || busy || deleteAttempt.current) return;
+    if (!deleting || deleting.closing || busy || deleteAttempt.current) return;
     const controller = new AbortController();
     deleteAttempt.current = controller;
     const started = performance.now();
@@ -115,6 +174,7 @@ export default function SavedGames(): React.JSX.Element {
     let timer: ReturnType<typeof setTimeout> | undefined;
     setBusy(true);
     setError("");
+    setRemoval({ id: deleting.id, phase: "deleting" });
     try {
       // Race the UI deadline as well as aborting storage: an unavailable browser API
       // must never keep this dialog modal, even if it ignores cancellation.
@@ -133,11 +193,16 @@ export default function SavedGames(): React.JSX.Element {
         deleteSavedGame(deleting.id, controller.signal),
         deadline,
       ]);
-      if (deleteAttempt.current === controller) setDeleting(undefined);
+      if (deleteAttempt.current === controller) {
+        setDeleted((ids) => new Set(ids).add(deleting.id));
+        setRemoval({ id: deleting.id, phase: "closing" });
+        closeDeleteDialog();
+      }
     } catch (failure) {
       // Unmount cancels this view's work without reporting a failure or changing a
       // newer view. Promise.race also consumes any late storage rejection.
       if (controller.signal.aborted && !timedOut) return;
+      setRemoval(undefined);
       reportSaveDeleteFailure(failure, {
         timedOut,
         elapsedMs: Math.round(performance.now() - started),
@@ -148,7 +213,7 @@ export default function SavedGames(): React.JSX.Element {
         cloudState: saves.cloudState,
       });
       if (timedOut) {
-        setDeleting(undefined);
+        closeDeleteDialog();
         dispatch(
           snackbarOpen("Delete may have failed. Please try again later."),
         );
@@ -189,10 +254,6 @@ export default function SavedGames(): React.JSX.Element {
       if (save.id === saves.activeId && inGame) focusGameMenu();
     });
   };
-  const onBack = () => {
-    dispatch(navigateBack());
-    restoreMenuFocus("[data-saves-trigger]");
-  };
   const focusGameMenu = () => {
     restoreMenuFocus(".gameMenuButton");
   };
@@ -200,18 +261,34 @@ export default function SavedGames(): React.JSX.Element {
     dispatch(navigate("FACILITIES"));
     focusGameMenu();
   };
+  const activeId = saves.activeId;
   const pending =
-    saves.activeId &&
-    inGame &&
-    !saves.entries.some((entry) => entry.id === saves.activeId);
-  const entries = sortSaves(saves.entries);
+    activeId && inGame && !saves.entries.some((entry) => entry.id === activeId);
+  const entries = sortSaves(saves.entries.filter(({ id }) => !deleted.has(id)));
   const showSearch = entries.length > 3;
-  const query = showSearch ? search.trim().toLocaleLowerCase() : "";
+  const waitingForDialog = !!removal && removal.phase !== "collapsing";
+  const query =
+    showSearch || waitingForDialog ? search.trim().toLocaleLowerCase() : "";
   const filtered = entries.filter((entry) =>
     `${entry.name} ${entry.scenarioName}`.toLocaleLowerCase().includes(query),
   );
+  const removalChild = (
+    child: React.ReactElement<React.ComponentProps<typeof RemovalCollapse>>,
+  ) => {
+    // TransitionGroup escapes React keys. Use the row ID to find its retained child.
+    const animate =
+      !!removal &&
+      (child.props.id === collapseId(removal.id) ||
+        child.props.id === SEARCH_COLLAPSE_ID);
+    return React.cloneElement(child, {
+      animate,
+      in: animate && waitingForDialog ? true : child.props.in,
+    });
+  };
+  const collapseSpacing = { "&&": { marginTop: 0 } };
   return (
     <ScreenPage
+      ref={page}
       id="gameCard"
       title="Saved games"
       onBack={onBack}
@@ -229,16 +306,26 @@ export default function SavedGames(): React.JSX.Element {
           }}
         >
           <CloudSaveStatus />
-          {showSearch && (
-            <TextField
-              fullWidth
-              size="small"
-              className="saveSearch"
-              label="Search saves"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          )}
+          <TransitionGroup component={null} childFactory={removalChild}>
+            {showSearch && (
+              <RemovalCollapse
+                key="search"
+                id={SEARCH_COLLAPSE_ID}
+                sx={collapseSpacing}
+              >
+                <Box sx={{ pt: 2 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    className="saveSearch"
+                    label="Search saves"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </Box>
+              </RemovalCollapse>
+            )}
+          </TransitionGroup>
           {error && !deleting && (
             <Alert severity="error" role="alert" onClose={() => setError("")}>
               {error}
@@ -280,214 +367,239 @@ export default function SavedGames(): React.JSX.Element {
               </Stack>
             </Alert>
           )}
-          {pending && (
-            <Paper
-              variant="outlined"
-              component="article"
-              className="saveEntry"
-              aria-label="Unsaved current game"
-            >
-              <Stack spacing={1}>
-                <Typography
-                  component="h2"
-                  variant="h6"
-                  sx={{ overflowWrap: "anywhere" }}
-                >
-                  {saves.pendingName || "Current game"}
-                </Typography>
-                <Typography color="warning.main" variant="body2">
-                  Unsaved
-                </Typography>
-                <Typography
-                  variant="body2"
-                  role={saves.saveState === "failed" ? "alert" : undefined}
-                >
-                  {saves.saveError ||
-                    "Keep this game open while saving is unavailable."}
-                </Typography>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                  <Button variant="contained" onClick={loadUnsavedGame}>
-                    Load
-                  </Button>
-                  <Button
-                    onClick={() => void perform(retryCurrentSave)}
-                    disabled={busy}
-                  >
-                    Retry save
-                  </Button>
-                  <Button
-                    onClick={() => void perform(exportCurrentSave)}
-                    disabled={busy}
-                  >
-                    Export current game
-                  </Button>
-                  <Button
-                    color="primary"
-                    onClick={() => {
-                      setError("");
-                      setDeleting({
-                        id: saves.activeId!,
-                        name: saves.pendingName || "Current game",
-                        pending: true,
-                      });
-                    }}
-                    disabled={busy}
-                  >
-                    Discard and leave
-                  </Button>
-                </Stack>
-              </Stack>
-            </Paper>
-          )}
-          {saves.loading && !entries.length && (
-            <Stack
-              direction="row"
-              spacing={1}
-              role="status"
-              sx={{ alignItems: "center" }}
-            >
-              <CircularProgress size={20} />
-              <Typography>Loading saved games…</Typography>
-            </Stack>
-          )}
-          {!saves.loading && !entries.length && !pending && !saves.error && (
-            <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
-              <Typography component="h2" variant="h6">
-                No saved games yet
-              </Typography>
-              <Typography color="text.secondary" sx={{ my: 1 }}>
-                Games save automatically when you start playing. Sign in to
-                restore cloud backups from another device.
-              </Typography>
-              <Button
-                variant="contained"
-                onClick={() => dispatch(navigate("NEW_GAME"))}
+          <TransitionGroup component={null} childFactory={removalChild}>
+            {pending && activeId && !deleted.has(activeId) && (
+              <RemovalCollapse
+                key={activeId}
+                id={collapseId(activeId)}
+                onExited={() => removalFinished(activeId)}
+                sx={collapseSpacing}
               >
-                New game
-              </Button>
-            </Paper>
-          )}
-          {entries.length > 0 && !filtered.length && (
-            <Typography role="status">No saves match “{search}”.</Typography>
-          )}
-          {filtered.map((save) => {
-            const current = save.id === saves.activeId && inGame;
-            const resumable = isResumableStatus(save.status);
-            const timestamp = new Date(save.savedAt).toLocaleString(undefined, {
-              dateStyle: "medium",
-              timeStyle: "short",
-            });
-            const title = save.name;
-            const subtitle = `${save.date.month} ${save.date.year} · ${difficultyLabel(save.difficulty)} · ${save.locationName}`;
-            return (
-              <Paper
-                key={save.id}
-                variant="outlined"
-                component="article"
-                className="saveEntry"
-                data-save-id={save.id}
-                data-current-save={current || undefined}
-                aria-label={title}
-              >
-                <Box
-                  sx={{
-                    position: "relative",
-                    pr: 5,
-                  }}
-                >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography
-                      component="h2"
-                      variant="h6"
-                      sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                    >
-                      {title}
-                    </Typography>
-                  </Box>
-                  <IconButton
-                    edge="end"
-                    sx={{ position: "absolute", top: -8, right: 0 }}
-                    aria-label={`Actions for ${title}`}
-                    aria-haspopup="menu"
-                    aria-expanded={menu?.save.id === save.id ? true : undefined}
-                    disabled={busy}
-                    onClick={(event) =>
-                      setMenu({ anchor: event.currentTarget, save })
-                    }
+                <Box sx={{ pt: 2 }}>
+                  <Paper
+                    variant="outlined"
+                    component="article"
+                    className="saveEntry"
+                    aria-label="Unsaved current game"
                   >
-                    <MoreVertIcon />
-                  </IconButton>
-                </Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  noWrap
-                  title={subtitle}
-                  sx={{ mt: 0.5 }}
-                >
-                  {subtitle}
-                </Typography>
-                <Typography
-                  component="div"
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
-                >
-                  <time
-                    dateTime={save.savedAt}
-                    title={timestamp}
-                    aria-label={
-                      current && saves.saveState === "saving"
-                        ? undefined
-                        : `Saved ${timestamp}`
-                    }
-                  >
-                    {current && saves.saveState === "saving"
-                      ? "Saving…"
-                      : `Saved ${timestamp}`}
-                  </time>
-                </Typography>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1.5}
-                  sx={{
-                    mt: 1.5,
-                    justifyContent: "space-between",
-                    alignItems: { xs: "stretch", sm: "center" },
-                  }}
-                >
-                  <Box>
-                    {save.status !== "inProgress" && (
+                    <Stack spacing={1}>
+                      <Typography
+                        component="h2"
+                        variant="h6"
+                        sx={{ overflowWrap: "anywhere" }}
+                      >
+                        {saves.pendingName || "Current game"}
+                      </Typography>
+                      <Typography color="warning.main" variant="body2">
+                        Unsaved
+                      </Typography>
                       <Typography
                         variant="body2"
-                        color={resumable ? "text.primary" : "error.main"}
+                        role={
+                          saves.saveState === "failed" ? "alert" : undefined
+                        }
                       >
-                        {STATUS_LABELS[save.status]}
+                        {saves.saveError ||
+                          "Keep this game open while saving is unavailable."}
                       </Typography>
-                    )}
-                    {(saves.unavailable?.[save.id]?.message ||
-                      unavailable[save.id]) && (
-                      <Typography variant="body2" color="error.main">
-                        {saves.unavailable?.[save.id]?.message ||
-                          unavailable[save.id]}
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                      >
+                        <Button variant="contained" onClick={loadUnsavedGame}>
+                          Load
+                        </Button>
+                        <Button
+                          onClick={() => void perform(retryCurrentSave)}
+                          disabled={busy}
+                        >
+                          Retry save
+                        </Button>
+                        <Button
+                          onClick={() => void perform(exportCurrentSave)}
+                          disabled={busy}
+                        >
+                          Export current game
+                        </Button>
+                        <Button
+                          color="primary"
+                          onClick={(event) => {
+                            setError("");
+                            deleteTrigger.current = event.currentTarget;
+                            setDeleting({
+                              id: activeId,
+                              name: saves.pendingName || "Current game",
+                              pending: true,
+                            });
+                          }}
+                          disabled={busy}
+                        >
+                          Discard and leave
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                </Box>
+              </RemovalCollapse>
+            )}
+          </TransitionGroup>
+          <TransitionGroup component={null} childFactory={removalChild}>
+            {filtered.map((save) => {
+              const current = save.id === saves.activeId && inGame;
+              const resumable = isResumableStatus(save.status);
+              const timestamp = new Date(save.savedAt).toLocaleString(
+                undefined,
+                {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                },
+              );
+              const title = save.name;
+              const subtitle = `${save.date.month} ${save.date.year} · ${difficultyLabel(save.difficulty)} · ${save.locationName}`;
+              return (
+                <RemovalCollapse
+                  key={save.id}
+                  id={collapseId(save.id)}
+                  onExited={() => removalFinished(save.id)}
+                  sx={collapseSpacing}
+                >
+                  <Box sx={{ pt: 2 }}>
+                    <Paper
+                      variant="outlined"
+                      component="article"
+                      className="saveEntry"
+                      data-save-id={save.id}
+                      data-current-save={current || undefined}
+                      aria-label={title}
+                    >
+                      <Box
+                        sx={{
+                          position: "relative",
+                          pr: 5,
+                        }}
+                      >
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            component="h2"
+                            variant="h6"
+                            sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                          >
+                            {title}
+                          </Typography>
+                        </Box>
+                        <IconButton
+                          edge="end"
+                          sx={{ position: "absolute", top: -8, right: 0 }}
+                          aria-label={`Actions for ${title}`}
+                          aria-haspopup="menu"
+                          aria-expanded={
+                            menu?.save.id === save.id ? true : undefined
+                          }
+                          disabled={busy}
+                          onClick={(event) =>
+                            setMenu({ anchor: event.currentTarget, save })
+                          }
+                        >
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        noWrap
+                        title={subtitle}
+                        sx={{ mt: 0.5 }}
+                      >
+                        {subtitle}
                       </Typography>
-                    )}
+                      <Typography
+                        component="div"
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mt: 0.5 }}
+                      >
+                        <time
+                          dateTime={save.savedAt}
+                          title={timestamp}
+                          aria-label={
+                            current && saves.saveState === "saving"
+                              ? undefined
+                              : `Saved ${timestamp}`
+                          }
+                        >
+                          {current && saves.saveState === "saving"
+                            ? "Saving…"
+                            : `Saved ${timestamp}`}
+                        </time>
+                      </Typography>
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1.5}
+                        sx={{
+                          mt: 1.5,
+                          justifyContent: "space-between",
+                          alignItems: { xs: "stretch", sm: "center" },
+                        }}
+                      >
+                        <Box>
+                          {save.status !== "inProgress" && (
+                            <Typography
+                              variant="body2"
+                              color={resumable ? "text.primary" : "error.main"}
+                            >
+                              {STATUS_LABELS[save.status]}
+                            </Typography>
+                          )}
+                          {(saves.unavailable?.[save.id]?.message ||
+                            unavailable[save.id]) && (
+                            <Typography variant="body2" color="error.main">
+                              {saves.unavailable?.[save.id]?.message ||
+                                unavailable[save.id]}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Button
+                          variant="contained"
+                          disabled={
+                            busy || (!current && !!saves.unavailable?.[save.id])
+                          }
+                          onClick={() =>
+                            resumable ? loadSave(save) : viewResult(save)
+                          }
+                        >
+                          {resumable ? "Load" : "View result"}
+                        </Button>
+                      </Stack>
+                    </Paper>
                   </Box>
-                  <Button
-                    variant="contained"
-                    disabled={
-                      busy || (!current && !!saves.unavailable?.[save.id])
-                    }
-                    onClick={() =>
-                      resumable ? loadSave(save) : viewResult(save)
-                    }
-                  >
-                    {resumable ? "Load" : "View result"}
-                  </Button>
-                </Stack>
+                </RemovalCollapse>
+              );
+            })}
+          </TransitionGroup>
+          {!removal &&
+            !saves.loading &&
+            !entries.length &&
+            !pending &&
+            !saves.error && (
+              <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+                <Typography component="h2" variant="h6">
+                  No saved games yet
+                </Typography>
+                <Typography color="text.secondary" sx={{ my: 1 }}>
+                  Games save automatically when you start playing. Sign in to
+                  restore cloud backups from another device.
+                </Typography>
+                <Button
+                  variant="contained"
+                  onClick={() => dispatch(navigate("NEW_GAME"))}
+                >
+                  New game
+                </Button>
               </Paper>
-            );
-          })}
+            )}
+          {!removal && entries.length > 0 && !filtered.length && (
+            <Typography role="status">No saves match “{search}”.</Typography>
+          )}
         </Stack>
       </Box>
       <Menu
@@ -539,8 +651,10 @@ export default function SavedGames(): React.JSX.Element {
           )}
         <MenuItem
           onClick={() => {
+            if (!menu) return;
             setError("");
-            setDeleting(menu?.save);
+            deleteTrigger.current = menu.anchor;
+            setDeleting(menu.save);
             setMenu(undefined);
           }}
         >
@@ -550,14 +664,19 @@ export default function SavedGames(): React.JSX.Element {
       <RenameSaveDialog save={rename} onClose={() => setRename(undefined)} />
       <ShareSaveDialog id={sharing} onClose={() => setSharing(undefined)} />
       <Dialog
-        open={!!deleting}
-        onClose={busy ? undefined : () => setDeleting(undefined)}
+        open={!!deleting && !deleting.closing}
+        onClose={busy ? undefined : closeDeleteDialog}
+        disableRestoreFocus
+        transitionDuration={reduceMotion ? 0 : undefined}
         fullWidth
         maxWidth="xs"
         aria-labelledby="delete-save-title"
         aria-describedby="delete-save-message"
         slotProps={{
-          transition: { onEntered: () => deleteCancel.current?.focus() },
+          transition: {
+            onEntered: () => deleteCancel.current?.focus(),
+            onExited: deleteDialogExited,
+          },
         }}
       >
         <DialogTitle id="delete-save-title">
@@ -583,17 +702,17 @@ export default function SavedGames(): React.JSX.Element {
             autoFocus
             ref={deleteCancel}
             disabled={busy}
-            onClick={() => setDeleting(undefined)}
+            onClick={closeDeleteDialog}
           >
             Cancel
           </Button>
           <Button
             color="error"
             variant="contained"
-            disabled={busy}
+            disabled={busy || deleting?.closing}
             onClick={() => void deleteGame()}
           >
-            {busy
+            {busy || removal?.phase === "closing"
               ? "Deleting…"
               : deleting?.pending
                 ? "Discard and leave"

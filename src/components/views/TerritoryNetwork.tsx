@@ -1,5 +1,9 @@
 import { CouchPlayerText } from "../../couch/PlayerColor";
 import * as React from "react";
+import { TransitionGroup } from "react-transition-group";
+import MapPanelSlide from "../base/MapPanelSlide";
+import { MapProjectPanel } from "../base/MapPanelWindow";
+import RemovalCollapse from "../base/RemovalCollapse";
 import { Button, Tab, Tabs, Typography, useMediaQuery } from "@mui/material";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
 import DesktopBuildRail from "../base/DesktopBuildRail";
@@ -8,6 +12,7 @@ import {
   landTransferredCustomers,
 } from "../../helpers/Territories";
 import { utilityOffer } from "../../helpers/Expansion";
+import TileConnectionBuildStatus from "../base/TileConnectionBuildStatus";
 import { currentTick } from "../../helpers/GameSelectors";
 import { facilityIconSrc } from "../../helpers/FacilityIcon";
 import {
@@ -47,6 +52,7 @@ import { cityCustomerCount } from "../../helpers/CityProfiles";
 import {
   citySizeLabel,
   formatTerrainPercent,
+  tileHasConstructionTechnology,
 } from "../base/TerritoryTileFacts";
 import { cityDemandByType } from "../../helpers/CityDemand";
 import { facilityMapStatus } from "../base/FacilityMapStatus";
@@ -58,7 +64,7 @@ import { useMoney } from "../base/CurrencyContext";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { generatorSizeChanged } from "../../reducers/GameActions";
 import { purchaseFacility } from "../../helpers/PurchaseFacility";
-import TileWorkspaceSurface, {
+import {
   findTileControl,
   TileInspectionSurface,
 } from "../base/TileWorkspaceSurface";
@@ -92,19 +98,17 @@ import {
 
 function ProjectBuildUnavailable({ onClose }: { onClose: () => void }) {
   return (
-    <TileWorkspaceSurface
-      id="tool-BUILD_GENERATORS"
-      closeLabel="Close project"
+    <MapProjectPanel
+      catalogue
       title="Project planner unavailable"
       focusKey="project-unavailable"
-      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={onClose}
     >
       <p role="status">
         The project planner could not load. Close this panel and open Build to
         try again.
       </p>
-    </TileWorkspaceSurface>
+    </MapProjectPanel>
   );
 }
 
@@ -122,16 +126,14 @@ function DeferredProjectBuild(
   return (
     <React.Suspense
       fallback={
-        <TileWorkspaceSurface
-          id="tool-BUILD_GENERATORS"
-          closeLabel="Close project"
-          title="Plan a project"
+        <MapProjectPanel
+          catalogue
+          title="Build"
           focusKey="project-loading"
-          returnFocusSelector=".desktopBuildRail, #buildNav"
           onClose={props.onClose}
         >
           <p role="status">Loading project planner…</p>
-        </TileWorkspaceSurface>
+        </MapProjectPanel>
       }
     >
       <ProjectBuild {...props} />
@@ -176,9 +178,17 @@ function TileNetwork(props: Props) {
     "network.project",
     undefined,
   );
+  const [draggedProject, setDraggedProject] =
+    React.useState<ProjectSelection>();
+  React.useEffect(() => {
+    if (!desktopRail) setDraggedProject(undefined);
+  }, [desktopRail]);
+  const dragProject = desktopRail ? draggedProject : undefined;
+  const mapProject =
+    dragProject ?? (planning && !catalogue ? project : undefined);
   const windSpeeds = useBuildForecast(
     game,
-    planning && !catalogue && project?.fuel === "Wind",
+    mapProject?.fuel === "Wind",
   )?.windSpeeds;
   const projectWindOutput = React.useMemo(
     () => windSpeeds && windOutputByTerrain(windSpeeds),
@@ -205,6 +215,11 @@ function TileNetwork(props: Props) {
   // Let the purchase dialog finish before moving focus to the updated inspector.
   const inspectorOwner = review ? tile?.territoryId : view?.ownerKey;
   const operatingFacility = view?.operatingFacility;
+  const soldMapFacility = React.useRef<string>();
+  const sellMapFacility = (id: number) => {
+    soldMapFacility.current = String(id);
+    props.facilityActions.onSell(id);
+  };
   const facilityStatus = view?.facility
     ? facilityMapStatus(view, game.date.minute)
     : undefined;
@@ -249,6 +264,15 @@ function TileNetwork(props: Props) {
     !tile.city &&
     !view.facility
   );
+  const buildConnection =
+    view?.owned &&
+    view.connection &&
+    !view.reserved &&
+    !view.facility &&
+    tile &&
+    tileHasConstructionTechnology(tile)
+      ? view.connection
+      : undefined;
   const showSiteCatalogue = building && !desktopRail && siteCatalogue;
   const storageFits = !!tile && tileFitsFacility(tile, { peakWh: 1, peakW: 1 });
   const closeSiteCatalogue = React.useCallback(
@@ -257,6 +281,7 @@ function TileNetwork(props: Props) {
   );
   const close = React.useCallback(() => {
     if (projectBusy.current) return;
+    soldMapFacility.current = undefined;
     setPlanning(false);
     setCandidate(undefined);
     setInspected(undefined);
@@ -314,30 +339,42 @@ function TileNetwork(props: Props) {
     if (panel?.projectRequested) startProject();
   }, [panel?.projectRequested, startProject]);
   const projectVisible = planning && (!panel?.open || projectPending);
+  const closeProject = React.useCallback(() => {
+    if (projectBusy.current) return;
+    close();
+    map.current
+      ?.querySelector<HTMLElement>(".desktopBuildRail")
+      ?.focus({ preventScroll: true });
+    map.current
+      ?.closest(".gameWorkspace")
+      ?.querySelector<HTMLElement>("#buildNav")
+      ?.focus({ preventScroll: true });
+  }, [close]);
   React.useLayoutEffect(() => {
     if (!projectVisible || !showProject) return;
-    showProject(close);
+    showProject(closeProject);
     return hideProject;
-  }, [projectVisible, showProject, hideProject, close]);
-  const projectPricingKey =
-    planning && project && !catalogue
-      ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => territoryMapTileKey(tile)))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
-      : undefined;
+  }, [projectVisible, showProject, hideProject, closeProject]);
+  const projectPricingKey = mapProject
+    ? `${signature(game)}|${game.interestRate}|${JSON.stringify(views.map(({ tile }) => territoryMapTileKey(tile)))}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`
+    : undefined;
   const projectSites = React.useMemo(() => {
-    if (!planning || !project || catalogue) return undefined;
+    if (!mapProject) return undefined;
     const connections = tilePurchaseQuotes(game, views);
     return new Map<TerritoryMapTileKey, ReadyProjectSite>(
       views.flatMap(({ tile, owned, connectable }) => {
         if (!owned && !connectable) return [];
-        const quote = projectSiteQuote(game, project, tile.id, connections);
-        return quote.facility
-          ? [[territoryMapTileKey(tile), quote] as const]
+        const key = territoryMapTileKey(tile);
+        const quote = projectSiteQuote(game, mapProject, tile.id, connections);
+        // A retained site's economic ID can resolve to a different company's position.
+        return quote.facility && territoryMapTileKey(quote.tile) === key
+          ? [[key, quote] as const]
           : [];
       }),
     );
     // Reuse the shared economic/planning signature; map focus and clock ticks do not reprice every site.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planning, project, catalogue, projectPricingKey]);
+  }, [mapProject, projectPricingKey]);
   const build = React.useCallback(
     (
       facility: FacilityShoppingType,
@@ -362,6 +399,7 @@ function TileNetwork(props: Props) {
       ({ tile }) => territoryMapTileKey(tile) === key,
     );
     if (!activated) return;
+    if (key !== inspected) soldMapFacility.current = undefined;
     const id = activated.tile.id;
     if (!mode && planning && !catalogue) {
       // A peer's retained alias can share an economic ID with a local site.
@@ -406,6 +444,34 @@ function TileNetwork(props: Props) {
   const preferredSite =
     candidate ??
     (building || (view?.owned && view.connection) ? tile?.id : railSite);
+  const openRailProject = (
+    selection: ProjectSelection | undefined,
+    dropSite?: ReadyProjectSite,
+  ) => {
+    if (projectBusy.current || pendingIds.size > 0) return;
+    panel?.returnToMap();
+    setProject(selection);
+    if (!selection) {
+      close();
+      return;
+    }
+    setCatalogue(false);
+    setPlanning(true);
+    setInspected(undefined);
+    const preferred =
+      dropSite?.tile.id ??
+      (preferredSite &&
+      ((view?.connection &&
+        tile?.id === preferredSite &&
+        tileFitsFacility(tile, selection)) ||
+        projectSiteQuote(game, selection, preferredSite).facility)
+        ? preferredSite
+        : undefined);
+    setCandidate(preferred);
+    const preferredTile =
+      dropSite?.tile ?? (preferred && getTerritoryTile(preferred, game));
+    setSelected(preferredTile && territoryMapTileKey(preferredTile));
+  };
   return (
     <section
       ref={map}
@@ -421,30 +487,8 @@ function TileNetwork(props: Props) {
           siteId={preferredSite}
           busy={projectPending || pendingIds.size > 0}
           focusRequest={railFocusRequest}
-          onProject={(selection) => {
-            if (projectBusy.current || pendingIds.size > 0) return;
-            panel?.returnToMap();
-            setProject(selection);
-            if (!selection) {
-              close();
-              return;
-            }
-            setCatalogue(false);
-            setPlanning(true);
-            setInspected(undefined);
-            const preferred =
-              preferredSite &&
-              ((view?.connection &&
-                tile?.id === preferredSite &&
-                tileFitsFacility(tile, selection)) ||
-                projectSiteQuote(game, selection, preferredSite).facility)
-                ? preferredSite
-                : undefined;
-            setCandidate(preferred);
-            const preferredTile =
-              preferred && getTerritoryTile(preferred, game);
-            setSelected(preferredTile && territoryMapTileKey(preferredTile));
-          }}
+          onProject={openRailProject}
+          onProjectDrag={setDraggedProject}
         />
       )}
       {views.length > 0 && (
@@ -461,6 +505,15 @@ function TileNetwork(props: Props) {
           projectPlanning={planning}
           projectPending={projectPending}
           projectSites={projectSites}
+          onProjectDrop={
+            dragProject && !projectPending && pendingIds.size === 0
+              ? (key) => {
+                  const site = projectSites?.get(key);
+                  if (site) openRailProject(dragProject, site);
+                  setDraggedProject(undefined);
+                }
+              : undefined
+          }
           projectWindOutput={projectWindOutput}
           onDeselect={close}
           game={game}
@@ -481,7 +534,7 @@ function TileNetwork(props: Props) {
             ? views.find(({ tile }) => territoryMapTileKey(tile) === menu.key)
             : undefined
         }
-        actions={props.facilityActions}
+        actions={{ ...props.facilityActions, onSell: sellMapFacility }}
         busy={projectPending}
         canAcquire={!!props.onAcquire}
         projectSite={!!menu && !!projectSites?.has(menu.key)}
@@ -491,44 +544,39 @@ function TileNetwork(props: Props) {
         onExpand={() => menu && inspect(menu.key, true, "expand")}
         onAcquire={setReview}
       />
-      {projectVisible && (
-        <DeferredProjectBuild
-          game={game}
-          project={project}
-          candidate={candidate}
-          compatibleSites={projectSites?.size ?? 0}
-          catalogue={catalogue}
-          onProject={(selection) => {
-            if (projectBusy.current) return;
-            setProject(selection);
-            setCatalogue(false);
-            setCandidate(undefined);
-            setSelected(undefined);
-          }}
-          onUpdateProject={
-            desktopRail
-              ? (selection) => {
-                  if (!projectBusy.current) setProject(selection);
-                }
-              : undefined
-          }
-          onChangeProject={() => {
-            if (projectBusy.current) return;
-            setCatalogue(true);
-            setCandidate(undefined);
-            if (desktopRail) {
-              setPlanning(false);
-              setRailFocusRequest((value) => value + 1);
-            }
-          }}
-          onClose={close}
-          onBusy={(busy) => {
-            projectBusy.current = busy;
-            setProjectPending(busy);
-            panel?.onProjectBusyChange?.(busy);
-          }}
-        />
-      )}
+      <TransitionGroup component={null}>
+        {projectVisible && (
+          <MapPanelSlide key="project">
+            <DeferredProjectBuild
+              game={game}
+              project={project}
+              candidate={candidate}
+              compatibleSites={projectSites?.size ?? 0}
+              catalogue={catalogue}
+              onProject={(selection) => {
+                if (projectBusy.current) return;
+                setProject(selection);
+                setCatalogue(false);
+                setCandidate(undefined);
+                setSelected(undefined);
+              }}
+              onUpdateProject={
+                desktopRail
+                  ? (selection) => {
+                      if (!projectBusy.current) setProject(selection);
+                    }
+                  : undefined
+              }
+              onClose={closeProject}
+              onBusy={(busy) => {
+                projectBusy.current = busy;
+                setProjectPending(busy);
+                panel?.onProjectBusyChange?.(busy);
+              }}
+            />
+          </MapPanelSlide>
+        )}
+      </TransitionGroup>
       {view && tile && inspected && (
         <TileInspectionSurface
           map={map}
@@ -566,6 +614,39 @@ function TileNetwork(props: Props) {
               {view.disaster.condition}
             </Typography>
           )}
+          <TransitionGroup
+            key={inspected}
+            component={null}
+            childFactory={(
+              child: React.ReactElement<
+                React.ComponentProps<typeof RemovalCollapse>
+              >,
+            ) =>
+              React.cloneElement(child, {
+                animate: child.props.id === soldMapFacility.current,
+              })
+            }
+          >
+            {operatingFacility && (
+              <RemovalCollapse
+                key={operatingFacility.id}
+                id={String(operatingFacility.id)}
+                onExited={() => {
+                  if (soldMapFacility.current === String(operatingFacility.id))
+                    soldMapFacility.current = undefined;
+                }}
+              >
+                <ExpandedFacilityDetails
+                  showStatus
+                  facility={operatingFacility}
+                  game={game}
+                  expandRequest={expandRequest}
+                  {...props.facilityActions}
+                  onSell={sellMapFacility}
+                />
+              </RemovalCollapse>
+            )}
+          </TransitionGroup>
           {showSiteCatalogue ? (
             <GameWorkspaceContext.Provider value={true}>
               <GameBuildCompleteContext.Provider value={closeSiteCatalogue}>
@@ -616,10 +697,20 @@ function TileNetwork(props: Props) {
             </>
           ) : (
             <>
-              {view.connection && (
-                <Typography role="status" variant="body2">
-                  {tileConnectionStatus(view.connection, game)}
-                </Typography>
+              {buildConnection ? (
+                <div className="tilePurchaseSummary">
+                  <TileConnectionBuildStatus
+                    connection={buildConnection}
+                    minute={game.date.minute}
+                    paused={game.speed === "PAUSED"}
+                  />
+                </div>
+              ) : (
+                view.connection && (
+                  <Typography role="status" variant="body2">
+                    {tileConnectionStatus(view.connection, game)}
+                  </Typography>
+                )
               )}
               {tile.city ? (
                 <div className="tileCityMetrics">
@@ -642,15 +733,7 @@ function TileNetwork(props: Props) {
                     <strong>{formatWatts(demandW)}</strong>
                   </div>
                 </div>
-              ) : operatingFacility ? (
-                <ExpandedFacilityDetails
-                  showStatus
-                  facility={operatingFacility}
-                  game={game}
-                  expandRequest={expandRequest}
-                  {...props.facilityActions}
-                />
-              ) : view.facility ? (
+              ) : !operatingFacility && view.facility ? (
                 <div className="tileCityMetrics">
                   <div>
                     <span>{view.facility.name}</span>
@@ -696,7 +779,7 @@ function TileNetwork(props: Props) {
                       {pendingIds.has(tile.id)
                         ? "Connecting…"
                         : quote
-                          ? `Connect (${formatPurchasePrice(quote.price)})`
+                          ? `Connect ${formatPurchasePrice(quote.price)}`
                           : "Connection unavailable"}
                     </Button>
                     {quote && (

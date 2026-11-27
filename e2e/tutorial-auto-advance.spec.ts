@@ -208,7 +208,7 @@ for (const mission of [
         const rate = page.locator("#rateSlider input");
         await rate.focus();
         await rate.press("ArrowRight");
-        await expect(hud).toContainText("Tap 1× to run the month");
+        await expect(hud).toContainText("Select slow speed to run the month");
       }
     }
     await expect(page.locator(".buildOption")).toHaveCount(0);
@@ -251,11 +251,15 @@ for (const mission of [
       await expect(
         page.locator(".facilityRow.selected .facilityDetails"),
       ).toBeVisible();
-      await expect(hud).toContainText("Tap 12× to start construction time");
+      await expect(hud).toContainText(
+        "Select fast speed to start construction time",
+      );
       await page
         .getByRole("button", { name: "slow speed", exact: true })
         .click();
-      await expect(hud).toContainText("Tap 12× to start construction time");
+      await expect(hud).toContainText(
+        "Select fast speed to start construction time",
+      );
       const fastSpeed = page.getByRole("button", {
         name: "fast speed",
         exact: true,

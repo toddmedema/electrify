@@ -308,12 +308,12 @@ for (const view of ["live", "saved"] as const) {
   );
 }
 
-it("shows both Across the Valley goals before starting", () => {
+it("shows the sole Across the Valley goal before starting", () => {
   render(
     <VictoryConditions scenario={getScenario(116)!} difficulty="Employee" />,
   );
   const requirements = screen.getByRole("region", { name: "Requirements" });
   expect(requirements).toHaveTextContent("Acquire 3 utilities");
-  expect(requirements).toHaveTextContent("Retain customers");
+  expect(requirements).not.toHaveTextContent("Retain customers");
   expect(requirements).not.toHaveTextContent(/retire|original oil/i);
 });

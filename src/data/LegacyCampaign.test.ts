@@ -10,6 +10,7 @@ import { SCENARIOS, getScenario } from "./Scenarios";
 import { scenarioRules, compileScenarioRules } from "../helpers/ScenarioRules";
 import { getCostTableDeflator } from "./Economy";
 import { roundToSignificantDigits } from "../helpers/Math";
+import { scenarioObjectiveDefinitions } from "../helpers/ObjectiveRules";
 import { objectiveTarget } from "../helpers/ScenarioObjectives";
 import { LOCATIONS } from "../Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../helpers/DateTime";
@@ -53,7 +54,7 @@ test("the final CEO inherits the same aging oil cohort without derating its repl
   expect(outputAt(8, 2042)).toEqual({ "1": 0.6 });
 });
 
-test("authored debt allowances scale opening demand and never borrow a fixture cash balance", () => {
+test("archived debt allowances scale opening demand and never borrow a fixture cash balance", () => {
   expect(
     LEGACY_GENERATIONS.map(({ debtDollars2023PerMW }) => debtDollars2023PerMW),
   ).toEqual([
@@ -61,9 +62,11 @@ test("authored debt allowances scale opening demand and never borrow a fixture c
     15000000, 15000000,
   ]);
   const allowance = () => {
-    const objective = legacyRuleDefinitions(2, { peakMW: 0.5 }).objectives.find(
-      (goal) => goal.metric === "monthEndDebt",
-    );
+    const objective = legacyRuleDefinitions(
+      2,
+      { peakMW: 0.5 },
+      true,
+    ).objectives.find((goal) => goal.metric === "monthEndDebt");
     if (!objective || objective.metric !== "monthEndDebt")
       throw new Error("Missing debt allowance");
     return objective.maxDebtDollars;
@@ -108,21 +111,7 @@ test.each(LEGACY_SCENARIOS)(
       seed: 611,
     });
     expect(compiled).toBeDefined();
-    expect(compiled!.objectives.length).toBeLessThanOrEqual(16);
-    expect(
-      compiled!.objectives.filter(
-        ({ metric }) => metric === "customerRetention",
-      ),
-    ).toEqual(
-      scenario.id === LEGACY_SCENARIOS[1].id
-        ? []
-        : [
-            expect.objectContaining({
-              deadlineMonth: 239,
-              minRetainedShare: 0.9,
-            }),
-          ],
-    );
+    expect(compiled!.objectives).toHaveLength(1);
     expect(
       compiled!.objectives.every(
         (objective) =>
@@ -132,7 +121,7 @@ test.each(LEGACY_SCENARIOS)(
   },
 );
 
-test("each term leads with a distinct historical task and keeps its shared safeguards", () => {
+test("each term has a distinct historical objective", () => {
   const featured = LEGACY_SCENARIOS.map(
     (scenario) => scenarioRules(scenario)!.objectives[0],
   );
@@ -203,25 +192,12 @@ test("published campaign amounts are the exact three-significant-digit threshold
     }
 });
 
-test.each([
-  { index: 1, metrics: ["customerCount", "monthEndDebt"] },
-  {
-    index: 8,
-    metrics: [
-      "emissionsBudget",
-      "customerRetention",
-      "monthEndDebt",
-      "monthlyBilledRate",
-    ],
-  },
-])(
-  "term $index has no redundant customer or carbon goals",
-  ({ index, metrics }) => {
-    expect(
-      scenarioRules(LEGACY_SCENARIOS[index])!.objectives.map(
-        ({ metric }) => metric,
-      ),
-    ).toEqual(metrics);
+test.each([...SCENARIOS, ...LEGACY_SCENARIOS])(
+  "$name has at most one goal beyond reliability and solvency",
+  (scenario) => {
+    expect(scenarioObjectiveDefinitions(scenario).length).toBeLessThanOrEqual(
+      1,
+    );
   },
 );
 

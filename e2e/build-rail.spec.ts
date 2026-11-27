@@ -76,6 +76,93 @@ test("wheeling over Power or Energy steps its size in both axes", async ({
   });
 });
 
+test("dragging a facility selects a compatible site and waits for confirmation", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop-chromium", "Uses the desktop rail");
+  const network = await startMap(page, "dark");
+  const before = (await readSavedGame(page))!;
+  const wind = network.getByRole("button", {
+    name: "Choose sites for Wind",
+    exact: true,
+  });
+  const project = network.getByRole("dialog", { name: /^Wind ·/ });
+  const city = network.locator(
+    '[data-map-target="champlain:city"] .territoryTileHitArea',
+  );
+  const site = network.locator('[data-map-target="champlain:site-13"]');
+
+  await expect(wind).toHaveAttribute("draggable", "true");
+  await wind.dragTo(city);
+  await expect(wind).toHaveAttribute("aria-pressed", "false");
+  await expect(project).toHaveCount(0);
+
+  await wind.dragTo(site.locator(".territoryTileHitArea"));
+  await expect(wind).toHaveAttribute("aria-pressed", "true");
+  await expect(site).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    project.getByRole("button", { name: "Cash", exact: true }),
+  ).toBeVisible();
+  await expect(
+    project.getByRole("button", { name: "Loan", exact: true }),
+  ).toBeVisible();
+  await reviewScreenshot(page, {
+    path: info.outputPath("dragged-project-review.png"),
+    scale: "css",
+  });
+  const after = (await readSavedGame(page))!;
+  expect(after.facilities).toEqual(before.facilities);
+  expect(after.territoryNetwork!.tilePurchases).toEqual(
+    before.territoryNetwork!.tilePurchases,
+  );
+  expect(currentTick(after)!.cash).toBe(currentTick(before)!.cash);
+
+  await project.getByRole("button", { name: "Cash", exact: true }).click();
+  await expect(project).toHaveCount(0);
+  await site.press("Enter");
+  const inspector = page.locator(".tileWorkspaceInspector");
+  const details = inspector.locator(".facilityDetails");
+  await expect(details).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await inspector
+    .getByRole("button", { name: /^Cancel construction of/ })
+    .click();
+  // Arm the observer before confirming. A busy renderer can skip every frame
+  // between the start and the end of the short collapse.
+  const measuredExit = await details.evaluateHandle((element) => {
+    const row = element.closest<HTMLElement>(".MuiCollapse-root")!;
+    const state = { inert: false, from: 0, to: -1 };
+    const observer = new MutationObserver(() => {
+      if (!row.inert || row.style.height !== "0px") return;
+      const height = row
+        .getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "height",
+        );
+      if (!(height?.effect instanceof KeyframeEffect)) return;
+      const [first, last] = height.effect.getKeyframes();
+      state.inert = row.inert;
+      state.from = parseFloat(String(first.height));
+      state.to = parseFloat(String(last.height));
+      observer.disconnect();
+    });
+    observer.observe(row, { attributeFilter: ["inert", "style"] });
+    return state;
+  });
+  await page
+    .getByRole("dialog", { name: /^Cancel construction of/ })
+    .getByRole("button", { name: "Cancel construction", exact: true })
+    .click();
+  await expect(details).toHaveCount(0);
+  const { inert, from, to } = await measuredExit.jsonValue();
+  expect(inert).toBe(true);
+  expect(from).toBeGreaterThan(0);
+  expect(to).toBe(0);
+  await measuredExit.dispose();
+});
+
 for (const theme of ["light", "dark"] as const) {
   test(`build catalogue preserves previews, sizing and responsive entry points · ${theme}`, async ({
     page,
@@ -94,7 +181,31 @@ for (const theme of ["light", "dark"] as const) {
     if (desktop) {
       // Every available technology is discoverable before opening Build.
       await expect(rail).toBeVisible();
+      await expect(rail).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const mapViewport = network.locator(".territoryMapViewport");
+      expect((await mapViewport.boundingBox())!.x).toBeLessThanOrEqual(
+        (await rail.boundingBox())!.x,
+      );
       const icons = rail.getByRole("button", { name: /^Choose sites for / });
+      const firstIcon = icons.first();
+      await expect(firstIcon).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const buttonSurface = await firstIcon.evaluate((button) => {
+        const hitArea = button.getBoundingClientRect();
+        const image = button.querySelector("img")!.getBoundingClientRect();
+        const background = getComputedStyle(button, "::before");
+        return {
+          color: background.backgroundColor,
+          widthShare: parseFloat(background.width) / hitArea.width,
+          heightShare: parseFloat(background.height) / hitArea.height,
+          iconWidth: image.width,
+          iconHeight: image.height,
+        };
+      });
+      expect(buttonSurface.color).not.toBe("rgba(0, 0, 0, 0)");
+      expect(buttonSurface.widthShare).toBeCloseTo(0.9);
+      expect(buttonSurface.heightShare).toBeCloseTo(0.9);
+      expect(buttonSurface.iconWidth).toBe(38);
+      expect(buttonSurface.iconHeight).toBe(38);
       const artwork = await icons.evaluateAll((buttons) =>
         buttons.map((button) => ({
           name: button
@@ -106,6 +217,21 @@ for (const theme of ["light", "dark"] as const) {
       expect(artwork.length).toBeGreaterThan(5);
       for (const { name, source } of artwork)
         expect(source).toBe(`/images/${name.toLowerCase()}.svg`);
+      for (const [category, label] of [
+        ["Generators", "Power"],
+        ["Storage", "Energy"],
+      ]) {
+        const heading = rail.getByRole("heading", {
+          name: category,
+          exact: true,
+        });
+        const sizing = rail.getByRole("button", {
+          name: new RegExp(`^${label}:`),
+        });
+        expect((await heading.boundingBox())!.y).toBeLessThan(
+          (await sizing.boundingBox())!.y,
+        );
+      }
       const energy = rail.getByRole("button", { name: /^Energy:/ });
       await energy.hover();
       const energySizing = rail.getByRole("region", { name: "Energy sizing" });
@@ -149,16 +275,22 @@ for (const theme of ["light", "dark"] as const) {
       const generator = preview.getByRole("table", {
         name: "generator properties",
       });
-      const headings = generator.getByRole("rowheader");
-      for (const [index, label] of [
+      await expect(generator.getByRole("rowheader")).toHaveText([
         "Build cost",
         "Build time",
         "Lifetime cost",
         "Expected capacity factor",
-      ].entries()) {
-        await expect(headings.nth(index)).toBeVisible();
-        await expect(headings.nth(index)).toHaveText(label);
-      }
+        "Direct emissions",
+      ]);
+      await expect(
+        preview.getByText(/Compared with typical buildable generators/),
+      ).toHaveCount(0);
+      const advanced = preview.getByRole("button", { name: "Advanced" });
+      await expect(advanced).toHaveAttribute("aria-expanded", "false");
+      const advancedGenerator = preview.getByRole("table", {
+        name: "advanced generator properties",
+      });
+      await expect(advancedGenerator).toHaveCount(0);
       const readouts = await generator.getByRole("row").evaluateAll((rows) =>
         rows.slice(0, 4).map((row) => {
           const label = row.children[0];
@@ -183,12 +315,23 @@ for (const theme of ["light", "dark"] as const) {
       await expect(wind).toHaveAttribute("aria-keyshortcuts", "ArrowRight");
       await wind.press("ArrowRight");
       await expect(preview).toBeFocused();
+      await advanced.focus();
+      await page.keyboard.press("Enter");
+      await expect(advanced).toHaveAttribute("aria-expanded", "true");
+      await expect(
+        advancedGenerator.getByRole("rowheader", {
+          name: "Typical monthly output",
+        }),
+      ).toBeVisible();
+      await page.keyboard.press("Space");
+      await expect(advancedGenerator).toHaveCount(0);
       await page.keyboard.press("Escape");
       await expect(preview).toHaveCount(0);
       await expect(wind).toBeFocused();
       await expect(tileSurfaces).toHaveCount(0);
 
-      await wind.click();
+      // The transparent edge remains part of the pointer target.
+      await wind.click({ position: { x: 2, y: 32 } });
       await expect(wind).toHaveAttribute("aria-pressed", "true");
       await expect(
         surface.getByText("Choose a highlighted site."),
@@ -284,9 +427,19 @@ for (const theme of ["light", "dark"] as const) {
       surface.getByRole("heading", { name: "Wind · 30MW", exact: true }),
     ).toBeVisible();
     await expect(surface.getByText("Choose a highlighted site.")).toBeVisible();
-    if (!desktop) await expect(build).toHaveAttribute("aria-expanded", "true");
+    if (!desktop) {
+      await expect(build).toHaveAttribute("aria-expanded", "true");
+      await reviewScreenshot(page, {
+        path: info.outputPath("pick-project-site.png"),
+        scale: "css",
+      });
+    }
+    await expect(
+      surface.getByRole("button", { name: "Change project", exact: true }),
+    ).toHaveCount(0);
+    await expect(surface.getByText(/total project .*cost/)).toHaveCount(0);
     await surface
-      .getByRole("button", { name: "Change project", exact: true })
+      .getByRole("button", { name: "Close project", exact: true })
       .click();
 
     if (desktop) {
@@ -305,8 +458,9 @@ for (const theme of ["light", "dark"] as const) {
         }),
       ).toBeVisible();
     } else {
+      await openMapProjectCatalogue(page);
       await expect(
-        surface.getByRole("heading", { name: "Plan a project", exact: true }),
+        surface.getByRole("heading", { name: "Build", exact: true }),
       ).toBeVisible();
       await expect(
         surface.getByRole("tab", { name: "Generators", exact: true }),
@@ -324,7 +478,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(after.facilities).toEqual(before.facilities);
   });
 
-  test(`storage hover orders its readouts like the generator card · ${theme}`, async ({
+  test(`storage hover shows five readouts with advanced details on demand · ${theme}`, async ({
     page,
   }, info) => {
     test.skip(
@@ -333,8 +487,8 @@ for (const theme of ["light", "dark"] as const) {
     );
     await startMap(page, theme);
     await editSavedGame(page, ({ game }) => {
-      // The Valley starts before utility-scale batteries are available.
-      const minute = 180 * MINUTES_PER_MONTH;
+      // Compare lithium and iron-air batteries after both enter the catalogue.
+      const minute = (2031 - game.startingYear) * 12 * MINUTES_PER_MONTH;
       const offset = minute - game.date.minute;
       game.date = getDateFromMinute(minute, game.startingYear);
       game.objectiveProgress = undefined;
@@ -361,6 +515,30 @@ for (const theme of ["light", "dark"] as const) {
       "Discharge power",
       "Duration at full power",
       "Round-trip efficiency",
+    ]);
+    await expect(
+      battery.getByText("Compared with typical buildable storage"),
+    ).toBeVisible();
+    await expect(
+      storage
+        .getByRole("row", { name: /^Round-trip efficiency/ })
+        .getByText("Better"),
+    ).toHaveAttribute("data-tone", "good");
+    await expect(
+      storage.getByRole("row", { name: /^Build cost/ }).getByText("Worse"),
+    ).toHaveAttribute("data-tone", "bad");
+    const advanced = battery.getByRole("button", { name: "Advanced" });
+    await expect(advanced).toHaveAttribute("aria-expanded", "false");
+    await reviewScreenshot(battery, {
+      path: info.outputPath(`build-rail-battery-${theme}.png`),
+    });
+    await advanced.click();
+    await expect(advanced).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      battery
+        .getByRole("table", { name: "advanced storage properties" })
+        .getByRole("rowheader"),
+    ).toHaveText([
       "Fixed operating cost",
       "Ramp up/down time",
       "Accounting lifetime",
@@ -368,7 +546,7 @@ for (const theme of ["light", "dark"] as const) {
       "Construction emissions",
     ]);
     await reviewScreenshot(battery, {
-      path: info.outputPath(`build-rail-battery-${theme}.png`),
+      path: info.outputPath(`build-rail-battery-advanced-${theme}.png`),
     });
   });
 
@@ -447,11 +625,13 @@ for (const theme of ["light", "dark"] as const) {
         top: rail.top,
         bottom: rail.bottom,
         mapLeft: map.left,
+        mapRight: map.right,
         overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
     expect(geometry.left).toBeGreaterThanOrEqual(0);
-    expect(geometry.right).toBeLessThanOrEqual(geometry.mapLeft + 1);
+    expect(geometry.left).toBeGreaterThanOrEqual(geometry.mapLeft);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.mapRight);
     expect(geometry.top).toBeGreaterThanOrEqual(0);
     expect(geometry.bottom).toBeLessThanOrEqual(560);
     expect(geometry.overflow).toBeLessThanOrEqual(1);

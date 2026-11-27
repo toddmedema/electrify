@@ -157,11 +157,11 @@
   .gameDockAction.MuiButton-root {
     border: 0;
     border-radius: var(--radius-pill);
-    color: var(--interactive-strong);
+    color: var(--interactive-blue);
     @media (hover: hover) and (pointer: fine) {
       &:hover {
-        color: var(--interactive-strong);
-        background: var(--interactive-tint);
+        color: var(--interactive-blue);
+        background: var(--bg-selected);
       }
     }
     &.gameDockActionOpen {
@@ -280,7 +280,7 @@
   .screenCatalog > .cardList,
   .screenCatalog > .constructionHeader,
   .screenCatalog > .MuiToolbar-root,
-  .screenCatalog > .generatorComparison,
+  .screenCatalog > .generatorComparisonSlot,
   .buildOption,
   .insightsViewportToolbar,
   .insightsTracks {
@@ -523,6 +523,66 @@ html:has(
   }
 }
 
+// A compact map keeps its outgoing tool painted for one short, noninteractive slide.
+.mapPanelSlide {
+  display: contents;
+}
+
+@media (max-width: 699px), (pointer: coarse) {
+  .gameWorkspace[data-persistent-map="true"]:not([data-desktop-map="true"]) {
+    .gameStage[data-panel-count="0"] .gameToolTray:has(> .mapPanelSlide) {
+      display: flex;
+    }
+    .mapPanelSlide {
+      position: absolute;
+      display: flex;
+      inset: 0;
+      pointer-events: none;
+
+      &[data-leaving="true"] {
+        z-index: -1;
+      }
+      > .gameToolPanel {
+        pointer-events: auto;
+      }
+    }
+    .territoryNetwork > .mapPanelSlide {
+      z-index: 8;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .mapPanelSlide-enter,
+      .mapPanelSlide-exit-active {
+        opacity: 0;
+        transform: translateY(40px);
+      }
+      .mapPanelSlide-enter-active,
+      .mapPanelSlide-exit-active {
+        transition:
+          transform 180ms ease-out,
+          opacity 180ms ease-out;
+      }
+      .mapPanelSlide-enter-active {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  }
+}
+
+.gameWorkspace[data-persistent-map="true"] .gameToolPanel.tileWorkspaceSurface {
+  position: absolute;
+}
+
+// The project uses the shared panel header with its own anchored map placement.
+.gameWorkspace[data-persistent-map="true"]
+  .gameToolPanel.tileWorkspaceProject
+  > .gameToolBody {
+  > .projectCandidateContent {
+    flex: 0 1 auto;
+    height: auto;
+  }
+}
+
 .gameWorkspace[data-map-windows="true"] {
   .gameStage .gameToolTray {
     display: block;
@@ -536,7 +596,7 @@ html:has(
       border-color: var(--border-strong);
     }
   }
-  .gameToolHeader {
+  .gameToolPanel[data-resizable="true"] > .gameToolHeader {
     cursor: grab;
     touch-action: none;
     user-select: none;

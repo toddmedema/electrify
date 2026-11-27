@@ -23,6 +23,105 @@ async function openManual(page: import("@playwright/test").Page) {
   await expect(page.getByRole("heading", { name: "Manual" })).toBeVisible();
 }
 
+for (const theme of ["light", "dark"] as const) {
+  test(`the Symbol guide groups readable symbols in ${theme}`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript(
+      (mode) => localStorage.setItem("theme", mode),
+      theme,
+    );
+    await openManual(page);
+    await page
+      .getByRole("button", { name: "Symbol guide", exact: true })
+      .click();
+    const guide = page.getByRole("region", { name: "Symbol guide" });
+    await expect(guide.getByRole("list")).toHaveCount(4);
+    await expect(guide.getByRole("listitem")).toHaveCount(22);
+    const grid = guide.getByRole("heading", { name: "Grid", exact: true });
+    const controls = guide.getByRole("heading", {
+      name: "Controls & progress",
+    });
+    const narrow = page.viewportSize()!.width <= 390;
+    const [gridBox, controlsBox] = await Promise.all([
+      grid.boundingBox(),
+      controls.boundingBox(),
+    ]);
+    if (narrow) expect(controlsBox!.y).toBeGreaterThan(gridBox!.y);
+    else expect(controlsBox!.y).toBeCloseTo(gridBox!.y);
+
+    const supply = guide.getByRole("listitem").filter({ hasText: /^Supply$/ });
+    const demand = guide.getByRole("listitem").filter({ hasText: /^Demand$/ });
+    expect((await demand.boundingBox())!.x).toBeGreaterThan(
+      (await supply.boundingBox())!.x,
+    );
+    expect((await demand.boundingBox())!.y).toBeCloseTo(
+      (await supply.boundingBox())!.y,
+    );
+    expect(
+      await guide.evaluate(
+        (element) => element.scrollWidth - element.clientWidth,
+      ),
+    ).toBeLessThanOrEqual(1);
+
+    if (process.env.REVIEW_SCREENSHOT_DIR) {
+      // Keep the phone width when framing the whole scrollable guide.
+      const viewport = page.viewportSize()!;
+      if (narrow)
+        await page.setViewportSize({ width: viewport.width, height: 1040 });
+      await page
+        .locator(".manual-entry")
+        .filter({ has: guide })
+        .screenshot({
+          animations: "disabled",
+          path: path.join(
+            process.env.REVIEW_SCREENSHOT_DIR,
+            `symbol-guide-${testInfo.project.name}-${theme}.png`,
+          ),
+        });
+    }
+  });
+}
+
+test("manual navigation references keep the dock glyph beside the bold name", async ({
+  page,
+}) => {
+  await openManual(page);
+  await page
+    .getByRole("textbox", { name: "Search the manual" })
+    .fill("Set it in Programs");
+  const pricing = page.getByRole("region", { name: "Pricing", exact: true });
+  const programs = pricing.locator("strong").filter({ hasText: /^Programs$/ });
+  await expect(programs).toBeVisible();
+  await expect(programs.locator('[aria-hidden="true"] > svg')).toHaveAttribute(
+    "data-concept",
+    "customers",
+  );
+});
+
+test("manual entry titles keep their height when toggled", async ({ page }) => {
+  await openManual(page);
+  const title = page.getByRole("button", { name: "Customer programs" });
+  const measureTitle = () =>
+    title.evaluate((element) => ({
+      height: element.getBoundingClientRect().height,
+      dividerWidth: getComputedStyle(element).borderBottomWidth,
+    }));
+
+  await expect(title).toHaveAttribute("aria-expanded", "false");
+  const collapsed = await measureTitle();
+  await title.click();
+  await expect(title).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(measureTitle).toEqual({
+    height: collapsed.height,
+    dividerWidth: "0px",
+  });
+
+  await title.click();
+  await expect(title).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(measureTitle).toEqual(collapsed);
+});
+
 // The manual's list is the scroller, except on short windows (<=768x600) where #gameCard
 // takes over and the list stops scrolling (app.scss). These measurements find whichever one
 // actually is, so the assertions hold in both layouts. Playwright can't pass functions as

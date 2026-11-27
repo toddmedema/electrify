@@ -206,7 +206,7 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   });
   await expect(map).toBeVisible();
   const front = workspace.locator(
-    '[data-map-window-front="true"], .tileWorkspaceInspector:not([data-game-tool]), .tileWorkspaceBuilding',
+    ':is([data-map-window-front="true"], .tileWorkspaceInspector:not([data-game-tool]), .tileWorkspaceBuilding):not([inert] *)',
   );
   while (await front.count()) {
     if (
@@ -223,10 +223,24 @@ export async function returnToTerritoryMap(page: Page): Promise<Locator> {
   }
   await expect(
     workspace.locator(
-      ".gameToolPanel:visible, .tileWorkspaceInspector:visible, .tileWorkspaceBuilding:visible",
+      ".gameToolPanel:visible:not(.tileWorkspaceProject), .tileWorkspaceInspector:visible, .tileWorkspaceBuilding:visible",
     ),
   ).toHaveCount(0);
   return map;
+}
+
+/** Opt in to facility badges through the same layer controls as a player. */
+export async function showMapFacilityStatus(map: Locator): Promise<void> {
+  await map.getByRole("button", { name: "Map layers", exact: true }).click();
+  const layers = map.page().getByRole("dialog", {
+    name: "Map layers",
+    exact: true,
+  });
+  await layers
+    .getByRole("checkbox", { name: "Facility status", exact: true })
+    .check();
+  await layers.press("Escape");
+  await expect(layers).toHaveCount(0);
 }
 
 export async function readTerritoryMapCamera(viewport: Locator) {
@@ -287,7 +301,7 @@ export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
     .click();
   const catalogue = map.locator(".tileWorkspaceSurface");
   await expect(
-    catalogue.getByRole("heading", { name: "Plan a project", exact: true }),
+    catalogue.getByRole("heading", { name: "Build", exact: true }),
   ).toBeVisible();
   return catalogue;
 }

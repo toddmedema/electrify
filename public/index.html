@@ -134,25 +134,54 @@
           object-fit: contain;
         }
       }
+      html:not(.js) body {
+        margin: 0;
+      }
+      html:not(.js) #root {
+        overflow: auto;
+      }
       .app-loading {
         max-width: 36rem;
         margin: 0 auto;
-        padding: 48px 24px;
-        color: #17212b;
-        font-family: Inter, sans-serif;
+        padding: 48px 16px;
+        color: #172334;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
         line-height: 1.6;
       }
-      html[data-theme="dark"] .app-loading {
-        color: #f2f6f9;
+      .app-loading nav {
+        display: flex;
+        flex-wrap: wrap;
+        column-gap: 8px;
       }
       .app-loading a {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 44px;
         min-height: 44px;
-        margin-right: 16px;
-        color: #0084f8;
+        color: #576574;
+        font-size: 0.875rem;
+        text-decoration: underline;
+        text-decoration-color: #0084f8;
+        text-underline-offset: 0.18em;
       }
-      html[data-theme="dark"] .app-loading a {
-        color: #8bc8f8;
+      .app-loading a:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: 2px;
+      }
+      @media (prefers-color-scheme: dark) {
+        html:not(.js),
+        html:not(.js) body {
+          background: #0b1016;
+          color-scheme: dark;
+        }
+        .app-loading {
+          color: #e6edf5;
+        }
+        .app-loading a {
+          color: #9aa9ba;
+          text-decoration-color: #629be1;
+        }
       }
     </style>
     <meta
@@ -162,7 +191,7 @@
     <title>Electrify — Electricity Strategy Game</title>
     <meta
       name="description"
-      content="Play Electrify, a free electricity-market strategy game. Build power plants, balance supply and demand, manage costs, and make your grid cleaner."
+      content="Run a power grid in Electrify, a free strategy game. Choose which plants to build and what to charge for electricity as demand grows."
     />
     <link rel="canonical" href="https://electrifygame.com/" />
 
@@ -214,7 +243,7 @@
     />
     <meta
       name="twitter:description"
-      content="Play Electrify, a free electricity-market strategy game. Build power plants, balance supply and demand, manage costs, and make your grid cleaner."
+      content="Run a power grid in Electrify, a free strategy game. Choose which plants to build and what to charge for electricity as demand grows."
     />
     <meta name="twitter:creator" content="@ToddMedema" />
     <meta
@@ -244,7 +273,7 @@
     />
     <meta
       property="og:description"
-      content="Play Electrify, a free electricity-market strategy game. Build power plants, balance supply and demand, manage costs, and make your grid cleaner."
+      content="Run a power grid in Electrify, a free strategy game. Choose which plants to build and what to charge for electricity as demand grows."
     />
     <script type="application/ld+json">
       {
@@ -272,7 +301,7 @@
             "@id": "https://electrifygame.com/#game",
             "url": "https://electrifygame.com/",
             "name": "Electrify",
-            "description": "A free, research-backed strategy game about running an electric utility. Build power plants, balance supply and demand, manage costs, and reduce grid emissions.",
+            "description": "A free, research-backed strategy game where you run a power grid. Choose which plants to build and what to charge for electricity as demand grows.",
             "image": "https://electrifygame.com/images/gameplay-preview.png",
             "inLanguage": "en",
             "genre": ["Strategy", "Simulation", "Educational"],
@@ -337,22 +366,21 @@
     <div id="root" style="width: 100%; height: 100%">
       <main class="app-loading">
         <h1>Electrify</h1>
-        <p><strong>Take charge of the power markets.</strong></p>
         <p>
-          Build power plants, balance supply and demand, manage costs, and make
-          your grid cleaner in a free, research-backed strategy game.
+          You run the power grid in this free, research-backed strategy game.
+          Choose which plants to build and what to charge for electricity. When
+          the sun goes down, what will keep the lights on?
         </p>
         <noscript>
-          <p><strong>Enable JavaScript to load and play Electrify.</strong></p>
+          <p>Turn on JavaScript to play Electrify.</p>
         </noscript>
-        <nav aria-label="About Electrify">
-          <a href="%PUBLIC_URL%/about.html">About the game</a>
+        <nav aria-label="Explore Electrify">
           <a href="%PUBLIC_URL%/power-grid-simulator.html">How to play</a>
-          <a href="%PUBLIC_URL%/classroom.html">For teachers</a>
-          <a href="%PUBLIC_URL%/scenarios.html">Official scenarios</a>
-          <a href="%PUBLIC_URL%/data-centers.html"
-            >Data centers and your grid</a
-          >
+          <a href="%PUBLIC_URL%/scenarios.html">Scenarios</a>
+          <a href="%PUBLIC_URL%/classroom.html">Classroom</a>
+          <a href="%PUBLIC_URL%/data-centers.html">Data centers</a>
+          <a href="%PUBLIC_URL%/energy-simulators.html">Compare simulators</a>
+          <a href="%PUBLIC_URL%/about.html">About</a>
           <a href="%PUBLIC_URL%/privacy.html">Privacy</a>
         </nav>
       </main>

@@ -318,17 +318,15 @@ describe("GameAppBar", () => {
 
   it("labels the frame-aligned speeds and offers ULTRA only on desktop-sized screens", () => {
     const { unmount } = renderAppBar();
-    expect(
-      screen.getByRole("button", { name: "fast speed" }),
-    ).toHaveTextContent("12×");
+    const fast = screen.getByRole("button", { name: "fast speed" });
+    expect(fast).toHaveAttribute("title", "fast speed (12×)");
     expect(screen.queryByRole("button", { name: "ultra speed" })).toBeNull();
     unmount();
 
     mockDesktop = true;
     renderAppBar();
-    expect(
-      screen.getByRole("button", { name: "ultra speed" }),
-    ).toHaveTextContent("24×");
+    const ultra = screen.getByRole("button", { name: "ultra speed" });
+    expect(ultra).toHaveAttribute("title", "ultra speed (24×)");
   });
 
   it("drops ULTRA to FAST once the screen is no longer desktop-sized", () => {
@@ -418,9 +416,9 @@ describe("GameAppBar", () => {
       );
       expect(appbar.querySelectorAll(".gameStatusBar")).toHaveLength(1);
       // The months label keeps its full text for assistive tech and copy, only its tail can hide.
-      expect(appbar.querySelector(".missionSummaryMonths")).toHaveTextContent(
-        /^\d+ months left$/,
-      );
+      expect(
+        screen.getByRole("button", { name: /^\d+ months left$/ }),
+      ).toBeInTheDocument();
     } finally {
       window.matchMedia = matchMedia;
     }
@@ -495,6 +493,28 @@ describe("GameAppBar", () => {
   });
 
   /* eslint-enable testing-library/no-container, testing-library/no-node-access */
+
+  it.each([
+    [100, /Keep ≥80% of customer baseline/],
+    [116, /Acquire utilities \(0\/3\)/],
+  ] as const)(
+    "adds only an authored goal to the term button for scenario %i",
+    (scenarioId, goal) => {
+      const game = createGame({ scenarioId });
+      renderAppBar({ game: { ...game, inGame: true } });
+      const term = screen.getByRole("button", { name: /months left$/ });
+      expect(term).toHaveAccessibleDescription(goal);
+      expect(term).toHaveTextContent(goal);
+    },
+  );
+
+  it("shows the term alone when only the standard requirements apply", () => {
+    const game = createGame({ scenarioId: 104 });
+    renderAppBar({ game: { ...game, inGame: true } });
+    const term = screen.getByRole("button", { name: /months left$/ });
+    expect(term).not.toHaveAccessibleDescription();
+    expect(term).toHaveTextContent(/^\d+ months left$/);
+  });
 
   it("uses reachable reserve from the simulation rather than plant nameplates", () => {
     const game = createGame({ scenarioId: 101 });

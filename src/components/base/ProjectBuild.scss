@@ -8,21 +8,15 @@
   overflow: auto;
   min-height: 0;
   padding: 0 16px 12px;
+
+  > .tileConnectionBuild {
+    margin-top: 12px;
+  }
 }
-.projectCandidateHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  p {
-    flex: 1;
-    margin: 4px 0;
-    font-size: 13px;
-    color: var(--font-color-secondary);
-  }
-  button {
-    flex-shrink: 0;
-    min-height: 44px;
-  }
+.projectLocation {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--font-color-secondary);
 }
 .projectFacts {
   display: grid;
@@ -63,18 +57,6 @@
     font-size: 13px;
   }
 }
-.projectSiteLegend {
-  display: grid;
-  gap: 8px;
-  font-size: 13px;
-  span {
-    border-left: 3px solid var(--interactive-blue);
-    padding-left: 8px;
-  }
-  span + span {
-    border-left-style: dashed;
-  }
-}
 .tileWorkspaceProject .tileWorkspaceBody {
   display: flex;
   flex-direction: column;
@@ -84,13 +66,6 @@
 @media (max-width: 740px) {
   .tileWorkspaceSurface.tileWorkspaceProject {
     max-height: min(55%, calc(100% - var(--game-dock-clearance, 80px) - 176px));
-  }
-  .tileWorkspaceProject .tileWorkspaceHeading {
-    padding-block: 4px;
-  }
-  .tileWorkspaceProject .tileWorkspaceHeading h3 {
-    font-size: 16px;
-    line-height: 24px;
   }
   .tileWorkspaceProject .projectCandidateScroll {
     padding: 0 12px 8px;
@@ -111,9 +86,6 @@
     max-height: calc(100% - var(--game-dock-clearance, 80px) - 8px);
     overflow: auto;
     overscroll-behavior: contain;
-    .tileWorkspaceHeading {
-      padding-block: 4px;
-    }
     .tileWorkspaceBody {
       flex: none;
       overflow: visible;

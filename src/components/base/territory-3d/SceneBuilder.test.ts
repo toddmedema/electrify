@@ -8,13 +8,12 @@ import type { TerritoryTileView } from "../../../helpers/TerritoryMapState";
 import { HEX_NEIGHBORS, hexWires } from "../TerritoryHexGeometry";
 import { MeshBuilder } from "./MeshBuilder";
 import { SceneBuilder, structureKind } from "./SceneBuilder";
-import type { MapModel, Vec3 } from "./Types";
-import { GROUND_HEX_CORNERS, projectPoint, tilePosition3D } from "./Projection";
+import type { MapModel } from "./Types";
+import { GROUND_HEX_CORNERS } from "./Projection";
 import { surfaceHeight } from "./SurfaceHeight";
 import { getTerrainModel } from "./TerrainModels";
 import { getStructureModel } from "./StructureModels";
-import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
-import { TERRITORY_OWNER_PALETTE } from "../TerritoryMapLayout";
+import { buildSelectionBorder } from "./BorderGeometry";
 import { buildWildfireEmitters, isBurningTerrain } from "./WildfireFront";
 
 const model: MapModel = {
@@ -53,7 +52,16 @@ function view(q = 0): TerritoryTileView {
 }
 function setup() {
   const terrain = jest.fn(() => model),
-    structure = jest.fn(() => model);
+    structure = jest.fn<MapModel, Parameters<typeof getStructureModel>>(
+      (_kind, _growth, _size, stage) =>
+        stage === undefined
+          ? model
+          : {
+              ...model,
+              key: `${model.key}:construction:${stage}`,
+              terminals: stage === 3 ? model.terminals : [],
+            },
+    );
   return {
     builder: new SceneBuilder({ terrain, structure }),
     terrain,
@@ -434,174 +442,155 @@ test("submerged cable geometry reaches the land terminal", () => {
   expect(nearest).toBeLessThan(0.01);
 });
 
-test("power ticks reuse static terrain, structure and wire topology while construction stays live", () => {
+test("construction changes only at milestones, including after a jump or resume", () => {
   const tile = {
     ...view(),
     tile: { ...view().tile, terrain: "river" as const },
-    facility: { name: "Solar", fuel: "Sun", peakW: 1, yearsToBuildLeft: 1 },
+    facility: {
+      name: "Solar",
+      fuel: "Sun",
+      peakW: 1,
+      yearsToBuildLeft: 1,
+      yearsToBuild: 1,
+    },
   } satisfies TerritoryTileView;
   const { builder, terrain, structure } = setup(),
     tiles = [tile.tile];
-  const first = builder.build([tile], tiles, [], 0, "run");
-  expect(first[1].model.key).toContain("construction");
-  const second = builder.build([{ ...tile }], tiles, [], 100, "run");
-  expect(second).toBe(first);
-  const commissioned = builder.build(
-    [{ ...tile, facility: { ...tile.facility, yearsToBuildLeft: 0 } }],
-    tiles,
-    [],
-    200,
-    "run",
-  );
+  const build = (yearsToBuildLeft: number) =>
+    builder.build(
+      [{ ...tile, facility: { ...tile.facility, yearsToBuildLeft } }],
+      tiles,
+      [],
+      100,
+      "run",
+    );
+  const first = build(1);
+  expect(first[1].model.key).toBe("test-structure:construction:0");
+  expect(build(0.751)).toBe(first);
+  expect(build(0.75)[1].model.key).toBe("test-structure:construction:1");
+  expect(build(0.5)[1].model.key).toBe("test-structure:construction:2");
+  expect(build(0.25)[1].model.key).toBe("test-structure:construction:3");
+  expect(build(0.001)[1].model.key).toBe("test-structure:construction:3");
+  const commissioned = build(0);
   expect(commissioned[0]).toBe(first[0]);
   expect(commissioned[1].model).toBe(model);
   expect(terrain).toHaveBeenCalledTimes(1);
-  expect(structure).toHaveBeenCalledTimes(1);
+  expect(structure).toHaveBeenCalledTimes(5);
+  expect(build(0.7)[1].model.key).toBe("test-structure:construction:1");
 });
 
-const pickFrame = {
-  width: 1280,
-  height: 900,
-  cameraX: 0,
-  cameraY: 0,
-  scale: 0.875,
-};
-const flatGround: MapModel = {
-  ...model,
-  key: "ground",
-  parts: [
-    {
-      mesh: new MeshBuilder()
-        .quad(
-          [-0.5, 0, -0.5],
-          [0.5, 0, -0.5],
-          [0.5, 0, 0.5],
-          [-0.5, 0, 0.5],
-          [1, 1, 1],
-        )
-        .build(),
+test("keeps the existing grid connected while a new plant fits its own switchgear", () => {
+  const target = view();
+  const peer: TerritoryTileView = {
+    ...target,
+    ownerKey: "peer:1",
+    owned: false,
+    facility: {
+      name: "Solar",
+      fuel: "Sun",
+      peakW: 50e6,
+      yearsToBuild: 1,
+      yearsToBuildLeft: 0.5,
     },
-  ],
-};
-test("real mountain relief picks its own tile above the neighboring ground hex", () => {
-  const mountain = {
-    ...view(),
-    developed: false,
-    tile: { ...view().tile, terrain: "mountain" as const },
   };
-  const north = {
-    ...view(1),
-    developed: false,
-    tile: { ...view(1).tile, q: 0.5, r: -1 },
+  const neighbor = view(1);
+  const lake: TerritoryTileView = {
+    ...view(-1),
+    tile: { ...view(-1).tile, id: "green-uplands:site-3", terrain: "lake" },
   };
+  const tiles = [target.tile, neighbor.tile, lake.tile];
+  const wires = hexWires(
+    tiles,
+    () => true,
+    undefined,
+    ({ terrain }) => terrain === "lake",
+  );
   const builder = new SceneBuilder({
     terrain: getTerrainModel,
     structure: getStructureModel,
   });
-  const [terrain] = builder.build(
-    [mountain, north],
-    [mountain.tile, north.tile],
-    [],
-    0,
-    "run",
-  );
-  const relief = terrain.model.parts[1].mesh.positions;
-  let face = 0;
-  for (let i = 9; i < relief.length; i += 9) {
-    const highest = (start: number) =>
-      Math.max(relief[start + 1], relief[start + 4], relief[start + 7]);
-    if (highest(i) > highest(face)) face = i;
-  }
-  const centroid = (axis: number) =>
-    (relief[face + axis] + relief[face + axis + 3] + relief[face + axis + 6]) /
-    3;
-  const peak = projectPoint([centroid(0), centroid(1), centroid(2)], pickFrame);
-  for (const views of [
-    [mountain, north],
-    [north, mountain],
-  ]) {
-    builder.build(
-      views,
-      views.map((item) => item.tile),
-      [],
+  const build = (
+    yearsToBuildLeft: number,
+    yearsToBuild?: number,
+    links = wires,
+  ) => {
+    const scene = builder.build(
+      [
+        {
+          ...peer,
+          facility: { ...peer.facility!, yearsToBuildLeft, yearsToBuild },
+        },
+        neighbor,
+        lake,
+      ],
+      tiles,
+      links,
       0,
       "run",
     );
-    expect(builder.pick(peak, pickFrame)).toBe(mountain.tile.id);
-  }
-});
-test("picking follows solid elevated triangles and leaves gaps in a silhouette to the ground", () => {
-  const triangle: MapModel = {
-    ...model,
-    key: "triangle",
-    parts: [
-      {
-        mesh: new MeshBuilder()
-          .triangle([0, 0.1, 0], [0.4, 0.1, 0], [0, 0.5, 0], [1, 1, 1])
-          .build(),
-      },
-    ],
+    return {
+      plant: scene.find(({ id }) => id === `structure:${target.tile.id}`)!,
+      junction: scene.find(
+        ({ id }) => id === `grid-junction:${target.tile.id}`,
+      ),
+      wire: scene.find(({ id }) => id === "wires:0")!,
+    };
   };
-  const builder = new SceneBuilder({
-      terrain: () => flatGround,
-      structure: () => triangle,
+  const legacy = build(0.1);
+  expect(legacy.plant.model).toBe(getStructureModel("solar", [], "small", 0));
+  const installing = build(0.5, 1);
+  expect(installing.plant.model).toBe(
+    getStructureModel("solar", [], "small", 2),
+  );
+  expect(installing.junction).toBe(legacy.junction);
+  expect(installing.wire).toBe(legacy.wire);
+  const existingLink = installing.wire.model.connections!.find(
+    ({ kind }) => kind === "overhead",
+  )!;
+  const { model: junction, position } = installing.junction!;
+  expect(
+    junction.terminals.map(([x, y, z]) => [
+      x + position[0],
+      y + position[1],
+      z + position[2],
+    ]),
+  ).toContainEqual(existingLink.start);
+  expect(installing.wire.model.connections!).toContainEqual(
+    expect.objectContaining({
+      kind: "submerged",
+      from: target.tile.id,
+      to: lake.tile.id,
+      start: [0, 0.006, 0],
     }),
-    tile = view();
-  builder.build([tile], [tile.tile], [], 0, "run");
-  expect(builder.pick(projectPoint([0.05, 0.4, 0], pickFrame), pickFrame)).toBe(
-    tile.tile.id,
   );
-  expect(
-    builder.pick(projectPoint([0.35, 0.45, 0], pickFrame), pickFrame),
-  ).toBeUndefined();
-  expect(builder.pick(projectPoint([-0.3, 0, 0], pickFrame), pickFrame)).toBe(
-    tile.tile.id,
-  );
-  expect(
-    builder.pick(projectPoint([-0.6, 0, 0], pickFrame), pickFrame),
-  ).toBeUndefined();
-});
-test("picks distinct retained hexes that share a facility tile ID", () => {
-  const retained = [view(), view(2)].map((item) => ({
-    ...item,
-    developed: false,
-    tile: { ...item.tile, id: "green-uplands:legacy-100" as const },
-  }));
-  const builder = new SceneBuilder({
-    terrain: () => flatGround,
-    structure: () => model,
+
+  const commissioning = build(0.24, 1);
+  expect(commissioning.junction).toBeUndefined();
+  expect(commissioning.wire.model.connections).toHaveLength(2);
+  for (const installedLink of commissioning.wire.model.connections!) {
+    expect(installedLink.from).toBe(target.tile.id);
+    expect(commissioning.plant.model.terminals).toContainEqual(
+      installedLink.start,
+    );
+  }
+  expect(commissioning.plant).toMatchObject({
+    active: false,
+    producing: false,
   });
-  const tiles = retained.map(({ tile }) => tile);
-  builder.build(retained, tiles, [], 0, "run");
-  expect(
-    tiles.map((tile) =>
-      builder.pick(projectPoint(tilePosition3D(tile), pickFrame), pickFrame),
-    ),
-  ).toEqual(["retained:0:0", "retained:2:0"]);
-});
-test("picking uses camera depth instead of tile iteration order", () => {
-  const tall: MapModel = {
-    ...model,
-    key: "tall",
-    parts: [
-      {
-        mesh: new MeshBuilder()
-          .box([0, 0.45, 0], [0.3, 0.9, 0.3], [1, 1, 1])
-          .build(),
-      },
-    ],
-  };
-  const front = view(),
-    rear = { ...view(1), tile: { ...view(1).tile, q: 0.5, r: -1 } };
-  const builder = new SceneBuilder({
-    terrain: () => flatGround,
-    structure: () => tall,
-  });
-  builder.build([front, rear], [front.tile, rear.tile], [], 0, "run");
-  expect(builder.pick(projectPoint([0, 0.8, 0], pickFrame), pickFrame)).toBe(
-    front.tile.id,
+  expect(build(0, 1).wire).toBe(commissioning.wire);
+
+  const buried = build(
+    0.5,
+    1,
+    wires.filter(({ kind }) => kind === "submerged"),
   );
+  expect(buried.junction).toBeUndefined();
+  expect(buried.wire.model.connections![0]).toMatchObject({
+    kind: "submerged",
+    start: [0, 0.006, 0],
+  });
 });
+
 test("the selection mesh places two backed dashes on all six hex edges", () => {
   const { model } = buildSelectionBorder(view().tile);
   for (const [edge, [x, z]] of GROUND_HEX_CORNERS.entries()) {
@@ -617,82 +606,6 @@ test("the selection mesh places two backed dashes on all six hex edges", () => {
     expect(surfaceHeight(model, (x + nextX) / 2, (z + nextZ) / 2)).toBe(0);
   }
 });
-
-test("ownership edges and selection dashes cannot intercept ground picking", () => {
-  const land = { ...view(), developed: false };
-  const neighbor = { ...view(1), developed: false };
-  const builder = new SceneBuilder({
-    terrain: getTerrainModel,
-    structure: getStructureModel,
-  });
-  const tiles = [land.tile, neighbor.tile];
-  const scene = builder.build([land, neighbor], tiles, [], 0, "run");
-  const ownership = buildOwnershipBorder(
-    [land, neighbor],
-    TERRITORY_OWNER_PALETTE.light,
-    {},
-    false,
-  )!;
-  const selection = buildSelectionBorder(land.tile);
-  // The joined area has ten exposed edges with two quads for each painted stroke.
-  expect(ownership.model.parts[0].mesh.positions.length / 9).toBe(40);
-  // This point is inside a selection dash and also over the terrain below it.
-  const point = projectPoint([0.494, 0.012, -0.17], pickFrame);
-  expect(
-    builder.pick(point, pickFrame, undefined, [...scene, ownership, selection]),
-  ).toBe(land.tile.id);
-});
-test.each(["wind", "offshore-wind"] as const)(
-  "picks the actual %s blade at signed retained phases and misses its mirrored pose",
-  (kind) => {
-    const wind = getStructureModel(kind),
-      rotor = wind.parts.find((part) => part.motion === "rotor")!,
-      builder = new SceneBuilder({
-        terrain: () => flatGround,
-        structure: () => wind,
-      }),
-      tile = view();
-    builder.build([tile], [tile.tile], [], 0, "run");
-    // Pick inside the uppermost front-facing real blade triangle, above the tower.
-    let blade: Vec3 = [0, 0, 0];
-    for (let i = 0; i < rotor.mesh.positions.length; i += 9) {
-      if (rotor.mesh.normals[i + 2] < 0.4) continue;
-      const coordinate = (axis: number) =>
-        (rotor.mesh.positions[i + axis] +
-          rotor.mesh.positions[i + 3 + axis] +
-          rotor.mesh.positions[i + 6 + axis]) /
-        3;
-      const center: Vec3 = [coordinate(0), coordinate(1), coordinate(2)];
-      if (center[1] > blade[1]) blade = center;
-    }
-    expect(blade[1]).toBeGreaterThan(0.15);
-    for (const phase of [0.2, -0.2]) {
-      // Independent clockwise expectation, deliberately not the production angle helper.
-      const point = projectPoint(
-          [
-            blade[0] * Math.cos(phase) +
-              blade[1] * Math.sin(phase) +
-              rotor.position![0],
-            -blade[0] * Math.sin(phase) +
-              blade[1] * Math.cos(phase) +
-              rotor.position![1],
-            blade[2] + rotor.position![2],
-          ],
-          pickFrame,
-        ),
-        motionPhase = (key: string) =>
-          key === `structure:${tile.tile.id}` ? phase : 0;
-      expect(builder.pick(point, pickFrame, motionPhase)).toBe(tile.tile.id);
-      expect(
-        builder.pick(
-          { ...point, x: pickFrame.width - point.x },
-          pickFrame,
-          motionPhase,
-        ),
-      ).toBeUndefined();
-    }
-  },
-);
 
 function operatingView() {
   const game = createGame({ scenarioId: 116, seed: 188 });
@@ -797,7 +710,7 @@ it("uses storage power instead of energy capacity for the construction model", (
     0,
     "run",
   );
-  expect(building.model.key).toBe("structure:battery:small:construction");
+  expect(building.model.key).toBe("structure:battery:small:construction:0");
 });
 
 it("follows measured production through idle, pause and construction without changing motion identity", () => {
@@ -983,6 +896,23 @@ test("hail hits the ground and panels, then leaves only fractured panels during 
   });
   expect(surfaces).toEqual(expect.arrayContaining(["ground", "panel"]));
   expect(damaged.model.key).toBe("structure:solar-hail-damaged:small");
+  const unbuilt = builder.build(
+    [
+      {
+        ...tile,
+        facility: { ...tile.facility!, yearsToBuildLeft: 1, yearsToBuild: 1 },
+        disaster: { hail: "impact", condition: "Hail strike" },
+      },
+    ],
+    board,
+    [],
+    20,
+    "run",
+  );
+  expect(unbuilt).toHaveLength(2);
+  expect(unbuilt[1].model.parts).toEqual(
+    getStructureModel("solar", [], "small", 0).parts,
+  );
   expect(damaged.model.terminals).toEqual(intact.model.terminals);
   expect(damaged.model.parts[0].mesh.positions).not.toEqual(
     intact.model.parts[0].mesh.positions,

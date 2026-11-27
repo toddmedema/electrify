@@ -94,8 +94,19 @@
   align-items: center;
   gap: 8px;
   min-height: 44px;
-  font-size: 0.9375rem;
+  font-size: 1.1875rem;
   font-weight: 700;
+}
+
+.scenario-related__heading .scenario-text-link {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-decoration-color: var(--brand);
+}
+
+.scenario-related__heading .scenario-text-link:hover {
+  color: var(--brand-hover);
 }
 
 .scenario-play-note {
@@ -207,7 +218,7 @@
 
 .scenario-decision-number {
   padding-top: 2px;
-  color: var(--brand-strong);
+  color: var(--text-muted);
   font-size: 0.875rem;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
@@ -226,7 +237,7 @@
   padding: 40px;
   border-radius: 12px;
   background: var(--surface-soft);
-  border-left: 4px solid var(--brand-strong);
+  border-left: 4px solid var(--brand);
 }
 
 .scenario-invitation h2 {
@@ -283,7 +294,7 @@
 
 .scenario-entry__link:hover h3,
 .scenario-entry__link:focus-visible h3 {
-  color: var(--brand-strong);
+  color: var(--brand);
   text-decoration: underline;
   text-underline-offset: 0.16em;
 }
@@ -319,9 +330,13 @@
   display: inline-flex;
   gap: 8px;
   margin-top: 16px;
-  color: var(--brand-strong);
+  color: var(--text);
   font-size: 0.8125rem;
   font-weight: 700;
+}
+
+.scenario-entry__more [aria-hidden="true"] {
+  color: var(--brand);
 }
 
 .scenario-entry--compact .scenario-entry__link {
@@ -423,7 +438,7 @@
 }
 
 .scenario-theme-nav a:hover {
-  border-color: var(--brand-strong);
+  border-color: var(--brand);
   background: var(--brand-wash);
 }
 
@@ -697,9 +712,5 @@
   .scenario-site .site-footer__inner {
     align-items: start;
     gap: 12px;
-  }
-
-  .scenario-site .site-footer nav {
-    gap: 4px 16px;
   }
 }

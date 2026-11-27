@@ -1,10 +1,8 @@
 /* eslint-disable testing-library/prefer-screen-queries -- Playwright owns browser queries. */
-import { expect, test } from "@playwright/test";
-import type { Page, TestInfo } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "./fixtures";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { crossplayFixture, installSteamBridge } from "./crossplay-fixture";
-import { isolateAnalytics } from "./fixtures";
 import { reviewScreenshot } from "./review-screenshot";
 
 const lobby = (page: Page) =>
@@ -15,7 +13,6 @@ const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
 
 async function enter(page: Page) {
-  await isolateAnalytics(page.context());
   await page.goto("/");
   await mainEntry(page).click();
   await expect(lobby(page)).toBeVisible();
@@ -149,7 +146,7 @@ async function saveAndResume(
 for (const steamHost of [false, true]) {
   test(`simulated relay lets ${steamHost ? "Steam" : "web"} host cross-play`, async ({
     page,
-    browser,
+    newIsolatedContext,
   }, testInfo) => {
     test.skip(
       testInfo.project.name !== "desktop-chromium" ||
@@ -158,7 +155,7 @@ for (const steamHost of [false, true]) {
     );
     const fixture = crossplayFixture();
     await fixture.prepareCheckpoints();
-    const otherContext = await browser.newContext({ ...testInfo.project.use });
+    const otherContext = await newIsolatedContext({ ...testInfo.project.use });
     let host: Page | undefined;
     try {
       const other = await otherContext.newPage();
@@ -229,12 +226,12 @@ for (const steamHost of [false, true]) {
 
 test("two browsers can start and advance a shared game with simulated relay", async ({
   page,
-  browser,
+  newIsolatedContext,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-390px", "Phone hosting journey.");
   const fixture = crossplayFixture();
   await fixture.prepareCheckpoints();
-  const guestContext = await browser.newContext({ ...testInfo.project.use });
+  const guestContext = await newIsolatedContext({ ...testInfo.project.use });
   try {
     const guest = await guestContext.newPage();
     await Promise.all([
@@ -284,17 +281,16 @@ test("the unified web lobby keeps the join and host controls visible", async ({
 
 test("a copied web invite opens the join prompt and admits the guest directly", async ({
   page,
-  browser,
+  newIsolatedContext,
 }, info) => {
   const fixture = crossplayFixture();
-  const guestContext = await browser.newContext({ ...info.project.use });
+  const guestContext = await newIsolatedContext({ ...info.project.use });
   try {
     const guest = await guestContext.newPage();
     await Promise.all([
       fixture.install(page, "web"),
       fixture.install(guest, "web"),
     ]);
-    await isolateAnalytics(guestContext);
     await page
       .context()
       .grantPermissions(["clipboard-read", "clipboard-write"]);

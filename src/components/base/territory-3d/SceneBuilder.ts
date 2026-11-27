@@ -15,6 +15,7 @@ import {
 } from "../../../helpers/TerritoryMapState";
 import { combustibleTile } from "../../../helpers/TerritoryWildfire";
 import {
+  facilityConstructionStage,
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
@@ -24,32 +25,19 @@ import { hailModel } from "./Hailstones";
 import { getTowerConstructionModel } from "./StructureModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
-import { CAMERA_COS, CAMERA_SIN, tilePosition3D } from "./Projection";
-import { rotorAngle } from "./RotorPose";
-import { HEX_WIDTH } from "../TerritoryHexGeometry";
+import { tilePosition3D } from "./Projection";
+import { surfaceHeight } from "./SurfaceHeight";
 import type {
+  FacilityConstructionStage,
   FacilitySize,
   MapInstance,
   MapModel,
-  ModelPart,
-  MapFrame,
   MapWireConnection,
   StructureKind,
   TerrainModelOptions,
   Vec3,
 } from "./Types";
 
-import { WATERSHED_LEVEL_OFFSETS, waterLevelOffset } from "./WaterSurface";
-
-/** Undefined allows ground hit testing; null means the point is outside the painted frame. */
-export type ScenePicker = (point: {
-  x: number;
-  y: number;
-}) => TerritoryMapTileKey | null | undefined;
-type PickFrame = Pick<
-  MapFrame,
-  "width" | "height" | "cameraX" | "cameraY" | "scale" | "weather"
->;
 interface TileScene {
   weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
@@ -58,14 +46,15 @@ interface TileScene {
   growth?: readonly CityGrowthSector[];
   terrain: MapInstance;
   model?: MapModel;
+  construction?: { stage: FacilityConstructionStage; model: MapModel };
+  gridJunction?: MapInstance;
   structure?: MapInstance;
   hail?: MapInstance;
 }
-
-function waterRange(part: ModelPart) {
-  return part.material === "watershed-water"
-    ? WATERSHED_LEVEL_OFFSETS
-    : part.waterLevelRange;
+interface WireEndpoint {
+  position: Vec3;
+  model?: MapModel;
+  gridJunction?: MapInstance;
 }
 
 function fillFraction(
@@ -94,50 +83,13 @@ function reservoirFill(facility?: FacilityOperatingType) {
     : undefined;
 }
 
-const pickBounds = new WeakMap<MapModel, readonly number[]>();
-function bounds(model: MapModel): readonly number[] {
-  const cached = pickBounds.get(model);
-  if (cached) return cached;
-  const value = [Infinity, -Infinity, Infinity, -Infinity];
-  for (const part of model.parts) {
-    if (part.motion === "steam") continue;
-    const vertices = part.mesh.positions,
-      offset = part.position ?? [0, 0, 0],
-      [empty, full] = waterRange(part) ?? [0, 0];
-    for (let i = 0; i < vertices.length; i += 3) {
-      const radius =
-        part.motion === "rotor" || part.motion === "sway"
-          ? Math.hypot(vertices[i], vertices[i + 1])
-          : undefined;
-      const x0 = offset[0] + (radius === undefined ? vertices[i] : -radius),
-        x1 = offset[0] + (radius === undefined ? vertices[i] : radius),
-        y0 =
-          offset[1] +
-          (radius === undefined ? vertices[i + 1] : -radius) -
-          (part.motion === "flow" ? 0.018 : 0) +
-          Math.min(empty, full),
-        y1 =
-          offset[1] +
-          (radius === undefined ? vertices[i + 1] : radius) +
-          (part.motion === "flow" ? 0.018 : 0) +
-          Math.max(empty, full),
-        z = offset[2] + vertices[i + 2];
-      value[0] = Math.min(value[0], x0);
-      value[1] = Math.max(value[1], x1);
-      value[2] = Math.min(value[2], z * CAMERA_SIN - y1 * CAMERA_COS);
-      value[3] = Math.max(value[3], z * CAMERA_SIN - y0 * CAMERA_COS);
-    }
-  }
-  pickBounds.set(model, value);
-  return value;
-}
-
 export interface ModelFactories {
   terrain: (terrain: TerrainType, options?: TerrainModelOptions) => MapModel;
   structure: (
     kind: StructureKind,
     growth?: readonly CityGrowthSector[],
     size?: FacilitySize,
+    stage?: FacilityConstructionStage,
   ) => MapModel;
 }
 const fuelModels: Record<FuelNameType, StructureKind> = {
@@ -170,8 +122,15 @@ export function structureKind(
       : facility.name === "Iron-Air Battery"
         ? "iron-air"
         : "battery";
-  if (facility?.fuel === "Natural Gas" && facility.name === "Natural Gas Steam")
-    return "gas-steam";
+  if (facility?.fuel === "Natural Gas") {
+    if (facility.name === "Natural Gas Steam") return "gas-steam";
+    if (facility.name === "Natural Gas CC") return "gas-combined-cycle";
+  }
+  if (
+    facility?.fuel === "Geothermal" &&
+    facility.name === "Enhanced Geothermal"
+  )
+    return "enhanced-geothermal";
   if (facility?.fuel === "Sun" && view.disaster?.hail)
     return "solar-hail-damaged";
   if (facility?.fuel) return fuelModels[facility.fuel];
@@ -200,13 +159,13 @@ function terminal(
   );
   return add(position, selected);
 }
-const constructionModels = new WeakMap<MapModel, MapModel>();
-function underConstruction(model: MapModel): MapModel {
-  const cached = constructionModels.get(model);
+const retrofitModels = new WeakMap<MapModel, MapModel>();
+function offlineRetrofitModel(model: MapModel): MapModel {
+  const cached = retrofitModels.get(model);
   if (cached) return cached;
   const value: MapModel = {
     ...model,
-    key: `${model.key}:construction`,
+    key: `${model.key}:retrofit`,
     parts: model.parts.map((part) => {
       const colors = new Float32Array(part.mesh.colors.length);
       for (let i = 0; i < colors.length; i += 3) {
@@ -221,13 +180,56 @@ function underConstruction(model: MapModel): MapModel {
       return { ...part, mesh: { ...part.mesh, colors } };
     }),
   };
-  constructionModels.set(model, value);
+  retrofitModels.set(model, value);
   return value;
+}
+
+// A low junction at the front corner keeps the existing grid continuous while the
+// site's own switchgear is absent. The center of the tile belongs to the project.
+const gridJunctionOffset: Vec3 = [0.3, 0, 0.35];
+const gridJunctionTerminals: readonly Vec3[] = [
+  [-0.026, 0.078, 0],
+  [0.026, 0.078, 0],
+];
+const gridJunctionMesh = new MeshBuilder()
+  .box([0, -0.009, 0], [0.084, 0.05, 0.048], PALETTE.rock)
+  .box([0, 0.033, 0], [0.077, 0.034, 0.042], PALETTE.steelShade);
+for (const [x, y, z] of gridJunctionTerminals)
+  gridJunctionMesh.cylinder([x, 0.05, z], 0.01, 0.008, y - 0.05, PALETTE.cream);
+const gridJunctionModel: MapModel = {
+  key: "structure:construction-grid-junction",
+  parts: [{ mesh: gridJunctionMesh.build(), castsShadow: true }],
+  terminals: gridJunctionTerminals,
+  footprint: 0.1,
+  height: 0.078,
+};
+
+function gridJunction(
+  terrain: MapInstance,
+  tileKey: TerritoryMapTileKey,
+): MapInstance {
+  const [x, , z] = gridJunctionOffset;
+  // Trees and farm props must not lift the junction above the terrain.
+  const y = surfaceHeight(
+    terrain.model,
+    x,
+    z,
+    terrain.model.supportY === undefined,
+  );
+  return {
+    id: `grid-junction:${tileKey}`,
+    position: add(terrain.position, [x, y, z]),
+    fog: terrain.fog,
+    active: false,
+    model: gridJunctionModel,
+  };
 }
 
 /** Static wire geometry changes with topology/terminals, never with every power tick. */
 export class SceneBuilder {
   private wireKey?: string;
+  private wires?: readonly HexWire[];
+  private overheadWireTiles = new Set<string>();
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
   private terrainAt = new Map<string, TerrainType>();
@@ -253,8 +255,16 @@ export class SceneBuilder {
       this.cells.clear();
       this.wireKey = undefined;
     }
-    const models = new Map<string, MapModel>();
-    const positions = new Map<string, Vec3>();
+    const endpoints = new Map<string, WireEndpoint>();
+    if (wires !== this.wires) {
+      this.wires = wires;
+      this.overheadWireTiles.clear();
+      for (const wire of wires)
+        if (wire.kind === "overhead") {
+          this.overheadWireTiles.add(wire.from);
+          this.overheadWireTiles.add(wire.to);
+        }
+    }
     const byId = new Map<string, TerritoryTileView>(
       views.map((view) => [territoryMapTileKey(view.tile), view]),
     );
@@ -352,11 +362,16 @@ export class SceneBuilder {
         cell.terrain = { ...cell.terrain, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
-      if (model) models.set(tileKey, model);
-      positions.set(tileKey, position);
+      const endpoint: WireEndpoint = { position };
+      endpoints.set(tileKey, endpoint);
       instances.push(cell.terrain);
       if (!model) continue;
-      if (kind === "solar-hail-damaged" && view.disaster?.hail === "impact") {
+      const stage = size ? facilityConstructionStage(view.facility) : undefined;
+      if (
+        stage === undefined &&
+        kind === "solar-hail-damaged" &&
+        view.disaster?.hail === "impact"
+      ) {
         cell.hail ??= {
           id: `hail:${tileKey}`,
           model: hailModel(cell.terrain.model, model, tile.q, tile.r),
@@ -371,6 +386,12 @@ export class SceneBuilder {
         view.facility && !tile.city && view.operatingFacility
           ? facilityOperatingStatus(view.operatingFacility, minute)
           : facilityMapStatus(view, minute);
+      if (stage !== undefined && kind && cell.construction?.stage !== stage)
+        cell.construction = {
+          stage,
+          model: this.factories.structure(kind, undefined, size, stage),
+        };
+      else if (stage === undefined) cell.construction = undefined;
       const connection = view.connection;
       const displayedModel =
           kind === "tower" && connection
@@ -378,14 +399,24 @@ export class SceneBuilder {
                 (minute - connection.startedMinute) /
                   (connection.towerMinute - connection.startedMinute),
               )
-            : status?.kind === "construction"
-              ? underConstruction(model)
-              : model,
+            : (cell.construction?.model ??
+              (status?.kind === "construction"
+                ? offlineRetrofitModel(model)
+                : model)),
         producing = status?.kind === "producing",
         active = producing || status?.kind === "charging",
         motionKey = view.operatingFacility
           ? `${runKey}:facility:${view.operatingFacility.id}`
           : undefined;
+      // Commissioning and the completed plant share the same fitted terminals.
+      if (stage === undefined || displayedModel.terminals.length)
+        endpoint.model = model;
+      else if (this.overheadWireTiles.has(tileKey)) {
+        cell.gridJunction ??= gridJunction(cell.terrain, tileKey);
+        instances.push(cell.gridJunction);
+        endpoint.gridJunction = cell.gridJunction;
+      }
+      const onPlayerGrid = tile.city && view.owned ? true : undefined;
       const waterLevel = tile.city
         ? undefined
         : reservoirFill(view.operatingFacility);
@@ -394,7 +425,8 @@ export class SceneBuilder {
         cell.structure.active !== active ||
         cell.structure.producing !== producing ||
         cell.structure.motionKey !== motionKey ||
-        cell.structure.waterLevel !== waterLevel
+        cell.structure.waterLevel !== waterLevel ||
+        cell.structure.onPlayerGrid !== onPlayerGrid
       )
         cell.structure = {
           id: `structure:${tileKey}`,
@@ -405,16 +437,24 @@ export class SceneBuilder {
           producing,
           motionKey,
           waterLevel,
+          onPlayerGrid,
         };
       instances.push(cell.structure);
     }
     for (const id of this.cells.keys())
       if (!byId.has(id)) this.cells.delete(id);
+    const wireEndpoint = (id: string, kind: HexWire["kind"]) => {
+      const endpoint = endpoints.get(id);
+      return kind === "overhead"
+        ? (endpoint?.gridJunction ?? endpoint)
+        : endpoint;
+    };
     const key = wires
-      .map(
-        (wire) =>
-          `${wire.id}:${wire.kind}:${models.get(wire.from)?.key}:${models.get(wire.to)?.key}:${byId.get(wire.from)?.visibilityDistance}:${byId.get(wire.to)?.visibilityDistance}`,
-      )
+      .map(({ id, kind, from, to }) => {
+        const a = wireEndpoint(from, kind);
+        const b = wireEndpoint(to, kind);
+        return `${id}:${kind}:${a?.model?.key}:${b?.model?.key}:${a?.position[1]}:${b?.position[1]}:${byId.get(from)?.visibilityDistance}:${byId.get(to)?.visibilityDistance}`;
+      })
       .join("|");
     if (key !== this.wireKey) {
       this.wireKey = key;
@@ -426,11 +466,11 @@ export class SceneBuilder {
       ];
       const connections: MapWireConnection[][] = [[], [], [], []];
       for (const wire of wires) {
-        const from = positions.get(wire.from),
-          to = positions.get(wire.to);
+        const from = wireEndpoint(wire.from, wire.kind),
+          to = wireEndpoint(wire.to, wire.kind);
         if (!from || !to) continue;
-        const a = terminal(models.get(wire.from), from, to),
-          b = terminal(models.get(wire.to), to, from);
+        const a = terminal(from.model, from.position, to.position),
+          b = terminal(to.model, to.position, from.position);
         const fog = Math.max(
           byId.get(wire.from)!.visibilityDistance,
           byId.get(wire.to)!.visibilityDistance,
@@ -518,107 +558,5 @@ export class SceneBuilder {
     )
       this.instances = instances;
     return this.instances;
-  }
-
-  /** Pick the nearest solid terrain or structure triangle; silhouette gaps retain the ground tile. */
-  pick(
-    point: { x: number; y: number },
-    frame: PickFrame,
-    motionPhase?: (key: string) => number,
-    instances: readonly MapInstance[] = this.instances,
-  ): TerritoryMapTileKey | undefined {
-    if (frame.scale <= 0) return undefined;
-    const x =
-        ((point.x - frame.width / 2) / frame.scale + frame.cameraX) / HEX_WIDTH,
-      y =
-        ((point.y - frame.height / 2) / frame.scale + frame.cameraY) /
-        HEX_WIDTH;
-    let depth = -Infinity,
-      tileKey: TerritoryMapTileKey | undefined;
-    for (const instance of instances) {
-      if (
-        !instance.id.startsWith("terrain:") &&
-        !instance.id.startsWith("structure:")
-      )
-        continue;
-      const px = x - instance.position[0],
-        py =
-          y -
-          instance.position[2] * CAMERA_SIN +
-          instance.position[1] * CAMERA_COS,
-        box = bounds(instance.model);
-      if (px < box[0] || px > box[1] || py < box[2] || py > box[3]) continue;
-      for (const part of instance.model.parts) {
-        if (
-          part.motion === "steam" ||
-          (part.hideWhenInactive && !instance.active)
-        )
-          continue;
-        const phase = part.motion
-            ? (motionPhase?.(instance.motionKey ?? instance.id) ?? 0) +
-              (part.phaseOffset ?? 0) * Math.PI * 2
-            : 0,
-          angle =
-            part.motion === "rotor"
-              ? rotorAngle(phase)
-              : part.motion === "sway"
-                ? Math.sin(phase) * 0.045
-                : 0,
-          range = waterRange(part),
-          rise =
-            (part.motion === "flow" ? Math.sin(phase) * 0.018 : 0) +
-            (range
-              ? waterLevelOffset(
-                  range,
-                  part.material === "watershed-water"
-                    ? frame.weather?.waterLevel
-                    : instance.waterLevel,
-                )
-              : 0),
-          c = Math.cos(angle),
-          s = Math.sin(angle),
-          offset = part.position ?? [0, 0, 0],
-          positions = part.mesh.positions;
-        const vertex = (i: number) => {
-          const vx = positions[i] * c - positions[i + 1] * s + offset[0],
-            vy = positions[i] * s + positions[i + 1] * c + offset[1] + rise,
-            vz = positions[i + 2] + offset[2];
-          return [
-            vx,
-            vz * CAMERA_SIN - vy * CAMERA_COS,
-            vy * CAMERA_SIN + vz * CAMERA_COS,
-          ];
-        };
-        for (let i = 0; i < positions.length; i += 9) {
-          const a = vertex(i),
-            b = vertex(i + 3),
-            d = vertex(i + 6),
-            denominator =
-              (b[1] - d[1]) * (a[0] - d[0]) + (d[0] - b[0]) * (a[1] - d[1]);
-          if (Math.abs(denominator) < 1e-12) continue;
-          const u =
-              ((b[1] - d[1]) * (px - d[0]) + (d[0] - b[0]) * (py - d[1])) /
-              denominator,
-            v =
-              ((d[1] - a[1]) * (px - d[0]) + (a[0] - d[0]) * (py - d[1])) /
-              denominator,
-            w = 1 - u - v;
-          if (u < -1e-7 || v < -1e-7 || w < -1e-7) continue;
-          const hitDepth =
-            u * a[2] +
-            v * b[2] +
-            w * d[2] +
-            instance.position[1] * CAMERA_SIN +
-            instance.position[2] * CAMERA_COS;
-          if (hitDepth > depth) {
-            depth = hitDepth;
-            tileKey = instance.id.startsWith("structure:")
-              ? (instance.id.slice(10) as TerritoryMapTileKey)
-              : (instance.id.slice(8) as TerritoryMapTileKey);
-          }
-        }
-      }
-    }
-    return tileKey;
   }
 }

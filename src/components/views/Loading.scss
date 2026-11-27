@@ -66,43 +66,14 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .missionLoadingPlug {
-      animation: missionLoadingBob 1.6s ease-in-out infinite;
-    }
-
-    .missionLoadingSpark {
-      animation: missionLoadingWink 1.6s ease-out infinite;
+    .missionLoadingArt {
+      animation: missionLoadingSpin 3.2s linear infinite;
     }
   }
 }
 
-@keyframes missionLoadingBob {
-  0%,
-  50%,
-  100% {
-    transform: translateY(0);
-  }
-
-  30% {
-    transform: translateY(-4px);
-  }
-}
-
-@keyframes missionLoadingWink {
-  0%,
-  48% {
-    opacity: 0;
-    transform: rotate(calc(var(--spark-direction) * 45deg)) scale(0.5);
-  }
-
-  55% {
-    opacity: 1;
-  }
-
-  72%,
-  100% {
-    opacity: 0;
-    transform: translate(calc(var(--spark-direction) * 5px), -4px)
-      rotate(calc(var(--spark-direction) * 45deg));
+@keyframes missionLoadingSpin {
+  to {
+    transform: rotate(1turn);
   }
 }

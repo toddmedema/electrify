@@ -46,12 +46,9 @@ export default function GameMenu({
       >
         <MoreVertIcon />
         {!online && (
-          <>
-            <span className="offlineDot" aria-hidden="true" />
-            <span id={descriptionId} className="srOnly">
-              Offline: saving to this device only
-            </span>
-          </>
+          <span id={descriptionId} className="srOnly">
+            Offline: saving to this device only
+          </span>
         )}
       </IconButton>
       <Menu

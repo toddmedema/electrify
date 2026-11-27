@@ -20,12 +20,13 @@ type SurfaceProps = {
   closeLabel?: string;
   title: string;
   titleIconSrc?: string;
+  /** Inline glyph (for example a MUI icon) shown before the title instead of `titleIconSrc`. */
+  titleIcon?: React.ReactNode;
   /** Changes only for explicit activation or a new kind of tile content. */
   focusKey: React.Key;
   subtitle?: React.ReactNode;
   building?: boolean;
   wide?: boolean;
-  projectCandidate?: boolean;
   initialFocusSelector?: string;
   returnFocusSelector?: string;
   onClose: () => void;
@@ -55,11 +56,11 @@ export default function TileWorkspaceSurface({
   closeLabel = "Close tile",
   title,
   titleIconSrc,
+  titleIcon,
   focusKey,
   subtitle,
   building,
   wide,
-  projectCandidate,
   initialFocusSelector,
   returnFocusSelector = ".territoryMapBuyToggle",
   onClose,
@@ -111,7 +112,7 @@ export default function TileWorkspaceSurface({
       role="dialog"
       aria-labelledby={titleId}
       id={stacked ? "tool-TILE" : id}
-      className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${wide ? " tileWorkspaceWide" : ""}${building ? " tileWorkspaceBuilding" : ""}${projectCandidate ? " tileWorkspaceProject" : ""}`}
+      className={`tileWorkspaceSurface${inspector ? " tileWorkspaceInspector" : ""}${wide ? " tileWorkspaceWide" : ""}${building ? " tileWorkspaceBuilding" : ""}`}
       data-game-tool={stacked ? "TILE" : undefined}
       data-map-window-front={front}
       style={window && { zIndex: window.stackingIndex }}
@@ -147,13 +148,17 @@ export default function TileWorkspaceSurface({
             tabIndex={-1}
             ref={heading}
           >
-            {titleIconSrc && (
+            {titleIconSrc ? (
               <img
                 className="tileWorkspaceTitleIcon"
                 src={titleIconSrc}
                 alt=""
               />
-            )}
+            ) : titleIcon ? (
+              <span className="tileWorkspaceTitleIcon" aria-hidden="true">
+                {titleIcon}
+              </span>
+            ) : null}
             {title}
           </Typography>
           {subtitle && (

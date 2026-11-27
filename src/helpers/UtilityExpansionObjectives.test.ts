@@ -3,7 +3,10 @@ import type {
   ObjectiveContext,
   ObjectiveMonthFacts,
 } from "../data/ScenarioObjectives";
-import { UTILITY_EXPANSION_OBJECTIVES } from "../data/UtilityExpansionObjectives";
+import {
+  UTILITY_EXPANSION_OBJECTIVES,
+  VALLEY_TWO_GOAL_OBJECTIVES,
+} from "../data/UtilityExpansionObjectives";
 import { EMPTY_HISTORY } from "./DateTime";
 import {
   createObjectiveProgress,
@@ -52,7 +55,7 @@ function observe(
   return result;
 }
 const objective = (metric: CompiledRuleObjective["metric"]) =>
-  UTILITY_EXPANSION_OBJECTIVES.find((value) => value.metric === metric)!;
+  VALLEY_TWO_GOAL_OBJECTIVES.find((value) => value.metric === metric)!;
 
 test("three distinct eligible sellers satisfy the acquisition deadline", () => {
   const acquisition = objective("utilityOwnership");
@@ -73,7 +76,7 @@ test("three distinct eligible sellers satisfy the acquisition deadline", () => {
   ).toMatchObject({ status: "completed", observed: 3, target: 3 });
 });
 
-test("one aggregate retention goal is judged only in December 2024", () => {
+test("the retired aggregate retention goal was judged only in December 2024", () => {
   const retention = objective("customerRetention");
   const baseline = 90000 + 179112 + 56324;
   expect(observe(retention, 238, {}, baseline, 1).status).toBe("pending");
@@ -134,10 +137,8 @@ test("rebasing acquisition evidence preserves facts and renews all consistency c
   expect(rebased.completedMonths).toBe(original.completedMonths);
   expect(rebased.retentionBaseline).toBe(269112);
   expect(
-    evaluateScenarioObjectives(
-      UTILITY_EXPANSION_OBJECTIVES,
-      rebased,
-      atClose,
-    ).find(({ metric }) => metric === "customerRetention")!.status,
-  ).toBe("pending");
+    evaluateScenarioObjectives(UTILITY_EXPANSION_OBJECTIVES, rebased, atClose),
+  ).toEqual([
+    expect.objectContaining({ metric: "utilityOwnership", observed: 1 }),
+  ]);
 });

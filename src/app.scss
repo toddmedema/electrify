@@ -66,13 +66,22 @@
   /* The label on an --interactive-blue fill. Pure white takes the logo blue to 3.7:1, where
      #f5f5f5 manages only 3.4:1 */
   --interactive-contrast: #ffffff;
+  // ==========================================================================
+  // DANGER: DO NOT CHANGE --interactive-blue. DO NOT RE-DECLARE IT ANYWHERE.
+  //
+  // This is THE call-to-action blue. It is also the logo's blue (logo-home.svg)
+  // and the blue of the home-screen smoke. They are one color, on purpose, and
+  // the owner has ordered that it STOP being changed. Not for a contrast score,
+  // not for an audit, not "just on the home screen", not "just in dark mode".
+  // If a label looks too faint on it, fix the label. Never touch the blue.
+  //
+  // src/CtaColor.test.ts fails the build if this value moves, if another rule
+  // re-declares the token, or if a home-screen CTA stops using it.
+  // ==========================================================================
   --interactive-blue: #0084f8; /* the logo blue - 3.7:1 on white */
-  /* The deeper blue for small interactive text and the speed thumb, where the logo blue falls
-     short of 4.5:1: 5.6:1 on white and under a white label, 4.9:1 on --speed-track */
-  --interactive-strong: #0066cc;
   /* The recessed channel the speed thumb slides in: a tonal step below the bar */
   --speed-track: var(--bg-sunken);
-  --speed-thumb: var(--interactive-strong);
+  --speed-thumb: var(--interactive-blue);
   // Neutral list sparklines: fuel colours would compete with blue's "interactive" meaning
   --spark-stroke: #546e7a; /* blueGray600 */
   --spark-fill: rgba(84, 110, 122, 0.12);
@@ -153,9 +162,19 @@
      trades chroma for lightness: oklch(0.68 0.12 254) against light's oklch(0.62 0.2 254).
      6.6:1 on --bg-primary, 6.9:1 under the #0a0a0a button label. The logo's dark twins
      (logo-dark.svg, logo-home-dark.svg) are painted in this blue, as is LOGO_BLUE.dark. */
+  // ==========================================================================
+  // DANGER: DO NOT CHANGE --interactive-blue (DARK). DO NOT RE-DECLARE IT ANYWHERE.
+  //
+  // This is THE call-to-action blue. It is also the logo's blue (logo-home.svg)
+  // and the blue of the home-screen smoke. They are one color, on purpose, and
+  // the owner has ordered that it STOP being changed. Not for a contrast score,
+  // not for an audit, not "just on the home screen", not "just in dark mode".
+  // If a label looks too faint on it, fix the label. Never touch the blue.
+  //
+  // src/CtaColor.test.ts fails the build if this value moves, if another rule
+  // re-declares the token, or if a home-screen CTA stops using it.
+  // ==========================================================================
   --interactive-blue: #629be1;
-  /* Small interactive text: 7.8:1 on --speed-track, 6.6:1 on the selected tint */
-  --interactive-strong: #8db6ee;
   /* --bg-sunken is nearly the page here, so the channel steps up to the raised surface instead */
   --speed-track: var(--bg-raised);
   --speed-thumb: var(--interactive-blue);
@@ -1111,7 +1130,7 @@ $topbar_height: 56px;
   max-height: 40%;
   overflow: auto;
   box-sizing: border-box;
-  background: var(--bg-raised);
+  background: var(--bg-primary);
   border-top: 1px solid var(--border-subtle);
   color: var(--font-color-primary);
   p {
@@ -1125,6 +1144,8 @@ $topbar_height: 56px;
   gap: 8px;
   .MuiButton-root {
     min-height: 44px;
+    font-size: 1.1875rem;
+    font-weight: 700;
   }
 }
 
@@ -1140,21 +1161,14 @@ $topbar_height: 56px;
   font-size: var(--font-size-body2);
 }
 
-// In a game the offline notice shrinks to a dot on the menu button, explained inside the menu
-.gameMenuButton {
-  position: relative;
-}
-
+// In a game the offline notice shrinks to a dot beside its menu item text
 .offlineDot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  flex: 0 0 auto;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   border: 1px solid var(--warning-dot-rim);
   background: var(--warning-dot);
-  pointer-events: none;
 }
 
 .gameMenuOffline.MuiMenuItem-root.Mui-disabled {
@@ -1163,11 +1177,6 @@ $topbar_height: 56px;
   opacity: 1;
   color: var(--font-color-faded);
   font-size: var(--font-size-body2);
-
-  .offlineDot {
-    position: static;
-    flex: 0 0 auto;
-  }
 }
 
 // Never squeezed by whatever is below it, on either layout
@@ -1212,15 +1221,6 @@ $topbar_height: 56px;
   }
 }
 
-.missionSummaryHeader {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  width: 100%;
-}
-
-// One line at every width: months left, then the goal or the risk to it, which truncates first.
 .missionSummaryCopy {
   display: flex;
   align-items: center;
@@ -1230,19 +1230,27 @@ $topbar_height: 56px;
   white-space: nowrap;
 }
 .missionSummaryMonths.MuiButton-root {
-  flex: 0 0 auto;
-  margin-left: auto;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  margin-inline: auto -8px;
   min-width: 0;
-  padding: 0 8px;
-  margin-inline-end: -8px;
+  padding: 4px 8px;
   font: inherit;
-  // Expand the hit area without increasing the status row's height.
-  margin-block: -12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .missionSummaryHeadline {
-  min-width: 0;
+  display: block;
+  max-width: 100%;
   overflow: hidden;
+  color: var(--font-color-primary);
   text-overflow: ellipsis;
+}
+.missionSummary.statusWarning .missionSummaryHeadline {
+  color: inherit;
 }
 .operatingEvidence,
 .insightsTrack {
@@ -1254,8 +1262,7 @@ $topbar_height: 56px;
 }
 
 @media (pointer: coarse) {
-  .missionSummary .MuiButton-root,
-  .missionSummaryMonths {
+  .missionSummary .MuiButton-root {
     min-height: 44px;
   }
 }
@@ -1269,7 +1276,6 @@ $topbar_height: 56px;
 }
 
 @media (max-width: ($phone_width - 1px)) {
-  .missionSummaryHeader,
   .missionSummaryCopy {
     gap: 8px;
   }
@@ -1480,20 +1486,13 @@ $topbar_height: 56px;
   }
 
   .gameStatusBar .missionSummaryMonths.MuiButton-root {
-    margin-inline: 0;
+    margin-inline-end: 0;
     padding-inline: $space-1;
   }
 }
 
 .gameCashNegative {
   color: var(--delta-bad);
-}
-
-// Phones read "136 mo left": the event beside it needs the room.
-@media (max-width: 599px) {
-  .missionSummaryMonthsTail {
-    display: none;
-  }
 }
 
 // Abbreviate the months and hour together before the wide bar gets crowded.
@@ -2334,9 +2333,14 @@ $pane_header_height: 48px;
 }
 
 .generatorComparisonChoices {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  display: flex;
+  container-type: inline-size;
+}
+
+.generatorComparisonChoice {
+  box-sizing: border-box;
+  width: calc((100cqw - 24px) / 3);
+  margin-inline-end: 8px;
 }
 
 .generatorComparisonRemove.MuiIconButton-root {
@@ -2353,7 +2357,7 @@ $pane_header_height: 48px;
     overflow-x: auto;
   }
   .generatorComparisonChoice {
-    flex: 0 0 200px;
+    width: 200px;
   }
   .generatorComparisonChoice .MuiTypography-caption:last-child {
     display: none;
@@ -2544,14 +2548,16 @@ $pane_header_height: 48px;
     min-height: 40px;
     max-width: 100%;
     padding-inline: 8px;
-    border: 0;
+    border: 1px solid var(--interactive-blue);
     border-radius: var(--radius-md);
     background: var(--bg-raised);
-    color: var(--interactive-strong);
     font: inherit;
     font-size: var(--font-size-caption);
     cursor: pointer;
 
+    &:not(:disabled) {
+      color: var(--font-color-primary);
+    }
     &:hover {
       background: var(--interactive-tint);
     }
@@ -3305,23 +3311,6 @@ $pane_header_height: 48px;
     min-width: 0;
   }
 
-  .conceptLegend {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: $space-2;
-    margin-top: $space-4;
-  }
-
-  .conceptLegendItem {
-    display: flex;
-    align-items: center;
-    gap: $space-2;
-    padding: $space-2;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    background: var(--bg-raised);
-  }
-
   .MuiCard-root {
     margin: 0 $space-2 $space-2;
     border-radius: 0;
@@ -3432,6 +3421,9 @@ $pane_header_height: 48px;
       .MuiButton-root {
         margin: 0;
         width: min(100%, 208px);
+        // The logo blue on white (or white on blue) needs large, bold labels.
+        font-size: 1.1875rem;
+        font-weight: 700;
       }
     }
   }
@@ -3551,6 +3543,8 @@ $pane_header_height: 48px;
     }
 
     .MuiAccordionSummary-root {
+      // Match the collapsed row in both states so opening an entry moves only its content.
+      min-height: 3rem;
       padding: 0 $space-4;
 
       // While a long entry scrolls, its title pins below the group header (32px =
@@ -3576,14 +3570,12 @@ $pane_header_height: 48px;
       }
     }
 
-    // A divider under the title while expanded: it gives the pinned bar a bottom edge, and
-    // collapsed entries keep their single card border instead of doubling it
-    &.Mui-expanded .MuiAccordionSummary-root {
-      border-bottom: 1px solid var(--border-subtle);
+    .MuiAccordionSummary-content {
+      margin-block: 0.75rem;
     }
 
     .MuiAccordionDetails-root {
-      padding: 0 $space-4 $space-4;
+      padding: $space-4;
     }
 
     // A citation list, not prose: each line is one assumption and the link that backs it
@@ -3896,8 +3888,7 @@ $pane_header_height: 48px;
 
       &.Mui-selected {
         border-color: $interactive_blue !important;
-        // The stronger blue keeps the small label above 4.5:1 on the selected tint.
-        color: var(--interactive-strong);
+        color: var(--font-color-primary);
         font-weight: 600;
       }
     }
@@ -5156,7 +5147,8 @@ $sizemap: (
 $homeSmokeCycle: 5.6s;
 
 .homeSmokePuff {
-  // The logo's own blue on each palette, so the puffs match logo-home(-dark).svg
+  // DANGER: the smoke is the logo's own blue on each palette (logo-home(-dark).svg), the
+  // same --interactive-blue the CTAs use. Do not give it a color of its own.
   fill: var(--interactive-blue);
   animation:
     homeSmokeDrift $homeSmokeCycle cubic-bezier(0.8, 0.4, 0.25, 0.3) infinite,
@@ -5658,6 +5650,78 @@ $homeSmokeCycle: 5.6s;
     min-height: 44px;
   }
 }
+.conceptLegend {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(18rem, calc((100% - var(--space-5)) / 2))), 1fr)
+  );
+  gap: var(--space-5);
+}
+
+.conceptLegendGroup {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: $space-2;
+
+  h4 {
+    margin: 0 0 $space-2;
+    font-size: var(--font-size-body1);
+    font-weight: 700;
+  }
+}
+
+.conceptLegendList {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(min(100%, max(8.25rem, calc((100% - #{$space-3}) / 2))), 1fr)
+  );
+  gap: $space-1 $space-3;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conceptLegendItem {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  min-height: 2.75rem;
+  font-size: var(--font-size-body2);
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.conceptLegendIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+
+  .MuiSvgIcon-colorWarning {
+    color: var(--warning-icon);
+  }
+}
+
+.gameNavigationLabel {
+  white-space: nowrap;
+
+  > span {
+    display: inline-block;
+    margin-inline-end: $space-1;
+    vertical-align: -0.125em;
+  }
+
+  .MuiSvgIcon-root {
+    display: block;
+    font-size: 1em;
+  }
+}
+
 // Manual prose, in the full manual and the help popover alike: a line height and half-line
 // paragraph rhythm that let long entries breathe, a measure capped near 70 characters so wide
 // windows don't stretch lines past comfortable reading, and links in the interaction blue
@@ -5668,7 +5732,7 @@ $homeSmokeCycle: 5.6s;
   // On the text itself, not the container, so composed pieces like the symbol legend keep
   // their own vertical centring
   p,
-  ul,
+  ul:not(.conceptLegendList),
   ol {
     max-width: 70ch;
     line-height: 1.5;
@@ -5746,11 +5810,6 @@ $homeSmokeCycle: 5.6s;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-}
-// The first paragraph's margin used to be the gap under an open entry's title divider, so
-// entries that open on a table or legend started flush against it. The gap lives here now.
-#manual .manual-entry .MuiAccordionDetails-root {
-  padding-top: $space-4;
 }
 @media (pointer: coarse) {
   .manual-link-text {
@@ -6215,7 +6274,7 @@ $homeSmokeCycle: 5.6s;
 .base_main .facilityRowHeader > :not(.outputProgressBar) {
   z-index: 1;
 }
-.facilityDisclosure .constructionProgress {
+.constructionProgress {
   display: block;
   position: absolute;
   left: 0;
@@ -6225,7 +6284,7 @@ $homeSmokeCycle: 5.6s;
   background: var(--border-subtle);
 }
 // Neutral at every fuel: identity stays in the icon, and the fill reads as one progress grammar.
-.facilityDisclosure .constructionProgressFill {
+.constructionProgressFill {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -6274,7 +6333,7 @@ $homeSmokeCycle: 5.6s;
 .screenCatalog > .cardList,
 .screenCatalog > .constructionHeader,
 .screenCatalog > .MuiToolbar-root,
-.screenCatalog > .generatorComparison {
+.screenCatalog > .generatorComparisonSlot {
   width: 100%;
   max-width: 1040px;
   margin-left: auto;
@@ -7677,7 +7736,7 @@ img[src$="/transmission.svg"] {
 }
 
 // A faint sweep stays inside the completed portion of each construction track.
-.facilityDisclosure .constructionProgressFill::before {
+.constructionProgressFill::before {
   content: "";
   position: absolute;
   top: 0;
@@ -7713,7 +7772,7 @@ img[src$="/transmission.svg"] {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {
-  .facilityDisclosure .constructionProgressFill::before {
+  .constructionProgressFill::before {
     animation: none;
     display: none;
   }
@@ -8293,22 +8352,23 @@ img[src$="/transmission.svg"] {
     flex: 1 1 auto;
     display: flex;
     flex-wrap: wrap;
-    gap: $space-1 $space-2;
+    row-gap: $space-1;
     margin: 0;
     padding: 0;
     list-style: none;
 
-    li {
+    .coopBrowsePlayer {
       display: inline-flex;
       align-items: center;
       gap: $space-1;
       padding: $space-1 $space-2;
+      margin-inline-end: $space-2;
       border: 1px solid var(--border-tile);
       border-radius: var(--radius-sm);
       font-size: var(--font-size-caption);
     }
 
-    li:has(.coopBrowseKickTarget) {
+    .coopBrowsePlayer:has(.coopBrowseKickTarget) {
       padding: 0;
     }
   }
@@ -8985,7 +9045,7 @@ option {
       gap: 8px;
       width: fit-content;
       padding: 0 8px;
-      color: var(--interactive-strong);
+      color: var(--font-color-primary);
       font-size: var(--font-size-body2);
       font-weight: var(--font-weight-emphasis);
       cursor: pointer;
@@ -8995,6 +9055,7 @@ option {
         display: none;
       }
       &::after {
+        color: var(--interactive-blue);
         content: "+";
       }
       &:hover {
@@ -9167,36 +9228,37 @@ option {
   }
 }
 
-// Keep title-screen text legible while leaving the logo's established blue intact.
-#menuCard,
-.couchSettingsPrompt {
-  --home-link: #0868be;
-  --interactive-blue: var(--home-link);
-}
-#menuCard .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled),
-.couchSettingsPrompt .MuiButton-text.MuiButton-colorPrimary:not(.Mui-disabled) {
-  color: var(--home-link);
-}
+// ============================================================================
+// DANGER: HOME BUTTONS, LINK UNDERLINES AND LOGO SMOKE USE THE LOGO BLUE.
+//
+// Never re-declare --interactive-blue here (this block used to, and it turned every
+// CTA and the smoke a different blue from the logo). Never add a "more legible",
+// deeper, lighter or per-screen blue for a button or a link: no --home-link, no
+// --interactive-strong, no hex. Everything reads --interactive-blue, in both themes.
+// src/CtaColor.test.ts and e2e/main-menu.spec.ts enforce all of this.
+// ============================================================================
 #menuCard {
   .homeExplore {
     display: flex;
     flex: 0 0 auto;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 0 16px;
-    padding: 8px 24px 16px;
+    column-gap: $space-2;
+    padding: $space-2 $space-4 $space-4;
   }
   .homeExplore a {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-width: 44px;
     min-height: 44px;
-    color: var(--home-link);
-    font-size: 0.8125rem;
+    color: var(--font-color-faded);
+    font-size: var(--font-size-body2);
+    font-weight: var(--font-weight-regular);
+    text-decoration: underline;
+    text-decoration-color: var(--interactive-blue);
+    text-underline-offset: 0.18em;
   }
-}
-html[data-theme="dark"] #menuCard,
-html[data-theme="dark"] .couchSettingsPrompt {
-  --home-link: #8bc8f8;
 }
 
 .homeWordmark {
@@ -9214,8 +9276,10 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   .homeExplore
   a:focus {
   background-color: var(--interactive-blue);
-  color: var(--interactive-contrast);
-  outline: 2px solid var(--home-link);
+  // Small type needs dark ink on the selected blue in both palettes.
+  color: #0a0a0a;
+  text-decoration-color: currentColor;
+  outline: 2px solid var(--interactive-blue);
   outline-offset: 2px;
 }
 

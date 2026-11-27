@@ -14,14 +14,15 @@ import {
 import {
   formatConnectionDuration,
   tileConnectionLabel,
+  tileConnectionProgress,
 } from "../../helpers/TerritoryConnections";
 import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { getSunriseSunset } from "../../helpers/DateTime";
+import { currentTick } from "../../helpers/GameSelectors";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
-import type { ScenePicker } from "../base/territory-3d/SceneBuilder";
 import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
 import { readMapWeather } from "../base/territory-3d/MapWeather";
 import WeatherAtmosphere from "../base/territory-3d/WeatherAtmosphere";
@@ -31,7 +32,10 @@ import {
   formatTerrainPercent,
   tileHasConstructionTechnology,
 } from "../base/TerritoryTileFacts";
-import { facilityMapStatus } from "../base/FacilityMapStatus";
+import {
+  facilityMapStatus,
+  needsSubmergedCable,
+} from "../base/FacilityMapStatus";
 import useFacilityMapMotion from "../base/useFacilityMapMotion";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
@@ -70,7 +74,9 @@ const RENDERER_MESSAGES = {
   failed: "The 3D map couldn’t load.",
 };
 const PAN_OVERSCAN = HEX_WIDTH / 4;
+const MIN_TILE_TARGET_HEIGHT = 44;
 const CAMERA_SHIFT_MS = 180;
+
 const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
   Residential: "homes",
   Commercial: "shops",
@@ -147,16 +153,8 @@ interface Props {
   projectPlanning?: boolean;
   projectPending?: boolean;
   projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
+  onProjectDrop?: (key: TerritoryMapTileKey) => void;
   projectWindOutput?: Partial<Record<TerrainType, number>>;
-}
-function needsSubmergedCable({ tile, facility }: TerritoryTileView) {
-  return (
-    !tile.city &&
-    !facility &&
-    (tile.terrain === "lake" ||
-      tile.terrain === "ocean" ||
-      tile.terrain === "river")
-  );
 }
 export default function TerritoryHexMap({
   game,
@@ -172,8 +170,10 @@ export default function TerritoryHexMap({
   projectPlanning = false,
   projectPending = false,
   projectSites,
+  onProjectDrop,
   projectWindOutput,
 }: Props) {
+  const showingProjectSites = projectPlanning || !!onProjectDrop;
   const mapId = React.useId();
   const workspace = useGameWorkspaceLayout();
   const dark = useTheme().palette.mode === "dark";
@@ -182,12 +182,13 @@ export default function TerritoryHexMap({
     RendererState | "failed"
   >(webGLAvailable ? "loading" : "unavailable");
   const threeDReady = rendererState === "ready";
-  const picker = React.useRef<ScenePicker>();
-  const setPicker = React.useCallback((value: ScenePicker | undefined) => {
-    picker.current = value;
-  }, []);
   const motion = useFacilityMapMotion(game.speed);
   const weather = React.useMemo(() => readMapWeather(game), [game]);
+  const now = currentTick(game);
+  const cityService =
+    now && now.demandW > 0
+      ? Math.max(0, Math.min(1, now.supplyW / now.demandW))
+      : 1;
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
@@ -198,7 +199,7 @@ export default function TerritoryHexMap({
   const [buyMode, setBuyMode] = React.useState(false);
   const [showStatusLayer, setShowStatusLayer] = useToolState(
     "network.showStatusLayer",
-    true,
+    false,
   );
   const [showNames, setShowNames] = useToolState("network.showNames", true);
   const topology = useStableArray(
@@ -243,8 +244,10 @@ export default function TerritoryHexMap({
   );
   const purchaseQuotes = React.useMemo(
     () =>
-      buyMode && !projectPlanning ? tilePurchaseQuotes(game, views) : undefined,
-    [buyMode, projectPlanning, game, views],
+      buyMode && !showingProjectSites
+        ? tilePurchaseQuotes(game, views)
+        : undefined,
+    [buyMode, showingProjectSites, game, views],
   );
   React.useEffect(() => {
     if (projectPlanning) setBuyMode(false);
@@ -588,9 +591,11 @@ export default function TerritoryHexMap({
       const box = element.getBoundingClientRect();
       const x = box.left + box.width / 2;
       const y = box.top + box.height / 2;
+      // Limit zoom at the camera so the projected hexes stay large enough to tap.
+      const minZoom = MIN_TILE_TARGET_HEIGHT / (HEX_HEIGHT * baseScale);
       // Keep the same point on the ground under the pointer or pinch midpoint.
       setCamera((point) => {
-        const zoom = Math.max(0.5, Math.min(2, point.zoom * factor));
+        const zoom = Math.max(minZoom, Math.min(2, point.zoom * factor));
         const oldScale = baseScale * point.zoom;
         const newScale = baseScale * zoom;
         return {
@@ -736,15 +741,16 @@ export default function TerritoryHexMap({
       color: "var(--interactive-blue)",
       reason,
     });
-    if (buyMode && view.connectable) return available("");
-    if (projectPlanning && projectSites?.has(territoryMapTileKey(tile)))
+    if (buyMode && !showingProjectSites && view.connectable)
+      return available("");
+    if (showingProjectSites && projectSites?.has(territoryMapTileKey(tile)))
       return available("Compatible site");
     if (view.ownerKey && !view.owned)
       return {
         color: color(view.ownerKey),
         reason: "",
       };
-    if (projectPlanning) return unavailable("Unavailable for this project");
+    if (showingProjectSites) return unavailable("Unavailable for this project");
     if (view.connection) return unavailable("");
     if (buyMode || tile.city) return unavailable("");
     if (view.reserved)
@@ -780,6 +786,10 @@ export default function TerritoryHexMap({
   }, [allWires, renderedTiles]);
   const revealTile = (tile: { q: number; r: number }) => {
     const target = hexCenter(tile);
+    const railWidth =
+      viewport.current
+        ?.closest(".territoryNetwork")
+        ?.querySelector<HTMLElement>(".desktopBuildRail")?.offsetWidth ?? 0;
     setCamera((current) => ({
       x:
         current.x +
@@ -789,7 +799,9 @@ export default function TerritoryHexMap({
         ) +
         Math.min(
           0,
-          target.x - current.x + Math.max(0, worldWidth / 2 - HEX_WIDTH),
+          target.x -
+            current.x +
+            Math.max(0, worldWidth / 2 - HEX_WIDTH - railWidth / scale),
         ),
       y:
         current.y +
@@ -863,28 +875,12 @@ export default function TerritoryHexMap({
     else if (key === inspected) onDeselect?.();
     else inspectTile(tile, fromPointer);
   };
-  const pointerTile = (event: {
-    target: EventTarget;
-    clientX: number;
-    clientY: number;
-  }) => {
+  // Hover and selection follow the hex grid's own hit areas, so terrain relief
+  // and facility models never steal a tile from the hex under the pointer.
+  const pointerTile = (event: { target: EventTarget }) => {
     const element = event.target instanceof Element ? event.target : undefined;
-    const ground = element?.closest<HTMLButtonElement>("[data-map-target]");
-    if (
-      !threeDReady ||
-      element?.closest(".territoryTilePrice, .territoryUtilityLabel strong")
-    )
-      return ground?.dataset.mapTarget as TerritoryMapTileKey | undefined;
-    const rect = viewport.current?.getBoundingClientRect();
-    const hit =
-      rect &&
-      picker.current?.({
-        x: event.clientX - rect.left - rect.width / 2,
-        y: event.clientY - rect.top - rect.height / 2,
-      });
-    return hit === undefined
-      ? (ground?.dataset.mapTarget as TerritoryMapTileKey | undefined)
-      : hit;
+    return element?.closest<HTMLButtonElement>("[data-map-target]")?.dataset
+      .mapTarget as TerritoryMapTileKey | undefined;
   };
   const showTooltip = React.useCallback(
     (anchor?: NonNullable<typeof tooltipAnchor.current>) => {
@@ -1085,14 +1081,28 @@ export default function TerritoryHexMap({
         aria-label="Territory map"
         data-camera-scale={scale}
         ref={viewport}
+        onDragOver={(event) => {
+          if (!onProjectDrop) return;
+          const key = pointerTile(event);
+          if (!key || !projectSites?.has(key)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={(event) => {
+          if (!onProjectDrop) return;
+          const key = pointerTile(event);
+          if (!key || !projectSites?.has(key)) return;
+          event.preventDefault();
+          onProjectDrop(key);
+        }}
         onPointerDown={(event) => {
           const middle = event.button === 1;
           if (event.button !== 0 && !middle) return;
           cancelCameraShift();
           clearHover();
           const id = middle ? undefined : pointerTile(event);
-          if (middle || id === null) event.preventDefault();
-          rememberActivation(id ?? undefined);
+          if (middle) event.preventDefault();
+          rememberActivation(id);
           const { pointerId, pointerType, clientX, clientY } = event;
           pointers.current.set(
             pointerId,
@@ -1108,23 +1118,13 @@ export default function TerritoryHexMap({
             pointer.current = undefined;
             return;
           }
-          suppressClick.current = id === null;
+          suppressClick.current = false;
           pointer.current = {
             id: event.pointerId,
             x: event.clientX,
             y: event.clientY,
             dragging: false,
           };
-          const ground =
-            event.target instanceof Element
-              ? event.target.closest<HTMLElement>("[data-map-target]")
-              : null;
-          if (id && ground?.dataset.mapTarget !== id) {
-            event.preventDefault();
-            stage.current
-              ?.querySelector<HTMLButtonElement>(`[data-map-target="${id}"]`)
-              ?.focus({ preventScroll: true });
-          }
         }}
         onAuxClick={(event) => {
           if (event.button === 1) event.preventDefault();
@@ -1242,7 +1242,7 @@ export default function TerritoryHexMap({
           }
           if (event.detail === 0) return;
           const id = pointerTile(event);
-          if (id === null || activation.current?.tileKey !== id) {
+          if (activation.current?.tileKey !== id) {
             activation.current = undefined;
             event.preventDefault();
             event.stopPropagation();
@@ -1282,13 +1282,13 @@ export default function TerritoryHexMap({
                   height: size.height,
                   dpr: window.devicePixelRatio || 1,
                   background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
+                  cityService,
                   visible: size.width > 0 && size.height > 0,
                   motionAllowed: motion.allowed,
                   playbackRate: motion.rate,
                   weather,
                 }}
                 onState={setRendererState}
-                onPicker={setPicker}
               />
             </React.Suspense>
           </MapSceneBoundary>
@@ -1302,6 +1302,9 @@ export default function TerritoryHexMap({
                   const status = facilityMapStatus(view, game.date.minute);
                   const kind = view.connection ? "construction" : status?.kind;
                   if (!kind || kind === "unknown") return null;
+                  const progress = view.connection
+                    ? tileConnectionProgress(view.connection, game.date.minute)
+                    : status?.progress;
                   const key = territoryMapTileKey(view.tile);
                   const origin = foregroundOrigin(view.tile);
                   return (
@@ -1321,7 +1324,10 @@ export default function TerritoryHexMap({
                       viewBox="0 0 500 500"
                       overflow="visible"
                     >
-                      <FacilityMapStatusArtwork kind={kind} />
+                      <FacilityMapStatusArtwork
+                        kind={kind}
+                        progress={progress}
+                      />
                     </svg>
                   );
                 })}
@@ -1333,6 +1339,9 @@ export default function TerritoryHexMap({
               key = territoryMapTileKey(tile),
               point = hexCenter(tile);
             const status = facilityMapStatus(view, game.date.minute);
+            const construction = view.connection
+              ? tileConnectionProgress(view.connection, game.date.minute)
+              : status?.progress;
             const utility = !!tile.city && !!view.ownerKey;
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
@@ -1354,10 +1363,10 @@ export default function TerritoryHexMap({
                 ? formatTerrainPercent(outputFactor)
                 : undefined;
             const projectLabel = projectSite
-              ? `Total project cost (${projectPrice}) · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
+              ? `Total project cost ${projectPrice} · ${projectSite.owned ? "Already connected" : "Connection included"}${outputModifier ? ` · ${outputModifier} estimated output vs flat terrain` : ""}`
               : undefined;
             const growth = tile.city && cityGrowth.get(tile.territoryId);
-            const tileLabel = [
+            const terrainAndStatus = [
               cityLabel ?? TERRAIN_LABELS[tile.terrain],
               growth &&
                 `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
@@ -1365,20 +1374,30 @@ export default function TerritoryHexMap({
               status?.kind === "unknown" ? undefined : status?.label,
               view.connection &&
                 tileConnectionLabel(view.connection, game.date.minute),
+              construction !== undefined &&
+                `${Math.min(99, Math.floor(construction * 100))}% complete`,
               disaster?.condition,
               disaster?.facilityImpact,
-              view.owned
-                ? undefined
-                : view.ownerKey
-                  ? view.ownerName
-                  : "Unconnected",
+              view.owned || !view.ownerKey ? undefined : view.ownerName,
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            const unconnected =
+              !view.owned && !view.ownerKey ? "Unconnected" : undefined;
+            const tileDescription = [
+              terrainAndStatus,
+              unconnected,
               hover.reason,
             ]
               .filter(Boolean)
               .join(" · ");
+            const tileTooltip =
+              threeDReady && unconnected
+                ? [terrainAndStatus, hover.reason].filter(Boolean).join(" · ")
+                : tileDescription;
             // The city is already named in the button label.
             const descriptionId =
-              utility && tileLabel === cityLabel
+              utility && tileDescription === cityLabel
                 ? undefined
                 : `${mapId}-${key}-status`;
             return (
@@ -1405,7 +1424,7 @@ export default function TerritoryHexMap({
                 }
                 data-purchasable={!!quote}
                 data-unaffordable={unaffordable}
-                data-tooltip={tileLabel}
+                data-tooltip={tileTooltip}
                 aria-busy={pending || undefined}
                 className={`territoryTileTarget${showName ? " territoryUtilityLabel" : ""}`}
                 style={
@@ -1422,10 +1441,10 @@ export default function TerritoryHexMap({
                 }
                 tabIndex={key === activeRoving ? 0 : -1}
                 aria-label={
-                  projectPlanning
+                  showingProjectSites
                     ? `Inspect ${territoryTileLabel(tile)} · ${projectLabel ?? "unavailable for this project"}`
                     : quote
-                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} (${money(quote.price)}) · ${tilePurchaseBenefitLabel(quote)} · ${formatConnectionDuration(quote.buildMonths)}${unaffordable ? "; not enough available cash" : ""}`
+                      ? `${unaffordable ? "Inspect" : "Connect"} ${territoryTileLabel(tile)} · ${money(quote.price)} · ${tilePurchaseBenefitLabel(quote)} · ${formatConnectionDuration(quote.buildMonths)}${unaffordable ? "; not enough available cash" : ""}`
                       : label
                 }
                 aria-pressed={key === activeSelected}
@@ -1524,7 +1543,7 @@ export default function TerritoryHexMap({
                     aria-hidden="true"
                     data-tooltip={projectLabel}
                   >
-                    <b>{`(${projectPrice})`}</b>
+                    <b>{projectPrice}</b>
                     {outputModifier && (
                       <span
                         className="territoryTileProduction"
@@ -1543,7 +1562,7 @@ export default function TerritoryHexMap({
                 )}
                 {quote && !projectPlanning && (
                   <span className="territoryTilePrice" aria-hidden="true">
-                    <b>{pending ? "Connecting…" : `(${money(quote.price)})`}</b>
+                    <b>{pending ? "Connecting…" : money(quote.price)}</b>
                     {quote.benefit !== "general" && (
                       <span>{tilePurchaseBenefitLabel(quote)}</span>
                     )}
@@ -1551,7 +1570,7 @@ export default function TerritoryHexMap({
                 )}
                 {descriptionId && (
                   <span className="srOnly" id={descriptionId}>
-                    {tileLabel}
+                    {tileDescription}
                   </span>
                 )}
               </button>

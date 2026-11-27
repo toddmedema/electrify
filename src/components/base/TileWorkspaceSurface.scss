@@ -44,6 +44,10 @@
       width: 24px;
       height: 24px;
       object-fit: contain;
+      // Also hosts inline glyphs, which the image rules above leave unsized
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .MuiIconButton-root {
       flex: 0 0 auto;
@@ -81,6 +85,16 @@
   .tilePurchaseSummary {
     display: grid;
     gap: 12px;
+  }
+  .tileConnectionBuild {
+    position: relative;
+    display: grid;
+    gap: 8px;
+    padding-bottom: 12px;
+
+    .constructionProgress {
+      border-radius: var(--radius-sm);
+    }
   }
   .tileCityMetrics {
     display: grid;

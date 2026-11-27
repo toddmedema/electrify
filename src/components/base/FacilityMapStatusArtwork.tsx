@@ -24,10 +24,13 @@ function glyph(kind: Exclude<FacilityMapStatusKind, "unknown">) {
 /** Decorative map badge in a uniformly scaled 500-unit canvas. */
 export default function FacilityMapStatusArtwork({
   kind,
+  progress,
 }: {
   kind: FacilityMapStatusKind;
+  progress?: number;
 }) {
   if (kind === "unknown") return null;
+  const construction = kind === "construction";
   return (
     <g
       className="facilityMapStatusArtwork"
@@ -37,7 +40,26 @@ export default function FacilityMapStatusArtwork({
       fill="#000"
       stroke="none"
     >
-      <circle r={42} fill="#FFF8E1" stroke="#000" strokeWidth={12} />
+      <circle
+        r={42}
+        fill="#FFF8E1"
+        stroke={construction && progress !== undefined ? "#BDB6A3" : "#000"}
+        strokeWidth={12}
+        strokeDasharray={
+          construction && progress === undefined ? "6 8" : undefined
+        }
+      />
+      {construction && progress !== undefined && (
+        <circle
+          r={42}
+          pathLength={1}
+          transform="rotate(-90)"
+          fill="none"
+          stroke="#000"
+          strokeWidth={12}
+          strokeDasharray={`${progress} 1`}
+        />
+      )}
       {glyph(kind)}
     </g>
   );

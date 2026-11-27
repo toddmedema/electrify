@@ -98,6 +98,7 @@ const minimumPhone = {
     "game-workspace",
     "learning-pages",
     "main-menu",
+    "mission-evidence",
     "scenario-pages",
     "tutorial-actions",
   ],

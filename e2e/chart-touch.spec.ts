@@ -3,7 +3,13 @@ import { openPane } from "./layout";
 import path from "path";
 
 async function scrollPlotIntoView(plot: Locator) {
-  // Font readiness and responsive layout can replace the first canvas while it is settling.
+  // uPlot remeasures its axes after the interface font loads and replaces the plot.
+  await plot.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
   // Retry only gesture setup; every touch, tooltip and viewport assertion still runs below.
   await expect(async () => {
     await plot.scrollIntoViewIfNeeded();
@@ -208,7 +214,7 @@ async function scrub(page: Page, chart: Locator, scroller?: Locator) {
     x: Math.round(box.x + box.width * fraction),
     y: Math.round(box.y + box.height * y),
   });
-  const tooltip = chart.locator(".chartTooltip");
+  const tooltip = chart.locator(".chartTooltip").filter({ hasText: /\S/ });
   try {
     await session.send("Input.dispatchTouchEvent", {
       type: "touchStart",
@@ -220,15 +226,15 @@ async function scrub(page: Page, chart: Locator, scroller?: Locator) {
       type: "touchMove",
       touchPoints: [point(0.55, 0.43)],
     });
-    await expect(tooltip).toBeVisible();
-    await expect(tooltip).not.toHaveText(first!);
-    const middle = await tooltip.textContent();
+    const middleTooltip = tooltip.filter({ hasNotText: first! });
+    await expect(middleTooltip).toBeVisible();
+    const middle = await middleTooltip.textContent();
     // Horizontal inspection keeps following the finger without moving the page.
     await session.send("Input.dispatchTouchEvent", {
       type: "touchMove",
       touchPoints: [point(0.85, 0.46)],
     });
-    await expect(tooltip).not.toHaveText(middle!);
+    await expect(tooltip.filter({ hasNotText: middle! })).toBeVisible();
     if (scroller) {
       await expect
         .poll(() => scroller.evaluate((el) => el.scrollTop))
@@ -334,14 +340,6 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Start game" }).click();
     const chart = page.locator("#chartSupplyDemand [role=img]");
     const plot = chart.locator(".u-over");
-    // Open the details on the chart that will receive the swipe. Loading the
-    // interface font can resize the plot and replace its first canvas.
-    await page.evaluate(async () => {
-      await document.fonts.ready;
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      );
-    });
     await scrollPlotIntoView(plot);
     const session = await page.context().newCDPSession(page);
     const tooltip = chart.locator(".chartTooltip-breakdown");
@@ -427,6 +425,10 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();
+    // The initial forecast adds the announced event to the mobile header and resizes the plot.
+    await expect(
+      page.getByRole("button", { name: /^Upcoming:/ }),
+    ).toBeVisible();
     const production = page.locator("#chartSupplyDemand [role=img]");
     await scrub(page, production);
     await restoreMouseAfterTouch(page, production);

@@ -1,4 +1,12 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import {
+  cloneElement,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../components/base/RemovalCollapse";
 import {
   Alert,
   Box,
@@ -41,6 +49,8 @@ export default function SavesDialog({
     id: string;
   }>();
   const [loaded, setLoaded] = useState(false);
+  // The save being deleted, so that only its removal animates (not a search filtering it out).
+  const exiting = useRef<string>();
   const run = (action: () => Promise<unknown>) => {
     setFailure(undefined);
     return action().catch((error) =>
@@ -57,20 +67,30 @@ export default function SavesDialog({
       await session.prepareResume(id, name);
       onClose();
     });
-  const remove = (id: string) =>
-    run(async () => {
-      await session.deleteSharedSave(id);
+  const remove = (id: string) => {
+    exiting.current = id;
+    return run(async () => {
+      try {
+        await session.deleteSharedSave(id);
+      } catch (error) {
+        exiting.current = undefined;
+        throw error;
+      }
       // The row that held focus is gone; start again from the dialog's first action.
-      focusInitialDialogAction(
-        document
-          .getElementById("multiplayer-saves-title")
-          ?.closest<HTMLElement>('[role="dialog"]') ?? null,
-        { force: true },
+      requestAnimationFrame(() =>
+        focusInitialDialogAction(
+          document
+            .getElementById("multiplayer-saves-title")
+            ?.closest<HTMLElement>('[role="dialog"]') ?? null,
+          { force: true },
+        ),
       );
     });
-  const showSearch = (library?.slots.length || 0) > 3;
+  };
+  const slots = library?.slots ?? [];
+  const showSearch = slots.length > 3;
   const query = showSearch ? search.trim().toLocaleLowerCase() : "";
-  const saves = library?.slots.filter((slot) =>
+  const saves = slots.filter((slot) =>
     slot.players.join(" ").toLocaleLowerCase().includes(query),
   );
   const loading = loadingSaves && !loaded;
@@ -135,74 +155,97 @@ export default function SavesDialog({
                 <Typography>Loading multiplayer saves…</Typography>
               </Stack>
             )}
-            {!loading && library && !library.slots.length && (
+            {!loading && library && !slots.length && (
               <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
                 <Typography component="h2" variant="h6">
                   No multiplayer saves yet
                 </Typography>
               </Paper>
             )}
-            {!!library?.slots.length && !saves?.length && (
+            {!!slots.length && !saves.length && (
               <Typography role="status">No saves match “{search}”.</Typography>
             )}
-            {saves?.map((save) => {
-              const savedAt = new Date(save.updatedAt);
-              const timestamp = savedAt.toLocaleString(undefined, {
-                dateStyle: "medium",
-                timeStyle: "short",
-              });
-              // Every multiplayer save is named for its scenario, so the players tell them apart.
-              const players = save.players.join(", ");
-              return (
-                <Paper
-                  key={save.id}
-                  variant="outlined"
-                  component="article"
-                  className="saveEntry"
-                  aria-label={players}
-                >
-                  <Box className="coopCampaignHeading">
-                    <Typography component="h2" variant="h6">
-                      {players}
-                    </Typography>
-                    <IconButton
-                      aria-label={`Actions for ${players}`}
-                      aria-haspopup="menu"
-                      aria-expanded={menu?.id === save.id || undefined}
-                      disabled={busy || loadingSaves}
-                      onClick={(event) =>
-                        setMenu({ anchor: event.currentTarget, id: save.id })
-                      }
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Box>
-                  <Typography
-                    component="div"
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ mt: 0.5 }}
+            <TransitionGroup
+              component={null}
+              childFactory={(
+                child: React.ReactElement<
+                  React.ComponentProps<typeof RemovalCollapse>
+                >,
+              ) =>
+                cloneElement(child, {
+                  animate: child.props.id === exiting.current,
+                })
+              }
+            >
+              {saves.map((save) => {
+                const savedAt = new Date(save.updatedAt);
+                const timestamp = savedAt.toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                });
+                // Every multiplayer save is named for its scenario, so the players tell them apart.
+                const players = save.players.join(", ");
+                return (
+                  <RemovalCollapse
+                    key={save.id}
+                    id={save.id}
+                    sx={{ "&&": { marginTop: 0 } }}
                   >
-                    <time
-                      dateTime={savedAt.toISOString()}
-                      title={timestamp}
-                      aria-label={`Saved ${timestamp}`}
-                    >
-                      Saved {timestamp}
-                    </time>
-                  </Typography>
-                  <Box className="coopCampaignResume">
-                    <Button
-                      variant="contained"
-                      disabled={busy || loadingSaves}
-                      onClick={() => void resume(save.id, save.name)}
-                    >
-                      Load
-                    </Button>
-                  </Box>
-                </Paper>
-              );
-            })}
+                    <Box sx={{ pt: 2 }}>
+                      <Paper
+                        variant="outlined"
+                        component="article"
+                        className="saveEntry"
+                        aria-label={players}
+                      >
+                        <Box className="coopCampaignHeading">
+                          <Typography component="h2" variant="h6">
+                            {players}
+                          </Typography>
+                          <IconButton
+                            aria-label={`Actions for ${players}`}
+                            aria-haspopup="menu"
+                            aria-expanded={menu?.id === save.id || undefined}
+                            disabled={busy || loadingSaves}
+                            onClick={(event) =>
+                              setMenu({
+                                anchor: event.currentTarget,
+                                id: save.id,
+                              })
+                            }
+                          >
+                            <MoreVertIcon />
+                          </IconButton>
+                        </Box>
+                        <Typography
+                          component="div"
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ mt: 0.5 }}
+                        >
+                          <time
+                            dateTime={savedAt.toISOString()}
+                            title={timestamp}
+                            aria-label={`Saved ${timestamp}`}
+                          >
+                            Saved {timestamp}
+                          </time>
+                        </Typography>
+                        <Box className="coopCampaignResume">
+                          <Button
+                            variant="contained"
+                            disabled={busy || loadingSaves}
+                            onClick={() => void resume(save.id, save.name)}
+                          >
+                            Load
+                          </Button>
+                        </Box>
+                      </Paper>
+                    </Box>
+                  </RemovalCollapse>
+                );
+              })}
+            </TransitionGroup>
             {busy && (
               <CircularProgress size={20} aria-label="Loading multiplayer" />
             )}

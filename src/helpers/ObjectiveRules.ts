@@ -31,8 +31,12 @@ import { getScenario } from "../data/Scenarios";
 import {
   RETIRED_UTILITY_EXPANSION_OBJECTIVES,
   UTILITY_EXPANSION_OBJECTIVES,
+  VALLEY_TWO_GOAL_OBJECTIVES,
 } from "../data/UtilityExpansionObjectives";
-import { scenarioRules } from "./ScenarioRules";
+import {
+  retiredLegacyScenarioObjectives,
+  scenarioRules,
+} from "./ScenarioRules";
 import { ruleDigest, canonicalRuleJson } from "./RuleIdentity";
 import { MINUTES_PER_MONTH } from "./DateTime";
 import { getTotalDebt } from "./Financials";
@@ -44,6 +48,7 @@ import {
   validObjectiveProgress,
   objectiveMonthObservation,
   rebaseObjectiveRetention,
+  keepObjectiveEvidence,
 } from "./ScenarioObjectives";
 export { objectiveDefinition } from "./ScenarioObjectives";
 
@@ -286,7 +291,7 @@ export function objectiveContextForGame(
   return objectiveContextForDefinitions(game, scenario, definitions);
 }
 
-function objectiveContextForDefinitions(
+export function objectiveContextForDefinitions(
   game: ObjectiveGameContext,
   scenario: ScenarioType,
   definitions: CompiledRuleObjective[],
@@ -591,13 +596,59 @@ export function gameObjectiveProgress(
   );
 }
 
+function archivedValleyGoals(game: GameType) {
+  const digest = game.objectiveProgress?.rulesDigest;
+  if (game.scenarioId !== EXPANSION_SCENARIO_ID || !digest) return undefined;
+  const scenario = getScenario(EXPANSION_SCENARIO_ID)!;
+  return [
+    VALLEY_TWO_GOAL_OBJECTIVES,
+    RETIRED_UTILITY_EXPANSION_OBJECTIVES,
+  ].find(
+    (goals) =>
+      objectiveContextForDefinitions(game, scenario, goals).rulesDigest ===
+      digest,
+  );
+}
+
+export function hasArchivedValleyGoals(game: GameType): boolean {
+  return !!archivedValleyGoals(game);
+}
+
+/** A recorded company outcome retains evidence under the rules in force when it ended. */
+export function validArchivedValleyGoals(game: GameType): boolean {
+  const goals = archivedValleyGoals(game);
+  return (
+    !!goals &&
+    validGameObjectiveProgressForDefinitions(
+      game,
+      getScenario(EXPANSION_SCENARIO_ID)!,
+      goals,
+    )
+  );
+}
+
 export function gameObjectiveResults(game: GameType): ObjectiveResult[] {
   const scenario = getScenario(game.scenarioId, game.customScenario);
   if (!scenario) return [];
-  const objectives = scenarioObjectiveDefinitions(scenario, game);
+  const objectives =
+    (game.multiplayer?.ending ? archivedValleyGoals(game) : undefined) ??
+    scenarioObjectiveDefinitions(scenario, game);
   if (!objectives.length) return [];
-  const context = objectiveContextForGame(game, scenario);
-  const progress = gameObjectiveProgress(game)!;
+  return gameResultsForDefinitions(
+    game,
+    scenario,
+    objectives,
+    gameObjectiveProgress(game)!,
+  );
+}
+
+function gameResultsForDefinitions(
+  game: GameType,
+  scenario: ScenarioType,
+  objectives: CompiledRuleObjective[],
+  progress: ObjectiveProgress,
+): ObjectiveResult[] {
+  const context = objectiveContextForDefinitions(game, scenario, objectives);
   const acquisitions = game.utilityExpansion ? utilityAcquisitions(game) : [];
   const acquisitionKey = acquisitions
     .map(({ targetId, minute }) => `${targetId}:${minute}`)
@@ -916,12 +967,19 @@ export function migrateValleyObjectiveProgress(
   publishedRules?: ValleyObjectiveRules,
 ): ObjectiveProgress | null {
   const scenario = getScenario(EXPANSION_SCENARIO_ID)!;
-  const context = objectiveContextForGame(game, scenario);
+  const context = objectiveContextForDefinitions(
+    game,
+    scenario,
+    VALLEY_TWO_GOAL_OBJECTIVES,
+  );
   const progress = game.objectiveProgress;
   if (!progress) return null;
   if (
     publishedRules !== "published-master" &&
-    progress.rulesDigest === context.rulesDigest
+    (progress.rulesDigest === context.rulesDigest ||
+      (!publishedRules &&
+        progress.rulesDigest ===
+          objectiveContextForGame(game, scenario).rulesDigest))
   )
     return progress;
   if (
@@ -934,12 +992,30 @@ export function migrateValleyObjectiveProgress(
   )
     return null;
   return historyProgress(
-    UTILITY_EXPANSION_OBJECTIVES,
+    VALLEY_TWO_GOAL_OBJECTIVES,
     game.monthlyHistory,
     context,
     objectiveRetentionBaseline(game, scenario),
     utilityAcquisitions(game),
   );
+}
+
+/** Verify under the prior rules before dropping conditions from a continuing official run. */
+export function migrateSingleOfficialGoal(
+  game: GameType,
+): ObjectiveProgress | null {
+  const scenario = getScenario(game.scenarioId)!;
+  const progress = game.objectiveProgress;
+  if (!progress) return null;
+  const current = scenarioObjectiveDefinitions(scenario, game);
+  const context = objectiveContextForDefinitions(game, scenario, current);
+  if (progress.rulesDigest === context.rulesDigest) return progress;
+  const previous = isLegacyCampaignScenario(game.scenarioId)
+    ? retiredLegacyScenarioObjectives(scenario, game)
+    : VALLEY_TWO_GOAL_OBJECTIVES;
+  if (!validGameObjectiveProgressForDefinitions(game, scenario, previous))
+    return null;
+  return keepObjectiveEvidence(progress, current[0], context);
 }
 
 export interface RunFailureType {
@@ -1056,10 +1132,28 @@ export function validLegacyCampaignEvidence(game: GameType): boolean {
       objectiveProgress: term.objectiveProgress,
       monthlyHistory: [],
     };
+    const scenario = getScenario(term.scenarioId);
+    if (!scenario) return false;
+    const current = scenarioObjectiveDefinitions(scenario, termGame);
+    const objectives =
+      term.objectiveProgress.rulesDigest ===
+      objectiveContextForDefinitions(termGame, scenario, current).rulesDigest
+        ? current
+        : retiredLegacyScenarioObjectives(scenario, termGame);
     if (
-      !validGameObjectiveProgress(termGame) ||
-      canonicalRuleJson(gameObjectiveResults(termGame)) !==
-        canonicalRuleJson(term.objectiveResults) ||
+      !validGameObjectiveProgressForDefinitions(
+        termGame,
+        scenario,
+        objectives,
+      ) ||
+      canonicalRuleJson(
+        gameResultsForDefinitions(
+          termGame,
+          scenario,
+          objectives,
+          term.objectiveProgress,
+        ),
+      ) !== canonicalRuleJson(term.objectiveResults) ||
       canonicalRuleJson(term.debrief.objectiveResults) !==
         canonicalRuleJson(term.objectiveResults)
     )

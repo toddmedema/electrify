@@ -1,3 +1,9 @@
+import { TransitionGroup } from "react-transition-group";
+import {
+  getInterfaceScale,
+  subscribeInterfaceScale,
+} from "../../InterfaceScale";
+import RemovalCollapse from "../base/RemovalCollapse";
 import { getTerritoryDefinition } from "../../data/Territories";
 import TerritoryBuildDestination, {
   useTerritoryBuildDestination,
@@ -31,6 +37,7 @@ import {
   Stack,
   Typography,
   IconButton,
+  useMediaQuery,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
@@ -96,6 +103,12 @@ import {
   largeMassUnit,
 } from "../../helpers/Units";
 import BuildDetails, { BuildDetailRow } from "../base/BuildDetails";
+import {
+  directEmissionsPerMWh,
+  generatorOutputPending,
+  typicalCapacityFactor,
+  type BuildPreviewComparison,
+} from "../base/BuildPreviewComparison";
 import { useUnits } from "../base/UnitsContext";
 import BuildOptionCard from "../base/BuildOptionCard";
 import {
@@ -222,21 +235,11 @@ function ExpectedOutputMetric(props: {
   );
 }
 
-/**
- * Hydro can only deliver the water that arrives, so its typical output follows the forecast
- * inflow rather than the design capacity factor, which a drought year can fall well short of.
- */
-function typicalCapacityFactor(
-  generator: GeneratorShoppingType,
-  shape?: ExpectedOutputShape,
-): number {
-  return shape?.kind === "water-inflow" ? shape.mean : generator.capacityFactor;
-}
-
 interface GeneratorBuildItemProps {
   /** Expanded canonical card without purchasing controls or dialogs. */
   preview?: boolean;
   previewSiteIssue?: string;
+  previewComparison?: BuildPreviewComparison;
   game?: GameType;
   hydroAvailability?: ReturnType<typeof getHydroAvailability>;
   onDismissHydroPrimer?: () => void;
@@ -283,7 +286,6 @@ export function GeneratorBuildItem(
     useMoney();
   const { generator, cash } = props;
   const units = useUnits();
-  const kgCO2ePerBtu = FUELS[generator.fuel]?.kgCO2ePerBtu ?? 0;
   const fuelPrices = getFuelPricesPerMBTU(
     props.date,
     props.seed,
@@ -374,10 +376,10 @@ export function GeneratorBuildItem(
     !pickingSite && !affordable ? (
       <BuildCashWarning cash={cash} downpayment={downpayment} />
     ) : undefined;
-  const outputPending =
-    props.forecastPending &&
-    (generator.fuel === "Hydro" ||
-      WEATHER_DEPENDENT_FUELS.includes(generator.fuel));
+  const outputPending = generatorOutputPending(
+    generator,
+    !!props.forecastPending,
+  );
   const canBuild = buildable && !shortfall && (pickingSite || !outputPending);
   const buildSubtitle = (buildable && shortfall) || secondaryText;
   const offerAffordableSize =
@@ -390,7 +392,7 @@ export function GeneratorBuildItem(
   const hasVariableOM = generator.variableOperatingCostPerMWh !== undefined;
   // kg of CO2 equivalent released per MWh generated - 0 for carbon-free sources,
   // whose fuel either isn't in FUELS at all (sun, wind) or is emission-free (uranium)
-  const kgCO2ePerMWh = Math.round(1000000 * generator.btuPerWh * kgCO2ePerBtu);
+  const kgCO2ePerMWh = directEmissionsPerMWh(generator);
   const constructionKgco2eTotal =
     (generator.constructionKgco2ePerW || 0) * generator.peakW;
   const buildTileId = props.tileId ?? props.territoryAvailability?.tileId;
@@ -598,6 +600,7 @@ export function GeneratorBuildItem(
     );
   }
 
+  const comparison = props.previewComparison?.markers;
   const metrics = (
     <>
       <BuildMetric
@@ -605,6 +608,7 @@ export function GeneratorBuildItem(
         label="Build cost"
         entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
         value={formatPurchasePrice(generator.buildCost)}
+        comparison={comparison?.buildCost}
         note={
           [
             pickingSite && "Before site costs",
@@ -621,6 +625,7 @@ export function GeneratorBuildItem(
         label="Build time"
         entry={MANUAL_ENTRY.HOW_TO_PLAY}
         value={formatBuildMonths(generator.yearsToBuild)}
+        comparison={comparison?.buildTime}
       />
       {!props.preview && (
         <ExpectedOutputMetric
@@ -639,12 +644,60 @@ export function GeneratorBuildItem(
     </>
   );
 
+  const lifetimeCost = props.secondaryMetric !== "lcWh" && (
+    <BuildDetailRow
+      label="Lifetime cost"
+      value={
+        outputPending
+          ? "Calculating…"
+          : formatForecastMoney(generator.lcWh * 1000000) + "/MWh"
+      }
+      entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
+      comparison={comparison?.lifetimeCost}
+    />
+  );
+  const expectedCapacity = (
+    <BuildDetailRow
+      label={
+        waterShape
+          ? "Capacity factor, this forecast"
+          : "Expected capacity factor"
+      }
+      value={
+        props.forecastPending && !outputShape
+          ? "Calculating…"
+          : percent(capacityFactor)
+      }
+      entry={MANUAL_ENTRY.CAPACITY_FACTOR}
+      comparison={comparison?.capacityFactor}
+    />
+  );
+  const directEmissions = (
+    <BuildDetailRow
+      label="Direct emissions"
+      value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
+      entry={MANUAL_ENTRY.EMISSIONS}
+      comparison={comparison?.directEmissions}
+    />
+  );
+
   return (
     <BuildOptionCard
       name={generator.name}
       iconSrc={iconSrc}
       compared={props.compared}
       preview={props.preview}
+      comparisonCaption={props.previewComparison?.caption}
+      previewSummary={
+        props.preview && (
+          <BuildDetails label="generator properties">
+            {metrics}
+            {lifetimeCost}
+            {expectedCapacity}
+            {directEmissions}
+          </BuildDetails>
+        )
+      }
       review={
         props.preview
           ? undefined
@@ -729,34 +782,15 @@ export function GeneratorBuildItem(
               </Stack>
             </Box>
           )}
-          <BuildDetails label="generator properties">
-            {props.preview && metrics}
-            {props.secondaryMetric !== "lcWh" && (
-              <BuildDetailRow
-                label="Lifetime cost"
-                value={
-                  (outputPending
-                    ? "Calculating…"
-                    : formatForecastMoney(generator.lcWh * 1000000)) +
-                  (outputPending ? "" : "/MWh")
-                }
-                entry={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}
-              />
-            )}
-            <BuildDetailRow
-              // Lifetime cost still assumes average water years; this is the year ahead
-              label={
-                waterShape
-                  ? "Capacity factor, this forecast"
-                  : "Expected capacity factor"
-              }
-              value={
-                props.forecastPending && !outputShape
-                  ? "Calculating…"
-                  : percent(capacityFactor)
-              }
-              entry={MANUAL_ENTRY.CAPACITY_FACTOR}
-            />
+          <BuildDetails
+            label={
+              props.preview
+                ? "advanced generator properties"
+                : "generator properties"
+            }
+          >
+            {!props.preview && lifetimeCost}
+            {!props.preview && expectedCapacity}
             {props.preview && (
               <BuildDetailRow
                 label={
@@ -846,11 +880,7 @@ export function GeneratorBuildItem(
                 entry={MANUAL_ENTRY.PROJECT_SITES}
               />
             )}
-            <BuildDetailRow
-              label="Direct emissions"
-              value={formatMass(kgCO2ePerMWh, units) + "/MWh"}
-              entry={MANUAL_ENTRY.EMISSIONS}
-            />
+            {!props.preview && directEmissions}
             <BuildDetailRow
               label="Construction emissions"
               value={`${formatLargeMassValueConcise(
@@ -1011,11 +1041,18 @@ export function GeneratorBuildItem(
 function GeneratorComparison(props: {
   forecastPending?: boolean;
   generators: GeneratorShoppingType[];
+  comparedNames: string[];
   outputShapes: Map<string, ExpectedOutputShape | undefined>;
   onClear: () => void;
   onRemove: (name: string) => void;
 }): React.JSX.Element | null {
   const { formatForecastMoney, formatPurchasePrice } = useMoney();
+  const scale = React.useSyncExternalStore(
+    subscribeInterfaceScale,
+    getInterfaceScale,
+  );
+  const wideEnoughToWrap = useMediaQuery("(min-width: 600px)");
+  const orientation = scale > 1 && wideEnoughToWrap ? "vertical" : "horizontal";
   if (props.generators.length === 0) {
     return null;
   }
@@ -1029,58 +1066,79 @@ function GeneratorComparison(props: {
           Clear
         </Button>
       </div>
-      <div className="generatorComparisonChoices">
+      <TransitionGroup
+        component="div"
+        className="generatorComparisonChoices"
+        childFactory={(
+          child: React.ReactElement<
+            React.ComponentProps<typeof RemovalCollapse>
+          >,
+        ) =>
+          React.cloneElement(child, {
+            animate: !props.comparedNames.some(
+              (name) =>
+                `comparison-${encodeURIComponent(name)}` === child.props.id,
+            ),
+          })
+        }
+      >
         {props.generators.map((generator) => (
-          <div className="generatorComparisonChoice" key={generator.name}>
-            <img
-              src={`/images/${generator.name.toLowerCase()}.svg`}
-              alt=""
-              aria-hidden
-            />
-            <Typography variant="body2" sx={{ fontWeight: 800 }}>
-              {generator.name}
-            </Typography>
-            <IconButton
-              className="generatorComparisonRemove"
-              size="small"
-              aria-label={`Remove ${generator.name} from comparison`}
-              onClick={() => props.onRemove(generator.name)}
-            >
-              <CloseIcon fontSize="small" />
-            </IconButton>
-            {/* A separator stays with the figure before it, so a narrow chip never starts a
+          <RemovalCollapse
+            key={generator.name}
+            id={`comparison-${encodeURIComponent(generator.name)}`}
+            orientation={orientation}
+          >
+            <div className="generatorComparisonChoice">
+              <img
+                src={`/images/${generator.name.toLowerCase()}.svg`}
+                alt=""
+                aria-hidden
+              />
+              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                {generator.name}
+              </Typography>
+              <IconButton
+                className="generatorComparisonRemove"
+                size="small"
+                aria-label={`Remove ${generator.name} from comparison`}
+                onClick={() => props.onRemove(generator.name)}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+              {/* A separator stays with the figure before it, so a narrow chip never starts a
               line with "·" */}
-            <Typography variant="caption">
-              <span className="nowrap">
-                {formatPurchasePrice(generator.buildCost)} ·
-              </span>{" "}
-              <span className="nowrap">
-                {formatBuildMonths(generator.yearsToBuild)}
-              </span>
-            </Typography>
-            <Typography variant="caption" color="textSecondary">
-              {props.forecastPending &&
-              !props.outputShapes.get(generator.name) ? (
-                "Calculating output and energy costs…"
-              ) : (
-                <>
-                  {formatWatts(
-                    generator.peakW *
-                      typicalCapacityFactor(
-                        generator,
-                        props.outputShapes.get(generator.name),
-                      ),
-                  )}{" "}
-                  typical{"\u00a0·"}{" "}
-                  <span className="nowrap">
-                    {formatForecastMoney(generator.lcWh * 1000000)}/MWh
-                  </span>
-                </>
-              )}
-            </Typography>
-          </div>
+              <Typography variant="caption">
+                <span className="nowrap">
+                  {formatPurchasePrice(generator.buildCost)} ·
+                </span>{" "}
+                <span className="nowrap">
+                  {formatBuildMonths(generator.yearsToBuild)}
+                </span>
+              </Typography>
+              <Typography variant="caption" color="textSecondary">
+                {props.forecastPending &&
+                !props.outputShapes.get(generator.name) ? (
+                  "Calculating output and energy costs…"
+                ) : (
+                  <>
+                    {formatWatts(
+                      generator.peakW *
+                        typicalCapacityFactor(
+                          generator,
+                          props.outputShapes.get(generator.name),
+                        ),
+                    )}{" "}
+                    typical{"\u00a0·"}{" "}
+                    <span className="nowrap">
+                      {formatForecastMoney(generator.lcWh * 1000000)}/MWh
+                    </span>
+                  </>
+                )}
+              </Typography>
+            </div>
+          </RemovalCollapse>
         ))}
-      </div>
+      </TransitionGroup>
     </section>
   );
 }
@@ -1403,14 +1461,37 @@ function BuildGenerators(props: Props): React.JSX.Element {
     });
   };
 
-  const comparison = (
-    <GeneratorComparison
-      generators={comparedGenerators}
-      outputShapes={outputShapes}
-      forecastPending={!forecast}
-      onClear={() => setComparedNames([])}
-      onRemove={toggleCompare}
-    />
+  const focusComparisonOption = (name: string) => {
+    Array.from(listRef.current?.querySelectorAll("button") ?? [])
+      .find((button) => button.getAttribute("aria-label") === `Compare ${name}`)
+      ?.focus({ preventScroll: true });
+  };
+  const animateComparison = (
+    child: React.ReactElement<React.ComponentProps<typeof RemovalCollapse>>,
+  ) => React.cloneElement(child, { animate: comparedNames.length === 0 });
+  const comparison = comparedGenerators.length > 0 && (
+    <RemovalCollapse
+      key="comparison"
+      component={comparisonInList ? "li" : "div"}
+      className={
+        comparisonInList ? "buildComparisonItem" : "generatorComparisonSlot"
+      }
+    >
+      <GeneratorComparison
+        generators={comparedGenerators}
+        comparedNames={comparedNames}
+        outputShapes={outputShapes}
+        forecastPending={!forecast}
+        onClear={() => {
+          focusComparisonOption(comparedGenerators[0].name);
+          setComparedNames([]);
+        }}
+        onRemove={(name) => {
+          focusComparisonOption(name);
+          toggleCompare(name);
+        }}
+      />
+    </RemovalCollapse>
   );
 
   if (!now) return <span />;
@@ -1460,15 +1541,21 @@ function BuildGenerators(props: Props): React.JSX.Element {
           Calculating output and energy costs…
         </Typography>
       )}
-      {!comparisonInList && comparison}
+      {!comparisonInList && (
+        <TransitionGroup component={null} childFactory={animateComparison}>
+          {comparison}
+        </TransitionGroup>
+      )}
       <List
         ref={listRef}
         dense
         className="scrollable cardList"
         aria-label="Generator options"
       >
-        {comparisonInList && comparedGenerators.length > 0 && (
-          <li className="buildComparisonItem">{comparison}</li>
+        {comparisonInList && (
+          <TransitionGroup component={null} childFactory={animateComparison}>
+            {comparison}
+          </TransitionGroup>
         )}
         {generators.map((g: GeneratorShoppingType) => {
           const advantages = [

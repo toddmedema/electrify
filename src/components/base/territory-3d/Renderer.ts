@@ -24,7 +24,6 @@ import type {
   MapLighting,
   MapMesh,
   ModelPart,
-  PaintedScene,
   RendererDiagnostics,
   RendererSceneInstance,
   Vec3,
@@ -36,6 +35,8 @@ const MAX_PIXELS = 2500000;
 const CAMERA_OVERSCAN = HEX_WIDTH / 2;
 const FOG_MIX = [0, 0.15, 0.35, 0.6];
 const FOG_SATURATION = [1, 0.8, 0.45, 0.15];
+const CITY_WINDOW_MATERIAL = 5;
+const NIGHT_BACKGROUND: Vec3 = [0.022, 0.032, 0.047];
 const VERTEX = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
@@ -48,6 +49,7 @@ uniform mat4 uProjection;
 uniform vec3 uLight;
 uniform bool uShadow;
 uniform vec4 uWeather;
+uniform float uCityService;
 out vec3 vNormal;
 out vec3 vColor;
 out vec4 vStyle;
@@ -71,6 +73,10 @@ void main() {
   vColor = aColor;
   vStyle = aStyle;
   vMaterial = aMaterial;
+  if (aMaterial.z == ${CITY_WINDOW_MATERIAL}.0) {
+    float service = mix(1.0, uCityService, aMaterial.x);
+    vMaterial.x = step(aColor.r, service);
+  }
 }`;
 const FRAGMENT = `#version 300 es
 precision highp float;
@@ -85,6 +91,7 @@ uniform vec4 uWeather;
 uniform vec3 uLightColor;
 uniform vec3 uBackground;
 uniform float uAmbient;
+uniform float uNight;
 uniform float uShadowAlpha;
 uniform bool uShadow;
 out vec4 color;
@@ -116,7 +123,10 @@ void main() {
   vec3 normal = normalize(vNormal);
   float incidence = max(0.0, dot(normal, uLight));
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
-  vec3 base = mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
+  bool cityWindow = vMaterial.z == ${CITY_WINDOW_MATERIAL}.0;
+  vec3 base = cityWindow
+    ? mix(vec3(0.22, 0.33, 0.37), vec3(0.39, 0.69, 0.66), vMaterial.x)
+    : mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
   if (vMaterial.z == 3.0) {
     float snowLine = mix(0.75, 0.25, uWeather.w);
     float cap = smoothstep(snowLine, snowLine + 0.13, vSurfacePosition.y);
@@ -152,7 +162,12 @@ void main() {
     glint *= glint;
     lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
   }
-  lit += base * (vStyle.z + vMaterial.x * 0.42);
+  lit *= mix(1.0, 0.40, uNight);
+  if (cityWindow) {
+    lit = mix(lit, vec3(1.0, 0.78, 0.40), vMaterial.x * (0.10 + uNight * 0.83));
+  } else {
+    lit += base * (vStyle.z + vMaterial.x * 0.42);
+  }
   lit *= vMaterial.y;
   float saturation = vStyle.w;
   lit = mix(vec3(dot(lit, vec3(0.2126, 0.7152, 0.0722))), lit, saturation);
@@ -200,6 +215,8 @@ type Uniforms = Record<
   | "waterHalfVector"
   | "background"
   | "ambient"
+  | "night"
+  | "cityService"
   | "shadowAlpha"
   | "shadow",
   WebGLUniformLocation | null
@@ -223,6 +240,7 @@ function sameLighting(a: MapLighting, b: MapLighting): boolean {
   return (
     a === b ||
     (a.ambient === b.ambient &&
+      a.night === b.night &&
       a.shadow === b.shadow &&
       sameVector(a.direction, b.direction) &&
       sameVector(a.color, b.color))
@@ -270,7 +288,7 @@ export class MapRenderer {
   private instanceCount = 0;
   private poseRevision = 0;
   private paintedLighting: MapLighting | undefined;
-  private paintedScene: PaintedScene | undefined;
+  private paintedFrame: MapFrame | undefined;
   private heldLighting: MapLighting | undefined;
   private lightingTransition:
     { from: MapLighting; started: number; duration: number } | undefined;
@@ -308,6 +326,7 @@ export class MapRenderer {
       !sameProjection(frame, previous) ||
       lightingChanged ||
       frame.dpr !== previous.dpr ||
+      frame.cityService !== previous.cityService ||
       frame.visible !== previous.visible ||
       frame.motionAllowed !== previous.motionAllowed ||
       frame.playbackRate !== previous.playbackRate ||
@@ -366,12 +385,6 @@ export class MapRenderer {
     this.sceneInstances = this.instances;
   }
 
-  motionPhase = (key: string): number => this.clock.phase(key);
-
-  getPaintedScene(): PaintedScene | undefined {
-    return this.paintedScene;
-  }
-
   diagnostics(includeScene = false): RendererDiagnostics {
     return {
       frames: this.frames,
@@ -424,7 +437,7 @@ export class MapRenderer {
         const surfaceOffset = watershed
           ? waterLevelOffset(
               WATERSHED_LEVEL_OFFSETS,
-              this.paintedScene?.frame.weather?.waterLevel,
+              this.paintedFrame?.weather?.waterLevel,
             )
           : 0;
         if (watershed || part.material === "water")
@@ -514,6 +527,8 @@ export class MapRenderer {
         waterHalfVector: gl.getUniformLocation(program, "uWaterHalfVector"),
         background: gl.getUniformLocation(program, "uBackground"),
         ambient: gl.getUniformLocation(program, "uAmbient"),
+        night: gl.getUniformLocation(program, "uNight"),
+        cityService: gl.getUniformLocation(program, "uCityService"),
         shadowAlpha: gl.getUniformLocation(program, "uShadowAlpha"),
         shadow: gl.getUniformLocation(program, "uShadow"),
       };
@@ -701,6 +716,7 @@ export class MapRenderer {
         previous.active !== next.active ||
         previous.frost !== next.frost ||
         previous.producing !== next.producing ||
+        previous.onPlayerGrid !== next.onPlayerGrid ||
         previous.motionKey !== next.motionKey ||
         previous.wildfire !== next.wildfire
       )
@@ -906,8 +922,14 @@ export class MapRenderer {
         : 0.78
       : 1;
     pose[19] = FOG_SATURATION[instance.fog] * saturation;
-    pose[20] =
-      part.material === "facility-window" && instance.producing ? 1 : 0;
+    const cityWindow = part.material === "city-window";
+    pose[20] = (
+      cityWindow
+        ? instance.onPlayerGrid
+        : part.material === "facility-window" && instance.producing
+    )
+      ? 1
+      : 0;
     pose[21] = facility && instance.active ? 1.06 : 1;
     pose[22] =
       part.material === "water"
@@ -918,7 +940,9 @@ export class MapRenderer {
             ? 3
             : part.material === "map-border"
               ? 4
-              : 0;
+              : cityWindow
+                ? CITY_WINDOW_MATERIAL
+                : 0;
     pose[23] = instance.frost && pose[22] !== 1 && pose[22] !== 2 ? 1 : 0;
   }
 
@@ -948,7 +972,15 @@ export class MapRenderer {
       this.storageAllocated = true;
     }
     gl.viewport(0, 0, width, height);
-    gl.clearColor(...frame.background, 1);
+    const background: Vec3 = [
+      frame.background[0] +
+        (NIGHT_BACKGROUND[0] - frame.background[0]) * lighting.night,
+      frame.background[1] +
+        (NIGHT_BACKGROUND[1] - frame.background[1]) * lighting.night,
+      frame.background[2] +
+        (NIGHT_BACKGROUND[2] - frame.background[2]) * lighting.night,
+    ];
+    gl.clearColor(...background, 1);
     gl.clearDepth(1);
     gl.clearStencil(0);
     gl.colorMask(true, true, true, true);
@@ -976,8 +1008,10 @@ export class MapRenderer {
       halfY / halfLength,
       halfZ / halfLength,
     );
-    gl.uniform3f(uniforms.background, ...frame.background);
+    gl.uniform3f(uniforms.background, ...background);
     gl.uniform1f(uniforms.ambient, lighting.ambient);
+    gl.uniform1f(uniforms.night, lighting.night);
+    gl.uniform1f(uniforms.cityService, frame.cityService);
     gl.uniform1f(uniforms.shadowAlpha, lighting.shadow);
     gl.uniform1i(uniforms.shadow, 0);
     gl.enable(gl.DEPTH_TEST);
@@ -1024,15 +1058,11 @@ export class MapRenderer {
       throw new Error("Map GPU buffer upload or draw failed");
     this.frames++;
     this.paintedLighting = lighting;
-    if (frame.width !== this.paintedScene?.frame.width)
+    if (frame.width !== this.paintedFrame?.width)
       this.canvas.style.width = `${frame.width}px`;
-    if (frame.height !== this.paintedScene?.frame.height)
+    if (frame.height !== this.paintedFrame?.height)
       this.canvas.style.height = `${frame.height}px`;
-    if (
-      this.paintedScene?.frame !== frame ||
-      this.paintedScene.instances !== this.instances
-    )
-      this.paintedScene = { frame, instances: this.instances };
+    this.paintedFrame = frame;
     this.instanceCount = this.sceneInstanceCount;
   }
 
@@ -1095,7 +1125,7 @@ export class MapRenderer {
       if (this.program) this.gl?.deleteProgram(this.program);
     }
     this.meshes.clear();
-    this.paintedScene = undefined;
+    this.paintedFrame = undefined;
     this.sceneFrame = undefined;
     this.sceneInstances = undefined;
     this.program = null;

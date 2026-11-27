@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, Page, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openMapProjectCatalogue, openPane } from "./layout";
 import { readShotRequest, ShotRequest } from "./shot-request";
 
 // Runner for `npm run shot`; see scripts/dev/shot.js. It starts the game and opens panes with
@@ -21,8 +21,11 @@ async function openView(page: Page, view: ShotRequest["view"]) {
       page.locator(".facilities:visible"),
       page.getByRole("button", { name: "Facilities", exact: true }),
     );
-  else if (view === "build") await openBuild(page);
-  else {
+  else if (view === "build") {
+    if (await page.locator(".gameWorkspace[data-persistent-map]").count())
+      await openMapProjectCatalogue(page);
+    else await openBuild(page);
+  } else {
     const label = TOOL_LABELS[view];
     await openPane(
       page.getByRole("region", { name: label, exact: true }),
@@ -55,9 +58,7 @@ test("capture", async ({ page, colorScheme }, info) => {
       `${request.route} shows no "Start game" button (is the scenario id valid?)`,
     ).toBeVisible();
     await start.click();
-    await expect(
-      page.getByText("Starting your mission…", { exact: true }),
-    ).toBeHidden();
+    await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     // A new game starts paused already; make sure, so the capture cannot change mid-delay.
     const running = page
       .getByRole("button", { name: "pause", exact: true })

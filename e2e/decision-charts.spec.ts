@@ -40,7 +40,7 @@ test("operating overview keeps editing quiet and full-campaign peaks readable", 
     ),
   ).toBeLessThanOrEqual(1);
   await page.evaluate(() => document.fonts.ready);
-  await expect(page.getByText("Starting your mission…")).toHaveCount(0);
+  await expect(page.getByText("Loading")).toHaveCount(0);
   await expect(page.locator('[class*="-exit-active"]')).toHaveCount(0);
   if (process.env.REVIEW_SCREENSHOT_DIR) {
     await page.screenshot({

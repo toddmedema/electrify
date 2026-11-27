@@ -9,18 +9,21 @@ import {
   openMapProjectCatalogue,
   returnToTerritoryMap,
   setMapProjectCapacity,
+  showMapFacilityStatus,
 } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 import { getBuildFacilityQuote } from "../src/data/Facilities";
 import gameReducer, { buildFacility } from "../src/reducers/Game";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
+import { HEX_HEIGHT } from "../src/components/base/TerritoryHexGeometry";
 import { SceneBuilder } from "../src/components/base/territory-3d/SceneBuilder";
 import { getStructureModel } from "../src/components/base/territory-3d/StructureModels";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
 import { getTerrainModel } from "../src/components/base/territory-3d/TerrainModels";
 import { editSavedGame, readSavedGame } from "./save-fixture";
-import { TICK_MINUTES } from "../src/Constants";
+import { TICK_MINUTES, YEARS_PER_TICK } from "../src/Constants";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../src/helpers/DateTime";
+import { currentTick } from "../src/helpers/GameSelectors";
 import {
   COLD_DEFINITION_ID,
   HAIL_DEFINITION_ID,
@@ -85,6 +88,136 @@ async function readyDiagnostics(canvas: Locator, scene = false) {
   return diagnostics!;
 }
 
+for (const theme of ["light", "dark"] as const) {
+  test(`city windows fill from the bottom as service returns at night in ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await startPausedMap(page, theme);
+
+    async function resumeAt(minute: number, served: number) {
+      await editSavedGame(page, ({ game }) => {
+        game.date = getDateFromMinute(minute, game.startingYear);
+        game.speed = "PAUSED";
+        const tick = currentTick(game)!;
+        tick.supplyW = tick.demandW * served;
+      });
+      await page.goto("/");
+      await page.getByRole("button", { name: "Continue", exact: true }).click();
+      const map = await returnToTerritoryMap(page);
+      const canvas = map.locator("canvas.territory3DCanvas");
+      await expect(canvas).toHaveAttribute("data-renderer", "ready");
+      const { scene } = await readyDiagnostics(canvas, true);
+      const { width, height } = (await canvas.boundingBox())!;
+      const camera = await readTerritoryMapCamera(
+        map.locator(".territoryMapViewport"),
+      );
+      const frame = {
+        width,
+        height,
+        cameraX: camera.x,
+        cameraY: camera.y,
+        scale: camera.scale,
+      };
+      const cities = ["champlain:city", "valley-electric:city"].map((city) => {
+        const { min, max } = scene!.find(
+          ({ id }) => id === `structure:${city}`,
+        )!;
+        const topLeft = projectPoint([min[0], max[1], min[2]], frame);
+        const bottomRight = projectPoint([max[0], min[1], max[2]], frame);
+        return {
+          left: Math.max(0, Math.floor(topLeft.x)),
+          top: Math.max(0, Math.floor(topLeft.y)),
+          right: Math.min(width, Math.ceil(bottomRight.x)),
+          bottom: Math.min(height, Math.ceil(bottomRight.y)),
+        };
+      });
+      const screenshot = await canvas.screenshot({
+        scale: "css",
+        animations: "disabled",
+      });
+      return canvas.evaluate(
+        async (element: HTMLCanvasElement, { base64, cities }) => {
+          const png = Uint8Array.from(atob(base64), (byte) =>
+            byte.charCodeAt(0),
+          );
+          const bitmap = await createImageBitmap(
+            new Blob([png], { type: "image/png" }),
+          );
+          const { width, height } = bitmap;
+          const context = new OffscreenCanvas(width, height).getContext("2d")!;
+          context.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          const pixels = context.getImageData(0, 0, width, height).data;
+          let brightness = 0;
+          for (let i = 0; i < pixels.length; i += 4)
+            brightness += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+          const [owned, neighbor] = cities.map(
+            ({ left, top, right, bottom }) => {
+              let warm = 0;
+              let sumY = 0;
+              for (let y = top; y < bottom; y++) {
+                for (let x = left; x < right; x++) {
+                  const i = (y * width + x) * 4;
+                  const r = pixels[i],
+                    g = pixels[i + 1],
+                    b = pixels[i + 2];
+                  // Bright amber panes remain distinct even through the neighbor's fog.
+                  if (r > 120 && r - g > 12 && g - b > 25) {
+                    warm++;
+                    sumY += y;
+                  }
+                }
+              }
+              return { warm, sumY };
+            },
+          );
+          // Read the WebGL backdrop separately from the overlaid weather illustration.
+          const gl = element.getContext("webgl2")!;
+          const [red, green, blue] = gl.getParameter(
+            gl.COLOR_CLEAR_VALUE,
+          ) as Float32Array;
+          const backdrop = red + green + blue;
+          return {
+            owned: owned.warm,
+            ownedMeanY: owned.warm ? owned.sumY / owned.warm : 0,
+            neighbor: neighbor.warm,
+            backdrop,
+            brightness: brightness / (width * height),
+          };
+        },
+        { base64: screenshot.toString("base64"), cities },
+      );
+    }
+
+    const daytime = await resumeAt(720, 1);
+    const dark = await resumeAt(0, 0);
+    const partial = await resumeAt(0, 0.5);
+    await reviewScreenshot(page, {
+      path: info.outputPath("partial-service.png"),
+      animations: "disabled",
+    });
+    const restored = await resumeAt(0, 1);
+    await reviewScreenshot(page, {
+      path: info.outputPath("full-service.png"),
+      animations: "disabled",
+    });
+
+    expect(dark.brightness).toBeLessThan(daytime.brightness * 0.65);
+    expect(dark.backdrop).toBeLessThan(daytime.backdrop);
+    expect(restored.owned).toBeGreaterThan(dark.owned + 12);
+    const proportion =
+      (partial.owned - dark.owned) / (restored.owned - dark.owned);
+    expect(proportion).toBeGreaterThan(0.25);
+    expect(proportion).toBeLessThan(0.75);
+    // Higher floors light up on recovery, pulling the center of the glow up.
+    expect(partial.ownedMeanY).toBeGreaterThan(restored.ownedMeanY);
+    expect(dark.neighbor).toBeGreaterThan(0);
+    expect(partial.neighbor).toBe(dark.neighbor);
+    expect(restored.neighbor).toBe(dark.neighbor);
+  });
+}
+
 test("Valley town growth survives resume and adds buildings to the map", async ({
   page,
 }, info) => {
@@ -139,6 +272,7 @@ test("mobile map tools leave even gutters around the live terrain", async ({
   page,
 }, info) => {
   test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const { canvas } = await startPausedMap(page);
   const dock = page.locator("#navfooter");
   const stage = page.locator(".gameStage");
@@ -161,6 +295,133 @@ test("mobile map tools leave even gutters around the live terrain", async ({
     expect(tool!.y - terrain!.y).toBeGreaterThanOrEqual(4);
     expect(actions!.y - (tool!.y + tool!.height)).toBeGreaterThanOrEqual(4);
   }
+});
+
+test("mobile map tools slide in and out and share the Build header", async ({
+  page,
+}, info) => {
+  test.skip(!info.project.use.hasTouch, "Requires the compact touch map");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await startPausedMap(page);
+  const dock = page.locator("#navfooter");
+  const programs = dock.getByRole("button", { name: "Programs", exact: true });
+  const panel = page.getByRole("region", { name: "Programs", exact: true });
+  // Capture the browser's keyframes before a busy renderer can skip the slide's
+  // frames and clear the animation before transitionstart is delivered.
+  const slides = await page.locator(".gameToolTray").evaluateHandle((tray) => {
+    const offsets: { from: number; to: number }[] = [];
+    const recorded = new WeakSet<Animation>();
+    const yOffset = (transform: unknown) => {
+      if (transform === "none") return 0;
+      return typeof transform === "string"
+        ? new DOMMatrix(transform).m42
+        : Number.NaN;
+    };
+    const observer = new MutationObserver(() => {
+      const wrapper = tray.querySelector("#tool-PROGRAMS")?.parentElement;
+      const slide = wrapper
+        ?.getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        );
+      if (!(slide?.effect instanceof KeyframeEffect) || recorded.has(slide))
+        return;
+      const [first, last] = slide.effect.getKeyframes();
+      recorded.add(slide);
+      offsets.push({
+        from: yOffset(first.transform),
+        to: yOffset(last.transform),
+      });
+    });
+    observer.observe(tray, {
+      subtree: true,
+      attributeFilter: ["class"],
+    });
+    return offsets;
+  });
+  await programs.click();
+  await expect.poll(async () => (await slides.jsonValue()).length).toBe(1);
+  const [entry] = await slides.jsonValue();
+  expect(entry.from).toBeGreaterThan(0);
+  expect(entry.to).toBe(0);
+  await expect(panel.locator("..")).toHaveCSS("transform", "none");
+  const programsHeader = panel.locator(":scope > header");
+  const headerStyle = (header: Locator) =>
+    header.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        element.className,
+        style.height,
+        style.backgroundColor,
+        style.padding,
+      ];
+    });
+  const expectedHeader = await headerStyle(programsHeader);
+  await programs.click();
+  await expect(panel).toHaveCount(0);
+  await expect(programs).toBeFocused();
+  await expect.poll(async () => (await slides.jsonValue()).length).toBe(2);
+  const [, exit] = await slides.jsonValue();
+  expect(exit.from).toBe(0);
+  expect(exit.to).toBeGreaterThan(0);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await programs.click();
+  await expect(panel).toBeVisible();
+  await panel.getByRole("button", { name: "Close Programs" }).click();
+  await expect(page.locator("#tool-PROGRAMS")).toHaveCount(0);
+  expect(await slides.jsonValue()).toHaveLength(2);
+  await slides.dispose();
+
+  const build = await openMapProjectCatalogue(page);
+  await expect(
+    build.getByRole("tab", { name: "Generators", exact: true }),
+  ).toBeVisible();
+  expect(await headerStyle(build.locator(":scope > header"))).toEqual(
+    expectedHeader,
+  );
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const buildTrigger = dock.getByRole("button", { name: "Build", exact: true });
+  // Reopen as soon as the browser creates the exit transition, while the same
+  // panel is still mounted and its controls are inert.
+  const reopen = await buildTrigger.evaluateHandle((button) => {
+    if (!(button instanceof HTMLButtonElement))
+      throw new Error("Expected the Build dock button");
+    const project = document.getElementById("tool-BUILD_GENERATORS")!;
+    const wrapper = project.parentElement!;
+    const result = { project, reopened: false };
+    const observer = new MutationObserver(() => {
+      const sliding = wrapper
+        .getAnimations()
+        .some(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "transform",
+        );
+      if (!wrapper.inert || !sliding) return;
+      observer.disconnect();
+      button.click();
+      result.reopened = true;
+    });
+    observer.observe(wrapper, { attributeFilter: ["class", "inert"] });
+    button.click();
+    return result;
+  });
+  await expect
+    .poll(() => reopen.evaluate(({ reopened }) => reopened))
+    .toBe(true);
+  await expect(
+    build.getByRole("heading", { name: "Build", exact: true }),
+  ).toBeFocused();
+  expect(
+    await reopen.evaluate(
+      ({ project }) => document.getElementById(project.id) === project,
+    ),
+  ).toBe(true);
+  await reopen.dispose();
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -242,7 +503,9 @@ test("resizing keeps the painted terrain and map labels centered at the same zoo
 }) => {
   const original = page.viewportSize()!;
   await page.clock.install();
-  const { map } = await startPausedMap(page);
+  const { map, canvas } = await startPausedMap(page);
+  await showMapFacilityStatus(map);
+  await readyDiagnostics(canvas);
   const viewport = map.locator(".territoryMapViewport");
   const scale = (await viewport.getAttribute("data-camera-scale"))!;
   await pauseBrowserClock(page);
@@ -322,15 +585,16 @@ for (const theme of ["light", "dark"] as const) {
     const { map, canvas } = await startPausedMap(page, theme);
     await readyDiagnostics(canvas);
     const viewport = map.locator(".territoryMapViewport");
-    const bounds = (await viewport.boundingBox())!;
+    const capital = viewport.locator('[data-map-target="champlain:city"]');
+    const hitArea = capital.locator(".territoryTileHitArea");
     const cameraX = (await readTerritoryMapCamera(viewport)).x;
-    const x = Math.round(bounds.x + bounds.width / 2);
-    const y = Math.round(bounds.y + bounds.height / 2);
-    await page.mouse.move(x, y);
-    const hovered = viewport.locator(
-      '[data-model-hovered="true"] .territoryTileHitArea',
-    );
-    await expect(hovered).toHaveCSS("background-image", /radial-gradient/);
+    await hitArea.hover();
+    await expect(capital).toHaveAttribute("data-model-hovered", "true");
+    await expect(hitArea).toHaveCSS("background-image", /radial-gradient/);
+    await expect(map.getByRole("tooltip")).toContainText("Burlington");
+    const bounds = (await hitArea.boundingBox())!;
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height / 2;
     await page.mouse.down({ button: "middle" });
     await page.mouse.move(x + 40, y + 20, { steps: 4 });
     await page.mouse.up({ button: "middle" });
@@ -379,7 +643,7 @@ test("desktop wheel zoom keeps the pointer anchored in every rendered frame", as
     [-180, Math.exp(0.3)],
     [180, 1],
     [-2000, 2],
-    [2000, 0.5],
+    [2000, 44 / HEX_HEIGHT / scale],
   ]) {
     await page.mouse.wheel(0, delta);
     await expect
@@ -408,6 +672,49 @@ test("desktop wheel zoom keeps the pointer anchored in every rendered frame", as
       "terrain drift in CSS pixels",
     ).toBeLessThan(1);
   }
+});
+
+test("minimum zoom keeps clicks aligned to the painted hex boundary", async ({
+  page,
+  isMobile,
+}) => {
+  const { map, canvas } = await startPausedMap(page);
+  await readyDiagnostics(canvas);
+  const viewport = map.getByRole("region", { name: "Territory map" });
+  const before = await readTerritoryMapCamera(viewport);
+  const city = viewport.locator('[data-map-target="champlain:city"]');
+  const neighbor = viewport.locator('[data-map-target="champlain:site-2"]');
+  await city.locator(".territoryTileHitArea").hover();
+  await page.mouse.wheel(0, 2000);
+  await expect
+    .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+    .toBeLessThan(before.scale * 0.7);
+
+  // Neighboring center points meet halfway across their shared slanted edge.
+  const a = (await city.boundingBox())!;
+  const b = (await neighbor.boundingBox())!;
+  const edge = {
+    x: (a.x + a.width / 2 + b.x + b.width / 2) / 2,
+    y: (a.y + a.height / 2 + b.y + b.height / 2) / 2,
+  };
+  const neighborPoint = { x: edge.x, y: edge.y - 1 };
+  const cityPoint = { x: edge.x, y: edge.y + 1 };
+  const hits = await page.evaluate(
+    (points) =>
+      points.map(({ x, y }) =>
+        document
+          .elementFromPoint(x, y)
+          ?.closest("[data-map-target]")
+          ?.getAttribute("data-map-target"),
+      ),
+    [neighborPoint, cityPoint],
+  );
+  expect(hits).toEqual(["champlain:site-2", "champlain:city"]);
+
+  if (isMobile) await page.touchscreen.tap(neighborPoint.x, neighborPoint.y);
+  else await page.mouse.click(neighborPoint.x, neighborPoint.y);
+  await expect(neighbor).toHaveAttribute("aria-pressed", "true");
+  await expect(city).toHaveAttribute("aria-pressed", "false");
 });
 
 test("pinch zooms the 3D map without magnifying the page", async ({
@@ -690,11 +997,15 @@ test("keyboard selection draws a centered 3D mountain outline and Escape clears 
   ).toBeFocused();
 });
 
-test("clicking real mountain relief above its ground selects the mountain tile", async ({
+test("clicking projected mountain relief follows the hex under the pointer", async ({
   page,
 }) => {
-  const { map } = await startPausedMap(page);
-  const { mountain, tile } = await nearestUnownedMountain(map);
+  const { map, canvas } = await startPausedMap(page);
+  const tile = getTerritoryTile("frontier:0:-5")!;
+  const mountain = map.locator(`[data-map-target="${tile.id}"]`);
+  const groundId = "frontier:1:-6";
+  const ground = map.locator(`[data-map-target="${groundId}"]`);
+  await expect(mountain).toHaveAttribute("data-owned", "false");
   // Reveal the same tile on compact viewports before testing pointer picking.
   await mountain.focus();
   await mountain.press("Escape");
@@ -724,6 +1035,10 @@ test("clicking real mountain relief above its ground selects the mountain tile",
     0,
     "run",
   );
+  const diagnostics = await readyDiagnostics(canvas, true);
+  const rendered = diagnostics.scene?.find(({ id }) => id === terrain.id);
+  expect(rendered?.modelKey).toBe(terrain.model.key);
+  expect(rendered?.max[1]).toBeGreaterThan(0);
   const mesh = terrain.model.parts[1].mesh.positions;
   let peak = [0, -Infinity, 0];
   for (let i = 0; i < mesh.length; i += 9) {
@@ -743,20 +1058,36 @@ test("clicking real mountain relief above its ground selects the mountain tile",
   );
   const bounds = (await viewport.boundingBox())!;
   const click = { x: bounds.x + point.x, y: bounds.y + point.y };
-  const ground = await page.evaluate(
+  // This peak projects into the hit area of its neighbor in the next row.
+  const groundAtPeak = await page.evaluate(
     ({ x, y }) =>
-      document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-map-target]")
-        ?.dataset.mapTarget,
+      document
+        .elementFromPoint(x, y)
+        ?.closest(".territoryTileHitArea")
+        ?.closest<HTMLElement>("[data-map-target]")?.dataset.mapTarget,
     click,
   );
-  // With a finite board, a foreground peak can also project above the map edge.
   expect(point.x).toBeGreaterThan(0);
   expect(point.x).toBeLessThan(width);
   expect(point.y).toBeGreaterThan(0);
   expect(point.y).toBeLessThan(height);
-  expect(ground).not.toBe(tile.id);
+  expect(groundAtPeak).toBe(groundId);
   await page.mouse.click(click.x, click.y);
+  await expect(ground).toHaveAttribute("aria-pressed", "true");
+  await expect(mountain).toHaveAttribute("aria-pressed", "false");
+  const surface = page.locator(".tileWorkspaceSurface");
+  await closeTileSurface(surface);
+  await expect(surface).toBeHidden();
+  const hitArea = mountain.locator(".territoryTileHitArea");
+  // The neighboring utility label can cover the center of this hex.
+  const position = await hitArea.evaluate(({ clientWidth, clientHeight }) => ({
+    x: clientWidth / 2,
+    y: clientHeight * 0.8,
+  }));
+  await hitArea.click({ position });
   await expect(mountain).toHaveAttribute("aria-pressed", "true");
+  await expect(ground).toHaveAttribute("aria-pressed", "false");
+  await expect(surface).toBeVisible();
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -782,7 +1113,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: /^(Choose sites|Pick site) for Wind$/ })
       .click();
     await expect(
-      surface.getByText("Connected · total project cost", { exact: true }),
+      surface.getByText("Choose a highlighted site.", { exact: true }),
     ).toBeVisible();
     const markers = map.locator(
       '[data-project-site="owned"] .territoryTilePrice',
@@ -829,13 +1160,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(quote.facility).toBeDefined();
     if (!quote.facility) throw new Error("Owned project site has no quote");
     const total = formatPurchasePrice(projectSiteCapitalCost(quote));
-    await expect(ownedMarker.locator("b")).toHaveText(`(${total})`);
+    await expect(ownedMarker.locator("b")).toHaveText(total);
     await expect(owned).toHaveAccessibleName(
       /Total project cost .*Already connected/,
     );
     await owned.focus();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost (${total}) · Already connected`,
+      `Total project cost ${total} · Already connected`,
     );
     await map.getByRole("button", { name: "Rapid connection mode" }).focus();
     await expect(map.getByRole("tooltip")).toHaveCount(0);
@@ -844,7 +1175,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface.getByText("Connected", { exact: true })).toBeVisible();
     await ownedMarker.hover();
     await expect(map.getByRole("tooltip")).toContainText(
-      `Total project cost (${total}) · Already connected`,
+      `Total project cost ${total} · Already connected`,
     );
     await page.mouse.move(0, 0);
     await reviewScreenshot(map, {
@@ -1146,7 +1477,11 @@ test("map windows move, resize, stack and remember their bounds", async ({
   await expect
     .poll(() =>
       fleet.evaluate((element: HTMLElement) => {
-        const tray = element.parentElement!;
+        const tray = element.offsetParent;
+        if (!(tray instanceof HTMLElement))
+          throw new Error(
+            "Expected a containing layout box for the Fleet window",
+          );
         return {
           rightGap: tray.clientWidth - element.offsetLeft - element.offsetWidth,
           bottomGap:
@@ -1347,6 +1682,86 @@ test("shows extreme cold on the 3D map and explains the plant derate", async ({
     });
   }
   await closeTileSurface(inspector);
+});
+
+test("solar assembly resumes at its saved stage and adds panels as the clock advances", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({
+    reducedMotion: info.project.use.hasTouch ? "reduce" : "no-preference",
+  });
+  await startPausedMap(page, info.project.use.hasTouch ? "dark" : "light");
+  const site = "champlain:site-12";
+  await editSavedGame(page, (save) => {
+    loadSimData(save.game.location);
+    const facility = getBuildFacilityQuote(
+      save.game,
+      { name: "Solar", peakW: 6e6 },
+      "champlain",
+      site,
+    )!;
+    save.game = structuredClone(
+      gameReducer(
+        save.game,
+        buildFacility({
+          facility,
+          financed: false,
+          territoryId: "champlain",
+          tileId: site,
+        }),
+      ),
+    );
+    const solar = save.game.facilities.find(({ tileId }) => tileId === site)!;
+    solar.yearsToBuildLeft = solar.yearsToBuild / 2 + YEARS_PER_TICK / 2;
+    save.game.speed = "PAUSED";
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const map = await returnToTerritoryMap(page);
+  const canvas = map.locator("canvas.territory3DCanvas");
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  const target = map.locator(`[data-map-target="${site}"]`);
+  await target.focus();
+  await expect(target).toHaveAccessibleDescription(/Under construction/);
+  await expect(target).toBeInViewport({ ratio: 0.75 });
+  const readPlant = async () =>
+    (await readyDiagnostics(canvas, true)).scene!.find(
+      ({ id }) => id === `structure:${site}`,
+    );
+  const rails = await readPlant();
+  expect(rails).toMatchObject({
+    modelKey: "structure:solar:small:construction:1",
+    active: false,
+  });
+  await target.blur();
+  const viewport = map.locator(".territoryMapViewport");
+  if (process.env.REVIEW_SCREENSHOT_DIR && !info.project.use.hasTouch) {
+    const { x, y, width, height } = (await target.boundingBox())!;
+    const { scale } = await readTerritoryMapCamera(viewport);
+    await page.mouse.move(x + width / 2, y + height / 2);
+    await page.mouse.wheel(0, -1200);
+    await expect
+      .poll(async () => (await readTerritoryMapCamera(viewport)).scale)
+      .toBeGreaterThan(scale * 1.8);
+    await page.getByRole("button", { name: "pause", exact: true }).hover();
+  }
+  await reviewScreenshot(viewport, {
+    path: info.outputPath("solar-racks.png"),
+  });
+
+  await page.getByRole("button", { name: "slow speed", exact: true }).click();
+  await expect
+    .poll(async () => (await readPlant())?.modelKey)
+    .toBe("structure:solar:small:construction:2");
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  const panels = await readPlant();
+  expect(panels).toMatchObject({ active: false, producing: false });
+  expect(panels!.triangles).toBeGreaterThan(rails!.triangles);
+  await expect(target).toHaveAccessibleDescription(/Under construction/);
+  await reviewScreenshot(viewport, {
+    path: info.outputPath("solar-installation.png"),
+  });
 });
 
 test("hail falls on the struck solar site and leaves visibly broken panels during repairs", async ({

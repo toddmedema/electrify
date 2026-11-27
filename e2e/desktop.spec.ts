@@ -384,7 +384,7 @@ test("the first offline walkthrough leads to a mission that saves, resumes after
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
   await page.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByText("Tap 1× to start time")).toBeVisible();
+  await expect(page.getByText("Select slow speed to start time")).toBeVisible();
   await page.getByRole("button", { name: "normal speed", exact: true }).click();
   await expect(
     page.getByText("Reach midnight without a blackout"),

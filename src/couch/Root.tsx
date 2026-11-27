@@ -1,5 +1,8 @@
+import { TransitionGroup } from "react-transition-group";
+import RemovalCollapse from "../components/base/RemovalCollapse";
 import { CouchPlayerText, couchPlayerColor } from "./PlayerColor";
 import {
+  cloneElement,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -110,6 +113,11 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
   const [saved, setSaved] = useState<World>();
   const [library, setLibrary] = useState<Saved[]>([]);
   const [deleting, setDeleting] = useState<Saved>();
+  const [removed, setRemoved] = useState<{ slot: Saved; index: number }>();
+  const exitingCampaign = useRef<string>();
+  const displayedLibrary = library.slice();
+  if (removed && !displayedLibrary.some(({ id }) => id === removed.slot.id))
+    displayedLibrary.splice(removed.index, 0, removed.slot);
   const [saveFailed, setSaveFailed] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [ready, setReady] = useState<string[]>([]);
@@ -1366,41 +1374,57 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
               release then press Confirm when ready.
             </Typography>
           )}
-          {stage === "join" &&
-            library.map((slot) => (
-              <div key={slot.id}>
-                <Button
-                  onClick={() => {
-                    setBusy(true);
-                    void request({ kind: "read-save", id: slot.id })
-                      .then(async (value) => {
-                        const world = value as World;
-                        starts.current++;
-                        await request({ kind: "reset-bindings" });
-                        setSaved(world);
-                        setSaveTime(slot.updatedAt);
-                        setSeats(world.seats);
-                        setBindings({});
-                        setReady([]);
-                        setError(
-                          "Assign a controller to each saved company before resuming.",
-                        );
-                      })
-                      .catch((failure) => setError(String(failure)))
-                      .finally(() => setBusy(false));
-                  }}
-                >
-                  Resume {slot.name} ·{" "}
-                  {new Date(slot.updatedAt).toLocaleString()}
-                </Button>
-                <Button
-                  aria-label={`Delete ${slot.name}`}
-                  onClick={() => setDeleting(slot)}
-                >
-                  Delete
-                </Button>
-              </div>
-            ))}
+          {stage === "join" && (
+            <TransitionGroup
+              component={null}
+              childFactory={(
+                child: React.ReactElement<
+                  React.ComponentProps<typeof RemovalCollapse>
+                >,
+              ) =>
+                cloneElement(child, {
+                  animate: child.props.id === exitingCampaign.current,
+                })
+              }
+            >
+              {displayedLibrary.map((slot) => (
+                <RemovalCollapse key={slot.id} id={slot.id}>
+                  <div>
+                    <Button
+                      onClick={() => {
+                        setBusy(true);
+                        void request({ kind: "read-save", id: slot.id })
+                          .then(async (value) => {
+                            const world = value as World;
+                            starts.current++;
+                            await request({ kind: "reset-bindings" });
+                            setSaved(world);
+                            setSaveTime(slot.updatedAt);
+                            setSeats(world.seats);
+                            setBindings({});
+                            setReady([]);
+                            setError(
+                              "Assign a controller to each saved company before resuming.",
+                            );
+                          })
+                          .catch((failure) => setError(String(failure)))
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      Resume {slot.name} ·{" "}
+                      {new Date(slot.updatedAt).toLocaleString()}
+                    </Button>
+                    <Button
+                      aria-label={`Delete ${slot.name}`}
+                      onClick={() => setDeleting(slot)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </RemovalCollapse>
+              ))}
+            </TransitionGroup>
+          )}
           {!devices.length && (
             <Typography>
               Connect two controllers with Steam Input bindings.
@@ -1603,7 +1627,12 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog open={!!deleting} fullWidth maxWidth="sm">
+      <Dialog
+        open={!!deleting}
+        fullWidth
+        maxWidth="sm"
+        slotProps={{ transition: { onExited: () => setRemoved(undefined) } }}
+      >
         <DialogTitle>Delete {deleting?.name}?</DialogTitle>
         <DialogContent>
           This removes the complete local campaign for all its companies from
@@ -1622,6 +1651,11 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
               setBusy(true);
               void request({ kind: "delete-save", id })
                 .then(() => {
+                  exitingCampaign.current = id;
+                  setRemoved({
+                    slot: deleting,
+                    index: library.findIndex((slot) => slot.id === id),
+                  });
                   setLibrary((slots) => slots.filter((slot) => slot.id !== id));
                   setDeleting(undefined);
                 })

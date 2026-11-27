@@ -1,8 +1,18 @@
+@import url("./fonts/inter/inter.css");
+
 :root {
   color-scheme: light dark;
+  /* ==========================================================================
+     DANGER: DO NOT CHANGE --brand. It is the CTA blue, the link blue and the logo's
+     blue (public/images/logo-home.svg): #0084f8 in light, #629be1 in dark (below).
+     Do not add a deeper or lighter blue for links or buttons, and do not set one
+     per page. The owner has ordered that the CTA color STOP being changed. Only
+     hover gets its own shade (--brand-hover). src/CtaColor.test.ts enforces this.
+     ========================================================================== */
   --brand: #0084f8;
-  --brand-strong: #006bc7;
-  --brand-deep: #1565c0;
+  --brand-hover: #1565c0;
+  --brand-label: #08131c;
+  --brand-hover-label: #ffffff;
   --brand-wash: rgba(0, 132, 248, 0.1);
   --page: #f2f7fb;
   --surface: #ffffff;
@@ -18,9 +28,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --brand: #64b5f6;
-    --brand-strong: #8bc8f8;
-    --brand-deep: #b8ddfa;
+    --brand: #629be1;
+    --brand-hover: #b8ddfa;
+    --brand-hover-label: var(--brand-label);
     --brand-wash: rgba(100, 181, 246, 0.13);
     --page: #0d141a;
     --surface: #172028;
@@ -63,13 +73,20 @@ body {
 }
 
 a {
-  color: var(--brand-strong);
+  color: var(--brand);
   text-decoration-thickness: 0.08em;
   text-underline-offset: 0.18em;
 }
 
+/* Keep prose legible at its surrounding size. The underline carries the brand blue. */
+:where(main, .page-breadcrumb, .site-footer)
+  a:where(:not([class], .impact-list a, .scenario-theme-nav a)) {
+  color: inherit;
+  text-decoration-color: var(--brand);
+}
+
 a:hover {
-  color: var(--brand-deep);
+  color: var(--brand-hover);
 }
 
 :focus-visible {
@@ -149,28 +166,22 @@ a:hover {
   text-decoration: none;
 }
 
-.topnav a:hover,
-.topnav a[aria-current="page"] {
+.topnav a:not(.topnav__play):is(:hover, [aria-current="page"]) {
   background: var(--brand-wash);
-  color: var(--brand-deep);
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--brand);
 }
 
 .topnav .topnav__play {
   margin-left: 0.35rem;
-  background: var(--brand-strong);
-  color: #ffffff;
+  background: var(--brand);
+  color: var(--brand-label);
 }
 
 .topnav .topnav__play:hover {
-  background: var(--brand-deep);
-  color: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  .topnav .topnav__play,
-  .topnav .topnav__play:hover {
-    color: #08131c;
-  }
+  background: var(--brand-hover);
+  color: var(--brand-hover-label);
 }
 
 .hero {
@@ -208,7 +219,7 @@ a:hover {
 
 .eyebrow {
   margin: 0 0 0.8rem;
-  color: var(--brand-strong);
+  color: var(--text-muted);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.15em;
@@ -272,22 +283,43 @@ a:hover {
 }
 
 .button--primary {
-  border-color: var(--brand-strong);
-  background: var(--brand-strong);
-  color: #ffffff;
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--brand-label);
+  transition-property: transform, border-color;
 }
 
 .button--primary:hover {
-  border-color: var(--brand-deep);
-  background: var(--brand-deep);
-  color: #ffffff;
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+  color: var(--brand-hover-label);
 }
 
-@media (prefers-color-scheme: dark) {
-  .button--primary,
-  .button--primary:hover {
-    color: #08131c;
-  }
+.site-message-page {
+  display: grid;
+  align-items: center;
+}
+
+.site-message {
+  width: min(calc(100% - 2rem), var(--reading-width));
+  margin: 0 auto;
+  padding-block: 3rem;
+}
+
+.site-message h1 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.site-message .button {
+  width: fit-content;
+}
+
+.site-message .site-footer {
+  margin-top: 1.5rem;
+  padding-top: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
 }
 
 .page-content {
@@ -399,7 +431,8 @@ a:hover {
   gap: 2rem;
 }
 
-.panel--contact:target {
+.panel--contact:target,
+#comparison-title:target {
   scroll-margin-top: 5.5rem;
 }
 
@@ -462,7 +495,7 @@ a:hover {
 }
 
 .impact-list a::after {
-  color: var(--brand-strong);
+  color: var(--brand);
   content: "\2197";
   font-size: 1.1rem;
 }
@@ -576,7 +609,7 @@ a:hover {
   justify-content: space-between;
   gap: 1rem;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .site-footer p {
@@ -588,7 +621,7 @@ a:hover {
 .site-footer nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0 1rem;
 }
 
 .site-footer nav a {

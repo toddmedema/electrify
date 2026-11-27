@@ -1,7 +1,13 @@
 import { FacilityOperatingType, isStorage } from "../../Types";
 import { facilityPermanentlyShutdown } from "../../helpers/Financials";
-import { isUpgradingAt, retrofitOutputMultiplier } from "../../helpers/Hazards";
+import {
+  isUpgradingAt,
+  retrofitOutputMultiplier,
+  upgradeProgress,
+} from "../../helpers/Hazards";
 import type { TerritoryTileView } from "../../helpers/TerritoryMapState";
+import { constructionFraction } from "./ConstructionProgress";
+import type { FacilityConstructionStage } from "./territory-3d/Types";
 
 export type FacilityMapStatusKind =
   "construction" | "paused" | "producing" | "idle" | "charging" | "unknown";
@@ -9,6 +15,34 @@ export type FacilityMapStatusKind =
 export interface FacilityMapStatus {
   kind: FacilityMapStatusKind;
   label: string;
+  progress?: number;
+}
+
+const constructionStages = [0, 1, 2, 3] as const;
+export function facilityConstructionStage(
+  facility: TerritoryTileView["facility"],
+): FacilityConstructionStage | undefined {
+  if (!facility || !(facility.yearsToBuildLeft > 0)) return undefined;
+  const total = facility.yearsToBuild;
+  if (total === undefined || !Number.isFinite(total) || total <= 0) return 0;
+  const completed = Math.max(0, 1 - facility.yearsToBuildLeft / total);
+  return constructionStages[
+    Math.min(
+      constructionStages.length - 1,
+      Math.floor(completed * constructionStages.length),
+    )
+  ];
+}
+
+/** Keep the existing buried route until a water site's switchgear is fitted. */
+export function needsSubmergedCable({
+  tile,
+  facility,
+}: Pick<TerritoryTileView, "tile" | "facility">): boolean {
+  if (tile.city || !["lake", "ocean", "river"].includes(tile.terrain))
+    return false;
+  const stage = facilityConstructionStage(facility);
+  return !facility || (stage !== undefined && stage < 3);
 }
 
 /** Share measured operating state between the map and the facility inspector. */
@@ -44,13 +78,30 @@ export function facilityMapStatus(
   includeConstruction = true,
 ): FacilityMapStatus | undefined {
   if (view.tile.city || !view.facility) return undefined;
-  if (view.operatingFacility) {
-    const status = facilityOperatingStatus(view.operatingFacility, minute);
-    return includeConstruction && view.operatingFacility.expansionInProgress
-      ? { kind: "construction", label: status.label }
+  const facility = view.operatingFacility;
+  if (facility) {
+    const status = facilityOperatingStatus(facility, minute);
+    if (facility.yearsToBuildLeft > 0)
+      return { ...status, progress: constructionFraction(facility) };
+    if (status.kind === "construction" && facility.upgradeInProgress)
+      return {
+        ...status,
+        progress: upgradeProgress(facility.upgradeInProgress, minute),
+      };
+    const expansion = facility.expansionInProgress;
+    return includeConstruction && expansion
+      ? {
+          kind: "construction",
+          label: status.label,
+          progress: constructionFraction(expansion),
+        }
       : status;
   }
   if (view.facility.yearsToBuildLeft > 0)
-    return { kind: "construction", label: "Under construction" };
+    return {
+      kind: "construction",
+      label: "Under construction",
+      progress: constructionFraction(view.facility),
+    };
   return { kind: "unknown", label: "Operating status unavailable" };
 }

@@ -10,7 +10,14 @@ import type {
 } from "./Types";
 
 // The union owns the inventory: adding a kind requires giving it these contracts.
-const inventory: Record<StructureKind, true> = {
+const sharedFinishedArt = {
+  "gas-combined-cycle": "gas",
+  "enhanced-geothermal": "geothermal",
+} as const;
+const inventory: Record<
+  Exclude<StructureKind, keyof typeof sharedFinishedArt>,
+  true
+> = {
   "city-small": true,
   "city-medium": true,
   "city-large": true,
@@ -41,6 +48,68 @@ const variants: { kind: StructureKind; size: FacilitySize }[] = kinds.map(
 );
 for (const kind of facilityKinds)
   variants.push({ kind, size: "small" }, { kind, size: "large" });
+
+const constructionKinds: StructureKind[] = [
+  ...facilityKinds,
+  "gas-combined-cycle",
+  "enhanced-geothermal",
+];
+const constructionVariants = constructionKinds.flatMap((kind) =>
+  (["small", "medium", "large"] as const).map((size) => ({ kind, size })),
+);
+
+it.each(constructionVariants)(
+  "$kind ($size) has four distinct inert construction models",
+  ({ kind, size }) => {
+    const finished = getStructureModel(kind, [], size);
+    const sequence = ([0, 1, 2, 3] as const).map((stage) => {
+      const model = getStructureModel(kind, [], size, stage);
+      expect(getStructureModel(kind, [], size, stage)).toBe(model);
+      expect(model.parts.length).toBeGreaterThan(0);
+      const world = model.parts.flatMap((part) => {
+        expect(part.motion).toBeUndefined();
+        expect(part.mesh.positions.length).toBeGreaterThan(0);
+        return vertices(part.mesh).map((point) => posed(part, point, 0));
+      });
+      expect(world.every((point) => point.every(Number.isFinite))).toBe(true);
+      expect(world.length / 3).toBeLessThan(1500);
+      expect(model.footprint).toBeLessThan(1);
+      expect(model.terminals).toEqual(stage === 3 ? finished.terminals : []);
+      for (const [x, y, z] of model.terminals)
+        expect(
+          world.some(
+            ([px, py, pz]) => Math.hypot(x - px, y - py, z - pz) < 0.000001,
+          ),
+        ).toBe(true);
+      return model;
+    });
+    const geometry = [...sequence, finished].map(({ parts }) =>
+      parts.flatMap(({ mesh }) => Array.from(mesh.positions)),
+    );
+    for (let index = 0; index < geometry.length; index++)
+      for (const previous of geometry.slice(0, index))
+        expect(
+          previous.length !== geometry[index].length ||
+            previous.some(
+              (value, coordinate) => value !== geometry[index][coordinate],
+            ),
+        ).toBe(true);
+  },
+);
+
+it.each(Object.entries(sharedFinishedArt))(
+  "%s shares the commissioned artwork of %s but has its own build sequence",
+  (kind, completed) => {
+    for (const size of ["small", "medium", "large"] as const) {
+      expect(getStructureModel(kind as StructureKind, [], size)).toBe(
+        getStructureModel(completed, [], size),
+      );
+      const siteWork = (variant: StructureKind) =>
+        getStructureModel(variant, [], size, 0).parts[0].mesh.positions;
+      expect(siteWork(kind as StructureKind)).not.toEqual(siteWork(completed));
+    }
+  },
+);
 
 it.each(["city-small", "city-medium", "city-large"] as const)(
   "%s grows distinct solid buildings within the tile and retains its wire terminals",
@@ -273,9 +342,15 @@ it("grows one mixed city family through denser windows and a taller skyline", ()
   const cities = (["small", "medium", "large"] as const).map((size) =>
     getStructureModel(`city-${size}`),
   );
-  for (const city of cities) {
-    const mesh = city.parts[0].mesh;
-    expect(city.parts).toHaveLength(1);
+  const panes = cities.map((city) => {
+    const [body, glazing] = city.parts;
+    const { mesh } = body;
+    expect(city.parts).toHaveLength(2);
+    expect(glazing).toMatchObject({
+      material: "city-window",
+      castsShadow: false,
+    });
+    expect(glazing.motion).toBeUndefined();
     expect(coloredVertices(mesh, PALETTE.grass).length).toBeGreaterThan(0);
     expect(coloredVertices(mesh, PALETTE.forestLight).length).toBeGreaterThan(
       0,
@@ -297,16 +372,44 @@ it("grows one mixed city family through denser windows and a taller skyline", ()
         (normal) => normal > 0.5 && normal < 0.9,
       ),
     ).toBe(true);
-  }
+    return glazing.mesh.positions.length / 18;
+  });
   for (let i = 1; i < cities.length; i++) {
     expect(cities[i].height).toBeGreaterThan(cities[i - 1].height + 0.08);
-    expect(
-      coloredVertices(cities[i].parts[0].mesh, PALETTE.mint).length,
-    ).toBeGreaterThan(
-      coloredVertices(cities[i - 1].parts[0].mesh, PALETTE.mint).length,
-    );
+    expect(panes[i]).toBeGreaterThan(panes[i - 1]);
   }
 });
+
+it.each(["small", "medium", "large"] as const)(
+  "lights the %s city from its lowest panes upward",
+  (size) => {
+    for (const growth of [
+      [],
+      ["Residential", "Commercial", "Industrial"],
+    ] as const) {
+      const city = getStructureModel(`city-${size}`, growth);
+      const { positions, colors } = city.parts.find(
+        ({ material }) => material === "city-window",
+      )!.mesh;
+      const panes = [];
+      // Each pane is two triangles with three coordinates per vertex.
+      for (let i = 0; i < positions.length; i += 18)
+        panes.push({ height: positions[i + 1], threshold: colors[i] });
+      panes.sort((a, b) => a.threshold - b.threshold);
+
+      for (let i = 1; i < panes.length; i++)
+        expect(panes[i].height).toBeGreaterThanOrEqual(panes[i - 1].height);
+      expect(panes[0].threshold).toBeGreaterThan(0);
+      expect(panes[panes.length - 1].threshold).toBeLessThan(1);
+      for (const service of [0.25, 0.5, 0.75]) {
+        const lit = panes.filter(
+          ({ threshold }) => threshold <= service,
+        ).length;
+        expect(Math.abs(lit - service * panes.length)).toBeLessThanOrEqual(0.5);
+      }
+    }
+  },
+);
 
 it.each(["wind", "offshore-wind"] as const)(
   "gives %s a thick root, broad inner chord and swept, tapered airfoil sections",
@@ -524,7 +627,12 @@ it("authors facade glazing separately without turning panels, rotors or cabinets
       expect(part.hideWhenInactive).toBeUndefined();
       expect(part.castsShadow).toBe(false);
     }
-    const quiet = kind.startsWith("city-") || kind === "tower";
-    expect(parts.every((part) => part.material === undefined)).toBe(quiet);
+    const city = kind.startsWith("city-");
+    expect(
+      parts.filter((part) => part.material === "city-window"),
+    ).toHaveLength(city ? 1 : 0);
+    expect(parts[0].material).toBe(
+      city || kind === "tower" ? undefined : "facility-surface",
+    );
   }
 });

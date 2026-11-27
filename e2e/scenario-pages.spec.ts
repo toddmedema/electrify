@@ -1,4 +1,5 @@
 import path from "path";
+import { expectReadableText } from "./contrast";
 import scenarios from "../site/scenarios.json";
 import { expect, test } from "./fixtures";
 import { openBuild, openPane } from "./layout";
@@ -20,7 +21,8 @@ test.describe("scenario pages without JavaScript", () => {
       await page.emulateMedia({ colorScheme: theme });
       await page.goto("/about.html");
       await page
-        .getByRole("link", { name: "Explore the official scenarios" })
+        .getByRole("main")
+        .getByRole("link", { name: "official scenarios", exact: true })
         .click();
       await expect(page).toHaveURL(/\/scenarios\.html$/);
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -56,6 +58,56 @@ test.describe("scenario pages without JavaScript", () => {
       }
     });
 
+    test(`static scenario links and primary actions keep readable labels in ${theme} @phone @minimum-phone`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto("/scenarios.html");
+      const primary = page.locator(".hero .button--primary");
+      const play = page.getByRole("link", { name: "Play", exact: true });
+      const blue = theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)";
+      for (const action of [play, primary]) {
+        await expect(action).toHaveCSS("background-color", blue);
+        await expectReadableText(action);
+        await action.hover();
+        await expect(action).toHaveCSS(
+          "background-color",
+          theme === "light" ? "rgb(21, 101, 192)" : "rgb(184, 221, 250)",
+        );
+        await expectReadableText(action);
+        await page.mouse.move(0, 0);
+      }
+      const guide = page
+        .getByRole("main")
+        .locator('p a[href="/classroom.html"]');
+      const prose = guide.locator("..");
+      const typography = (element: Element) => {
+        const { fontSize, fontWeight } = getComputedStyle(element);
+        return { fontSize, fontWeight };
+      };
+      expect(await guide.evaluate(typography)).toEqual(
+        await prose.evaluate(typography),
+      );
+      await expect(guide).toHaveCSS("text-decoration-line", "underline");
+      await expect(guide).toHaveCSS("text-decoration-color", blue);
+      await expectReadableText(guide);
+      await expectReadableText(page.locator(".hero .eyebrow"));
+      await expectReadableText(page.locator(".scenario-entry__more").first());
+      await page
+        .getByRole("main")
+        .locator('a[href="/scenarios/the-end-of-an-era.html"]')
+        .click();
+      await expectReadableText(
+        page.locator(".scenario-decision-number").first(),
+      );
+      await expectReadableText(
+        page.getByRole("main").getByRole("link", {
+          name: "Learn how to play",
+          exact: true,
+        }),
+      );
+    });
+
     // Verify every authored page in light mode. Sample the shared styling in dark
     // mode and at the minimum width without repeating every document journey.
     for (const scenario of scenarios) {
@@ -80,7 +132,7 @@ test.describe("scenario pages without JavaScript", () => {
         await expect(page.getByRole("main")).toContainText(scenario.setup[0]);
         await expect(
           page.getByRole("contentinfo").getByRole("link", {
-            name: "How to play",
+            name: "Learn how to play",
             exact: true,
           }),
         ).toBeVisible();

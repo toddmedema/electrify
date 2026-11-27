@@ -101,6 +101,11 @@ it("offers the steam plant beside the peaker in the historical build rail", () =
     "/images/natural gas steam.svg",
   );
   fireEvent.focus(steam);
+  fireEvent.click(
+    within(
+      screen.getByLabelText("Natural Gas Steam technology preview"),
+    ).getByRole("button", { name: "Advanced" }),
+  );
   expect(
     within(
       screen.getByLabelText("Natural Gas Steam technology preview"),
@@ -143,7 +148,11 @@ it("keeps a fixed icon order and fades technologies the company cannot afford", 
     expect(button).toHaveTextContent(/^$/);
   }
   fireEvent.focus(wind());
-  expect(screen.getByLabelText("Wind technology preview")).toBeVisible();
+  const preview = screen.getByLabelText("Wind technology preview");
+  expect(preview).toBeVisible();
+  expect(
+    within(preview).queryByText(/Compared with typical/),
+  ).not.toBeInTheDocument();
   fireEvent.click(wind());
   expect(onProject).not.toHaveBeenCalled();
   currentTick(game)!.cash = 1e9;
@@ -151,7 +160,7 @@ it("keeps a fixed icon order and fades technologies the company cannot afford", 
   expect(wind()).toHaveAttribute("aria-disabled", "false");
 });
 
-it("opens just one full expanded card on hover without spending or stealing focus", () => {
+it("opens just one compact card on hover without spending or stealing focus", () => {
   const { game, onProject } = show();
   const before = JSON.stringify(game);
   const button = wind();
@@ -164,7 +173,28 @@ it("opens just one full expanded card on hover without spending or stealing focu
     within(preview).getByText(/Pair with backup or storage/),
   ).toBeVisible();
   expect(within(preview).getByText("Build cost")).toBeInTheDocument();
-  expect(within(preview).getByText("Accounting lifetime")).toBeInTheDocument();
+  const generator = within(preview).getByRole("table", {
+    name: "generator properties",
+  });
+  expect(
+    within(generator)
+      .getAllByRole("rowheader")
+      .map((row) => row.textContent),
+  ).toEqual([
+    "Build cost",
+    "Build time",
+    "Lifetime cost",
+    "Expected capacity factor",
+    "Direct emissions",
+  ]);
+  const advanced = within(preview).getByRole("button", { name: "Advanced" });
+  expect(advanced).toHaveAttribute("aria-expanded", "false");
+  expect(
+    within(preview).queryByText("Accounting lifetime"),
+  ).not.toBeInTheDocument();
+  fireEvent.click(advanced);
+  expect(advanced).toHaveAttribute("aria-expanded", "true");
+  expect(within(preview).getByText("Accounting lifetime")).toBeVisible();
   expect(
     within(preview).queryByRole("button", {
       name: /Review purchase|Show.*details|Choose sites|Close technology preview/,
@@ -187,9 +217,46 @@ it("opens just one full expanded card on hover without spending or stealing focu
       /Quick to build and nearly instant to respond/,
     ),
   ).toBeVisible();
+  expect(
+    within(screen.getByLabelText("Battery technology preview")).getByRole(
+      "button",
+      { name: "Advanced" },
+    ),
+  ).toHaveAttribute("aria-expanded", "false");
   expect(onProject).not.toHaveBeenCalled();
   expect(JSON.stringify(game)).toBe(before);
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+it("compares available storage and leaves the power and duration tradeoff neutral", () => {
+  show(undefined, (game) => {
+    game.date.year = 2031;
+    game.startingYear = 2031;
+  });
+  fireEvent.mouseEnter(
+    screen.getByRole("button", { name: "Choose sites for Battery" }),
+  );
+  const preview = within(
+    screen.getByRole("region", { name: "Battery technology preview" }),
+  );
+  expect(
+    preview.getByText("Compared with typical buildable storage"),
+  ).toBeVisible();
+  expect(
+    within(
+      preview.getByRole("row", { name: /^Round-trip efficiency/ }),
+    ).getByText("Better"),
+  ).toHaveAttribute("data-tone", "good");
+  expect(
+    within(
+      preview.getByRole("row", { name: /^Duration at full power/ }),
+    ).getByText(/Shorter/),
+  ).toHaveAttribute("data-tone", "neutral");
+  expect(
+    within(preview.getByRole("row", { name: /^Discharge power/ })).getByText(
+      /Higher/,
+    ),
+  ).toHaveAttribute("data-tone", "neutral");
 });
 
 it("opens sizing on hover and keeps it open after a click until an outside press", () => {
@@ -508,6 +575,9 @@ it("shows the owning site quote directly in the preview build cost", () => {
   expect(
     screen.queryByRole("button", { name: "Choose sites for Offshore Wind" }),
   ).not.toBeInTheDocument();
+  expect(
+    within(preview).queryByText(/Compared with typical buildable generators/),
+  ).not.toBeInTheDocument();
   expect(onProject).not.toHaveBeenCalled();
 });
 
@@ -520,6 +590,9 @@ it("explains why construction is unavailable when inspecting a city", () => {
   expect(
     within(preview).getByText("Cities add demand and have no building slot."),
   ).toBeVisible();
+  expect(
+    within(preview).queryByText(/Compared with typical/),
+  ).not.toBeInTheDocument();
 });
 
 it("disables an oversized project until the player changes the sizing", () => {

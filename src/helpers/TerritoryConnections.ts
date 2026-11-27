@@ -34,6 +34,16 @@ export function pendingTileConnections(
   return result;
 }
 
+export function tileConnectionProgress(
+  { startedMinute, connectionMinute }: TileConnection,
+  minute: number,
+): number {
+  const duration = connectionMinute - startedMinute;
+  return duration > 0
+    ? Math.max(0, Math.min(1, (minute - startedMinute) / duration))
+    : 1;
+}
+
 export function tileConnectionLabel(
   connection: TileConnection,
   minute: number,

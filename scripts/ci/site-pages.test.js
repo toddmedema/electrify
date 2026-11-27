@@ -630,7 +630,7 @@ test("every sitemap page receives links from four distinct pages, including desc
           ...document.querySelectorAll(
             'main a[href="/power-grid-simulator.html"]',
           ),
-        ].some((anchor) => /power grid simulator/i.test(anchor.textContent)),
+        ].some((anchor) => /learn how to play/i.test(anchor.textContent)),
         pathname,
       );
     }

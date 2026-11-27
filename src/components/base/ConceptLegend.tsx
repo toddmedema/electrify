@@ -1,23 +1,58 @@
 import * as React from "react";
-import { Typography } from "@mui/material";
-import ConceptIcon, {
-  CONCEPT_LABELS,
-  CONCEPT_NAMES,
-  ConceptNameType,
-} from "./ConceptIcon";
+import ConceptIcon, { CONCEPT_LABELS, ConceptNameType } from "./ConceptIcon";
 
-/**
- * The visible key for the vocabulary introduced by the first missions. Keeping the legend driven
- * by the same names and labels as every in-game glyph means adding a concept cannot leave the
- * Manual's explanation silently out of date.
- */
+const GROUPS: { label: string; concepts: ConceptNameType[] }[] = [
+  {
+    label: "Grid",
+    concepts: [
+      "supply",
+      "demand",
+      "blackout",
+      "customers",
+      "generator",
+      "storage",
+    ],
+  },
+  {
+    label: "Controls & progress",
+    concepts: [
+      "build",
+      "buy",
+      "reorder",
+      "construction",
+      "pause",
+      "play",
+      "time",
+      "goal",
+    ],
+  },
+  {
+    label: "Money & rates",
+    concepts: ["money", "finances", "rate", "fuel"],
+  },
+  {
+    label: "Forecasts & alerts",
+    concepts: ["forecast", "weather", "severeWeather", "danger"],
+  },
+];
+
 export default function ConceptLegend(): React.JSX.Element {
   return (
-    <div className="conceptLegend" data-testid="concept-legend">
-      {CONCEPT_NAMES.map((concept: ConceptNameType) => (
-        <div className="conceptLegendItem" key={concept}>
-          <ConceptIcon concept={concept} fontSize="large" />
-          <Typography variant="body2">{CONCEPT_LABELS[concept]}</Typography>
+    <div className="conceptLegend">
+      {GROUPS.map(({ label, concepts }) => (
+        <div className="conceptLegendGroup" key={label}>
+          <h4>{label}</h4>
+          {/* eslint-disable-next-line jsx-a11y/no-redundant-roles -- Safari drops list semantics when markers are hidden. */}
+          <ul className="conceptLegendList" role="list">
+            {concepts.map((concept) => (
+              <li className="conceptLegendItem" key={concept}>
+                <span className="conceptLegendIcon">
+                  <ConceptIcon concept={concept} decorative />
+                </span>
+                {CONCEPT_LABELS[concept]}
+              </li>
+            ))}
+          </ul>
         </div>
       ))}
     </div>

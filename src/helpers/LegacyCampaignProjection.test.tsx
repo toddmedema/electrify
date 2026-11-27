@@ -100,6 +100,6 @@ test("forecast goals use the current CEO's local evidence and actual calendar da
   });
   expect(
     predicted.requirements.find(({ id }) => id === "funded-expansion"),
-  ).toMatchObject({ status: "on-track" });
+  ).toBeUndefined();
   expect(game.objectiveProgress).toBeUndefined();
 });

@@ -34,9 +34,7 @@ for (const theme of ["light", "dark"]) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(pane, navigation);
     await expect(page.locator("main.base_main")).toHaveCount(1);
-    await expect(
-      page.getByText("Starting your mission…", { exact: true }),
-    ).toBeHidden();
+    await expect(page.getByText("Loading", { exact: true })).toBeHidden();
     const list = pane.locator(".unifiedFacilitiesList");
     await list.locator(".facilityDisclosure").first().click();
     // Wide panes scroll the fleet; phones and short panes scroll its containing body/card.

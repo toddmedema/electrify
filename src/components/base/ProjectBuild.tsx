@@ -27,7 +27,8 @@ import { useBuildForecast } from "./BuildForecast";
 import { useMoney } from "./CurrencyContext";
 import { useTerritoryTilePurchases } from "./TerritoryTilePurchases";
 import ConceptIcon from "./ConceptIcon";
-import TileWorkspaceSurface from "./TileWorkspaceSurface";
+import { MapProjectPanel } from "./MapPanelWindow";
+import TileConnectionBuildStatus from "./TileConnectionBuildStatus";
 import BuildFacilities from "../views/BuildFacilities";
 import "./ProjectBuild.scss";
 
@@ -38,7 +39,6 @@ export default function ProjectBuild({
   compatibleSites,
   catalogue,
   onProject,
-  onChangeProject,
   onUpdateProject,
   onClose,
   onBusy,
@@ -49,7 +49,6 @@ export default function ProjectBuild({
   compatibleSites: number;
   catalogue: boolean;
   onProject: (project: ProjectSelection) => void;
-  onChangeProject: () => void;
   /** Update options without discarding the chosen geographic site. */
   onUpdateProject?: (project: ProjectSelection) => void;
   onClose: () => void;
@@ -94,7 +93,7 @@ export default function ProjectBuild({
     ? `${ready.facility.name} · ${formatWatts(ready.facility.peakW)}`
     : project
       ? `${project.name} · ${formatWatts(project.peakW)}`
-      : "Plan a project";
+      : "Build";
   const confirm = async (financed?: boolean) => {
     if (lock.current || !project || !candidate) return;
     const shown = payment && (financed ? payment.loan : payment.cash);
@@ -190,14 +189,10 @@ export default function ProjectBuild({
   const loanLeads =
     !!payment && payment.cash.remaining < 0 && payment.loan.remaining >= 0;
   return (
-    <TileWorkspaceSurface
-      id="tool-BUILD_GENERATORS"
-      closeLabel="Close project"
-      building={catalogue}
-      title={catalogue ? "Plan a project" : title}
+    <MapProjectPanel
+      catalogue={catalogue}
+      title={catalogue ? "Build" : title}
       focusKey={`${catalogue}:${candidate ?? "sites"}`}
-      projectCandidate={!catalogue}
-      returnFocusSelector=".desktopBuildRail, #buildNav"
       onClose={() => {
         if (!lock.current) onClose();
       }}
@@ -210,33 +205,14 @@ export default function ProjectBuild({
       ) : (
         <div className="projectCandidateContent">
           <div className="projectCandidateScroll">
-            <div className="projectCandidateHeader">
-              {ready && (
-                <p className="projectLocation">
-                  {territoryTileLabel(ready.tile)} ·{" "}
-                  {territoryMapLabel(ready.tile.territoryId)}
-                </p>
-              )}
-              <Button
-                size="small"
-                disabled={!!progress}
-                onClick={() => {
-                  if (!lock.current) onChangeProject();
-                }}
-              >
-                Change project
-              </Button>
-            </div>
+            {ready && (
+              <p className="projectLocation">
+                {territoryTileLabel(ready.tile)} ·{" "}
+                {territoryMapLabel(ready.tile.territoryId)}
+              </p>
+            )}
             {!candidate && compatibleSites > 0 && (
-              <>
-                <p>Choose a highlighted site.</p>
-                <p className="projectSiteLegend">
-                  <span>Connected · total project cost</span>
-                  <span>
-                    Connection required · total project and connection cost
-                  </span>
-                </p>
-              </>
+              <p>Choose a highlighted site.</p>
             )}
             {!candidate && compatibleSites === 0 && (
               <Alert severity="info">
@@ -245,8 +221,16 @@ export default function ProjectBuild({
                 with Connect.
               </Alert>
             )}
-            {candidate && !ready && (
-              <Alert severity="info">{quote?.reason}</Alert>
+            {quote?.pendingConnection ? (
+              <TileConnectionBuildStatus
+                connection={quote.pendingConnection}
+                announce
+                minute={game.date.minute}
+                paused={game.speed === "PAUSED"}
+              />
+            ) : (
+              candidate &&
+              !ready && <Alert severity="info">{quote?.reason}</Alert>
             )}
             {ready && connection && (
               <dl className="projectFacts">
@@ -405,6 +389,6 @@ export default function ProjectBuild({
           )}
         </div>
       )}
-    </TileWorkspaceSurface>
+    </MapProjectPanel>
   );
 }

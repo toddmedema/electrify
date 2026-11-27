@@ -1,7 +1,7 @@
 import { expect, test, Page, Locator, TestInfo } from "./fixtures";
 import path from "node:path";
 import { waitForDesktopInput } from "./menu-keyboard";
-import { foregroundContrast } from "./contrast";
+import { expectReadableText, foregroundContrast } from "./contrast";
 import { decodeSave } from "../src/SaveEncoding";
 import type { SaveGameType, TerritoryTileId } from "../src/Types";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
@@ -1518,7 +1518,7 @@ test("TV saved display preferences style direct scenario links before play", asy
   const warning = page.locator(".gridHealth.statusWarning");
   await expect(warning).toBeVisible();
   await expect(warning.locator(".gridStatusFuture")).toContainText(
-    "FUTURE Supply risk:",
+    "FUTURE Shortage:",
   );
   expect(
     await foregroundContrast(warning.locator(".gridStatusButton")),
@@ -2334,6 +2334,9 @@ test("TV first launch shares one focus selection with keyboard and controller", 
     "color",
     await dismiss.evaluate((element) => getComputedStyle(element).color),
   );
+  const paletteFloor = info.project.name === "tv-1080-light" ? 3.5 : 4.5;
+  await expectReadableText(accept, paletteFloor);
+  await expectReadableText(dismiss, paletteFloor);
   const selectedFill = await play.evaluate(
     (element) => getComputedStyle(element).backgroundColor,
   );
@@ -2374,11 +2377,13 @@ test("TV first launch shares one focus selection with keyboard and controller", 
     };
     await reach(accept, "down");
     await expect(accept).toHaveCSS("background-color", selectedFill);
+    await expectReadableText(accept, paletteFloor);
     await expect(dismiss).toHaveCSS("background-color", transparent);
     await oneSelection();
     await direction("right");
     await expect(dismiss).toBeFocused();
     await expect(dismiss).toHaveCSS("background-color", selectedFill);
+    await expectReadableText(dismiss, paletteFloor);
     await expect(accept).toHaveCSS("background-color", transparent);
     await oneSelection();
     await direction("left");

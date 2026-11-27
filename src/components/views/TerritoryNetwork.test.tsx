@@ -24,9 +24,13 @@ import {
   territoryTilePowerLimit,
 } from "../../helpers/TerritoryTiles";
 import {
+  territoryMapTileKey as mockTerritoryMapTileKey,
   territoryTileViews,
+  type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
+import * as territoryMapState from "../../helpers/TerritoryMapState";
+import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { currentTick } from "../../helpers/GameSelectors";
 import {
   formatCount,
@@ -86,10 +90,12 @@ jest.mock("./TerritoryHexMap", () => ({
   __esModule: true,
   default: (props: {
     views: readonly TerritoryTileView[];
-    selected?: TerritoryTileId;
-    onSelect: (id: TerritoryTileId, activate?: boolean) => void;
+    selected?: TerritoryMapTileKey;
+    onSelect: (key: TerritoryMapTileKey, activate?: boolean) => void;
+    projectSites?: ReadonlyMap<TerritoryMapTileKey, ReadyProjectSite>;
+    onProjectDrop?: (key: TerritoryMapTileKey) => void;
     onTileMenu: (anchor: {
-      key: TerritoryTileId;
+      key: TerritoryMapTileKey;
       top: number;
       left: number;
     }) => void;
@@ -99,24 +105,33 @@ jest.mock("./TerritoryHexMap", () => ({
       {props.views
         .filter(
           ({ tile, owned, connectable }) =>
-            owned || tile.city || connectable || tile.id === props.selected,
+            owned ||
+            tile.city ||
+            connectable ||
+            mockTerritoryMapTileKey(tile) === props.selected,
         )
-        .map(({ tile }) => (
-          <button
-            className="territoryTileTarget"
-            tabIndex={props.selected === tile.id ? 0 : -1}
-            key={tile.id}
-            aria-pressed={props.selected === tile.id}
-            aria-label={`Inspect ${tile.id}`}
-            onFocus={() => props.onSelect(tile.id)}
-            onClick={() => props.onSelect(tile.id, true)}
-            onContextMenu={() =>
-              props.onTileMenu({ key: tile.id, top: 100, left: 100 })
-            }
-          >
-            {tile.terrain}
-          </button>
-        ))}
+        .map(({ tile }) => {
+          const key = mockTerritoryMapTileKey(tile);
+          return (
+            <button
+              className="territoryTileTarget"
+              tabIndex={props.selected === key ? 0 : -1}
+              key={key}
+              aria-pressed={props.selected === key}
+              aria-label={`Inspect ${key}`}
+              onFocus={() => props.onSelect(key)}
+              onClick={() => props.onSelect(key, true)}
+              onDrop={() => {
+                if (props.projectSites?.has(key)) props.onProjectDrop?.(key);
+              }}
+              onContextMenu={() =>
+                props.onTileMenu({ key, top: 100, left: 100 })
+              }
+            >
+              {tile.terrain}
+            </button>
+          );
+        })}
     </div>
   ),
 }));
@@ -459,10 +474,12 @@ it("starts construction on exactly the inspected tile and keeps building locked"
   expect(currentTick(store.getState().game)!.cash).toBe(before - quote.price);
   expect(ownsTerritoryTile(store.getState().game, tile.id)).toBe(true);
   expect(screen.getAllByRole("dialog")).toHaveLength(1);
-  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(surface()).toHaveTextContent(
+    `Constructing transmission lines · ${quote.buildMonths} ${quote.buildMonths === 1 ? "month" : "months"} left`,
+  );
   expect(
-    within(surface()).queryByRole("button", { name: "Build here" }),
-  ).not.toBeInTheDocument();
+    within(surface()).getByRole("button", { name: "Build here" }),
+  ).toBeDisabled();
   expect(within(surface()).getByRole("heading", { level: 3 })).toHaveFocus();
   expect(store.getState().game.territoryNetwork!.tilePurchases).toHaveLength(1);
 });
@@ -699,7 +716,7 @@ it.each([undefined, 1280])(
       );
     });
     expect(
-      await within(surface()).findByText(/Connection under construction/),
+      await within(surface()).findByText(/Constructing transmission lines/),
     ).toBeVisible();
     expect(
       within(surface()).queryByRole("button", { name: "Cash" }),
@@ -760,6 +777,62 @@ it("uses the persistent desktop rail for Build and owned empty tiles, preselecti
   await openProjectPlanner(wind);
   expect(wind).toHaveAttribute("aria-pressed", "true");
   expect(store.getState().game.facilities).toHaveLength(game.facilities.length);
+  expect(currentTick(store.getState().game)!.cash).toBe(1e9);
+});
+
+it("only reviews a dragged project at the position resolved by its quote", async () => {
+  const game = ready();
+  const local = {
+    id: "champlain:legacy-100",
+    territoryId: "champlain",
+    q: 20,
+    r: -20,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 40e6,
+  } as const;
+  const peer = { ...local, q: 21 };
+  game.territoryNetwork!.legacyTiles!.push(local);
+  game.multiplayer = {
+    seat: "host",
+    legacyTiles: [{ tile: peer, seat: "guest", name: "Neighbor" }],
+  };
+  // The fixed board currently disallows connecting retained aliases. Exercise
+  // the drop boundary with stale eligibility and the real company-local quote.
+  const views = territoryTileViews(game).map((view) =>
+    view.tile === peer ? { ...view, connectable: true } : view,
+  );
+  const stub = jest
+    .spyOn(territoryMapState, "territoryTileViews")
+    .mockReturnValueOnce(views);
+  const { store } = show(game, 1280);
+  stub.mockRestore();
+  const wind = screen.getByRole("button", { name: "Choose sites for Wind" });
+  const peerSite = screen.getByRole("button", {
+    name: "Inspect retained:21:-20",
+  });
+  const localSite = screen.getByRole("button", {
+    name: "Inspect retained:20:-20",
+  });
+  const dataTransfer = { setData: jest.fn() };
+  expect(wind).toHaveAttribute("draggable", "true");
+
+  fireEvent.dragStart(wind, { dataTransfer });
+  fireEvent.drop(peerSite);
+  await act(async () => Promise.resolve());
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(localSite).toHaveAttribute("aria-pressed", "false");
+  fireEvent.dragEnd(wind);
+
+  fireEvent.dragStart(wind, { dataTransfer });
+  fireEvent.drop(localSite);
+  await act(async () => Promise.resolve());
+  expect(localSite).toHaveAttribute("aria-pressed", "true");
+  expect(within(surface()).getByRole("button", { name: "Cash" })).toBeEnabled();
+  expect(store.getState().game.facilities).toEqual(game.facilities);
+  expect(store.getState().game.territoryNetwork!.tilePurchases).toEqual(
+    game.territoryNetwork!.tilePurchases,
+  );
   expect(currentTick(store.getState().game)!.cash).toBe(1e9);
 });
 
@@ -925,13 +998,22 @@ it("retains the inspected site while a desktop connection is being built", async
   inspect(site.id);
   fireEvent.click(within(surface()).getByRole("button", { name: /Connect/ }));
   expect(ownsTerritoryTile(store.getState().game, site.id)).toBe(true);
+  const inspector = within(surface());
   expect(
-    within(surface()).queryByRole("tab", { name: "Generators" }),
+    inspector.getByText(/Constructing transmission lines/),
+  ).not.toHaveAttribute("role");
+  expect(
+    inspector.getByRole("button", { name: "Build here" }),
+  ).toHaveAccessibleDescription(/Constructing transmission lines.*0% complete/);
+  expect(
+    inspector.queryByRole("tab", { name: "Generators" }),
   ).not.toBeInTheDocument();
   await openProjectPlanner(
     screen.getByRole("button", { name: "Choose sites for Wind" }),
   );
-  expect(surface()).toHaveTextContent(/Connection under construction/);
+  expect(within(surface()).getByRole("status")).toHaveTextContent(
+    /Constructing transmission lines/,
+  );
   expect(
     within(surface()).queryByRole("button", { name: "Cash" }),
   ).not.toBeInTheDocument();

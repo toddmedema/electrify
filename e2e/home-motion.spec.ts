@@ -1,5 +1,32 @@
-import { foregroundContrast } from "./contrast";
-import { expect, test } from "./fixtures";
+import { expectReadableText } from "./contrast";
+import { expect, Locator, test } from "./fixtures";
+
+async function expectHomeLinks(navigation: Locator) {
+  const links = navigation.getByRole("link");
+  const paths = [
+    "power-grid-simulator",
+    "scenarios",
+    "classroom",
+    "data-centers",
+    "energy-simulators",
+    "about",
+    "privacy",
+  ];
+  await expect(links).toHaveCount(paths.length);
+  const rows = new Set<number>();
+  await navigation.evaluate(() => document.fonts.ready);
+  for (const path of paths) {
+    const link = navigation.locator(`a[href="/${path}.html"]`);
+    await expect(link).toBeVisible();
+    await expect(link).toHaveCSS("text-decoration-line", "underline");
+    const bounds = (await link.boundingBox())!;
+    expect(bounds.height).toBeGreaterThanOrEqual(44);
+    expect(bounds.width).toBeGreaterThanOrEqual(44);
+    rows.add(Math.round(bounds.y));
+    await expectReadableText(link, 4.5);
+  }
+  expect(rows.size).toBeLessThanOrEqual(2);
+}
 
 test("reduced motion keeps the home decoration still and actions usable", async ({
   page,
@@ -32,32 +59,12 @@ for (const theme of ["light", "dark"] as const) {
         authRequests.push(request.url());
     });
     await page.goto("/");
+    await expect(page.locator("#appStartup")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Play", exact: true }),
     ).toBeVisible();
     const explore = page.getByRole("navigation", { name: "Explore Electrify" });
-    const paths = [
-      "power-grid-simulator",
-      "scenarios",
-      "classroom",
-      "data-centers",
-      "energy-simulators",
-      "about",
-      "privacy",
-    ];
-    for (const path of paths) {
-      const link = explore.locator(`a[href="/${path}.html"]`);
-      await link.scrollIntoViewIfNeeded();
-      await expect(link).toBeVisible();
-      expect(
-        await link.evaluate(
-          (element) => element.getBoundingClientRect().height,
-        ),
-      ).toBeGreaterThanOrEqual(44);
-    }
-    expect(await page.locator('a[href^="/"]').count()).toBeGreaterThanOrEqual(
-      7,
-    );
+    await expectHomeLinks(explore);
     expect(
       await page
         .locator("#menuCard")
@@ -70,13 +77,66 @@ for (const theme of ["light", "dark"] as const) {
     ).toBeGreaterThan(0);
     expect(authRequests).toEqual([]);
     const controls = page.locator(
-      "#menuCard .MuiButton-text.MuiButton-colorPrimary, .homeExplore a",
+      "#centeredMenu button, #menuCard .homeExplore a",
     );
     expect(await controls.count()).toBeGreaterThanOrEqual(10);
+    const paletteFloor = theme === "light" ? 3.5 : 4.5;
+    const hasHover = await page.evaluate(
+      () => matchMedia("(hover: hover)").matches,
+    );
+    // Check the rendered font as well as the color pair, including the filled selection.
     for (const control of await controls.all()) {
-      expect(await foregroundContrast(control)).toBeGreaterThanOrEqual(4.5);
+      await expectReadableText(control, paletteFloor);
     }
-    await explore.getByRole("link", { name: "For teachers" }).click();
+    for (const control of await controls.all()) {
+      await control.focus();
+      await expect(control).toBeFocused();
+      await expectReadableText(control, paletteFloor);
+      if (hasHover) {
+        await control.hover();
+        await expectReadableText(control, paletteFloor);
+      }
+    }
+    // Tab from the preceding link so coarse-pointer projects use keyboard focus styling.
+    await explore
+      .getByRole("link", { name: "Compare simulators" })
+      .press("Tab");
+    const about = explore.getByRole("link", { name: "About", exact: true });
+    await expect(about).toBeFocused();
+    await expect(about).toHaveCSS(
+      "background-color",
+      theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)",
+    );
+    await expectReadableText(about, paletteFloor);
+    await explore.getByRole("link", { name: "Classroom" }).click();
     await expect(page).toHaveURL(/classroom\.html$/);
   });
 }
+
+test.describe("homepage without JavaScript", () => {
+  test.use({ javaScriptEnabled: false });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`the homepage links to guides in ${theme} mode`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.locator("html")).toHaveCSS(
+        "background-color",
+        theme === "dark" ? "rgb(11, 16, 22)" : "rgb(255, 255, 255)",
+      );
+      const explore = page.getByRole("navigation", {
+        name: "Explore Electrify",
+      });
+      await expectHomeLinks(explore);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+      await explore
+        .getByRole("link", { name: "How to play", exact: true })
+        .click();
+      await expect(page).toHaveURL(/\/power-grid-simulator\.html$/);
+      await expect(page.getByRole("main")).toBeVisible();
+    });
+  }
+});

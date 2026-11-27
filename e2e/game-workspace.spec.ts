@@ -477,11 +477,15 @@ test("Build and Programs restore selections and scrolling without reopening hidd
     Math.min(240, element.scrollHeight - element.clientHeight),
   );
   expect(left).toBeGreaterThan(0);
-  const listBounds = (await list.boundingBox())!;
-  await page.mouse.move(listBounds.x + listBounds.width / 2, listBounds.y + 24);
-  await page.mouse.wheel(0, left);
+  await list.evaluate((element, position) => {
+    element.scrollTop = position;
+  }, left);
   const scrollPosition = () => list.evaluate((element) => element.scrollTop);
   await expect.poll(scrollPosition).toBe(left);
+  // Let the scroll event land before switching tabs.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(resolve)),
+  );
   await page.getByRole("tab", { name: "Storage", exact: true }).click();
   await size.focus();
   await size.press("ArrowRight");

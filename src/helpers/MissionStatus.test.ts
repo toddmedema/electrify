@@ -97,11 +97,11 @@ test("a successor's remaining time and objective dates use its own 20-year term"
   )!;
   expect(growth.target).not.toContain("1921");
   expect(growth.timing).toBe("Checked at term end.");
-  const debt = status.requirements.find(
-    (row) => row.label === "Keep debt within the published allowance",
-  )!;
-  expect(debt.target).not.toContain("1882 dollars");
-  expect(debt.compact).not.toContain("1882 dollars");
+  expect(status.requirements.map(({ id }) => id)).toEqual([
+    "grow-the-customer-base",
+    "cash",
+    "survival",
+  ]);
 });
 
 test("zero demand cannot invent blackout failure", () => {

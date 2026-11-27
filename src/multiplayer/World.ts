@@ -50,7 +50,11 @@ import { CUSTOM_SCENARIO_ID, getScenario } from "../data/Scenarios";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
 import { pendingScenarioChoice } from "../helpers/ScenarioChoices";
-import { gameObjectiveResults } from "../helpers/ObjectiveRules";
+import {
+  gameObjectiveResults,
+  hasArchivedValleyGoals,
+  validArchivedValleyGoals,
+} from "../helpers/ObjectiveRules";
 import { validScenarioMod } from "../helpers/ScenarioMod";
 import { pendingTileConnections } from "../helpers/TerritoryConnections";
 import { MINUTES_PER_MONTH, summarizeHistory } from "../helpers/DateTime";
@@ -985,6 +989,9 @@ function buildRoomView(
                       name: facility.name,
                       peakW: facility.peakW,
                       yearsToBuildLeft: facility.yearsToBuildLeft,
+                      ...(facility.yearsToBuildLeft > 0
+                        ? { yearsToBuild: facility.yearsToBuild }
+                        : {}),
                       ...(facility.fuel !== undefined
                         ? { fuel: facility.fuel }
                         : {}),
@@ -1189,6 +1196,30 @@ function validGrid(
   peers?: TerritoryPurchaseContext,
 ) {
   const g = world.grids[i];
+  const outcome = world.outcomes[world.seats[i].id];
+  const ending = g.multiplayer?.ending;
+  if (
+    ending !== undefined &&
+    (!outcome ||
+      ending?.outcome !== outcome.outcome ||
+      ending.title !== outcome.title ||
+      ending.month !== outcome.month ||
+      ending.reason !== outcome.reason)
+  )
+    return false;
+  let objectiveProgress = g.objectiveProgress;
+  if (outcome) {
+    try {
+      if (hasArchivedValleyGoals(g)) {
+        // Validate the frozen evidence under its own rules before checking the rest
+        // of the grid as a standalone save under current rules.
+        if (!validArchivedValleyGoals(g)) return false;
+        objectiveProgress = undefined;
+      }
+    } catch {
+      return false;
+    }
+  }
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
   const expectedConnections = initial.grids[i].transmission!.lines;
   const nativeLines = isUtilityExpansionGame(g)
@@ -1211,6 +1242,7 @@ function validGrid(
       serializeSave({
         ...g,
         multiplayer: undefined,
+        objectiveProgress,
         transmission: intertiesEnabledForScenario(scenario, g.location)
           ? {
               buyingRule: g.transmission!.buyingRule,
@@ -1433,6 +1465,12 @@ export function hydrateWorld(value: unknown): World {
     )
       throw new Error(INVALID_GRIDS);
   }
+  // Some checkpoints record retirement only in the world's seat outcomes.
+  result.grids.forEach((grid) => {
+    const multiplayer = grid.multiplayer!;
+    const outcome = result.outcomes[multiplayer.seat];
+    if (outcome) multiplayer.ending = outcome;
+  });
   restoreCommitments(world, result);
   return result;
 }
@@ -1476,6 +1514,9 @@ function territoryGameForWorld(
                         name: facility.name,
                         peakW: facility.peakW,
                         yearsToBuildLeft: facility.yearsToBuildLeft,
+                        ...(facility.yearsToBuildLeft > 0
+                          ? { yearsToBuild: facility.yearsToBuild }
+                          : {}),
                         ...(facility.fuel !== undefined
                           ? { fuel: facility.fuel }
                           : {}),
@@ -1828,12 +1869,20 @@ function upgradeTerritoryWorld(value: unknown): unknown {
         ? "acquisition-preview"
         : undefined;
   for (let i = 0; i < result.grids.length; i++) {
+    const grid = result.grids[i];
     const upgraded = upgradeSave(
-      { schemaVersion: old.gameSchema, game: result.grids[i] },
+      { schemaVersion: old.gameSchema, game: grid },
       publishedValleyRules,
     );
     if (!upgraded) return value;
-    result.grids[i] = upgraded.game as GameType;
+    const migrated = upgraded.game as GameType;
+    const seat = result.seats?.[i];
+    const ending = seat && result.outcomes?.[seat.id];
+    if (ending && hasArchivedValleyGoals(grid)) {
+      // A retired company keeps the goals that produced its recorded outcome.
+      migrated.objectiveProgress = grid.objectiveProgress;
+    }
+    result.grids[i] = migrated;
   }
   result.gameSchema = SAVE_SCHEMA_VERSION;
   result.rules = RULES;
