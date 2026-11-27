@@ -1,3 +1,5 @@
+@import url("./fonts/inter/inter.css");
+
 :root {
   color-scheme: light dark;
   /* ==========================================================================
@@ -76,10 +78,11 @@ a {
   text-underline-offset: 0.18em;
 }
 
-/* Keep logo-blue text large enough to read on light surfaces. */
-:where(a:not([class], .topnav a, .impact-list a, .scenario-theme-nav a)) {
-  font-size: max(1em, 1.1875rem);
-  font-weight: 700;
+/* Keep prose legible at its surrounding size. The underline carries the brand blue. */
+:where(main, .page-breadcrumb, .site-footer)
+  a:where(:not([class], .impact-list a, .scenario-theme-nav a)) {
+  color: inherit;
+  text-decoration-color: var(--brand);
 }
 
 a:hover {
@@ -290,6 +293,33 @@ a:hover {
   border-color: var(--brand-hover);
   background: var(--brand-hover);
   color: var(--brand-hover-label);
+}
+
+.site-message-page {
+  display: grid;
+  align-items: center;
+}
+
+.site-message {
+  width: min(calc(100% - 2rem), var(--reading-width));
+  margin: 0 auto;
+  padding-block: 3rem;
+}
+
+.site-message h1 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.site-message .button {
+  width: fit-content;
+}
+
+.site-message .site-footer {
+  margin-top: 1.5rem;
+  padding-top: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
 }
 
 .page-content {
@@ -578,7 +608,7 @@ a:hover {
   justify-content: space-between;
   gap: 1rem;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .site-footer p {
@@ -590,7 +620,7 @@ a:hover {
 .site-footer nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
+  gap: 0 1rem;
 }
 
 .site-footer nav a {

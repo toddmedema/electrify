@@ -510,13 +510,12 @@ for (const theme of ["light", "dark"] as const) {
     await expect(smoke).toHaveCount(2);
     for (const puff of await smoke.all())
       await expect(puff).toHaveCSS("fill", LOGO_BLUE[theme]);
-    // Settings (and Quit, Mods, Turn on sound) and the explore links are logo blue too,
-    // not a quieter or deeper blue.
+    // Settings and the underlines on discovery links use the same logo blue.
     await expect(
       page.getByRole("button", { name: "Settings", exact: true }),
     ).toHaveCSS("color", LOGO_BLUE[theme]);
     for (const link of await page.locator("#menuCard .homeExplore a").all())
-      await expect(link).toHaveCSS("color", LOGO_BLUE[theme]);
+      await expect(link).toHaveCSS("text-decoration-color", LOGO_BLUE[theme]);
     // The CTAs that are not filled read in the same blue, and take the fill when selected.
     const friends = page.getByRole("button", { name: "Play with friends" });
     await expect(friends).toBeVisible();

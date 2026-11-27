@@ -318,7 +318,7 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   await page.goto("/data-centers.html");
   await page
     .locator(".topnav")
-    .getByRole("link", { name: "Explore the impact" })
+    .getByRole("link", { name: "Open simulator" })
     .click();
   await expect(page).toHaveURL(/dataCenters=1/);
   await ready(page);
