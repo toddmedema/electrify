@@ -199,7 +199,6 @@ export default function ProjectBuild({
     >
       {catalogue ? (
         <BuildFacilities
-          embedded
           onPickSite={(option) => onProject(selectProject(option))}
         />
       ) : (

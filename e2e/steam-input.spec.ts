@@ -514,7 +514,6 @@ test("TV home controller navigation includes every footer icon and wraps", async
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem("interfaceScale", "1.5");
-    localStorage.setItem("workspace", "single");
   });
   await page.goto("/");
   await waitForDesktopInput(page);
@@ -713,9 +712,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   );
   await input(page, "confirm");
   await expect(purchase).toHaveCount(0);
-  if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) === "side"
-  ) {
+  if (await page.locator(".gameWorkspace").getAttribute("data-map-windows")) {
     await expect(build).toBeVisible();
     await select(
       page,
@@ -725,7 +722,11 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   }
   await expect(build).toHaveCount(0);
 
-  // Confirm lifts a reorder handle; directions must move the row rather than leave it.
+  // Fleet is the first pane after the map. Confirm lifts a reorder handle.
+  await input(page, "nextPane");
+  await expect(
+    page.getByRole("region", { name: "Fleet", exact: true }),
+  ).toBeVisible();
   const rows = page.locator(".facilities:visible .facilityRow");
   const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
   const grip = rows.first().getByRole("button", { name: /^Reorder / });
@@ -743,8 +744,9 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
   await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
 
-  // From the fleet the pane ring reaches Build, then Programs at every viewport width.
-  await input(page, "nextPane");
+  // Use the Build action from Fleet and verify category memory through the pane ring.
+  await input(page, "build");
+  await expect(build).toBeVisible();
   for (const category of ["Storage", "Interties"]) {
     await page.getByRole("tab", { name: category, exact: true }).click();
     await input(page, "nextPane");
@@ -753,9 +755,14 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
       page.getByRole("tab", { name: category, exact: true }),
     ).toHaveAttribute("aria-selected", "true");
   }
-  await input(page, "nextPane");
   const programs = page.getByRole("region", { name: "Programs", exact: true });
-  await expect(programs).toBeVisible();
+  await input(page, "nextPane");
+  for (const destination of ["Fleet", "Agreements", "Events", "Programs"]) {
+    await input(page, "nextPane");
+    await expect(
+      page.getByRole("region", { name: destination, exact: true }),
+    ).toBeVisible();
+  }
   const rate = programs.getByRole("slider", {
     name: "The rate you charge for electricity generation",
     exact: true,
@@ -787,7 +794,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
       animations: "disabled",
     });
   }
-  // Programs → Insights → Events → Scenario → Fleet closes every retained side pane.
+  // Programs → Insights → Scenario → Build → Map closes the active panel.
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
@@ -1258,9 +1265,9 @@ test("controller cycles six right-hand panels around the persistent map", async 
   for (const name of [
     "Fleet",
     "Agreements",
+    "Events",
     "Programs",
     "Insights",
-    "Events",
     "Scenario",
   ]) {
     await input(page, "nextPane");
@@ -1497,7 +1504,6 @@ test("TV saved display preferences style direct scenario links before play", asy
   await page.addInitScript(() => {
     const savedPrefs = () => {
       localStorage.setItem("interfaceScale", "2");
-      localStorage.setItem("workspace", "single");
       localStorage.setItem("screenEdgePadding", "4");
     };
     // The shared bridge fixture clears preferences. Preserve these explicit display
@@ -1839,7 +1845,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(page.locator("#appbar:visible")).toBeVisible();
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "single",
+      "map",
     );
     const capture = async (view: string) => {
       await expect(page.locator(".base_main")).toHaveCount(1);
@@ -1920,18 +1926,15 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
         });
       }
     };
-    await select(
-      page,
-      page.getByRole("button", { name: "Build", exact: true }),
-    );
+    const fleet = page.getByRole("button", { name: "Fleet", exact: true });
+    await select(page, fleet);
     await input(page, "right");
     await expect(
-      page.getByRole("button", { name: "Programs", exact: true }),
+      page.getByRole("button", { name: "Agreements", exact: true }),
     ).toBeFocused();
     await input(page, "left");
-    await expect(
-      page.getByRole("button", { name: "Build", exact: true }),
-    ).toBeFocused();
+    await expect(fleet).toBeFocused();
+    await input(page, "confirm");
     await capture("fleet");
     const inspect = page.getByRole("button", {
       name: "Inspect Coal",
@@ -1942,7 +1945,8 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await capture("fleet-expanded");
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });
-    await expect(page.locator(".gameFleet")).toBeHidden();
+    await expect(page.locator(".gameMapStage")).toBeVisible();
+    await expect(page.locator("#facilitiesPane")).toBeHidden();
     await expect(build.locator("summary")).toHaveCount(0);
     const compareSolar = build.getByRole("button", {
       name: "Compare Solar",
@@ -1974,9 +1978,8 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       .locator(".gameToolBody,ul.cardList")
       .evaluateAll((elements) => elements.map((element) => element.scrollTop));
     await input(page, "nextPane");
-    await expect(
-      page.getByRole("region", { name: "Programs", exact: true }),
-    ).toBeVisible();
+    await expect(build).toHaveCount(0);
+    await expect(page.locator(".gameMapStage")).toBeVisible();
     await input(page, "previousPane");
     await expect(reviewSolar).toBeFocused();
     await expect
@@ -2502,9 +2505,6 @@ for (const source of [
       accept ? "1.5" : "1",
     );
     // Acceptance persists the applied choices; dismissal keeps defaults without writing them.
-    expect(await page.evaluate(() => localStorage.getItem("workspace"))).toBe(
-      accept ? "single" : null,
-    );
     expect(
       await page.evaluate(() => localStorage.getItem("screenEdgePadding")),
     ).toBeNull();

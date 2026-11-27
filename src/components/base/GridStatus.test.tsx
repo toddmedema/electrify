@@ -19,7 +19,6 @@ import { openEvidence } from "../../helpers/Evidence";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { selectProjection } from "../../helpers/Projection";
 import Facilities from "../views/FacilitiesContainer";
-import { GameWorkspaceContext } from "./GameWorkspaceContext";
 import GridStatus from "./GridStatus";
 import {
   projectionReady,
@@ -255,20 +254,18 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
   dispatch(navigate("INSIGHTS"));
   function LegacyFacilities() {
     const card = useSelector((state: AppStateType) => state.card.name);
-    return card === "FACILITIES" ? <Facilities /> : null;
+    return card === "FLEET" ? <Facilities territoryView="FLEET" /> : null;
   }
   render(
     <Provider store={store}>
       <ThemeProvider theme={createAppTheme("light")}>
-        <GameWorkspaceContext.Provider value={true}>
-          <GridStatus
-            game={game}
-            now={game.timeline[0]}
-            onEvidence={(target) => dispatch(openEvidence(target))}
-            onNavigate={(card) => dispatch(navigate(card))}
-          />
-          <LegacyFacilities />
-        </GameWorkspaceContext.Provider>
+        <GridStatus
+          game={game}
+          now={game.timeline[0]}
+          onEvidence={(target) => dispatch(openEvidence(target))}
+          onNavigate={(card) => dispatch(navigate(card))}
+        />
+        <LegacyFacilities />
       </ThemeProvider>
     </Provider>,
   );

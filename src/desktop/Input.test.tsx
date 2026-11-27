@@ -560,7 +560,7 @@ it.each([
   ["EVENTS", "nextChart"],
   ["EVENTS", "previousChart"],
 ] as const)(
-  "%s %s reveals hidden fleet charts before focusing them in a single-tool workspace",
+  "%s %s opens Fleet charts from the compact map",
   async (tool, action) => {
     store.dispatch(delta({ inGame: true }));
     store.dispatch(navigate(tool));
@@ -569,8 +569,15 @@ it.each([
       return (
         <main className="base_main">
           <div className="gameWorkspace">
-            <div className="gameStage" data-layout="single">
-              <div className="gameFleet" hidden={card !== "FACILITIES"}>
+            <nav className="gameActionDock">
+              <button id="fleetNav">Fleet</button>
+            </nav>
+            <div className="gameStage" data-layout="map">
+              <div
+                className="gameToolPanel"
+                data-game-tool="FLEET"
+                hidden={card !== "FLEET"}
+              >
                 <div className="accessibleChart">
                   <div role="img" aria-label="Supply chart" tabIndex={0} />
                   <div role="img" aria-label="Demand chart" tabIndex={0} />
@@ -579,7 +586,7 @@ it.each([
               <section
                 className="gameToolPanel"
                 data-game-tool={tool}
-                hidden={card === "FACILITIES"}
+                hidden={card === "FLEET"}
               >
                 <button>Close tool</button>
               </section>
@@ -598,7 +605,7 @@ it.each([
     await Promise.resolve();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
     f.emit({ actions: [action] });
-    expect(store.getState().card.name).toBe("FACILITIES");
+    expect(store.getState().card.name).toBe("FLEET");
     act(() => jest.advanceTimersByTime(20));
     expect(
       screen.getByRole("img", {

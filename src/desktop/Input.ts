@@ -176,10 +176,8 @@ export function startDesktopInput(
       (button) =>
         button.matches(".gameActionDock button") &&
         button.dataset.gameDestination !== "FACILITIES" &&
-        // The map's Build action starts project selection. Bumpers cycle the map and its tools.
-        !button.matches(
-          '.gameWorkspace[data-map-workspace="true"] .gameDockBuild',
-        ),
+        // A territorial Build action starts project selection outside the tool stack.
+        !button.matches(".gameDockBuild:not([data-game-destination])"),
     );
     const card = store.getState().card.name;
     const active =
@@ -197,7 +195,9 @@ export function startDesktopInput(
         if (!live || !foreground || store.getState().card.name !== "FACILITIES")
           return;
         controls()
-          .find((control) => control.matches(".territoryMapBuyToggle"))
+          .find((control) =>
+            control.matches(".territoryMapBuyToggle, .territoryMapLayerToggle"),
+          )
           ?.focus({ preventScroll: true });
       });
     } else {
@@ -218,19 +218,16 @@ export function startDesktopInput(
       element.matches('.accessibleChart > [role="img"][tabindex="0"]'),
     );
     if (!charts.length) {
-      if (
-        document.querySelector(
-          '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
-        )
-      ) {
-        store.dispatch(navigate("FACILITIES"));
+      const fleet = controls().find((control) => control.id === "fleetNav");
+      if (fleet && store.getState().card.name !== "FLEET") {
+        store.dispatch(navigate("FLEET"));
         if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
         chartFrame = requestAnimationFrame(() => {
           chartFrame = undefined;
           if (
             live &&
             foreground &&
-            store.getState().card.name === "FACILITIES" &&
+            store.getState().card.name === "FLEET" &&
             !overlay(inputScope())
           )
             chart(delta);

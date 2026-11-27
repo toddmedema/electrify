@@ -416,10 +416,7 @@ export default function MapWorkspace({
                                     if (!floating) closePanel();
                                   }}
                                 >
-                                  <BuildFacilities
-                                    embedded
-                                    category={buildCategory}
-                                  />
+                                  <BuildFacilities category={buildCategory} />
                                 </GameBuildCompleteContext.Provider>
                               )}
                               {tool.id === "PROGRAMS" && (

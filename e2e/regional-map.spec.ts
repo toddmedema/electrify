@@ -80,7 +80,10 @@ test("regional map presents the city and plants while Fleet and intertie builds 
   await expect(
     page.locator("#facilitiesPane #chartSupplyDemand"),
   ).toBeVisible();
-  await dock.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  await dock.getByRole("button", { name: "Fleet", exact: true }).click();
+  await expect(page.locator("#facilitiesPane")).toBeHidden();
+  await expect(canvas).toBeVisible();
   const build = await openBuild(page);
   await build.getByRole("tab", { name: "Interties", exact: true }).click();
   await expect(

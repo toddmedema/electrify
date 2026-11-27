@@ -1530,26 +1530,6 @@ $pane_header_height: 48px;
   border-bottom: $border_accent;
 }
 
-.facilities .paneHeader {
-  gap: 8px;
-
-  // Shared control size, with 4px of breathing room inside the pane header.
-  .button-buildFacility {
-    margin-left: auto;
-    height: var(--control-size);
-    min-height: var(--control-size);
-    padding: 4px 12px;
-
-    .MuiButton-startIcon {
-      margin-right: 8px;
-    }
-
-    .MuiButton-startIcon > svg {
-      font-size: 1em;
-    }
-  }
-}
-
 .transmissionPanel {
   display: flex;
   flex-direction: column;
@@ -1739,13 +1719,6 @@ $pane_header_height: 48px;
   flex-direction: column;
   gap: 8px;
   padding: 0 16px 8px;
-}
-
-// Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
-@media (pointer: coarse) {
-  .facilities .paneHeader .button-buildFacility {
-    height: 44px;
-  }
 }
 
 // A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --

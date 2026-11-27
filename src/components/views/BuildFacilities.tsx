@@ -16,9 +16,6 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { getTutorialStep } from "../../data/Scenarios";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
-import ConceptIcon from "../base/ConceptIcon";
-import CatalogTitleBar from "../base/CatalogTitleBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
@@ -34,11 +31,9 @@ const categories = [
 ] as const;
 
 export default function BuildFacilities({
-  embedded = false,
   category,
   onPickSite,
 }: {
-  embedded?: boolean;
   category?: string;
   onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
 }): React.JSX.Element {
@@ -66,7 +61,6 @@ export default function BuildFacilities({
         ([name]) =>
           name === (onPickSite ? projectCategory : (category ?? card)),
       )?.[0] || "BUILD_GENERATORS";
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
   const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
   const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
   const gesture = React.useRef<{ id: number; x: number; y: number } | null>(
@@ -88,22 +82,8 @@ export default function BuildFacilities({
   };
 
   return (
-    <div
-      id={embedded ? undefined : "topbar"}
-      className="flexContainer screenCatalog buildFacilities"
-    >
+    <div className="flexContainer screenCatalog buildFacilities">
       <header className="constructionHeader">
-        {!embedded && (
-          <CatalogTitleBar
-            icon={<ConceptIcon concept="build" fontSize="small" />}
-            title="Build"
-            cash={cash}
-            onClose={close}
-            closeButtonId="close-button"
-            // The build screen stands in for the game bar, so tutorials find its speeds here
-            speedControlId="speedChangeButtons"
-          />
-        )}
         {!introductoryChoices && (
           <Tabs
             className="constructionTabs"

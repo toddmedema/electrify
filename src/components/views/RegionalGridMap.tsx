@@ -84,12 +84,12 @@ export default function RegionalGridMap({
     [game, sources],
   );
   const view =
-    inspected &&
-    !blocked &&
-    views.find(({ tile }) => territoryMapTileKey(tile) === inspected);
-  const tile = view && view.tile;
-  const facility = view && view.operatingFacility;
-  const homeCity = !!(tile && tile.city && view.owned);
+    inspected && !blocked
+      ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
+      : undefined;
+  const tile = view?.tile;
+  const facility = view?.operatingFacility;
+  const homeCity = !!(tile?.city && view?.owned);
   const tick = homeCity ? currentTick(game) : undefined;
   return (
     <section
