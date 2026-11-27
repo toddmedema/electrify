@@ -13,10 +13,11 @@ import {
 } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { inEraRate } from "../../data/RetailRates";
-import { LOCATIONS } from "../../Constants";
+import { COOP_CUSTOM_FACILITY_LIMIT, LOCATIONS } from "../../Constants";
 import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
 import { createGame } from "../../testing/Simulator";
+import type { CoopSelectionType } from "../../Types";
 import CustomGame from "./CustomGame";
 
 jest.mock("../../OfflineWeatherData", () => ({
@@ -330,6 +331,116 @@ it("does not forecast a facility that is unavailable in the selected year", () =
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Start game" })).toBeDisabled();
   expect(mockCreateForecastWorker).not.toHaveBeenCalled();
+});
+
+it("blocks a retained facility when its capacity exceeds the selected year's limit", () => {
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: [{ name: "Battery", peakWh: 100_000_000 }],
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  const start = screen.getByRole("button", { name: "Start game" });
+  expect(start).toBeEnabled();
+  fireEvent.mouseDown(setupCombobox("Starting year"));
+  fireEvent.click(screen.getByRole("option", { name: "2010" }));
+  expect(start).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Remove Battery" })).toBeVisible();
+  fireEvent.click(start);
+  expect(onStart).not.toHaveBeenCalled();
+
+  fireEvent.mouseDown(setupCombobox("Starting year"));
+  fireEvent.click(screen.getByRole("option", { name: "2020" }));
+  expect(start).toBeEnabled();
+});
+
+const readyCoopHost: CoopSelectionType = {
+  role: "host",
+  hostName: "Alice",
+  players: [
+    { id: "a", name: "Alice", host: true, connected: true, ready: false },
+    { id: "b", name: "Bob", host: false, connected: true, ready: true },
+  ],
+  ready: false,
+  starting: false,
+};
+
+it("allows a co-op host to reach the facility limit and prevents another addition", () => {
+  const onScenarioChange = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: Array.from(
+          { length: COOP_CUSTOM_FACILITY_LIMIT - 1 },
+          () => ({ name: "Coal", peakW: 100_000_000 }),
+        ),
+      }}
+      coop={readyCoopHost}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+      onScenarioChange={onScenarioChange}
+    />,
+  );
+
+  fireEvent.mouseDown(setupCombobox("Facility type"));
+  fireEvent.click(screen.getByRole("option", { name: "Coal" }));
+  const add = screen.getByRole("button", { name: "Add facility" });
+  expect(add).toBeEnabled();
+  fireEvent.click(add);
+  expect(onScenarioChange.mock.lastCall?.[0].facilities).toHaveLength(
+    COOP_CUSTOM_FACILITY_LIMIT,
+  );
+  expect(add).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Start for everyone" }),
+  ).toBeEnabled();
+  expect(screen.getByText(/co-op games support up to/i)).toBeVisible();
+});
+
+it("lets a host repair an oversized recalled fleet before sharing or starting it", () => {
+  const onStart = jest.fn();
+  const onScenarioChange = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: Array.from(
+          { length: COOP_CUSTOM_FACILITY_LIMIT + 1 },
+          () => ({ name: "Coal", peakW: 100_000_000 }),
+        ),
+      }}
+      coop={readyCoopHost}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+      onScenarioChange={onScenarioChange}
+    />,
+  );
+
+  const start = screen.getByRole("button", { name: "Start for everyone" });
+  expect(start).toBeDisabled();
+  expect(onScenarioChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove Coal" })[0]);
+  expect(onScenarioChange.mock.lastCall?.[0].facilities).toHaveLength(
+    COOP_CUSTOM_FACILITY_LIMIT,
+  );
+  expect(start).toBeEnabled();
+  fireEvent.click(start);
+  expect(onStart.mock.lastCall?.[0].facilities).toHaveLength(
+    COOP_CUSTOM_FACILITY_LIMIT,
+  );
 });
 
 it("re-quotes starting cash when the starting year changes", () => {

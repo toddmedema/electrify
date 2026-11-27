@@ -1,4 +1,5 @@
 import { currencyForLocation } from "../../helpers/Currency";
+import { COOP_CUSTOM_FACILITY_LIMIT } from "../../Constants";
 import { useMoney } from "../base/CurrencyContext";
 import {
   getHydroAvailability,
@@ -278,13 +279,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
   const previewSeed = React.useRef(scenario.seed ?? newSeed());
   const guest = props.coop?.role === "guest";
+  const host = props.coop?.role === "host";
+  const atCoopFacilityLimit =
+    host && scenario.facilities.length >= COOP_CUSTOM_FACILITY_LIMIT;
+  const overCoopFacilityLimit =
+    host && scenario.facilities.length > COOP_CUSTOM_FACILITY_LIMIT;
+  const coopFacilityLimitNoticeId = React.useId();
   const { onScenarioChange } = props;
   React.useEffect(() => {
+    if (overCoopFacilityLimit) return;
     onScenarioChange?.({
       ...scenario,
       seed: scenario.seed ?? previewSeed.current,
     });
-  }, [scenario, onScenarioChange]);
+  }, [scenario, onScenarioChange, overCoopFacilityLimit]);
   // A guest's setup is whatever the host is showing, seed included, so forecasts match too.
   React.useEffect(() => {
     if (!guest) return;
@@ -361,6 +369,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
       .sort((a, b) => a - b);
   const sizes = sizesFor(adding);
   const selectedSize = sizes.includes(addSize) ? addSize : sizes[0];
+  const addBlocked = guest || atCoopFacilityLimit || !adding || !selectedSize;
   // What the utility starts with, what a kilowatt hour may be charged at, and what a ton of CO2e
   // may be feed, in the money of the year the game starts in. All move with the starting year,
   // which is why changing that year has to re-quote whatever was already chosen rather than
@@ -412,18 +421,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const isLocationUnavailable = useOfflineWeather(selectableLocations, current);
   const weatherUnavailable = !!current && !!isLocationUnavailable?.(current);
 
-  // Rolling the year back past a technology's invention would otherwise leave a facility in the
-  // list that quietly disappears once the game loads
+  // Retained plants use the selected year's technology limits and their actual capacities.
+  // Conventional Hydro is checked against individual sites above.
   const claimedSites: Array<{ name: string }> = [];
   const unavailable = scenario.facilities.filter(
     (f: Partial<FacilityShoppingType>) => {
       const name = facilityName(f);
-      if (
-        !availableTechnologies.some((technology) => technology.name === name)
-      ) {
-        return true;
-      }
+      const technology = availableTechnologies.find((t) => t.name === name);
+      if (!technology) return true;
       if (name === "Hydro") return false;
+      const capacity = (technology.storage ? f.peakWh : f.peakW) ?? 0;
+      if (capacity > technology.maxSize) return true;
       const sitesRemaining = getViableLocationsRemaining(
         location,
         claimedSites,
@@ -435,6 +443,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
   );
 
   const forecastInvalid = unavailable.length > 0 || !!hydroSetup.error;
+  const startDisabled =
+    forecastInvalid || weatherUnavailable || overCoopFacilityLimit;
+  const startGame = () => {
+    if (guest || startDisabled) return;
+    onStart({ ...scenario, seed: scenario.seed ?? previewSeed.current });
+  };
   const forecastLocation = getScenarioLocation(scenario);
   const forecast = useWorkerRequest(
     forecastInvalid || weatherUnavailable || !forecastLocation
@@ -519,9 +533,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
 
   const addFacility = () => {
-    if (!adding || !selectedSize) {
-      return;
-    }
+    if (addBlocked) return;
     const facility = adding.storage
       ? { name: adding.name, peakWh: selectedSize }
       : { name: adding.name, peakW: selectedSize };
@@ -926,6 +938,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   or change the setup.
                 </Typography>
               )}
+              {atCoopFacilityLimit && (
+                <Typography
+                  id={coopFacilityLimitNoticeId}
+                  variant="body2"
+                  color={overCoopFacilityLimit ? "error" : "textSecondary"}
+                  role={overCoopFacilityLimit ? "alert" : undefined}
+                >
+                  Co-op games support up to {COOP_CUSTOM_FACILITY_LIMIT}{" "}
+                  starting facilities.{" "}
+                  {overCoopFacilityLimit
+                    ? "Remove facilities to start."
+                    : "Remove a facility to add another."}
+                </Typography>
+              )}
 
               <section
                 className={`customSetupOutlook customSetupOutlook-${outlook.status}${
@@ -1114,8 +1140,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 <IconButton
                   onClick={addFacility}
                   aria-label="Add facility"
+                  aria-describedby={
+                    atCoopFacilityLimit ? coopFacilityLimitNoticeId : undefined
+                  }
                   color="primary"
-                  disabled={!adding || sizes.length === 0}
+                  disabled={addBlocked}
                   size="large"
                 >
                   <AddIcon />
@@ -1128,13 +1157,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
           {props.coop ? (
             <CoopStartButton
               coop={props.coop}
-              disabled={forecastInvalid || weatherUnavailable}
-              onStart={() =>
-                onStart({
-                  ...scenario,
-                  seed: scenario.seed ?? previewSeed.current,
-                })
-              }
+              disabled={startDisabled}
+              onStart={startGame}
             />
           ) : (
             <Button
@@ -1143,13 +1167,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
               variant="contained"
               color="primary"
               startIcon={<PlayCircleIcon />}
-              disabled={forecastInvalid || weatherUnavailable}
-              onClick={() =>
-                onStart({
-                  ...scenario,
-                  seed: scenario.seed ?? previewSeed.current,
-                })
-              }
+              disabled={startDisabled}
+              onClick={startGame}
             >
               Start game
             </Button>
