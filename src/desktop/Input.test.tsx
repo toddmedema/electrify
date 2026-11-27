@@ -559,11 +559,14 @@ it.each([
   ["PROGRAMS", "previousChart"],
   ["EVENTS", "nextChart"],
   ["EVENTS", "previousChart"],
+  ["FACILITIES", "nextChart"],
+  ["FACILITIES", "previousChart"],
 ] as const)(
   "%s %s opens Fleet charts from the compact map",
   async (tool, action) => {
     store.dispatch(delta({ inGame: true }));
     store.dispatch(navigate(tool));
+    const fromMap = tool === "FACILITIES";
     function Surface() {
       const card = useAppSelector((state) => state.card.name);
       return (
@@ -586,7 +589,7 @@ it.each([
               <section
                 className="gameToolPanel"
                 data-game-tool={tool}
-                hidden={card === "FLEET"}
+                hidden={fromMap || card === "FLEET"}
               >
                 <button>Close tool</button>
               </section>

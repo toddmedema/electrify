@@ -1298,6 +1298,10 @@ test("controller cycles six tools around the persistent map", async ({
   await expect(
     page.getByRole("button", { name: "Rapid connection mode", exact: true }),
   ).toBeFocused();
+  await input(page, "nextChart");
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  await expect(fleet).toBeVisible();
+  await expect(fleet.locator('#chartSupplyDemand [role="img"]')).toBeFocused();
 });
 
 async function startControllerMapAtToolbar(page: Page) {
@@ -1941,6 +1945,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     });
     await select(page, inspect);
     await input(page, "confirm");
+    await expect(inspect).toHaveAttribute("aria-expanded", "true");
     await capture("fleet-expanded");
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });
