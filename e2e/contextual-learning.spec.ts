@@ -350,22 +350,10 @@ test("reading help preserves the current tutorial objective", async ({
     .click();
   const objective = page.locator(".tutorialHud");
   await expect(objective).toBeVisible();
-  // Financing terms carry the mission's money help. Insights no longer has an inline help link.
-  const facilities = page.locator(".facilities:visible");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
-  const build = await openBuild(page);
-  await build.getByRole("tab", { name: "Generators", exact: true }).click();
-  await page
-    .locator('.buildOption button[aria-label^="Review purchase of"]:enabled')
-    .first()
-    .click();
-  await expect(objective).toBeVisible();
+  await page.getByRole("button", { name: "Insights", exact: true }).click();
   const before = await objective.innerText();
   const help = page.getByRole("button", {
-    name: "What is interest rate?",
+    name: "What is Profit?",
     exact: true,
   });
   await help.click();

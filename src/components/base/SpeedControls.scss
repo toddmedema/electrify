@@ -88,7 +88,7 @@
       }
 
       .MuiSvgIcon-root {
-        color: var(--interactive-blue);
+        color: inherit;
         font-size: 1.125rem; // 18px: a pause glyph that sits inside a 32px thumb, not against it
       }
 
@@ -97,10 +97,6 @@
       &[data-thumb="true"] {
         color: #0a0a0a;
         font-weight: 600;
-
-        .MuiSvgIcon-root {
-          color: inherit;
-        }
       }
 
       &.Mui-selected:not([data-thumb="true"]) {

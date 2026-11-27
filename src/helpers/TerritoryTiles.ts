@@ -26,7 +26,7 @@ import {
   POWER_AGREEMENT_BLOCKS,
   UTILITY_AREAS,
 } from "../data/UtilityExpansion";
-import { isUtilityExpansionGame } from "./ExpansionContext";
+import { isTutorialMapGame, isUtilityExpansionGame } from "./ExpansionContext";
 import { HEX_NEIGHBORS } from "./HexNeighbors";
 import { terrainBuildingPowerLimit } from "./TerritoryCapacity";
 import {
@@ -37,7 +37,10 @@ import {
 export function hasTerritoryNetwork(
   game: Pick<GameType, "scenarioId" | "customScenario" | "territoryNetwork">,
 ): boolean {
-  return isUtilityExpansionGame(game) && game.territoryNetwork?.version === 3;
+  return (
+    game.territoryNetwork?.version === 3 &&
+    (isUtilityExpansionGame(game) || isTutorialMapGame(game))
+  );
 }
 export function ownedTerritories(game: GameType): TerritoryId[] {
   if (!hasTerritoryNetwork(game)) return ["champlain"];

@@ -146,13 +146,11 @@ it("supports standard keyboard navigation between build tabs", async () => {
   );
 });
 
-it.each([1, 2, 3])(
-  "hides build categories while sorting, sizing or reviewing Mission 2 generator choices at step %s",
-  (step) => {
-    setup(1, step);
-    expect(screen.queryByRole("tablist")).toBeNull();
-    expect(
-      screen.getByRole("tabpanel", { name: "Generators" }),
-    ).toHaveTextContent("Generator catalog");
-  },
-);
+it("keeps the build categories available in the generator lesson", () => {
+  setup(1, 0);
+  expect(screen.getByRole("tab", { name: "Generators" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  expect(screen.getByRole("tab", { name: "Storage" })).toBeVisible();
+});

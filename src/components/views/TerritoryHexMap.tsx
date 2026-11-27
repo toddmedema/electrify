@@ -1405,6 +1405,10 @@ export default function TerritoryHexMap({
                 key={key}
                 type="button"
                 data-map-target={key}
+                data-map-facility={view.facility?.name}
+                data-map-construction={
+                  view.facility?.yearsToBuildLeft ? true : undefined
+                }
                 data-map-inspected={key === inspected || undefined}
                 data-territory={tile.territoryId}
                 data-owner={view.ownerKey}

@@ -18,7 +18,6 @@ import {
 } from "./Transmission";
 
 const intern: IntertieContext = {
-  scenarioId: 112,
   locationId: "SF",
   seed: 42,
   southernHemisphere: false,
@@ -120,7 +119,14 @@ describe("intertie outlook", () => {
   });
 
   it("shows a seasonal hydro neighbour tightening in late summer and fall", () => {
-    const outlook = intertieOutlook("california-north", intern, year())!;
+    // Use enough line capacity to expose the market's seasonal supply.
+    const outlook = intertieOutlook(
+      "california-north",
+      intern,
+      year(),
+      -Infinity,
+      2e9,
+    )!;
     expect(outlook.archetype.id).toBe("SEASONAL_HYDRO");
     expect([7, 8, 9]).toContain(outlook.lowMonth);
     expect(outlook.monthly[5]).toBeGreaterThan(

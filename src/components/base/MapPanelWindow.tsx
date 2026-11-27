@@ -133,7 +133,7 @@ export default function MapPanelWindow({
   stackingIndex?: number;
   front?: boolean;
   floating?: MapWindowLayout;
-  onRaise?: () => void;
+  onRaise?: (toClose: boolean) => void;
   onClose: () => void;
   onBack?: () => void;
   project?: { catalogue: boolean; focusKey: React.Key };
@@ -146,6 +146,7 @@ export default function MapPanelWindow({
   const [draft, setDraft] = React.useState<Rect>();
   const gesture = React.useRef<Gesture>();
   const title = React.useRef<HTMLHeadingElement>(null);
+  const closeButton = React.useRef<HTMLButtonElement>(null);
   const titleId = React.useId();
   const projectFocus = project?.focusKey;
   React.useLayoutEffect(() => {
@@ -276,6 +277,12 @@ export default function MapPanelWindow({
     );
   };
 
+  const raiseFrom = (event: React.SyntheticEvent<HTMLElement>) => {
+    const target = event.target;
+    if (target instanceof Node && event.currentTarget.contains(target))
+      onRaise?.(closeButton.current?.contains(target) ?? false);
+  };
+
   return (
     <section
       id={`tool-${tool}`}
@@ -301,15 +308,9 @@ export default function MapPanelWindow({
         }
       }
       onPointerDownCapture={(event) => {
-        if (
-          event.button === 0 &&
-          event.currentTarget.contains(event.target as Node)
-        )
-          onRaise?.();
+        if (event.button === 0) raiseFrom(event);
       }}
-      onFocusCapture={(event) => {
-        if (event.currentTarget.contains(event.target)) onRaise?.();
-      }}
+      onFocusCapture={raiseFrom}
       onPointerMove={(event) => {
         const next = update(event);
         if (next) setDraft(next);
@@ -364,6 +365,7 @@ export default function MapPanelWindow({
         <IconButton
           aria-label={project ? "Close project" : `Close ${label}`}
           onClick={onClose}
+          ref={closeButton}
         >
           <CloseIcon />
         </IconButton>

@@ -1,0 +1,132 @@
+import type { Locator } from "@playwright/test";
+import { openMapProjectCatalogue, setMapProjectCapacity } from "./layout";
+import { TUTORIALS } from "../src/data/Scenarios";
+import { expect, type Page } from "./fixtures";
+
+export async function startTutorialMission(
+  page: Page,
+  id: number,
+  theme?: "light" | "dark",
+) {
+  const ids = TUTORIALS.map((mission) => mission.id);
+  await page.addInitScript(
+    ({ completed, theme }) => {
+      localStorage.setItem("audioEnabled", "false");
+      if (theme) localStorage.setItem("theme", theme);
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: completed.map((scenarioId) => ({
+            scenarioId,
+            timesPlayed: 1,
+            date: "2026-11-26",
+          })),
+        }),
+      );
+    },
+    { completed: ids.slice(0, ids.indexOf(id)), theme },
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Tutorials", exact: true }).click();
+  await expect(page.locator(".tutorialHud")).toBeVisible();
+}
+
+export const tutorialMap = (page: Page) =>
+  page.getByRole("region", { name: "Territory map workspace", exact: true });
+
+export const tutorialCoal = (page: Page) =>
+  tutorialMap(page).locator('[data-map-facility="Coal"][data-owned="true"]');
+
+export async function openTutorialFleet(page: Page) {
+  await tutorialCoal(page).click();
+  await expect(
+    page.getByRole("dialog", { name: "Coal", exact: true }),
+  ).toBeVisible();
+  const fleet = page.getByRole("button", { name: "Fleet", exact: true });
+  await expect(fleet).toHaveAttribute("aria-expanded", "false");
+  await fleet.click();
+  await expect(page.locator("#chartSupplyDemand")).toBeVisible();
+}
+
+export async function readTutorialSupplyChart(page: Page) {
+  await openTutorialFleet(page);
+  await page.locator("#chartSupplyDemand").click();
+  await expect(
+    page.getByRole("button", { name: "slow speed", exact: true }),
+  ).toBeVisible();
+}
+
+export async function reachableTutorialTile(page: Page, tiles: Locator) {
+  const reachableSite = () =>
+    tiles.evaluateAll((elements) => {
+      const reachable = elements.filter((node) => {
+        const box = node.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          box.left + box.width / 2,
+          box.top + box.height / 2,
+        );
+        return node.contains(hit);
+      });
+      const preferred = reachable.find(
+        (node) => node.getAttribute("data-terrain") === "plains",
+      );
+      return (preferred ?? reachable[0])?.getAttribute("data-map-target") ?? "";
+    });
+  await expect.poll(reachableSite).not.toBe("");
+  return tutorialMap(page).locator(
+    `[data-map-target="${await reachableSite()}"]`,
+  );
+}
+
+export async function buildTutorialProject(
+  page: Page,
+  name: string,
+  {
+    storage = false,
+    size,
+    openMap,
+  }: { storage?: boolean; size?: string; openMap?: Locator } = {},
+) {
+  const catalogue = await openMapProjectCatalogue(page, openMap);
+  const desktop = await catalogue
+    .and(page.locator(".desktopBuildRail"))
+    .isVisible();
+  if (!desktop && storage) {
+    await catalogue.getByRole("tab", { name: "Storage", exact: true }).click();
+  }
+  if (size) await setMapProjectCapacity(catalogue, storage, size);
+  const choose = catalogue.getByRole("button", {
+    name: `${desktop ? "Choose sites" : "Pick site"} for ${desktop && name === "Lithium Battery" ? "Battery" : name}`,
+    exact: true,
+    disabled: false,
+  });
+  if (desktop) await choose.press("Enter");
+  else await choose.click();
+  const map = openMap ?? tutorialMap(page);
+  const sites = map.locator('[data-project-site="owned"]:visible');
+  if (storage) {
+    await expect(sites.first()).toBeVisible();
+    await expect(
+      map.locator('[data-project-site="owned"].tutorialTarget'),
+    ).toHaveCount(0);
+  }
+  const touch = await page.evaluate(
+    () => matchMedia("(pointer: coarse)").matches,
+  );
+  if (touch) await (await reachableTutorialTile(page, sites)).tap();
+  else {
+    // The project dialog takes focus when it opens. Let it finish before a
+    // keyboard user moves focus to a site and presses Enter.
+    await expect(
+      map.locator(".tileWorkspaceProject").getByRole("heading"),
+    ).toBeFocused();
+    await sites.first().press("Enter");
+  }
+  const loan = map.getByRole("button", {
+    name: "Loan",
+    exact: true,
+    disabled: false,
+  });
+  if (desktop) await loan.press("Enter");
+  else await loan.click();
+}
