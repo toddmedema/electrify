@@ -164,7 +164,7 @@ function layoutFor(
   const available = (cell: HexCoordinate) =>
     !placements.has(tileId(cell)) && !reserved.has(tileId(cell));
 
-  const spareLand = (isAvailable = available) => {
+  const spareLand = (isAvailable: (cell: Cell) => boolean = available) => {
     if (ordinary.some(isAvailable)) return ordinary;
     radius++;
     for (const coordinates of regionalHexes(radius)) {
