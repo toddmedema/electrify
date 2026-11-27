@@ -43,7 +43,10 @@ export default function RegionalGridMap({
   const focusAfterClose = React.useRef<TerritoryMapTileKey>();
   const [sources, setSources] = React.useState<DataCenterCustomerSources>();
   const [selected, setSelected] = React.useState<TerritoryMapTileKey>();
-  const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
+  const [inspection, setInspection] = React.useState<{
+    tileKey: TerritoryMapTileKey;
+    facilityId: number | undefined;
+  }>();
   React.useEffect(() => {
     let active = true;
     initDataCenterCustomers().then(
@@ -57,40 +60,47 @@ export default function RegionalGridMap({
     };
   }, []);
   const close = React.useCallback(() => {
-    setInspected(undefined);
+    setInspection(undefined);
     setSelected(undefined);
   }, []);
   const generation = game.campaign?.generationIndex;
   React.useEffect(() => {
     if (generation !== undefined) close();
   }, [close, generation]);
+  const views = React.useMemo(
+    () => regionalMapViews(game, sources),
+    [game, sources],
+  );
+  const inspectedView =
+    inspection &&
+    views.find(
+      ({ tile, operatingFacility }) =>
+        territoryMapTileKey(tile) === inspection.tileKey &&
+        operatingFacility?.id === inspection.facilityId,
+    );
+  // A named dam can reserve an existing plot and move the plant inspected there.
+  if (inspection && !inspectedView) setInspection(undefined);
+  const blocked = open && !tileWindow;
+  const view = blocked ? undefined : inspectedView;
+  const inspected = view ? inspection?.tileKey : undefined;
   const closeInspection = React.useCallback(() => {
     focusAfterClose.current = inspected;
     close();
   }, [close, inspected]);
-  const blocked = open && !tileWindow;
   React.useEffect(() => {
     if (blocked) close();
   }, [blocked, close]);
   React.useLayoutEffect(() => {
-    if (!inspected || blocked || !showTile) return;
+    if (!inspected || !showTile) return;
     showTile(closeInspection);
     return hideTile;
-  }, [blocked, closeInspection, hideTile, inspected, showTile]);
+  }, [closeInspection, hideTile, inspected, showTile]);
   React.useLayoutEffect(() => {
     const key = focusAfterClose.current;
     if (inspected || !key) return;
     focusAfterClose.current = undefined;
     findTileControl(map.current, key)?.focus({ preventScroll: true });
   }, [inspected]);
-  const views = React.useMemo(
-    () => regionalMapViews(game, sources),
-    [game, sources],
-  );
-  const view =
-    inspected && !blocked
-      ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
-      : undefined;
   const tile = view?.tile;
   const facility = view?.operatingFacility;
   const homeCity = !!(tile?.city && view?.owned);
@@ -106,12 +116,19 @@ export default function RegionalGridMap({
         game={game}
         views={views}
         selected={selected}
-        inspected={view ? inspected : undefined}
+        inspected={inspected}
         onSelect={(key, inspect) => {
           setSelected(key);
-          if (inspect) {
+          if (!inspect) return;
+          const target = views.find(
+            ({ tile }) => territoryMapTileKey(tile) === key,
+          );
+          if (target) {
             if (blocked) returnToMap?.();
-            setInspected(key);
+            setInspection({
+              tileKey: key,
+              facilityId: target.operatingFacility?.id,
+            });
           }
         }}
         onDeselect={close}

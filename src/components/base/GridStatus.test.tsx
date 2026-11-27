@@ -252,7 +252,7 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
   });
   const dispatch = store.dispatch as AppDispatch;
   dispatch(navigate("INSIGHTS"));
-  function LegacyFacilities() {
+  function Fleet() {
     const card = useSelector((state: AppStateType) => state.card.name);
     return card === "FLEET" ? <Facilities territoryView="FLEET" /> : null;
   }
@@ -265,7 +265,7 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
           onEvidence={(target) => dispatch(openEvidence(target))}
           onNavigate={(card) => dispatch(navigate(card))}
         />
-        <LegacyFacilities />
+        <Fleet />
       </ThemeProvider>
     </Provider>,
   );

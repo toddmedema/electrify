@@ -106,6 +106,25 @@ entry points for `start`, `build`, `test*`, `sim`, and `typecheck` regenerate th
 commit or merge it. Run `npm run compatibility:generate` by hand only if your editor needs the
 missing file. See [run compatibility](docs/run-compatibility.md) for scope.
 
+## Agent updates
+
+- In chat, lead with what changed, what's blocked, or what you need from Todd. Default to 1–3
+  sentences. Use plain verbs and contractions. Put test inventories, commands, and screenshots in
+  the PR; in chat, keep the evidence or caveat that changes the next decision.
+- In PRs, say what changes for players or maintainers, then what passed, failed, or is still
+  pending. Keep commands, results, and required screenshots under their own headings. Never
+  compress “not run,” “failed,” and “pending” into “verified.”
+- Before sending, cut the setup and anything that repeats the result. Keep the exact label, number,
+  or caveat if it helps the reader act. Follow a request for more detail.
+
+Examples:
+
+- Progress: “Build now reopens on phones without losing focus. I'm checking reduced motion.”
+- Blocked: “The build passed, but I couldn't run the browser checks locally. Hosted CI is still
+  running.”
+- PR summary: “Tutorials now start on the 3D map. All seven passed on desktop and at both phone
+  widths. See Verification for the commands and results.”
+
 ## Pull requests
 
 - After required local checks pass, create or update the PR and report remote CI's current status;
@@ -187,6 +206,11 @@ missing file. See [run compatibility](docs/run-compatibility.md) for scope.
 Before UI work, read and follow the [interface design guidance](docs/interface-design.md). It
 covers action hierarchy, spacing and control heights, palette and contrast, reflow down to 360 px,
 and accessible labels for controls and charts.
+
+## Player-facing writing
+
+Whenever you add or change words players see, even inside a code change, use the
+[player-facing writing skill](.agents/skills/player-facing-writing/SKILL.md).
 
 ## Task guidance skills
 
