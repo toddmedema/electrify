@@ -8,15 +8,42 @@ const database = "projects/electrify-game/databases/(default)";
 const listenPath = "/google.firestore.v1.Firestore/Listen/channel";
 const rankPath = `/v1/${database}/documents:runAggregationQuery`;
 
-type StructuredQuery = { from?: { collectionId?: string }[] };
+type FieldFilter = {
+  field?: { fieldPath?: string };
+  op?: string;
+  value?: { integerValue?: string | number; stringValue?: string };
+};
+type StructuredQuery = {
+  from?: { collectionId?: string }[];
+  where?: {
+    compositeFilter?: {
+      op?: string;
+      filters?: { fieldFilter?: FieldFilter }[];
+    };
+  };
+};
 
-function selectsScores(query: StructuredQuery | undefined): boolean {
-  return query?.from?.length === 1 && query.from[0]?.collectionId === "scores";
+function selectsLeaderboard(query: StructuredQuery | undefined): boolean {
+  const filter = query?.where?.compositeFilter;
+  const equalValue = (fieldPath: string) =>
+    filter?.filters?.find(
+      ({ fieldFilter }) =>
+        fieldFilter?.field?.fieldPath === fieldPath &&
+        fieldFilter.op === "EQUAL",
+    )?.fieldFilter?.value;
+  return (
+    query?.from?.length === 1 &&
+    query.from[0]?.collectionId === "scores" &&
+    filter?.op === "AND" &&
+    equalValue("scenarioId")?.integerValue != null &&
+    equalValue("scoreVersion")?.integerValue != null &&
+    equalValue("outcome")?.stringValue === "completed"
+  );
 }
 
 // Scenario previews look up public scores even for signed-out players. Simulate an
-// unavailable leaderboard so the SDK settles from its empty cache. Other collections
-// and writes need their own explicit fixtures.
+// unavailable leaderboard so the SDK settles from its empty cache. Other operations
+// on scores, including the profile rename lookup, need explicit fixtures.
 function isLeaderboardRead(request: Request, url: URL): boolean {
   if (
     request.method() !== "POST" ||
@@ -28,7 +55,7 @@ function isLeaderboardRead(request: Request, url: URL): boolean {
       const requestBody = request.postDataJSON() as {
         structuredAggregationQuery?: { structuredQuery?: StructuredQuery };
       } | null;
-      return selectsScores(
+      return selectsLeaderboard(
         requestBody?.structuredAggregationQuery?.structuredQuery,
       );
     }
@@ -50,7 +77,7 @@ function isLeaderboardRead(request: Request, url: URL): boolean {
         } | null;
         return (
           message?.addTarget?.query?.parent === `${database}/documents` &&
-          selectsScores(message.addTarget.query.structuredQuery)
+          selectsLeaderboard(message.addTarget.query.structuredQuery)
         );
       })
     );
