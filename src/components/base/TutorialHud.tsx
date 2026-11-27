@@ -366,7 +366,7 @@ export default function TutorialHud({
   }, [step, advanceOnClick]);
 
   React.useEffect(() => {
-    if (!target || step.capstone) {
+    if (!target) {
       return;
     }
     try {

@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useAppDispatch, useAppSelector } from "../../Store";
-import { navigate } from "../../reducers/Card";
+import { navigate, tutorialRaisedMapTool } from "../../reducers/GameActions";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../../WorkspaceLayout";
 import { BuildForecastProvider } from "./BuildForecast";
@@ -169,8 +169,12 @@ export default function MapWorkspace({
               ],
             },
       );
+      // A stacked tool can be brought forward without navigating or changing browser history.
+      if (isDockTool(item) && item !== active && stack.windows.includes(item)) {
+        dispatch(tutorialRaisedMapTool(item));
+      }
     },
-    [floating],
+    [active, dispatch, floating, stack.windows],
   );
   const focusHeading = React.useCallback((item: MapWindow) => {
     workspace.current
