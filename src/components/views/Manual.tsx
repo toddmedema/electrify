@@ -86,7 +86,7 @@ export function clearManualMemory() {
   lastScrollTop = 0;
 }
 
-// Find the active scroller before moving a manual entry into view.
+// On short screens the page scrolls around the list. Adjust the active scroller.
 function scrollContainerOf(el: HTMLElement): HTMLElement {
   let node: HTMLElement | null = el;
   while (node && node !== document.body) {

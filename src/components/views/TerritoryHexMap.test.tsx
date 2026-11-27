@@ -171,8 +171,7 @@ it("widens the Legacy map at every handover and restores the same view on a cold
     }
     expect(
       screen.getByRole("button", {
-        name: "Inspect San Francisco on map",
-        exact: true,
+        name: /^Inspect San Francisco on map$/,
       }),
     ).toHaveStyle({
       height: `${HexGeometry.HEX_HEIGHT * priorScale}px`,

@@ -1281,6 +1281,18 @@ $topbar_height: 56px;
   }
 }
 
+// Short Settings and Manual pages scroll the entire column.
+@media (max-width: $tablet_width) and (max-height: 600px) {
+  #gameCard {
+    overflow-y: auto;
+    display: block;
+  }
+  #gameCard .scrollable {
+    overflow: visible;
+    height: auto;
+  }
+}
+
 .gridHealth {
   display: flex;
   align-items: center;
@@ -3700,6 +3712,14 @@ $pane_header_height: 48px;
     gap: 8px;
     padding: 8px;
     text-align: center;
+  }
+
+  #gameCard {
+    height: 100%;
+
+    & > div {
+      flex: 0 1 auto;
+    }
   }
 
   .cardList {

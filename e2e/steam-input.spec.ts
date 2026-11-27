@@ -1430,11 +1430,6 @@ async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await page
     .getByRole("combobox", { name: "Interface scale", exact: true })
     .selectOption(maximum ? "2" : "1.5");
-  await select(
-    page,
-    page.getByRole("button", { name: "Single tool", exact: true }),
-  );
-  await input(page, "confirm");
   if (maximum) {
     await select(
       page,

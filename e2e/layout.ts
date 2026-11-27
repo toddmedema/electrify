@@ -353,6 +353,10 @@ export async function openFleet(page: Page): Promise<Locator> {
   const fleet = page.locator("#facilitiesPane");
   const action = page.getByRole("button", { name: "Fleet", exact: true });
   await openPane(fleet, action);
+  if (
+    await page.locator('#tool-FLEET[data-map-window-front="false"]').isVisible()
+  )
+    await action.click();
   return fleet;
 }
 

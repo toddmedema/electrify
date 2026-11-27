@@ -39,7 +39,7 @@ test("regional map presents the city and plants while Fleet and intertie builds 
     exact: true,
   });
   await city.click();
-  const cityDetails = map.getByRole("dialog", {
+  const cityDetails = page.getByRole("dialog", {
     name: "San Francisco",
     exact: true,
   });
@@ -57,7 +57,7 @@ test("regional map presents the city and plants while Fleet and intertie builds 
       .replace(/^Inspect /, "")
       .replace(/ on map$/, "");
     await plant.press("Enter");
-    const plantDetails = map.getByRole("dialog", {
+    const plantDetails = page.getByRole("dialog", {
       name: plantName,
       exact: true,
     });
@@ -119,7 +119,7 @@ test("regional fleet and map details remain reachable without WebGL2", async ({
     .getByRole("button", { name: "Inspect San Francisco on map", exact: true })
     .press("Enter");
   await expect(
-    map.getByRole("dialog", { name: "San Francisco", exact: true }),
+    page.getByRole("dialog", { name: "San Francisco", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await regionalDock(page)
