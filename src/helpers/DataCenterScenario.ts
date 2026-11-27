@@ -1,19 +1,7 @@
 import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../data/Scenarios";
-import { hasGeothermalResource } from "../data/LocationProfiles";
 import { inEraMoney } from "../data/FuelPrices";
-import {
-  FuelNameType,
-  LocationType,
-  ScenarioFacilityType,
-  ScenarioType,
-} from "../Types";
-import { getDataCenterPowerMix } from "../data/DataCenterPowerMix";
-import {
-  HYDRO_SITES,
-  offeredHydroSiteIds,
-  resolveHydroInventory,
-} from "../data/HydroSites";
-import { getStartingFacilityAge } from "../data/StartingFacilityAges";
+import type { LocationType, ScenarioType } from "../Types";
+import { regionalStartingFleet } from "./RegionalStartingFleet";
 
 export const DATA_CENTER_SEED = 1062026;
 export const DATA_CENTER_DIFFICULTY = "CEO" as const;
@@ -81,55 +69,6 @@ export function createDataCenterScenario(
   }
   const startingDemandScale = researched?.startingDemandScale || 1;
   const scale = startingCustomers * startingDemandScale;
-  const mix = getDataCenterPowerMix(location, startingYear);
-  const facilities: ScenarioFacilityType[] = [];
-  // Research establishes relative installed capacity, not the local inventory or its size.
-  // The same model load sizing and baseline-only calibration apply to every portfolio.
-  Object.entries(mix.shares).forEach(([fuel, share]) => {
-    // Hawaii's reported geothermal capacity is on Hawaii Island, not Oahu.
-    if (fuel === "Geothermal" && location.id === "HNL") return;
-    if (fuel === "Geothermal" && !hasGeothermalResource(location)) return;
-    const peakW = Math.max(1, Math.round(scale * 2500 * share));
-    if (fuel === "Hydro") {
-      // Regional hydro may sit outside the playable site's catchment. Use only
-      // researched physical sites and never exceed their documented capacities.
-      const inventory = resolveHydroInventory(location);
-      let remaining = peakW;
-      if (inventory?.status === "researched") {
-        for (const id of offeredHydroSiteIds(inventory)) {
-          if (!remaining) break;
-          const capacity = Math.min(remaining, HYDRO_SITES[id].maxPeakW);
-          facilities.push({ fuel: "Hydro", peakW: capacity, hydroSiteId: id });
-          remaining -= capacity;
-        }
-      }
-    } else if (fuel === "Natural Gas") {
-      facilities.push(
-        {
-          name: "Natural Gas CC",
-          fuel,
-          peakW: Math.max(1, Math.round(peakW * 0.8)),
-        },
-        {
-          name: "Natural Gas Peaker",
-          fuel,
-          peakW: Math.max(1, Math.round(peakW * 0.2)),
-        },
-      );
-    } else {
-      facilities.push({ fuel: fuel as FuelNameType, peakW });
-    }
-  });
-  facilities.forEach((facility) => {
-    if (facility.fuel) {
-      facility.initialAgeYears = getStartingFacilityAge(
-        location,
-        facility.fuel,
-        startingYear,
-        facility.name,
-      ).ageYears;
-    }
-  });
   const scenario: ScenarioType = {
     ...DEFAULT_CUSTOM_SCENARIO,
     name: "Data centers & your community",
@@ -143,7 +82,7 @@ export function createDataCenterScenario(
     ownership: "Public",
     durationMonths: 16 * 12,
     cash: inEraMoney(scale * 800, startingYear),
-    facilities,
+    facilities: regionalStartingFleet(location, startingYear, scale * 2500),
     eventScenarioIds: [],
   };
   return configureDataCenterGrowth(

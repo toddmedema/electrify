@@ -38,6 +38,11 @@ const selectedDifficulty = () =>
 // Co-op guests follow the host's selection.
 const coopRole = () => store.getState().ui.coop?.role;
 
+const DEFAULT_CUSTOM_SETUP: ScenarioType = {
+  ...DEFAULT_CUSTOM_SCENARIO,
+  startingFleetSource: "regional",
+};
+
 // An explicit second parameter lets connect observe synced unlock changes.
 export const mapStateToProps = (
   state: AppStateType,
@@ -56,7 +61,7 @@ export const mapStateToProps = (
   const scenario =
     (coop?.role === "guest" && coop.custom) ||
     current ||
-    getCustomScenario(DEFAULT_CUSTOM_SCENARIO);
+    getCustomScenario(DEFAULT_CUSTOM_SETUP);
   const eventId = customEventFromSearch(window.location.search);
   return {
     coop,

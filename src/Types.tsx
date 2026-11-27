@@ -1075,6 +1075,8 @@ export interface ScenarioType {
   endTitle?: string;
   endMessage?: string;
   feePerKgCO2e: number;
+  /** Custom setup follows the location blend until the player edits the fleet. */
+  startingFleetSource?: "regional";
   facilities: ScenarioFacilityType[];
 }
 

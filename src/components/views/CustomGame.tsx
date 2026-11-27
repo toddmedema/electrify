@@ -62,6 +62,7 @@ import {
 } from "../../helpers/CustomGameForecast";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
+import { withRegionalStartingFleet } from "../../helpers/RegionalStartingFleet";
 import {
   formatWattHours,
   formatWatts,
@@ -254,7 +255,12 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const { game, onBack, onDelta, onStart } = props;
   const units = useUnits();
   const [scenario, setScenario] = React.useState<ScenarioType>(() =>
-    prepareCustomScenario(props.scenario),
+    prepareCustomScenario(
+      props.coop?.role !== "guest" &&
+        props.scenario.startingFleetSource === "regional"
+        ? withRegionalStartingFleet(props.scenario)
+        : props.scenario,
+    ),
   );
   const currency = currencyForLocation(
     getScenarioLocation(scenario),
@@ -460,7 +466,15 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // A guest's setup only ever changes when the host's does.
   const change = (delta: Partial<ScenarioType>) => {
     if (guest) return;
-    setScenario(prepareCustomScenario({ ...scenario, ...delta }));
+    const next = { ...scenario, ...delta };
+    setScenario(
+      prepareCustomScenario(
+        next.startingFleetSource === "regional" &&
+          delta.startingYear !== undefined
+          ? withRegionalStartingFleet(next)
+          : next,
+      ),
+    );
   };
 
   const changeStartingCustomers = (
@@ -468,17 +482,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
     delta: Partial<ScenarioType> = {},
   ) => {
     if (guest) return;
-    setScenario((currentScenario: ScenarioType) =>
-      prepareCustomScenario({
-        ...currentScenario,
-        ...delta,
-        startingCustomers,
-        facilities: facilitiesForStartingCustomers(
-          currentScenario,
-          startingCustomers,
-        ),
-      }),
-    );
+    setScenario((currentScenario: ScenarioType) => {
+      const next = { ...currentScenario, ...delta, startingCustomers };
+      return prepareCustomScenario(
+        next.startingFleetSource === "regional"
+          ? withRegionalStartingFleet(next)
+          : {
+              ...next,
+              facilities: facilitiesForStartingCustomers(
+                currentScenario,
+                startingCustomers,
+              ),
+            },
+      );
+    });
   };
 
   /**
@@ -506,7 +523,10 @@ export default function CustomGame(props: Props): React.JSX.Element {
     const facility = adding.storage
       ? { name: adding.name, peakWh: selectedSize }
       : { name: adding.name, peakW: selectedSize };
-    change({ facilities: [...scenario.facilities, facility] });
+    change({
+      startingFleetSource: undefined,
+      facilities: [...scenario.facilities, facility],
+    });
   };
 
   const removeFacility = (index: number, trigger: HTMLButtonElement) => {
@@ -524,6 +544,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
       : document.getElementById("addFacilityName");
     next?.focus();
     change({
+      startingFleetSource: undefined,
       facilities: scenario.facilities.filter(
         (_f: Partial<FacilityShoppingType>, i: number) => i !== index,
       ),
@@ -870,6 +891,25 @@ export default function CustomGame(props: Props): React.JSX.Element {
               >
                 Facilities
               </Typography>
+              {scenario.startingFleetSource === "regional" ? (
+                <Typography variant="caption" color="textSecondary">
+                  Starting facilities follow the regional capacity mix until you
+                  edit the fleet.
+                </Typography>
+              ) : (
+                <Button
+                  disabled={guest}
+                  onClick={() =>
+                    setScenario(
+                      prepareCustomScenario(
+                        withRegionalStartingFleet(scenario),
+                      ),
+                    )
+                  }
+                >
+                  Use regional fleet
+                </Button>
+              )}
               {hydroSetup.error && (
                 <Typography color="error" role="alert">
                   {hydroSetup.error}

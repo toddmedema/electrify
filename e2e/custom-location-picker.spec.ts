@@ -235,7 +235,7 @@ test("custom setup uses side-by-side settings and facilities only in two-pane la
   const row = facilities.locator(".build-list-item").first();
   const contentBox = await row.locator(".MuiCardHeader-content").boundingBox();
   const removeBox = await row
-    .getByRole("button", { name: "Remove Natural Gas Peaker" })
+    .getByRole("button", { name: /^Remove / })
     .boundingBox();
   expect(contentBox).not.toBeNull();
   expect(removeBox).not.toBeNull();
@@ -292,9 +292,16 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
     timeout: 20000,
   });
 
-  await page
-    .getByRole("button", { name: "Remove Natural Gas Peaker", exact: true })
-    .click();
+  const startingPlants = page
+    .getByRole("region", { name: "Facilities", exact: true })
+    .locator(".startingFacility:not([inert])")
+    .getByRole("button", { name: /^Remove / });
+  const startingCount = await startingPlants.count();
+  expect(startingCount).toBeGreaterThan(1);
+  for (let count = startingCount; count > 0; count--) {
+    await startingPlants.first().click();
+    await expect(startingPlants).toHaveCount(count - 1);
+  }
   await expect(outlook).toContainText("Calculating Year 1 outlook…");
   await expect(outlook).toContainText("0%", { timeout: 20000 });
   await expect(outlook).toContainText("Deficit forecast");
@@ -543,6 +550,18 @@ test("location constraints keep Play valid only where the starting fleet is viab
   await search.fill("San Francisco");
   await page.getByRole("option", { name: "San Francisco, CA" }).click();
   await expect(play).toBeEnabled();
+
+  await search.fill("Paris");
+  await page.getByRole("option", { name: "Paris, France" }).click();
+  await expect(play).toBeDisabled();
+  await page.getByRole("button", { name: "Use regional fleet" }).click();
+  await expect(play).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Remove Nuclear" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Remove Geothermal" }),
+  ).toHaveCount(0);
 });
 
 test("dark theme and reduced motion keep the map legible and still", async ({
