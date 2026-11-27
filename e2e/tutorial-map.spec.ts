@@ -78,6 +78,7 @@ test("Mission 1 · inspect the 3D map, read Fleet and keep a full day supplied",
 test("Mission 2 · buy two generators on the map and find construction", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startMission(page, 1);
   await goal(page, "Build a gas peaker");
   await buildTutorialProject(page, "Natural Gas Peaker");
@@ -115,6 +116,7 @@ test("Mission 2 · buy two generators on the map and find construction", async (
 test("Mission 3 · move Coal above storage and cover the daily peak with a battery", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startMission(page, 2);
   const touch = await page.evaluate(
     () => matchMedia("(pointer: coarse)").matches,
@@ -143,8 +145,17 @@ test("Mission 3 · move Coal above storage and cover the daily peak with a batte
     await page.keyboard.press("ArrowUp");
     await page.keyboard.press("Space");
   }
+  await expect(hud(page)).toContainText(
+    /resets your grid to a single coal plant/i,
+  );
+  await reviewScreenshot(hud(page), {
+    path: test.info().outputPath("tutorial-storage-reset.png"),
+    animations: "disabled",
+    scale: "css",
+  });
   await activate(nextButton(page, "Start final challenge"));
   await goal(page, "Cover peak demand with storage");
+  await expect(page.getByTestId("tutorial-target-ring")).toHaveCount(0);
   await buildTutorialProject(page, "Lithium Battery", {
     storage: true,
     size: "19",
@@ -229,6 +240,12 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
   page,
 }) => {
   await startMission(page, 112);
+  const floating = page.viewportSize()!.width >= 1024;
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  if (floating) {
+    await action(page, "Fleet");
+    await expect(fleet).toHaveAttribute("data-map-window-front", "true");
+  }
   await action(page, "Agreements");
   await page
     .getByRole("button", {
@@ -245,8 +262,26 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     .getByRole("button", { name: "Accept agreement", exact: true })
     .click();
   await goal(page, "Open Fleet to see power flows");
+  if (floating) {
+    await expect(fleet).toHaveAttribute("data-map-window-front", "false");
+  } else {
+    await expect(fleet).toHaveCount(0);
+  }
   await action(page, "Fleet");
+  await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   await goal(page, "Run the clock until your grid imports power");
+  await expect(
+    page.getByRole("button", { name: "pause", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("#speedChangeButtons")).toHaveClass(
+    /tutorialTarget/,
+  );
+  await expect(page.getByTestId("tutorial-target-ring")).toBeVisible();
+  await reviewScreenshot(page, {
+    path: test.info().outputPath("tutorial-agreements-clock.png"),
+    animations: "disabled",
+    scale: "css",
+  });
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
   await goal(page, "Find External power on the chart");
   await expect(

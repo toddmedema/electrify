@@ -2,13 +2,23 @@ import { readTutorialSupplyChart } from "./tutorial-fixture";
 import { TUTORIALS } from "../src/data/Scenarios";
 import { reviewScreenshot } from "./review-screenshot";
 import { expectDialogActionsOnOneRow } from "./dialog-layout";
-import { expect, test, type Page, type TestInfo } from "./fixtures";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type TestInfo,
+} from "./fixtures";
 
 async function completeMission(
   page: Page,
   testInfo: TestInfo,
   keepPlaying: boolean,
 ) {
+  // The capstone exercises the simulation and its dialogs with the 3D map at rest.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const activate = (button: Locator) =>
+    testInfo.project.use.hasTouch ? button.tap() : button.press("Enter");
   await page.addInitScript(
     (theme) => {
       window.localStorage.clear();
@@ -62,18 +72,18 @@ async function completeMission(
     page.getByRole("button", { name: "Fleet", exact: true }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "normal speed" }).click();
+  await activate(page.getByRole("button", { name: "normal speed" }));
   await expect(
     page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   // The clock keeps running into the capstone, so stop it while the setup below is arranged
-  await page.getByRole("button", { name: "pause", exact: true }).click();
+  await activate(page.getByRole("button", { name: "pause", exact: true }));
   await expect(
     page.getByText("Solar fades in the evening, so coal picks up the load."),
   ).toBeVisible();
   await expect(page.locator(".tutorialHudHint")).toHaveCount(0);
   await expectObjectiveDocked();
-  await page.screenshot({ path: testInfo.outputPath("capstone.png") });
+  await reviewScreenshot(page, { path: testInfo.outputPath("capstone.png") });
 
   // Remove firm capacity so the first attempt demonstrates consequence feedback and retry. The
   // objective is docked outside the game surface, so the same control remains operable at every
@@ -87,9 +97,9 @@ async function completeMission(
     exact: true,
   });
   if ((await disclosure.getAttribute("aria-expanded")) !== "true")
-    await disclosure.click();
-  await pauseCoal.click();
-  await page.getByRole("button", { name: "fast speed" }).click();
+    await activate(disclosure);
+  await activate(pauseCoal);
+  await activate(page.getByRole("button", { name: "fast speed" }));
   await expect(
     page.getByRole("heading", { name: "Final challenge needs another try" }),
   ).toBeVisible();
@@ -100,7 +110,7 @@ async function completeMission(
     page.getByText("Reach midnight without a blackout"),
   ).toBeVisible();
   if ((await disclosure.getAttribute("aria-expanded")) !== "true")
-    await disclosure.click();
+    await activate(disclosure);
   await expect(pauseCoal).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Resume Coal", exact: true }),
@@ -124,7 +134,7 @@ async function completeMission(
       TUTORIALS.slice(1).map(({ id }) => id),
     );
   }
-  await page.getByRole("button", { name: "fast speed" }).click();
+  await activate(page.getByRole("button", { name: "fast speed" }));
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
   ).toBeVisible();
@@ -180,7 +190,7 @@ async function completeMission(
       fleetBefore,
     );
     await expect(clock).toHaveAttribute("data-game-minute", minuteBefore!);
-    await page.getByRole("button", { name: "normal speed" }).click();
+    await activate(page.getByRole("button", { name: "normal speed" }));
     await expect(
       page.getByRole("button", { name: "pause", exact: true }),
     ).toBeVisible();

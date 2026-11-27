@@ -198,13 +198,17 @@ describe("tutorialGateMiddleware", () => {
       rate: 0.06,
       tutorialStep: challenge - 1,
     });
-    changeTutorialStep(store.dispatch as never, {
+    const dispatch = jest.fn(store.dispatch);
+    changeTutorialStep(dispatch as never, {
       fromStep: challenge - 1,
       toStep: challenge,
       tutorialSteps: steps,
       scenarioId: 3,
       currentCard: "INSIGHTS",
     });
+    const actionTypes = dispatch.mock.calls.map(([action]) => action.type);
+    expect(actionTypes).not.toContain("game/quit");
+    expect(actionTypes).not.toContain("game/start");
     expect(store.getState().game.tutorialStep).toBe(challenge);
     expect(store.getState().game.dollarsPerkWh).toBe(0.06);
     expect(store.getState().game.speed).toBe("PAUSED");
