@@ -190,9 +190,11 @@ and accessible labels for controls and charts.
 
 ## Task guidance skills
 
-Read the matching skill before starting: [scenario copy](.agents/skills/scenario-writing/SKILL.md)
-for scenario, event and story text; [icon design](.agents/skills/icon-design/SKILL.md) for scenario
-and facility icons.
+Read the matching skill before starting.
+
+- [Public-site writing](.agents/skills/public-site-writing/SKILL.md) for website copy.
+- [Scenario writing](.agents/skills/scenario-writing/SKILL.md) for scenario, event, and story text.
+- [Icon design](.agents/skills/icon-design/SKILL.md) for scenario and facility icons.
 
 ## Guardrails
 

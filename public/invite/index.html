@@ -7,17 +7,23 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <title>Electrify multiplayer invitation</title>
-    <link rel="stylesheet" href="/invite/invite.css" />
+    <link rel="stylesheet" href="/legal.css" />
     <script defer src="/invite/invite.js"></script>
   </head>
-  <body>
-    <main>
-      <h1>Electrify multiplayer invitation</h1>
-      <p>Open a current invitation from the host to join their game.</p>
-      <a href="/">Open Electrify</a>
+  <body class="site-message-page">
+    <main class="site-message">
+      <h1>Join a multiplayer game</h1>
+      <p>
+        To join the host’s game, open the full invite link they sent you. Ask
+        them for a new link if yours is out of date.
+      </p>
+      <noscript
+        ><p>Turn on JavaScript before opening the invite link.</p></noscript
+      >
+      <a class="button button--primary" href="/">Open Electrify</a>
     </main>
   </body>
 </html>
