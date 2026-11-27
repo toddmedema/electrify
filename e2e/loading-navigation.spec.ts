@@ -1,3 +1,4 @@
+import { readTutorialSupplyChart } from "./tutorial-fixture";
 import { expect, test } from "./fixtures";
 
 test.use({ serviceWorkers: "block" });
@@ -11,9 +12,7 @@ test("dismissing an achievement notification during loading leaves the next miss
   await page.clock.install();
   await page.goto("/");
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await readTutorialSupplyChart(page);
   await page.getByRole("button", { name: "normal speed", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),
@@ -43,9 +42,11 @@ test("dismissing an achievement notification during loading leaves the next miss
     await page.clock.resume();
     // This objective appears only after loaded() and its delayed restoration both finish.
     await expect(
-      page.getByRole("region", { name: "Step 1 of 10", exact: true }),
+      page.getByRole("region", { name: "Step 1 of 3", exact: true }),
     ).toBeVisible();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Territory map workspace" }),
+    ).toBeVisible();
   } finally {
     release();
     await page.unrouteAll({ behavior: "wait" });

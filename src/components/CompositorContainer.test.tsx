@@ -92,23 +92,16 @@ describe("onTutorialStep", () => {
     );
   });
 
-  // The mirror of the case above: a later step closes the build screen, so stepping back into
-  // the preceding shop step has to reopen it
-  it("navigates back into a screen a later step closed", () => {
-    const facilitiesStep = generators.findIndex(
-      (candidate, index) =>
-        index > 0 &&
-        cardOf(candidate) === STARTING_CARD &&
-        cardOf(generators[index - 1]) === "BUILD_GENERATORS",
-    );
-    expect(facilitiesStep).toBeGreaterThan(0);
+  it("navigates back into a pane a later step closed", () => {
+    const finances = walkthrough("Mission 4: Finances");
+    const capstone = finances.findIndex((candidate) => candidate.capstone);
     const dispatched = step({
-      steps: generators,
-      fromStep: facilitiesStep,
-      toStep: facilitiesStep - 1,
-      currentCard: STARTING_CARD,
+      steps: finances,
+      fromStep: capstone,
+      toStep: capstone - 1,
+      currentCard: "INSIGHTS",
     });
-    expect(navigatedTo(dispatched)).toBe("BUILD_GENERATORS");
+    expect(navigatedTo(dispatched)).toBe("PROGRAMS");
   });
 
   it("doesn't navigate while stepping within a single card", () => {
@@ -118,7 +111,7 @@ describe("onTutorialStep", () => {
           steps: generators,
           fromStep: 1,
           toStep: 2,
-          currentCard: "BUILD_GENERATORS",
+          currentCard: "FACILITIES",
         }),
       ),
     ).toBeUndefined();
@@ -173,7 +166,7 @@ describe("onTutorialStep", () => {
   // Regression test. Tapping 1x is what finishes the step before this capstone, and rebuilding
   // the scenario on entry reloaded the game and paused the clock the player had just started
   it.each(["Mission 1: Electricity", "Mission 4: Finances"])(
-    "keeps %s running into its capstone",
+    "keeps %s progress when entering its capstone",
     (mission) => {
       const steps = walkthrough(mission);
       const capstone = steps.findIndex((candidate) => candidate.capstone);
@@ -191,7 +184,7 @@ describe("onTutorialStep", () => {
           : ["game/delta"],
       );
       expect(navigatedTo(dispatched)).toBe(
-        mission === "Mission 4: Finances" ? "PROGRAMS" : undefined,
+        mission === "Mission 4: Finances" ? "INSIGHTS" : undefined,
       );
       expect(dispatched[dispatched.length - 1].payload).toEqual({
         tutorialStep: capstone,
@@ -231,7 +224,8 @@ describe("walkthrough steps", () => {
     const declared = tutorials.flatMap(
       (scenario) =>
         scenario.tutorialSteps?.flatMap((tutorialStep) =>
-          tutorialStep.advanceOnAction
+          tutorialStep.advanceOnAction &&
+          typeof tutorialStep.advanceOnAction !== "function"
             ? ([] as string[]).concat(tutorialStep.advanceOnAction)
             : [],
         ) || [],
@@ -300,9 +294,7 @@ it.each(TUTORIALS)("keeps the completed $name setup playable", (scenario) => {
       speed: "PAUSED",
     }),
   );
-  store.dispatch(
-    tutorialCompleteDialog({ scenarioId: scenario.id, title: "Complete" }),
-  );
+  store.dispatch(tutorialCompleteDialog({ title: "Complete" }));
   const before = store.getState().game;
   const completion = store.getState().ui.dialog;
   expect(completion.tertiaryLabel).toBe("Keep playing");

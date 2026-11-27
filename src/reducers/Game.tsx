@@ -50,6 +50,7 @@ import {
   type CombinedUtilityDemandProfile,
 } from "../helpers/CombinedUtilityDemand";
 import {
+  isTutorialMapGame,
   isUtilityExpansionGame,
   ownedUtilityConnection,
 } from "../helpers/ExpansionContext";
@@ -2113,7 +2114,8 @@ export const gameSlice = createSlice({
         );
       }
 
-      if (isUtilityExpansionGame(state)) {
+      const utilityExpansion = isUtilityExpansionGame(state);
+      if (utilityExpansion || isTutorialMapGame(state)) {
         state.territoryNetwork = {
           version: 3,
           landPurchases: [],
@@ -2126,6 +2128,8 @@ export const gameSlice = createSlice({
         });
         if (!assignTerritoryTiles(state))
           throw new Error("Invalid starting tile placement");
+      }
+      if (utilityExpansion) {
         state.transmission!.inheritedAgreementTerms = 3;
         state.utilityExpansion = {
           sellerFleet: "seeded",
@@ -4320,9 +4324,7 @@ export function tutorialCompleteDialog({
   title,
   message,
   nextTutorial,
-  scenarioId,
 }: {
-  scenarioId: number;
   title: string;
   message?: string;
   nextTutorial?: ScenarioType;
@@ -4350,8 +4352,6 @@ export function tutorialCompleteDialog({
     // Keep completion explicit; practice is available through Keep playing.
     notCancellable: true,
     tutorialComplete: true,
-    offerInstall:
-      TUTORIALS.findIndex((tutorial) => tutorial.id === scenarioId) >= 2,
     tertiaryLabel: "Keep playing",
     tertiaryAction: () => getStore().dispatch(dialogClose()),
     secondaryLabel: "Main menu",
@@ -5185,7 +5185,6 @@ export function* tickStatePhases(
             setTimeout(() => {
               return getStore().dispatch(
                 tutorialCompleteDialog({
-                  scenarioId: scoredScenarioId,
                   title: endTitle || "Mission complete!",
                   message: endMessage,
                   nextTutorial,

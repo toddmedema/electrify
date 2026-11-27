@@ -500,7 +500,7 @@ it("does not manufacture named hydro or geothermal sites from visual terrain", (
   ).toBe(false);
 });
 
-it("keeps inherited acquisition prices and all non-116 scenarios neutral", () => {
+it("keeps inherited acquisition prices and scenarios without a map neutral", () => {
   const game = fixture();
   const network = acquisitionAssets(game, "ridge-electric")!;
   const withoutNetwork = acquisitionAssets(
@@ -510,7 +510,7 @@ it("keeps inherited acquisition prices and all non-116 scenarios neutral", () =>
   expect(network.map((facility) => facility.buildCost)).toEqual(
     withoutNetwork.map((facility) => facility.buildCost),
   );
-  for (const scenarioId of [0, 100, 106, 115]) {
+  for (const scenarioId of [100, 106, 115]) {
     const other = { ...game, scenarioId };
     expect(
       GENERATORS(

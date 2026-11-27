@@ -4,7 +4,6 @@ import { Button, Typography } from "@mui/material";
 import * as React from "react";
 import { TutorialStepType, isGatedStep } from "../../Types";
 import { useControllerInput } from "../../desktop/InputPresentation";
-import { TOOL_SHORTCUTS } from "./KeyboardShortcuts";
 import { tutorialInputText } from "./TutorialPrompt";
 
 export interface TutorialHudProps {
@@ -26,7 +25,7 @@ function resolveStep(step: TutorialStepType, desktop: boolean) {
   return {
     action: override?.action || step.action,
     content: override?.content || step.content,
-    target: override?.target || step.target,
+    target: override?.target ?? step.target,
   };
 }
 
@@ -317,11 +316,7 @@ export default function TutorialHud({
     content,
     target,
   } = resolveStep(step, desktop);
-  const shortcut =
-    !controllerInput && target === ".button-buildFacility"
-      ? ` (${TOOL_SHORTCUTS.BUILD_GENERATORS.join(", ")})`
-      : "";
-  const action = tutorialInputText(resolvedAction, controllerInput) + shortcut;
+  const action = tutorialInputText(resolvedAction, controllerInput);
   // Next is the step's main button only when it's the only way forward. A step that also
   // advances on an in-game deed keeps it as a quiet fallback, so the ringed control is the one
   // thing on screen asking to be tapped
@@ -371,7 +366,7 @@ export default function TutorialHud({
   }, [step, advanceOnClick]);
 
   React.useEffect(() => {
-    if (!target || step.capstone) {
+    if (!target) {
       return;
     }
     try {

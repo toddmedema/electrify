@@ -6,7 +6,6 @@ import {
   TICKS_PER_MONTH,
   YEARS_PER_TICK,
 } from "../Constants";
-import { getScenario } from "../data/Scenarios";
 import { facilityExpansionQuote } from "../helpers/FacilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
 import {
@@ -249,31 +248,6 @@ describe("live tick working state", () => {
       ).not.toHaveProperty("upgradeInProgress");
     },
   );
-
-  it("isolates completion of the tutorial intertie exercise and its forecast", () => {
-    const state = createGame({ scenarioId: 112, seed: 61 });
-    state.tutorialStep = getScenario(112)!.tutorialSteps!.findIndex(
-      (step) => step.phase === "INTERTIE_STRESS_SUPPLY",
-    );
-    state.tutorialIntertieStress = {
-      active: true,
-      startsMinute: 0,
-      suppliedTicks: TICKS_PER_MONTH - 1,
-      completed: false,
-    };
-    state.timeline[1].demandW = 0;
-    const before = mutableCopy(state);
-    const expected = mutableCopy(state);
-    tickState(expected);
-    freeze(state, true);
-
-    const actual = draftTick(state);
-
-    expectSameState(actual, expected);
-    expectSameState(state, before);
-    expect(actual.tutorialIntertieStress?.completed).toBe(true);
-    expect(actual.speed).toBe("PAUSED");
-  });
 });
 
 describe("live presentation tick batches", () => {

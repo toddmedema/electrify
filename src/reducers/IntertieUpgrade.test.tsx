@@ -459,7 +459,7 @@ describe("building intertie tiers directly", () => {
   });
 
   it("round trips a directly built tier through saves and rejects an impossible tier", () => {
-    const before = createGame({ scenarioId: 112, seed: 249007 });
+    const before = createGame({ scenarioId: 100, seed: 249007 });
     const state = cloneDeep(
       gameReducer(
         before,
@@ -499,7 +499,7 @@ describe("intertie operating controls", () => {
   it.each([false, true])(
     "cancels construction and settles financing (%s)",
     (financed) => {
-      const initial = createGame({ scenarioId: 112, seed: 249007 });
+      const initial = createGame({ scenarioId: 100, seed: 249007 });
       const before = getTimeFromTimeline(
         initial.date.minute,
         initial.timeline,
