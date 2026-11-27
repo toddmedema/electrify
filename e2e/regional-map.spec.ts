@@ -147,6 +147,16 @@ test("the regional desktop rail selects a capacity for the real construction rev
     .click();
   await expect(purchase).toHaveCount(0);
   await expect(build).toBeVisible();
+
+  const buildEntry = rail.getByRole("button", { name: "Build", exact: true });
+  await build.getByRole("button", { name: "Close Build", exact: true }).click();
+  await page.keyboard.press("Shift+s");
+  const storage = build.getByRole("tab", { name: "Storage", exact: true });
+  await expect(storage).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Escape");
+  await expect(buildEntry).toBeFocused();
+  await page.keyboard.press("b");
+  await expect(storage).toHaveAttribute("aria-selected", "true");
 });
 
 test("regional fleet and map details remain reachable without WebGL2", async ({
