@@ -54,9 +54,11 @@ function effect(
   return { mesh, position, motion, hideWhenInactive: true, castsShadow: false };
 }
 
-/** Small separated panes stay legible on both sunlit and shaded city facades. */
+type CityPane = [Vec3, Vec3, Vec3, Vec3];
+type AddCityWindow = (...corners: CityPane) => void;
+
 function cityWindows(
-  mesh: MeshBuilder,
+  window: AddCityWindow,
   x: number,
   y: number,
   z: number,
@@ -70,35 +72,40 @@ function cityWindows(
     right = x + width / 2 + 0.001;
   for (const offset of [-width / 4, width / 4]) {
     const left = x + offset - pane / 2;
-    mesh.quad(
+    window(
       [left, low, front],
       [left + pane, low, front],
       [left + pane, high, front],
       [left, high, front],
-      P.mint,
     );
   }
   for (const offset of [-depth / 4, depth / 4]) {
     const back = z + offset - pane / 2;
-    mesh.quad(
+    window(
       [right, low, back + pane],
       [right, low, back],
       [right, high, back],
       [right, high, back + pane],
-      P.mint,
     );
   }
 }
 
-function townhouse(mesh: MeshBuilder, x: number, z: number, roof: RGB): void {
+function townhouse(
+  mesh: MeshBuilder,
+  window: AddCityWindow,
+  x: number,
+  z: number,
+  roof: RGB,
+): void {
   mesh.box([x, 0.095, z], [0.1, 0.118, 0.11], P.cream);
   gable(mesh, [x, 0.154, z], [0.116, 0.045, 0.126], roof);
-  cityWindows(mesh, x, 0.117, z, 0.1, 0.11);
+  cityWindows(window, x, 0.117, z, 0.1, 0.11);
   mesh.box([x, 0.065, z + 0.057], [0.022, 0.058, 0.004], P.timber);
 }
 
 function cityBlock(
   mesh: MeshBuilder,
+  window: AddCityWindow,
   x: number,
   z: number,
   width: number,
@@ -137,7 +144,7 @@ function cityBlock(
   for (let floor = 0; floor < floors; floor++) {
     const inset = setback && floor >= lowerFloors ? 0.032 : 0;
     cityWindows(
-      mesh,
+      window,
       x,
       bottom + 0.041 + floor * floorHeight,
       z,
@@ -147,7 +154,12 @@ function cityBlock(
   }
 }
 
-function workshop(mesh: MeshBuilder, x: number, z: number): void {
+function workshop(
+  mesh: MeshBuilder,
+  window: AddCityWindow,
+  x: number,
+  z: number,
+): void {
   mesh
     .box([x, 0.018, z], [0.154, 0.036, 0.133], P.steel)
     .box([x, 0.079, z], [0.136, 0.086, 0.099], P.cream)
@@ -186,7 +198,13 @@ function workshop(mesh: MeshBuilder, x: number, z: number): void {
         P.steel,
       );
   }
-  mesh.box([x - 0.032, 0.101, z + 0.05], [0.035, 0.014, 0.003], P.mint);
+  const front = z + 0.0515;
+  window(
+    [x - 0.0495, 0.094, front],
+    [x - 0.0145, 0.094, front],
+    [x - 0.0145, 0.108, front],
+    [x - 0.0495, 0.108, front],
+  );
 }
 
 function city(
@@ -195,6 +213,10 @@ function city(
   key: string,
 ): MapModel {
   const body = new MeshBuilder();
+  const panes: CityPane[] = [];
+  const window: AddCityWindow = (...corners) => {
+    panes.push(corners);
+  };
   // A shared street and pocket park tie the three skylines into one city family.
   body
     .box([0, 0.018, 0], [0.64, 0.036, 0.46], P.steel)
@@ -212,39 +234,49 @@ function city(
       .cylinder([x, 0.073, z], 0.032, 0.018, 0.048, P.forestLight, 5);
 
   if (size === "small") {
-    townhouse(body, -0.225, -0.105, P.forest);
-    townhouse(body, -0.075, -0.105, P.steelShade);
-    townhouse(body, 0.035, -0.105, P.timber);
-    townhouse(body, 0.205, 0.16, P.forest);
-    cityBlock(body, -0.17, 0.155, 0.13, 0.11, 3, P.steelShade);
+    townhouse(body, window, -0.225, -0.105, P.forest);
+    townhouse(body, window, -0.075, -0.105, P.steelShade);
+    townhouse(body, window, 0.035, -0.105, P.timber);
+    townhouse(body, window, 0.205, 0.16, P.forest);
+    cityBlock(body, window, -0.17, 0.155, 0.13, 0.11, 3, P.steelShade);
   } else if (size === "medium") {
-    cityBlock(body, -0.215, -0.12, 0.13, 0.14, 4, P.forest);
-    cityBlock(body, -0.035, -0.12, 0.15, 0.14, 5, P.steelShade);
-    cityBlock(body, -0.025, 0.16, 0.15, 0.11, 3, P.steelShade);
-    townhouse(body, -0.225, 0.16, P.timber);
-    townhouse(body, 0.205, 0.16, P.forest);
+    cityBlock(body, window, -0.215, -0.12, 0.13, 0.14, 4, P.forest);
+    cityBlock(body, window, -0.035, -0.12, 0.15, 0.14, 5, P.steelShade);
+    cityBlock(body, window, -0.025, 0.16, 0.15, 0.11, 3, P.steelShade);
+    townhouse(body, window, -0.225, 0.16, P.timber);
+    townhouse(body, window, 0.205, 0.16, P.forest);
   } else {
-    cityBlock(body, -0.215, -0.125, 0.14, 0.15, 6, P.forest);
-    cityBlock(body, -0.025, -0.125, 0.16, 0.16, 9, P.steelShade, true);
-    cityBlock(body, -0.085, 0.16, 0.13, 0.11, 4, P.steelShade);
-    cityBlock(body, 0.08, 0.16, 0.13, 0.11, 6, P.forest);
-    townhouse(body, -0.24, 0.16, P.timber);
-    townhouse(body, 0.24, 0.16, P.forest);
+    cityBlock(body, window, -0.215, -0.125, 0.14, 0.15, 6, P.forest);
+    cityBlock(body, window, -0.025, -0.125, 0.16, 0.16, 9, P.steelShade, true);
+    cityBlock(body, window, -0.085, 0.16, 0.13, 0.11, 4, P.steelShade);
+    cityBlock(body, window, 0.08, 0.16, 0.13, 0.11, 6, P.forest);
+    townhouse(body, window, -0.24, 0.16, P.timber);
+    townhouse(body, window, 0.24, 0.16, P.forest);
   }
   // Each sector has a separate lot. Adding a block never moves an existing building or terminal.
   if (growth.includes("Residential")) {
     body.box([-0.334, 0.018, 0.025], [0.136, 0.036, 0.147], P.steel);
-    townhouse(body, -0.334, 0.025, P.forest);
+    townhouse(body, window, -0.334, 0.025, P.forest);
   }
   if (growth.includes("Commercial")) {
     const shopX = 0.356,
       shopZ = 0.091;
     body.box([shopX, 0.018, shopZ], [0.134, 0.036, 0.134], P.steel);
-    cityBlock(body, shopX, shopZ, 0.094, 0.104, 2, P.timber);
+    cityBlock(body, window, shopX, shopZ, 0.094, 0.104, 2, P.timber);
     body.box([shopX, 0.104, shopZ + 0.057], [0.094, 0.025, 0.022], P.forest);
   }
-  if (growth.includes("Industrial")) workshop(body, 0.198, 0.297);
-  return model(key, body, switchgear(body, 0.27));
+  if (growth.includes("Industrial")) workshop(body, window, 0.198, 0.297);
+
+  // Rank the actual panes across the skyline so lit windows fill from street level up.
+  const glazing = new MeshBuilder();
+  panes.sort(([a], [b]) => a[1] - b[1]);
+  panes.forEach(([a, b, c, d], i) => {
+    // The city-window shader reads the red channel as the pane's service threshold.
+    glazing.quad(a, b, c, d, [(i + 0.5) / panes.length, 0, 0]);
+  });
+  return model(key, body, switchgear(body, 0.27), [
+    { mesh: glazing.build(), material: "city-window", castsShadow: false },
+  ]);
 }
 
 const towerConstructionStages = 16;

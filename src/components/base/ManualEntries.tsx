@@ -3,6 +3,7 @@ import { useCurrency, useMoney } from "./CurrencyContext";
 import * as React from "react";
 import KeyboardShortcuts, { SHORTCUTS_SEARCH_TEXT } from "./KeyboardShortcuts";
 import ConceptLegend from "./ConceptLegend";
+import { GameNavigationLabel } from "./GameNavigation";
 import EntryLink from "./ManualEntryLink";
 import { useUnits } from "./UnitsContext";
 import {
@@ -229,7 +230,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <EntryLink to={MANUAL_ENTRY.CUSTOMER_DEMAND}>
             use less electricity
           </EntryLink>
-          , or use it at a better time. Set these in Programs.
+          , or use it at a better time. Set these in{" "}
+          <GameNavigationLabel destination="PROGRAMS">
+            Programs
+          </GameNavigationLabel>
+          .
         </p>
         <p>
           <strong>Efficiency and rooftop solar rebates:</strong> One-time,
@@ -307,23 +312,36 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           reliable, affordable, clean grid.
         </p>
         <p>
-          <strong>Facilities:</strong> Build and manage plants.{" "}
+          Build plants in{" "}
+          <GameNavigationLabel destination="BUILD_GENERATORS">
+            Build
+          </GameNavigationLabel>
+          . Manage them in the facilities list, which opens from{" "}
+          <GameNavigationLabel destination="FLEET">Fleet</GameNavigationLabel>{" "}
+          in map games.{" "}
           <EntryLink to={MANUAL_ENTRY.PRIORITIZING_GENERATORS}>
             Generators higher in the list run first
           </EntryLink>
           .
         </p>
         <p>
-          <strong>Programs:</strong> Set{" "}
-          <EntryLink to={MANUAL_ENTRY.PRICING}>rates</EntryLink> and{" "}
+          Set <EntryLink to={MANUAL_ENTRY.PRICING}>rates</EntryLink> and{" "}
           <EntryLink to={MANUAL_ENTRY.CUSTOMER_PROGRAMS}>
             customer programs
-          </EntryLink>
+          </EntryLink>{" "}
+          in{" "}
+          <GameNavigationLabel destination="PROGRAMS">
+            Programs
+          </GameNavigationLabel>
           .
         </p>
         <p>
-          <strong>Insights:</strong> Track finances and{" "}
-          <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink>.
+          Track finances and{" "}
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>forecasts</EntryLink> in{" "}
+          <GameNavigationLabel destination="INSIGHTS">
+            Insights
+          </GameNavigationLabel>
+          .
         </p>
         <p>
           To fit decades into one sitting, one simulated day stands for a month.
@@ -336,12 +354,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     group: "Gameplay",
     keywords:
       "icons glyphs legend key money supply demand blackout customers generator storage build buy reorder pause play time construction finances forecast rate pricing fuel weather severe storm hail cold danger goal",
-    entry: (
-      <div>
-        <p>These symbols mean the same thing everywhere in the game.</p>
-        <ConceptLegend />
-      </div>
-    ),
+    entry: <ConceptLegend />,
   },
   {
     title: MANUAL_ENTRY.BASELOAD_VS_PEAKER,
@@ -447,7 +460,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           }}
         />
         <p>
-          The build screen uses it to estimate{" "}
+          <GameNavigationLabel destination="BUILD_GENERATORS">
+            Build
+          </GameNavigationLabel>{" "}
+          uses it to estimate{" "}
           <EntryLink to={MANUAL_ENTRY.TOTAL_COST_OF_ENERGY}>
             cost per MWh
           </EntryLink>
@@ -620,9 +636,14 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Your total includes your generation and the electricity you buy, shown
           separately in{" "}
-          <EntryLink to={MANUAL_ENTRY.FORECASTS}>Insights</EntryLink>. Each
-          neighbor's estimate is an annual average, listed in{" "}
-          <EntryLink to={MANUAL_ENTRY.INTERTIES}>Interties</EntryLink>.
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>
+            <GameNavigationLabel destination="INSIGHTS">
+              Insights
+            </GameNavigationLabel>
+          </EntryLink>
+          . The estimate on each{" "}
+          <EntryLink to={MANUAL_ENTRY.INTERTIES}>intertie</EntryLink> is an
+          annual average.
         </p>
         <p>
           Local figures count CO2 from burning fuel, including biomass, with no
@@ -663,10 +684,13 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Insights estimates what happens if you change nothing. Pause or
-          reorder plants and the forecasts update, so you can test an idea
-          before running the clock. Choose a preset, or select Layers to compare
-          charts over the same dates.
+          <GameNavigationLabel destination="INSIGHTS">
+            Insights
+          </GameNavigationLabel>{" "}
+          estimates what happens if you change nothing. Pause or reorder plants
+          and the forecasts update, so you can test an idea before running the
+          clock. Choose a preset, or select Layers to compare charts over the
+          same dates.
         </p>
       </div>
     ),
@@ -857,7 +881,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>Use these keys while a scenario is running:</p>
-        <KeyboardShortcuts />
+        <KeyboardShortcuts showNavigationIcons />
       </div>
     ),
   },
@@ -869,10 +893,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Move a plant higher in Facilities to run it first. This is the{" "}
-          <strong>dispatch order</strong>. Real markets usually run the cheapest
-          plants first, and the last plant needed often sets the price for
-          everyone. In Electrify you choose the order.
+          Move a plant higher in the facilities list to run it first. This is
+          the <strong>dispatch order</strong>. Real markets usually run the
+          cheapest plants first, and the last plant needed often sets the price
+          for everyone. In Electrify you choose the order.
         </p>
         <p>
           Lower plants cover the demand that's left and start and stop
@@ -906,7 +930,10 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Ramp rate is how quickly a generator changes output. The build screen
+          Ramp rate is how quickly a generator changes output.{" "}
+          <GameNavigationLabel destination="BUILD_GENERATORS">
+            Build
+          </GameNavigationLabel>{" "}
           estimates its time from zero to full power.{" "}
           <EntryLink to={MANUAL_ENTRY.ROUND_TRIP_EFFICIENCY}>
             Batteries
@@ -987,8 +1014,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           Your rate is the price customers pay per{" "}
           <EntryLink to={MANUAL_ENTRY.POWER_AND_ENERGY}>kWh</EntryLink>, the
-          number on a power bill. Set it in Programs. Revenue is that price
-          times electricity delivered, adjusted for{" "}
+          number on a power bill. Set it in{" "}
+          <GameNavigationLabel destination="PROGRAMS">
+            Programs
+          </GameNavigationLabel>
+          . Revenue is that price times electricity delivered, adjusted for{" "}
           <EntryLink to={MANUAL_ENTRY.CUSTOMER_PROGRAMS}>
             time-of-use tariffs and curtailment credits
           </EntryLink>
@@ -1005,15 +1035,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
         <p>
           The market rate rises with{" "}
           <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>inflation</EntryLink>.
-          Enable Follow inflation to raise your own rate each January too.
-          Choosing a rate by hand turns it off.
         </p>
         <p>
           <strong>Publicly owned:</strong> Customers can't switch utilities.
           Your <EntryLink to={MANUAL_ENTRY.SCORE}>score</EntryLink> rewards a
           lifetime average rate below the scenario's target and penalizes one
-          above it, but you still need revenue to cover costs. By default, your
-          rate follows inflation.
+          above it, but you still need revenue to cover costs.
         </p>
       </div>
     ),
@@ -1043,8 +1070,12 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             storage losses
           </EntryLink>
           . Holding 80 MWh does not let it supply 80 MW.{" "}
-          <EntryLink to={MANUAL_ENTRY.FORECASTS}>Insights</EntryLink> charts
-          both.
+          <EntryLink to={MANUAL_ENTRY.FORECASTS}>
+            <GameNavigationLabel destination="INSIGHTS">
+              Insights
+            </GameNavigationLabel>
+          </EntryLink>{" "}
+          charts both.
         </p>
         <Figure
           src="/images/manual-power-energy.webp"
@@ -1223,8 +1254,11 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     entry: (
       <div>
         <p>
-          Your score tracks how you do as CEO. Check <strong>Goals</strong> for
-          your scenario-specific targets.
+          Your score tracks how you do as CEO. Check <strong>Goals</strong> in{" "}
+          <GameNavigationLabel destination="SCENARIO">
+            Scenario
+          </GameNavigationLabel>{" "}
+          for your targets.
         </p>
         <p>
           You fail if you go bankrupt or serve less than 90% of demand three
@@ -1235,10 +1269,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           The tables below show how points add up across Service, Financial
           performance and Environmental impact, including{" "}
           <EntryLink to={MANUAL_ENTRY.EMISSIONS}>emissions</EntryLink>.
-        </p>
-        <p>
-          Only completed missions earn leaderboard ranks and personal bests.
-          Sign in to submit one.
         </p>
         <p>Investor-owned points:</p>
         <table className="points">
@@ -1506,12 +1536,7 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           <EntryLink to={MANUAL_ENTRY.CARBON_FEE}>carbon fees</EntryLink>. It
           lets you compare a solar farm's upfront cost with a{" "}
           <EntryLink to={MANUAL_ENTRY.BASELOAD_VS_PEAKER}>gas peaker</EntryLink>
-          's ongoing fuel bills. Your borrowing rate weighs future costs against
-          money spent today, but actual{" "}
-          <EntryLink to={MANUAL_ENTRY.INTEREST_RATES}>
-            loan payments
-          </EntryLink>{" "}
-          are separate.
+          's ongoing fuel bills.
         </p>
         <p>
           These costs change over time. The global average cost of power from
@@ -1538,11 +1563,6 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
             Operating costs
           </EntryLink>{" "}
           for fixed and variable O&amp;M.
-        </p>
-        <p>
-          A plant's lifetime revenue is its share of electricity sales,
-          including exports. Charging storage creates no extra sale, and imports
-          earn local plants nothing.
         </p>
       </div>
     ),

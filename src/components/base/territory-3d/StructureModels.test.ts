@@ -342,9 +342,15 @@ it("grows one mixed city family through denser windows and a taller skyline", ()
   const cities = (["small", "medium", "large"] as const).map((size) =>
     getStructureModel(`city-${size}`),
   );
-  for (const city of cities) {
-    const mesh = city.parts[0].mesh;
-    expect(city.parts).toHaveLength(1);
+  const panes = cities.map((city) => {
+    const [body, glazing] = city.parts;
+    const { mesh } = body;
+    expect(city.parts).toHaveLength(2);
+    expect(glazing).toMatchObject({
+      material: "city-window",
+      castsShadow: false,
+    });
+    expect(glazing.motion).toBeUndefined();
     expect(coloredVertices(mesh, PALETTE.grass).length).toBeGreaterThan(0);
     expect(coloredVertices(mesh, PALETTE.forestLight).length).toBeGreaterThan(
       0,
@@ -366,16 +372,44 @@ it("grows one mixed city family through denser windows and a taller skyline", ()
         (normal) => normal > 0.5 && normal < 0.9,
       ),
     ).toBe(true);
-  }
+    return glazing.mesh.positions.length / 18;
+  });
   for (let i = 1; i < cities.length; i++) {
     expect(cities[i].height).toBeGreaterThan(cities[i - 1].height + 0.08);
-    expect(
-      coloredVertices(cities[i].parts[0].mesh, PALETTE.mint).length,
-    ).toBeGreaterThan(
-      coloredVertices(cities[i - 1].parts[0].mesh, PALETTE.mint).length,
-    );
+    expect(panes[i]).toBeGreaterThan(panes[i - 1]);
   }
 });
+
+it.each(["small", "medium", "large"] as const)(
+  "lights the %s city from its lowest panes upward",
+  (size) => {
+    for (const growth of [
+      [],
+      ["Residential", "Commercial", "Industrial"],
+    ] as const) {
+      const city = getStructureModel(`city-${size}`, growth);
+      const { positions, colors } = city.parts.find(
+        ({ material }) => material === "city-window",
+      )!.mesh;
+      const panes = [];
+      // Each pane is two triangles with three coordinates per vertex.
+      for (let i = 0; i < positions.length; i += 18)
+        panes.push({ height: positions[i + 1], threshold: colors[i] });
+      panes.sort((a, b) => a.threshold - b.threshold);
+
+      for (let i = 1; i < panes.length; i++)
+        expect(panes[i].height).toBeGreaterThanOrEqual(panes[i - 1].height);
+      expect(panes[0].threshold).toBeGreaterThan(0);
+      expect(panes[panes.length - 1].threshold).toBeLessThan(1);
+      for (const service of [0.25, 0.5, 0.75]) {
+        const lit = panes.filter(
+          ({ threshold }) => threshold <= service,
+        ).length;
+        expect(Math.abs(lit - service * panes.length)).toBeLessThanOrEqual(0.5);
+      }
+    }
+  },
+);
 
 it.each(["wind", "offshore-wind"] as const)(
   "gives %s a thick root, broad inner chord and swept, tapered airfoil sections",
@@ -593,7 +627,12 @@ it("authors facade glazing separately without turning panels, rotors or cabinets
       expect(part.hideWhenInactive).toBeUndefined();
       expect(part.castsShadow).toBe(false);
     }
-    const quiet = kind.startsWith("city-") || kind === "tower";
-    expect(parts.every((part) => part.material === undefined)).toBe(quiet);
+    const city = kind.startsWith("city-");
+    expect(
+      parts.filter((part) => part.material === "city-window"),
+    ).toHaveLength(city ? 1 : 0);
+    expect(parts[0].material).toBe(
+      city || kind === "tower" ? undefined : "facility-surface",
+    );
   }
 });

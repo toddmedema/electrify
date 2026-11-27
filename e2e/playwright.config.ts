@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import path from "node:path";
 import { browserViewports, focusBrowserProject } from "./browser-projects";
 import { journeyTrace } from "./journey-trace";
 
@@ -8,6 +9,11 @@ const port = process.env.E2E_PORT || "3100";
 // Reuse an explicitly hosted production build for real frame measurements. The default
 // remains the development server so the normal UI suite still gets its e2e environment.
 const baseURL = process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`;
+
+export const expectedErrorReporter = path.resolve(
+  __dirname,
+  "expected-error.reporter.ts",
+);
 
 export default defineConfig({
   testDir: ".",
@@ -23,7 +29,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: process.env.CI ? "github" : "list",
+  reporter: [[expectedErrorReporter], [process.env.CI ? "github" : "list"]],
   use: {
     launchOptions:
       require("../scripts/ci/browser-launch").browserLaunchOptions(),

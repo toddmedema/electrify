@@ -70,7 +70,9 @@ const SORTED_ENTRIES = [...MANUAL_ENTRIES].sort((a, b) => {
 const SEARCH_TEXT: Record<string, string> = {};
 SORTED_ENTRIES.forEach((entry: ManualEntryType) => {
   SEARCH_TEXT[entry.title] =
-    `${entry.title} ${entry.keywords || ""} ${manualEntryText(entry.entry)} ${entry.sections?.map((section) => `${section.title} ${manualEntryText(section.entry)}`).join(" ") || ""}`.toLowerCase();
+    `${entry.title} ${entry.keywords || ""} ${manualEntryText(entry.entry)} ${entry.sections?.map((section) => `${section.title} ${manualEntryText(section.entry)}`).join(" ") || ""}`
+      .replace(/\s+/g, " ")
+      .toLowerCase();
 });
 
 // The manual unmounts whenever the player leaves it, so "where was I" has to live outside the
