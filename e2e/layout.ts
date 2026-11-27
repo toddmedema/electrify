@@ -377,6 +377,24 @@ export async function openPane(
   return true;
 }
 
+export async function openCustomSetup(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      "plays",
+      JSON.stringify({
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
+      }),
+    );
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "View Custom Game details" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Custom setup" }),
+  ).toBeVisible();
+}
+
 /** Open the saved-game library from the menu and wait for its screen. */
 export async function openSavedGames(page: Page) {
   await page.getByRole("button", { name: "menu", exact: true }).click();
