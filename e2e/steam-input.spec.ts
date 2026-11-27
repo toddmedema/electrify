@@ -725,6 +725,9 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   }
   await expect(build).toHaveCount(0);
 
+  await select(page, page.getByRole("button", { name: "Fleet", exact: true }));
+  await input(page, "confirm");
+
   // Confirm lifts a reorder handle; directions must move the row rather than leave it.
   const rows = page.locator(".facilities:visible .facilityRow");
   const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
