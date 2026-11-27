@@ -9,6 +9,7 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from "../multiplayer/WorkerProtocol";
+import { newMatchSpec } from "../multiplayer/WorkerProtocol";
 import {
   CONTROL_HEARTBEAT_TIMEOUT_MS,
   SAVE_TIMEOUT_MS,
@@ -156,7 +157,7 @@ export class CouchCoordinator {
     this.post({
       kind: "create",
       local: true,
-      spec,
+      spec: newMatchSpec(spec),
       seats: this.roster,
       matchId,
       epoch,

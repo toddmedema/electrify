@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { openFleet } from "./layout";
 
 test("one online visit stores everything a styled offline launch needs", async ({
   page,
@@ -168,8 +169,9 @@ test("installed play preloads official weather and enables custom cities after s
   await expect(available).toBeEnabled();
   await available.click();
   await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const fleet = await openFleet(page);
   await expect(
-    page.getByRole("list", { name: "Plants and storage" }),
+    fleet.getByRole("list", { name: "Plants and storage" }),
   ).toBeVisible();
 
   await page.goto("/?dataCenters=1");

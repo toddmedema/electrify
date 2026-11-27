@@ -71,6 +71,8 @@ export function sameBuildQuote<Props extends { game: GameType }>(
         before.speed === after.speed &&
         before.inGame === after.inGame &&
         before.tutorialStep === after.tutorialStep &&
+        before.multiplayer?.territorial?.claims.length ===
+          after.multiplayer?.territorial?.claims.length &&
         before.interestRate === after.interestRate &&
         (before.runIdentity ?? before.location) ===
           (after.runIdentity ?? after.location) &&

@@ -256,8 +256,9 @@ export async function readTerritoryMapCamera(viewport: Locator) {
 export async function selectTerritoryMapTile(
   page: Page,
   tile: { id: string; q: number; r: number },
+  map?: Locator,
 ): Promise<Locator> {
-  const map = await returnToTerritoryMap(page);
+  map ??= await returnToTerritoryMap(page);
   const target = map.locator(`[data-map-target="${tile.id}"]`);
   const viewport = map.locator(".territoryMapViewport");
   const point = hexCenter(tile);
@@ -287,9 +288,14 @@ export async function selectTerritoryMapTile(
   return target;
 }
 
-/** Open the map catalogue through its public entry point at the current effective width. */
-export async function openMapProjectCatalogue(page: Page): Promise<Locator> {
-  const map = await returnToTerritoryMap(page);
+/** Open the map catalogue through its public entry point at the current effective width.
+ * Use an already open map when the journey has just reached it.
+ */
+export async function openMapProjectCatalogue(
+  page: Page,
+  openMap?: Locator,
+): Promise<Locator> {
+  const map = openMap ?? (await returnToTerritoryMap(page));
   const rail = map.getByRole("complementary", {
     name: "Build facilities",
     exact: true,

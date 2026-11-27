@@ -23,6 +23,23 @@ export function isUtilityExpansionScenario(
   );
 }
 
+const AGREEMENTS_TUTORIAL_ID = 112;
+const MAP_TUTORIAL_IDS: ReadonlySet<number> = new Set([
+  0,
+  1,
+  2,
+  4,
+  3,
+  5,
+  AGREEMENTS_TUTORIAL_ID,
+]);
+
+export function isTutorialMapGame(
+  game: Pick<GameType, "scenarioId" | "customScenario">,
+): boolean {
+  return !game.customScenario && MAP_TUTORIAL_IDS.has(game.scenarioId);
+}
+
 /** Mod runtime snapshots are validated by their owner before reaching the simulation. */
 export function isUtilityExpansionGame(
   game: Pick<GameType, "scenarioId" | "customScenario">,
@@ -30,7 +47,8 @@ export function isUtilityExpansionGame(
   return game.customScenario
     ? game.scenarioId === game.customScenario.id &&
         isUtilityExpansionScenario(game.customScenario)
-    : game.scenarioId === EXPANSION_SCENARIO_ID;
+    : game.scenarioId === EXPANSION_SCENARIO_ID ||
+        game.scenarioId === AGREEMENTS_TUTORIAL_ID;
 }
 
 export function validUtilityExpansionParameters(

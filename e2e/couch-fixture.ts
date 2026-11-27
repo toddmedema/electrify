@@ -1,6 +1,12 @@
 import { BrowserContext, Frame, Page, errors, expect } from "@playwright/test";
 import type { DesktopInputAction, DesktopInputFrame } from "../src/Desktop";
-import type { World } from "../src/multiplayer/Types";
+import type { RoomView, World } from "../src/multiplayer/Types";
+import type { SeatEvent } from "../src/couch/Protocol";
+
+type CouchFixtureWindow = Window & { observedCouchView?: RoomView };
+
+export const readCouchRoomView = (actor: Page | Frame) =>
+  actor.evaluate(() => (window as CouchFixtureWindow).observedCouchView);
 
 type Device = DesktopInputFrame & { id: string };
 const defaultDevices: Device[] = ["101", "202"].map((id) => ({
@@ -734,7 +740,9 @@ export async function createCouchFixture(
     const callbacks = new Set<(message: unknown) => void>();
     const pending: unknown[] = [];
     if (seatId) {
-      subscribe("couchPortMessage", (message) => {
+      subscribe<SeatEvent>("couchPortMessage", (message) => {
+        if (message.kind === "view" && message.view.game)
+          (window as CouchFixtureWindow).observedCouchView = message.view;
         if (!callbacks.size) pending.push(message);
         else callbacks.forEach((callback) => callback(message));
       });

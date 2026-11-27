@@ -2,7 +2,7 @@ import * as React from "react";
 import { TransitionGroup } from "react-transition-group";
 import MapPanelSlide from "./MapPanelSlide";
 import { useAppDispatch, useAppSelector } from "../../Store";
-import { navigate } from "../../reducers/Card";
+import { navigate, tutorialViewedMapTool } from "../../reducers/GameActions";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../../WorkspaceLayout";
 import { BuildForecastProvider } from "./BuildForecast";
@@ -50,6 +50,11 @@ export default function MapWorkspace({
   const dispatch = useAppDispatch();
   const card = useAppSelector((state) => state.card);
   const settings = useAppSelector((state) => state.settings);
+  const tutorialStep = useAppSelector((state) => state.game.tutorialStep);
+  const territorial = useAppSelector(
+    (state) => !!state.game.multiplayer?.territorial,
+  );
+  const [agreementPeer, setAgreementPeer] = React.useState<string>();
   const candidate = gameToolForCard(card.name);
   const [projectBusy, setProjectBusy] = React.useState(false);
   const requestedPanel: MapTool | undefined =
@@ -88,10 +93,18 @@ export default function MapWorkspace({
     card: typeof card;
     destination?: MapTool;
     windows: MapWindow[];
+    raisedToClose?: boolean;
   }>(() => ({ card, destination, windows: destination ? [destination] : [] }));
   const windows = floating ? stack.windows : stack.windows.slice(-1);
   const openPanels = windows.filter(isDockTool);
   const active = windows.at(-1);
+  // Navigation remembers the last dock tool even when a tile covers it. Teach
+  // the tool the player actually sees, excluding the temporary raise on Close.
+  const viewed = stack.raisedToClose ? undefined : active;
+  React.useEffect(() => {
+    if (tutorialStep >= 0 && viewed && isDockTool(viewed))
+      dispatch(tutorialViewedMapTool(viewed));
+  }, [dispatch, tutorialStep, viewed]);
   // Selecting a destination brings it forward. Closing a window can also change
   // the card, but the remaining windows keep their order.
   if (card !== stack.card || destination !== stack.destination) {
@@ -158,13 +171,16 @@ export default function MapWorkspace({
     [card, destination, dispatch, floating, windows],
   );
   const raise = React.useCallback(
-    (item: MapWindow) => {
+    (item: MapWindow, raisedToClose = false) => {
       if (!floating) return;
       setStack((current) =>
-        current.windows.at(-1) === item || !current.windows.includes(item)
+        !current.windows.includes(item) ||
+        (current.windows.at(-1) === item &&
+          !!current.raisedToClose === raisedToClose)
           ? current
           : {
               ...current,
+              raisedToClose,
               windows: [
                 ...current.windows.filter((window) => window !== item),
                 item,
@@ -197,14 +213,22 @@ export default function MapWorkspace({
     setStack((current) =>
       current.windows.includes("TILE")
         ? current
-        : { ...current, windows: [...current.windows, "TILE"] },
+        : {
+            ...current,
+            raisedToClose: false,
+            windows: [...current.windows, "TILE"],
+          },
     );
   }, []);
   const hideTile = React.useCallback(() => {
     tileClose.current = undefined;
     setStack((current) =>
       current.windows.includes("TILE")
-        ? { ...current, windows: current.windows.filter(isDockTool) }
+        ? {
+            ...current,
+            raisedToClose: false,
+            windows: current.windows.filter(isDockTool),
+          }
         : current,
     );
   }, []);
@@ -328,10 +352,15 @@ export default function MapWorkspace({
                     <Facilities
                       paneId="mapPane"
                       territoryView="FACILITIES"
-                      onTerritoryView={(view) => {
-                        if (view !== "FACILITIES" && openPanels.includes(view))
+                      onTerritoryView={(view, peer) => {
+                        if (view === "AGREEMENTS") setAgreementPeer(peer);
+                        if (
+                          view !== "FACILITIES" &&
+                          openPanels.includes(view)
+                        ) {
                           raise(view);
-                        else dispatch(navigate(view));
+                          focusHeading(view);
+                        } else dispatch(navigate(view));
                       }}
                     />
                   </div>
@@ -359,7 +388,7 @@ export default function MapWorkspace({
                                     }
                                   : undefined
                               }
-                              onRaise={() => raise(tool.id)}
+                              onRaise={(toClose) => raise(tool.id, toClose)}
                               onClose={closePanel}
                               onBack={
                                 tool.id === "PROGRAMS" ? programBack : undefined
@@ -369,6 +398,7 @@ export default function MapWorkspace({
                                 {isMapView(tool.id) && (
                                   <Facilities
                                     territoryView={tool.id}
+                                    agreementPeer={agreementPeer}
                                     paneId={
                                       tool.id === "AGREEMENTS"
                                         ? "agreementsPane"
@@ -394,7 +424,7 @@ export default function MapWorkspace({
                   </div>
                 </div>
                 <Navigation
-                  showMapBuild={!desktopMap}
+                  showMapBuild={territorial || !desktopMap}
                   showEventStatus={!desktopMap}
                   openMapViews={openPanels.filter(isMapView)}
                   onToggleMapView={toggleTool}

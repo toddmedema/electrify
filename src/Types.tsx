@@ -642,7 +642,7 @@ interface SharedOperatingType
   };
   startingAssetId?: string;
   territoryId?: TerritoryId;
-  /** Exactly one developed map cell; absent outside the territory scenario. */
+  /** Exactly one developed map cell in games with physical placement. */
   tileId?: TerritoryTileId;
   /** Transfer restrictions on inherited assets; absent means ordinary resale value. */
   cashBackMultiplier?: number;
@@ -823,10 +823,13 @@ interface SharedShoppingType {
 export type GameToolType =
   "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
 
+export type TutorialActionType =
+  GameToolType | Exclude<MapWorkspaceView, "FACILITIES">;
+
 export interface TutorialStepType {
   // Introduced here and retained through this and every later mission in authored order.
   // The scenario objective/score belongs to real scenarios, never tutorials.
-  revealActions?: Exclude<GameToolType, "SCENARIO">[];
+  revealActions?: Exclude<TutorialActionType, "SCENARIO">[];
   skipBeacon?: boolean;
   // The card this step's target lives on. Every step change navigates here, in both
   // directions, so stepping backwards over a step that navigated forwards still lands on
@@ -870,13 +873,15 @@ export interface TutorialStepType {
   // Gate for deeds that leave no distinguishable state behind (a drag re-order, a pause
   // toggle): advance when an action with one of these types is dispatched. Either gate
   // field alone makes the step gated; both may be combined (OR)
-  advanceOnAction?: string | string[];
+  advanceOnAction?:
+    string | string[] | ((action: unknown, state: AppStateType) => boolean);
   // An independent application check. By default, entering one restarts the authored scenario at
   // this step, giving it a deterministic, retryable state instead of inheriting whatever the
   // guided portion changed. A capstone that explicitly builds on the guided work can preserve it.
   // Success advances normally; failure pauses for consequence-specific feedback.
   capstone?: {
     preserveProgress?: boolean;
+    retryFromPreviousStep?: boolean;
     // Optional authored checkpoint overrides. The normal tutorial and its capstone can therefore
     // teach with different starting economics while still rebuilding the whole Game slice through
     // initGame on entry/retry. Anything omitted inherits the mission's scenario-level value.
@@ -889,12 +894,12 @@ export interface TutorialStepType {
     success: (state: AppStateType) => boolean;
     failure?: (state: AppStateType) => boolean;
     successMessage: string;
-    failureMessage: string;
+    failureMessage: string | ((state: AppStateType) => string);
   };
   // Optional wording or target for a genuinely different desktop control. The action dock
   // itself is shared across widths, so navigation lessons use the same target everywhere.
   desktop?: {
-    target: string;
+    target?: string;
     action?: string;
     content?: React.JSX.Element;
   };
@@ -1586,6 +1591,7 @@ export interface GameType {
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    territorial?: import("./helpers/MultiplayerTerritory").TerritorialState;
     /** Shared finite land claim, projected by the host from all company receipts. */
     landOwner?: { seat: string; name: string };
     landOwners?: Partial<
@@ -1649,6 +1655,12 @@ export interface GameType {
       upgradeRequestedBy?: string;
       /** This player asked for the pending upgrade and waits on the other owner. */
       upgradeRequestedBySelf?: boolean;
+      upgradeProposalRevision?: number;
+      border?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
+      endpoints?: { here: FrontierTerritoryId; there: FrontierTerritoryId };
+      connectionRequestedBy?: string;
+      connectionRequestedBySelf?: boolean;
+      connectionProposalRevision?: number;
       /** This neighbor's run ended, so its link no longer carries power. */
       retired?: boolean;
     }[];
@@ -1805,7 +1817,6 @@ export interface DialogType {
   notCancellable?: boolean;
   closeText?: string;
   // A milestone worth celebrating, where offering to install the app lands well
-  offerInstall?: boolean;
   tutorialComplete?: boolean;
   allTutorialsCompleted?: boolean;
   open: boolean;

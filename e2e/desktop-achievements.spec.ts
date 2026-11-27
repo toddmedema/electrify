@@ -1,3 +1,4 @@
+import { readTutorialSupplyChart } from "./tutorial-fixture";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -28,15 +29,7 @@ test("a real tutorial completion journals First Spark offline and survives relau
   try {
     const page = desktop.page;
     await page.getByRole("button", { name: "Tutorials", exact: true }).click();
-    await page.getByRole("button", { name: "Next", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Inspect Coal", exact: true })
-      .click();
-    await page.getByRole("button", { name: "Next", exact: true }).click();
-    await expect(
-      page.getByText("Select slow speed to start time"),
-    ).toBeVisible();
-    expect((await read()).earned).toEqual([]);
+    await readTutorialSupplyChart(page);
     await page
       .getByRole("button", { name: "normal speed", exact: true })
       .click();

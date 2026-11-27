@@ -83,8 +83,8 @@ export function selectionKey(browse: BrowseState): string {
 const finite = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value);
 
-/** A custom game a guest can render and forecast; the host's start validates it in full. */
-function validCustom(value: unknown): value is ScenarioType {
+/** A bounded custom setup both lobby guests and the match worker can prepare. */
+export function validCoopCustomScenario(value: unknown): value is ScenarioType {
   if (!value || typeof value !== "object") return false;
   const custom = value as ScenarioType;
   return (
@@ -141,7 +141,7 @@ export function validBrowseState(value: unknown): value is BrowseState {
       (Number.isSafeInteger(browse.scenarioId) &&
         !getScenario(browse.scenarioId)?.tutorialSteps &&
         !!getScenario(browse.scenarioId))) &&
-    (browse.custom === undefined || validCustom(browse.custom)) &&
+    (browse.custom === undefined || validCoopCustomScenario(browse.custom)) &&
     (browse.mod === undefined ||
       (browse.card === "MODS" &&
         browse.custom === undefined &&

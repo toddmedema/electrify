@@ -26,7 +26,7 @@ import {
   GameType,
   SpeedType,
   CardNameType,
-  GameToolType,
+  TutorialActionType,
   TickPresentFutureType,
 } from "../../Types";
 import { connectToStore } from "./ConnectToStore";
@@ -83,7 +83,7 @@ export interface StateProps {
   activeEvents?: ActiveEventGroupType[];
   upcomingEvents?: UpcomingStoryEventType[];
   game: GameType;
-  tutorialActions?: GameToolType[];
+  tutorialActions?: TutorialActionType[];
   evidenceRequest?: EvidenceRequestType;
   facilityDragActive?: boolean;
   activeSave?: { id: string; name: string };

@@ -1029,6 +1029,10 @@ test("quick touch swipes scroll the enlarged dock without opening a tool", async
     height: 1080,
   });
   await startGame(page, "light", 100, 2);
+  // The Fleet setup clicks with the mouse. Park it outside the dock so a
+  // button scrolling under the stationary cursor cannot produce a hover label.
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
   const dock = page.locator("#navfooter");
   const box = (await dock.boundingBox())!;
   // Maximum interface scale gives the compact dock a horizontal scroll range.

@@ -100,7 +100,10 @@ export function dockCenter(
 export default function GameWorkspace({
   memory,
 }: { memory?: Map<string, unknown> } = {}) {
-  const map = useAppSelector((state) => hasTerritoryNetwork(state.game));
+  const map = useAppSelector(
+    (state) =>
+      !!state.game.multiplayer?.territorial || hasTerritoryNetwork(state.game),
+  );
   return map ? <MapWorkspace memory={memory} /> : <Workspace memory={memory} />;
 }
 

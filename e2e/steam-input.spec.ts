@@ -1118,17 +1118,35 @@ test("controller advances the first tutorial through inspection, chart and clock
   await input(page, "confirm");
   const hud = page.locator(".tutorialHud");
   await expect(hud).toBeVisible();
-  await select(page, hud.getByRole("button", { name: "Next", exact: true }));
-  await input(page, "confirm");
   await select(
     page,
-    page.getByRole("button", { name: "Inspect Coal", exact: true }),
+    page.locator('[data-map-facility="Coal"][data-owned="true"]'),
   );
   await input(page, "confirm");
+  const inspector = page.getByRole("dialog", { name: "Coal", exact: true });
+  await expect(inspector).toBeVisible();
+  await expect(hud.locator(".tutorialHudAction")).toHaveText("Open Fleet");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Menu",
+  );
+  await input(page, "back");
+  await expect(inspector).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Gameplay",
+  );
+  await input(page, "nextPane");
+  await expect(hud.locator(".tutorialHudAction")).toHaveText(
+    "Select the supply and demand chart",
+  );
   const chart = page.locator('#chartSupplyDemand [role="img"]');
-  await select(page, chart);
+  await input(page, "nextChart");
+  await expect(chart).toBeFocused();
   await input(page, "confirm");
-  await expect(hud).toContainText("Demand rises as the city wakes up.");
+  await expect(hud).toContainText(
+    "Watch how the grid changes as the city wakes up.",
+  );
   await select(page, page.getByRole("button", { name: "pause", exact: true }));
   await input(page, "right");
   await expect(
@@ -1136,11 +1154,13 @@ test("controller advances the first tutorial through inspection, chart and clock
   ).toBeFocused();
   await input(page, "confirm");
   await expect(hud).toContainText(
-    "Watch coal output climb slowly as sunlight fades.",
+    "Solar fades in the evening, so coal picks up the load.",
   );
   // Tutorial-hidden actions must stay unavailable through controller shortcuts too.
   await input(page, "build");
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+  await expect(
+    page.locator(".tileWorkspaceBuilding:visible, .desktopBuildRail:visible"),
+  ).toHaveCount(0);
 });
 
 test("controller reviews, cancels and confirms a utility acquisition", async ({

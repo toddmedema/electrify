@@ -17,6 +17,7 @@ import { getTutorialStep } from "../../data/Scenarios";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
 import { getTimeFromTimeline } from "../../helpers/DateTime";
+import type { TerritoryTileId } from "../../Types";
 import ConceptIcon from "../base/ConceptIcon";
 import CatalogTitleBar from "../base/CatalogTitleBar";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
@@ -37,10 +38,14 @@ export default function BuildFacilities({
   embedded = false,
   category,
   onPickSite,
+  mapCatalogue = false,
+  lockedTileId,
 }: {
   embedded?: boolean;
   category?: string;
   onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
+  mapCatalogue?: boolean;
+  lockedTileId?: TerritoryTileId;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const closeTool = React.useContext(GameToolCloseContext);
@@ -50,6 +55,7 @@ export default function BuildFacilities({
   const introductoryChoices =
     getTutorialStep(game)?.phase === "GENERATOR_CHOICES";
   const intertiesAvailable =
+    !game.multiplayer?.territorial &&
     !hasTerritoryNetwork(game) &&
     !!game.transmission &&
     (!!game.multiplayer || corridorsForLocation(game.location).length > 0);
@@ -60,11 +66,12 @@ export default function BuildFacilities({
   const [projectCategory, setProjectCategory] = useToolState<
     (typeof categories)[number][0]
   >("project.category", "BUILD_GENERATORS");
+  const localCategory = !!onPickSite || mapCatalogue;
   const active = introductoryChoices
     ? "BUILD_GENERATORS"
     : visibleCategories.find(
         ([name]) =>
-          name === (onPickSite ? projectCategory : (category ?? card)),
+          name === (localCategory ? projectCategory : (category ?? card)),
       )?.[0] || "BUILD_GENERATORS";
   const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
   const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
@@ -73,7 +80,7 @@ export default function BuildFacilities({
     null,
   );
   const changeCategory = (name: (typeof categories)[number][0]) => {
-    if (onPickSite) {
+    if (localCategory) {
       setProjectCategory(name);
       return;
     }
@@ -182,10 +189,16 @@ export default function BuildFacilities({
         }}
       >
         {active === "BUILD_GENERATORS" && (
-          <BuildGeneratorsContainer onPickSite={onPickSite} />
+          <BuildGeneratorsContainer
+            onPickSite={onPickSite}
+            lockedTileId={lockedTileId}
+          />
         )}
         {active === "BUILD_STORAGE" && (
-          <BuildStorageContainer onPickSite={onPickSite} />
+          <BuildStorageContainer
+            onPickSite={onPickSite}
+            lockedTileId={lockedTileId}
+          />
         )}
         {active === "BUILD_INTERTIES" && (
           <div ref={intertiesRef} className="scrollable constructionInterties">

@@ -47,6 +47,7 @@ export default function FeedbackDialog({
   const trackedOpen = useRef(false);
   const sending = useRef(false);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const messageInput = useRef<HTMLTextAreaElement>(null);
 
   useEffect(
     () =>
@@ -102,6 +103,9 @@ export default function FeedbackDialog({
       open
       fullWidth
       maxWidth="xs"
+      slotProps={{
+        transition: { onEntered: () => messageInput.current?.focus() },
+      }}
       onClose={() => {
         if (!sending.current) onClose();
       }}
@@ -138,6 +142,7 @@ export default function FeedbackDialog({
             </Typography>
             <TextField
               autoFocus
+              inputRef={messageInput}
               required
               label="Your feedback"
               value={message}
