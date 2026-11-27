@@ -1,3 +1,4 @@
+import { AWAITING_TILE_CONNECTION } from "../../helpers/TerritoryConnections";
 import { configureStore } from "@reduxjs/toolkit";
 import {
   act,
@@ -758,6 +759,18 @@ function renderProjects(game: GameType, onBuild = jest.fn()) {
     </Provider>,
   );
 }
+
+it("shows that a built facility is waiting for its grid connection", () => {
+  const game = createGame({ scenarioId: 116 });
+  const plant = game.facilities.find(({ name }) => name === "Wind")!;
+  plant.yearsToBuildLeft = AWAITING_TILE_CONNECTION;
+  renderFacilities(game);
+  const row = screen.getByRole("button", {
+    name: /^Inspect Wind, .*Waiting for grid connection/,
+  });
+  expect(row).toHaveTextContent("Waiting for grid connection");
+  expect(row).not.toHaveTextContent("month left");
+});
 
 describe("weather hazards in the fleet", () => {
   // Game minutes per real day: a representative game month stands for a real month.

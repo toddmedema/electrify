@@ -59,9 +59,13 @@
   .projectPaymentMethods {
     flex-direction: row;
     flex-wrap: nowrap;
+    gap: 4px;
     .MuiFormControlLabel-root {
       min-height: 44px;
-      margin: 0 4px 0 -4px;
+      margin: 0;
+    }
+    .MuiRadio-root {
+      padding: 4px;
     }
   }
 }
@@ -95,6 +99,7 @@
     flex: 1;
   }
   .projectConnectActions button {
+    flex: 1 0 auto;
     white-space: nowrap;
   }
 }

@@ -1496,7 +1496,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(surface).not.toContainText("Cash after connection");
     await expect(
       surface.getByRole("button", {
-        name: `Connect (${formatPurchasePrice(quote.price)})`,
+        name: `Connect only (${formatPurchasePrice(quote.price)})`,
         exact: true,
       }),
     ).toBeEnabled();
@@ -2124,7 +2124,7 @@ test("map tile hover and right-click expose the tile's own actions", async ({
   await target.click({ button: "right" });
   const menu = page.getByRole("menu", { name: "Tile actions" });
   const connect = menu.getByRole("menuitem", {
-    name: `Connect (${formatPurchasePrice(quote.price)})`,
+    name: `Connect only (${formatPurchasePrice(quote.price)})`,
     exact: true,
   });
   await expect(connect).toBeEnabled();
@@ -2132,6 +2132,10 @@ test("map tile hover and right-click expose the tile's own actions", async ({
     menu.getByRole("menuitem", { name: "Inspect", exact: true }),
   ).toHaveCount(0);
   await expect(tooltip).toHaveCount(0);
+  await expect(
+    menu.getByRole("menuitem", { name: "Plan project here" }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
   await expect(connect).toBeFocused();
   await expect(menu).toBeInViewport({ ratio: 1 });
   await reviewScreenshot(page, {

@@ -168,6 +168,20 @@ for (const theme of ["light", "dark"] as const) {
       expect(sheet.height).toBeLessThanOrEqual(map.height * 0.55 + 1);
       expect(sheet.y - map.y).toBeGreaterThanOrEqual(160);
       expect(tile.y + tile.height).toBeLessThanOrEqual(sheet.y + 1);
+      expect(
+        await confirm.evaluate((button) => {
+          const text = Array.from(button.childNodes).find(
+            (node) =>
+              node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+          );
+          if (!text) return false;
+          const range = document.createRange();
+          range.selectNode(text);
+          const label = range.getBoundingClientRect();
+          const bounds = button.getBoundingClientRect();
+          return label.left >= bounds.left && label.right <= bounds.right;
+        }),
+      ).toBe(true);
     }
     await reviewScreenshot(network, {
       path: testInfo.outputPath(`project-candidate-${theme}.png`),
@@ -229,7 +243,7 @@ test("plans a project from a disconnected tile inspector", async ({ page }) => {
   const network = await start(page, "light");
   const tile = getTerritoryTile("green-uplands:site-1")!;
   await selectTerritoryMapTile(page, tile);
-  const surface = network.locator(".tileWorkspaceSurface");
+  const surface = page.locator(".tileWorkspaceSurface");
   await expect(
     surface.getByRole("button", { name: /^Connect only/ }),
   ).toBeVisible();
