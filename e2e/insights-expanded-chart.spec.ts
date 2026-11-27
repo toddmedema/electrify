@@ -26,9 +26,10 @@ async function expectChartAxesInView(dialog: Locator) {
       }),
     )
     .toBeLessThanOrEqual(1);
-  for (const plot of await dialog.locator(".uplot").all()) {
-    await expect(plot).toBeInViewport({ ratio: 1 });
-  }
+  const plots = await dialog.locator(".uplot").all();
+  await Promise.all(
+    plots.map((plot) => expect(plot).toBeInViewport({ ratio: 1 })),
+  );
 }
 
 function measureButtons(scope: Locator) {
@@ -88,58 +89,60 @@ async function expectSelectableFuelKey(
 ) {
   const key = container.getByRole("group", { name });
   await expect(key).toBeVisible();
-  await expect(
-    key.getByRole("button", { name: "All fuels", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(key.getByText("Demand", { exact: true })).toBeVisible();
-  await expect(
-    key.getByRole("button", { name: "Demand", exact: true }),
-  ).toHaveCount(0);
-  const minimumHeight = await page.evaluate(() =>
-    matchMedia("(pointer: coarse)").matches ? 44 : 40,
-  );
-  const buttons = await measureButtons(key);
+  const [minimumHeight, buttons, keyOverflow] = await Promise.all([
+    page.evaluate(() => (matchMedia("(pointer: coarse)").matches ? 44 : 40)),
+    measureButtons(key),
+    key.evaluate((element) => element.scrollWidth - element.clientWidth),
+    expect(
+      key.getByRole("button", { name: "All fuels", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true"),
+    expect(key.getByText("Demand", { exact: true })).toBeVisible(),
+    expect(
+      key.getByRole("button", { name: "Demand", exact: true }),
+    ).toHaveCount(0),
+  ]);
   expect(buttons.length).toBeGreaterThan(0);
   for (const { height, overflow } of buttons) {
     expect(height).toBeGreaterThanOrEqual(minimumHeight);
     expect(overflow).toBeLessThanOrEqual(1);
   }
-  expect(
-    await key.evaluate((element) => element.scrollWidth - element.clientWidth),
-  ).toBeLessThanOrEqual(1);
+  expect(keyOverflow).toBeLessThanOrEqual(1);
 }
 
 async function expectLegendLayout(container: Locator) {
-  const legends = container.locator(".chartLegend");
-  expect(await legends.count()).toBeGreaterThan(0);
-  for (const legend of await legends.all()) {
-    const geometry = await legend.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      return {
-        left: bounds.left,
-        right: bounds.right,
-        overflow: element.scrollWidth - element.clientWidth,
-        items: Array.from(element.querySelectorAll(".chartLegendItem")).map(
-          (item) => {
-            const pair = item.getBoundingClientRect();
-            const swatch = item
-              .querySelector(".chartLegendSwatch")!
-              .getBoundingClientRect();
-            const label = item
-              .querySelector(".chartLegendLabel")!
-              .getBoundingClientRect();
-            return {
-              left: pair.left,
-              right: pair.right,
-              top: pair.top,
-              bottom: pair.bottom,
-              sampleWidth: swatch.width,
-              sampleGap: label.left - swatch.right,
-            };
-          },
-        ),
-      };
-    });
+  const legends = await container
+    .locator(".chartLegend")
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const bounds = element.getBoundingClientRect();
+        return {
+          left: bounds.left,
+          right: bounds.right,
+          overflow: element.scrollWidth - element.clientWidth,
+          items: Array.from(element.querySelectorAll(".chartLegendItem")).map(
+            (item) => {
+              const pair = item.getBoundingClientRect();
+              const swatch = item
+                .querySelector(".chartLegendSwatch")!
+                .getBoundingClientRect();
+              const label = item
+                .querySelector(".chartLegendLabel")!
+                .getBoundingClientRect();
+              return {
+                left: pair.left,
+                right: pair.right,
+                top: pair.top,
+                bottom: pair.bottom,
+                sampleWidth: swatch.width,
+                sampleGap: label.left - swatch.right,
+              };
+            },
+          ),
+        };
+      }),
+    );
+  expect(legends.length).toBeGreaterThan(0);
+  for (const geometry of legends) {
     expect(
       geometry.overflow,
       "legend stays inside its pane",
@@ -227,63 +230,82 @@ test("full-screen Insights suspends the covered map until the chart closes", asy
   await expect.poll(mapFrames).toBeGreaterThan(covered.lastFrame);
 });
 
-for (const theme of ["light", "dark"] as const) {
-  test(`chart legends align and wrap in ${theme} at 125% interface scale`, async ({
-    page,
-  }, info) => {
-    await page.addInitScript((mode) => {
+async function openChartInsights(
+  page: Page,
+  mode: "light" | "dark",
+  layers: string[],
+  scale?: string,
+) {
+  await page.addInitScript(
+    ({ mode, layers, scale }) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);
-      localStorage.setItem("interfaceScale", "1.25");
-      localStorage.setItem(
-        "insightsLayers",
-        JSON.stringify([
-          "supplyDemand",
-          "demandByType",
-          "supplyByFuel",
-          "water",
-        ]),
+      if (scale) localStorage.setItem("interfaceScale", scale);
+      localStorage.setItem("insightsLayers", JSON.stringify(layers));
+    },
+    { mode, layers, scale },
+  );
+  await page.goto("/?scenario=108");
+  await page.getByRole("button", { name: "Start game" }).click();
+  const insights = page.locator(".insights:visible");
+  await openPane(
+    insights,
+    page.getByRole("button", { name: "Insights", exact: true }),
+  );
+  return insights;
+}
+
+const legendLayers = ["supplyDemand", "demandByType", "supplyByFuel", "water"];
+
+for (const theme of ["light", "dark"] as const) {
+  for (const { label, charts } of [
+    {
+      label: "Supply & Demand and Demand by use",
+      charts: ["Supply & Demand", "Demand by use"],
+    },
+    { label: "Supply by Fuel and Water", charts: ["Supply by Fuel", "Water"] },
+  ] as const) {
+    test(`chart legends align and wrap in ${theme} at 125% interface scale for ${label}`, async ({
+      page,
+    }, info) => {
+      const insights = await openChartInsights(
+        page,
+        theme,
+        legendLayers,
+        "1.25",
       );
-    }, theme);
-    await page.goto("/?scenario=108");
-    await page.getByRole("button", { name: "Start game" }).click();
-    const insights = page.locator(".insights:visible");
-    await openPane(
-      insights,
-      page.getByRole("button", { name: "Insights", exact: true }),
-    );
-    await expect(insights.locator(".uplot").first()).toBeVisible();
-    if (process.env.REVIEW_SCREENSHOT_DIR) {
-      await page.mouse.move(0, 0);
-      await insights.screenshot({
-        path: path.join(
-          process.env.REVIEW_SCREENSHOT_DIR,
-          `legends-${info.project.name}-${theme}.png`,
-        ),
-        animations: "disabled",
-      });
-    }
-    await expectLegendLayout(insights);
-    for (const name of [
-      "Supply & Demand",
-      "Demand by use",
-      "Supply by Fuel",
-      "Water",
-    ]) {
-      await insights
-        .getByRole("button", { name: `Expand ${name} chart`, exact: true })
-        .click();
-      const dialog = page.getByRole("dialog", { name, exact: true });
-      if (name === "Supply by Fuel") {
-        await expectSelectableFuelKey(dialog, page, "Show supply by fuel");
-      } else {
-        await expectLegendLayout(dialog);
+      await expect(insights.locator(".uplot").first()).toBeVisible();
+      if (charts[0] === "Supply & Demand") {
+        if (process.env.REVIEW_SCREENSHOT_DIR) {
+          await page.mouse.move(0, 0);
+          await insights.screenshot({
+            path: path.join(
+              process.env.REVIEW_SCREENSHOT_DIR,
+              `legends-${info.project.name}-${theme}.png`,
+            ),
+            animations: "disabled",
+          });
+        }
+        await expectLegendLayout(insights);
       }
-      await expectChartAxesInView(dialog);
-      await dialog.getByRole("button", { name: `Close ${name} chart` }).click();
-      await expect(dialog).toHaveCount(0);
-    }
-  });
+      for (const name of charts) {
+        await insights
+          .getByRole("button", { name: `Expand ${name} chart`, exact: true })
+          .click();
+        const dialog = page.getByRole("dialog", { name, exact: true });
+        if (name === "Supply by Fuel") {
+          await expectSelectableFuelKey(dialog, page, "Show supply by fuel");
+        } else {
+          await expectLegendLayout(dialog);
+        }
+        await expectChartAxesInView(dialog);
+        await dialog
+          .getByRole("button", { name: `Close ${name} chart` })
+          .click();
+        await expect(dialog).toHaveCount(0);
+      }
+    });
+  }
 }
 
 test("expanded chart axes and fuel controls fit at 125% interface scale after resizing", async ({
@@ -460,30 +482,50 @@ test("every chart header keeps its help button beside the expand control, even w
   await expect(dialog).toHaveCount(0);
 });
 
+const inspectionLayers = ["fuelPrices", "water", "inflationInterest", "cash"];
+
+function observeChartResizeErrors(page: Page) {
+  const resizeErrors: string[] = [];
+  page.on("pageerror", (error) => {
+    if (/ResizeObserver loop/.test(error.message))
+      resizeErrors.push(error.message);
+  });
+  return resizeErrors;
+}
+
+async function captureExpandedChart(
+  page: Page,
+  theme: string,
+  project: string,
+  name: string,
+) {
+  const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
+  if (!reviewDir) return;
+  await page.mouse.move(0, 0);
+  await expect(page.getByRole("tooltip")).toHaveCount(0);
+  await page.locator(".expandedChartContent").evaluateAll((elements) =>
+    elements.forEach((element) => {
+      element.scrollTop = 0;
+    }),
+  );
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await page.screenshot({
+    path: path.join(reviewDir, `${name}-${project}-${theme}.png`),
+    animations: "disabled",
+  });
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`chart inspection preserves fuel selection and zoom in ${theme}`, async ({
     page,
   }, info) => {
-    const resizeErrors: string[] = [];
-    page.on("pageerror", (error) => {
-      if (/ResizeObserver loop/.test(error.message))
-        resizeErrors.push(error.message);
-    });
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-      localStorage.setItem(
-        "insightsLayers",
-        JSON.stringify(["fuelPrices", "water", "inflationInterest", "cash"]),
-      );
-    }, theme);
-    await page.goto("/?scenario=108");
-    await page.getByRole("button", { name: "Start game" }).click();
-    const insights = page.locator(".insights:visible");
-    await openPane(
-      insights,
-      page.getByRole("button", { name: "Insights", exact: true }),
-    );
+    const resizeErrors = observeChartResizeErrors(page);
+    const insights = await openChartInsights(page, theme, inspectionLayers);
     const expand = insights.getByRole("button", {
       name: "Expand Fuel Prices chart",
     });
@@ -496,28 +538,7 @@ for (const theme of ["light", "dark"] as const) {
         return compactHeight;
       })
       .toBeGreaterThan(0);
-    const reviewDir = process.env.REVIEW_SCREENSHOT_DIR;
-    const capture = async (name: string) => {
-      if (!reviewDir) return;
-      await page.mouse.move(0, 0);
-      await expect(page.getByRole("tooltip")).toHaveCount(0);
-      await page.locator(".expandedChartContent").evaluateAll((elements) =>
-        elements.forEach((element) => {
-          element.scrollTop = 0;
-        }),
-      );
-      await page.evaluate(
-        () =>
-          new Promise<void>((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-          ),
-      );
-      await page.screenshot({
-        path: path.join(reviewDir, `${name}-${info.project.name}-${theme}.png`),
-        animations: "disabled",
-      });
-    };
-    await capture("fuel-compact");
+    await captureExpandedChart(page, theme, info.project.name, "fuel-compact");
     await insights.getByRole("button", { name: "Coal", exact: true }).click();
     await expand.click();
     const dialog = page.getByRole("dialog", {
@@ -594,14 +615,24 @@ for (const theme of ["light", "dark"] as const) {
     await expect(chart.locator(".chartTooltip")).not.toContainText(
       /Biomass|Natural Gas|Oil|Uranium/,
     );
-    await capture("fuel-coal-expanded");
+    await captureExpandedChart(
+      page,
+      theme,
+      info.project.name,
+      "fuel-coal-expanded",
+    );
     await dialog
       .getByRole("button", { name: "All fuels", exact: true })
       .click();
     await expect(chart).toHaveAccessibleName(
       /Biomass.*Coal.*Natural Gas.*Oil.*Uranium/,
     );
-    await capture("fuel-all-expanded");
+    await captureExpandedChart(
+      page,
+      theme,
+      info.project.name,
+      "fuel-all-expanded",
+    );
     const dialogButtons = await measureButtons(dialog);
     expect(dialogButtons.length).toBeGreaterThan(0);
     for (const { x, width, height } of dialogButtons) {
@@ -627,12 +658,31 @@ for (const theme of ["light", "dark"] as const) {
       insights.getByRole("button", { name: "All fuels", exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     await expectMobileFuelLegend(insights, page);
+    expect(resizeErrors).toEqual([]);
+  });
+
+  test(`Water, Inflation & Interest, and Cash fit when zoomed and expanded in ${theme}`, async ({
+    page,
+  }, info) => {
+    const resizeErrors = observeChartResizeErrors(page);
+    const insights = await openChartInsights(page, theme, inspectionLayers);
+    await expect(insights.locator(".uplot").first()).toBeVisible();
+    const range = insights.getByLabel(/^Displayed date range:/);
+    const initialRange = (await range.getAttribute("aria-label"))!;
+    await insights
+      .getByRole("button", { name: "Zoom in", exact: true })
+      .click();
+    await expect(range).not.toHaveAttribute("aria-label", initialRange);
+    const zoomedRange = (await range.getAttribute("aria-label"))!;
     for (const name of ["Water", "Inflation & Interest", "Cash"]) {
       const button = insights.getByRole("button", {
         name: `Expand ${name} chart`,
       });
       await button.click();
       const focused = page.getByRole("dialog", { name, exact: true });
+      await expect(
+        focused.getByLabel(/^Displayed date range:/),
+      ).toHaveAttribute("aria-label", zoomedRange);
       await expect(focused.locator(".uplot")).toHaveCount(
         name === "Inflation & Interest" ? 2 : 1,
       );
@@ -643,7 +693,10 @@ for (const theme of ["light", "dark"] as const) {
           (element) => element.scrollWidth - element.clientWidth,
         ),
       ).toBeLessThanOrEqual(1);
-      await capture(
+      await captureExpandedChart(
+        page,
+        theme,
+        info.project.name,
         `expanded-${name === "Water" ? "water" : name === "Cash" ? "cash" : "rates"}`,
       );
       await focused

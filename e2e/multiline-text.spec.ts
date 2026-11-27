@@ -133,69 +133,81 @@ for (const theme of ["light", "dark"] as const) {
       expect(cashBox.x + cashBox.width + 4).toBeLessThanOrEqual(clock.x);
     });
 
-    test(`purchase explanations and long titles wrap in ${theme}`, async ({
-      page,
-    }, info) => {
-      for (const [category, name] of [
-        ["Generators", "Solar"],
-        ["Generators", "Natural Gas CC"],
-        ["Storage", "Pumped Hydro"],
-        ["Interties", "Pacific Northwest intertie"],
-      ]) {
-        await page.getByRole("tab", { name: category, exact: true }).click();
-        await page
-          .getByRole("button", {
-            name: `Review purchase of ${name}`,
-            exact: true,
-          })
-          .click();
-        const dialog = page.getByRole("dialog", { name: /^Build / });
-        await expect(dialog).toBeVisible();
-        await expect(
-          page.locator(".MuiDialog-root").filter({ has: dialog }),
-        ).toHaveCSS("opacity", "1");
-        await expectDialogToFit(dialog);
-        const content = dialog.locator(".MuiDialogContent-root");
-        expect(
-          await content.evaluate((el) => el.scrollWidth - el.clientWidth),
-        ).toBeLessThanOrEqual(1);
-        await expectTextToFit(
-          dialog.locator(
-            ".resilienceBuildOptionDetail, .closableDialogTitleText, .decisionImpactFact strong",
-          ),
-        );
-        const title = (await dialog
-          .locator(".closableDialogTitleText")
-          .boundingBox())!;
-        const close = (await dialog
-          .getByRole("button", { name: "close", exact: true })
-          .boundingBox())!;
-        expect(title.x + title.width + 7).toBeLessThanOrEqual(close.x);
-        if (name === "Solar") {
-          const description = dialog.getByText(
-            "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",
-            { exact: true },
+    for (const { label, purchases } of [
+      {
+        label: "generator",
+        purchases: [
+          ["Generators", "Solar"],
+          ["Generators", "Natural Gas CC"],
+        ],
+      },
+      {
+        label: "storage and intertie",
+        purchases: [
+          ["Storage", "Pumped Hydro"],
+          ["Interties", "Pacific Northwest intertie"],
+        ],
+      },
+    ] as const) {
+      test(`${label} purchase explanations and long titles wrap in ${theme}`, async ({
+        page,
+      }, info) => {
+        for (const [category, name] of purchases) {
+          await page.getByRole("tab", { name: category, exact: true }).click();
+          await page
+            .getByRole("button", {
+              name: `Review purchase of ${name}`,
+              exact: true,
+            })
+            .click();
+          const dialog = page.getByRole("dialog", { name: /^Build / });
+          await expect(dialog).toBeVisible();
+          await expect(
+            page.locator(".MuiDialog-root").filter({ has: dialog }),
+          ).toHaveCSS("opacity", "1");
+          await expectDialogToFit(dialog);
+          const content = dialog.locator(".MuiDialogContent-root");
+          expect(
+            await content.evaluate((el) => el.scrollWidth - el.clientWidth),
+          ).toBeLessThanOrEqual(1);
+          await expectTextToFit(
+            dialog.locator(
+              ".resilienceBuildOptionDetail, .closableDialogTitleText, .decisionImpactFact strong",
+            ),
           );
-          await expect(description).toBeVisible();
-          if (page.viewportSize()!.width < 600) {
-            const lines = await description.evaluate(
-              (el) =>
-                el.getBoundingClientRect().height /
-                parseFloat(getComputedStyle(el).lineHeight),
+          const [title, close] = await Promise.all([
+            dialog.locator(".closableDialogTitleText").boundingBox(),
+            dialog
+              .getByRole("button", { name: "close", exact: true })
+              .boundingBox(),
+          ]);
+          expect(title!.x + title!.width + 7).toBeLessThanOrEqual(close!.x);
+          if (name === "Solar") {
+            const description = dialog.getByText(
+              "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",
+              { exact: true },
             );
-            expect(lines).toBeGreaterThan(1);
+            await expect(description).toBeVisible();
+            if (page.viewportSize()!.width < 600) {
+              const lines = await description.evaluate(
+                (el) =>
+                  el.getBoundingClientRect().height /
+                  parseFloat(getComputedStyle(el).lineHeight),
+              );
+              expect(lines).toBeGreaterThan(1);
+            }
+            await reviewScreenshot(page, {
+              path: info.outputPath(`solar-purchase-${theme}.png`),
+              animations: "disabled",
+            });
           }
-          await reviewScreenshot(page, {
-            path: info.outputPath(`solar-purchase-${theme}.png`),
-            animations: "disabled",
-          });
+          await dialog
+            .getByRole("button", { name: "close", exact: true })
+            .click();
+          await expect(dialog).toHaveCount(0);
         }
-        await dialog
-          .getByRole("button", { name: "close", exact: true })
-          .click();
-        await expect(dialog).toHaveCount(0);
-      }
-    });
+      });
+    }
 
     test(`generator detail labels and values fit their columns in ${theme}`, async ({
       page,
