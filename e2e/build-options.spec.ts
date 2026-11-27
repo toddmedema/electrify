@@ -12,6 +12,7 @@ import {
 } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { purchaseTerms } from "../src/helpers/Financials";
+import { wToSliderTick } from "../src/helpers/BuildSizing";
 import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
 import { getAuthoredTerritoryTile } from "../src/data/TerritoryTiles";
 import {
@@ -1122,9 +1123,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     const build = await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
-    // The default custom fleet opens at 2 GWh. Select a 1 GWh / 10 MW project.
+    // The starting size follows the generated fleet. Select a 1 GWh / 10 MW project.
+    const storageWh = 1_000_000_000;
     const size = build.getByRole("slider");
-    await size.press("ArrowLeft");
+    await size.fill(String(wToSliderTick(storageWh)));
     await expect(size).toHaveAccessibleName("Capacity 1GWh");
     const ironAir = page.locator(".buildOption").filter({
       has: page.getByRole("button", {
@@ -1180,7 +1182,7 @@ for (const theme of ["light", "dark"] as const) {
         (await readSavedGame(page))?.facilities.some(
           (facility) =>
             facility.name === "Iron-Air Battery" &&
-            facility.peakWh === 1000000000,
+            facility.peakWh === storageWh,
         ),
       )
       .toBe(true);

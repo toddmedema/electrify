@@ -505,13 +505,16 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
+  const fleet = await openFleet(page);
+  await fleet
+    .getByRole("button", { name: "Inspect Coal", exact: true })
+    .click();
+  await fleet.getByRole("button", { name: "Pause Coal", exact: true }).click();
   // The pause confirmation can cover Resume on phones, and MUI keeps it open on hover.
   // Release the pointer and wait for it to clear before acting on the row beneath it.
   await page.mouse.move(0, 0);
   await expect(page.locator(".snackbarContent")).toBeHidden();
-  await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
+  await fleet.getByRole("button", { name: "Resume Coal", exact: true }).click();
   // A future shortfall stays explicit without replacing the current reserve.
   const grid = page.locator(".gridHealth:visible");
   await expect(grid).not.toHaveClass(/gridHealth-blackout/);

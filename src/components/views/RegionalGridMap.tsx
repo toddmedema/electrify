@@ -36,7 +36,10 @@ export default function RegionalGridMap({
   const map = React.useRef<HTMLElement>(null);
   const [sources, setSources] = React.useState<DataCenterCustomerSources>();
   const [selected, setSelected] = React.useState<TerritoryMapTileKey>();
-  const [inspected, setInspected] = React.useState<TerritoryMapTileKey>();
+  const [inspection, setInspection] = React.useState<{
+    tileKey: TerritoryMapTileKey;
+    facilityId: number | undefined;
+  }>();
   React.useEffect(() => {
     let active = true;
     initDataCenterCustomers().then(
@@ -50,7 +53,7 @@ export default function RegionalGridMap({
     };
   }, []);
   const close = React.useCallback(() => {
-    setInspected(undefined);
+    setInspection(undefined);
     setSelected(undefined);
   }, []);
   const views = React.useMemo(
@@ -58,8 +61,15 @@ export default function RegionalGridMap({
     [game, sources],
   );
   const view =
-    inspected &&
-    views.find(({ tile }) => territoryMapTileKey(tile) === inspected);
+    inspection &&
+    views.find(
+      ({ tile, operatingFacility }) =>
+        territoryMapTileKey(tile) === inspection.tileKey &&
+        operatingFacility?.id === inspection.facilityId,
+    );
+  // A named dam can reserve an existing plot and move the plant inspected there.
+  if (inspection && !view) setInspection(undefined);
+  const inspected = view ? inspection?.tileKey : undefined;
   const tile = view && view.tile;
   const facility = view && view.operatingFacility;
   const homeCity = !!(tile && tile.city && view.owned);
@@ -75,10 +85,19 @@ export default function RegionalGridMap({
         game={game}
         views={views}
         selected={selected}
-        inspected={view ? inspected : undefined}
+        inspected={inspected}
         onSelect={(key, inspect) => {
           setSelected(key);
-          if (inspect) setInspected(key);
+          if (!inspect) return;
+          const target = views.find(
+            ({ tile }) => territoryMapTileKey(tile) === key,
+          );
+          if (target) {
+            setInspection({
+              tileKey: key,
+              facilityId: target.operatingFacility?.id,
+            });
+          }
         }}
         onDeselect={close}
         onCloseInspection={view ? close : undefined}

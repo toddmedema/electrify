@@ -29,8 +29,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await readSavedGame(page))?.seed)
       .toBe(0.25 * 2 ** 32);
+    const fleet = await openFleet(page);
     await expect(
-      page.getByRole("button", { name: /Inspect Northern intertie/ }),
+      fleet.getByRole("button", { name: /Inspect Northern intertie/ }),
     ).toBeVisible();
     const events = page.locator(".eventLog");
     await openPane(

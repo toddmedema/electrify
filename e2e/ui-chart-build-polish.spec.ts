@@ -204,9 +204,12 @@ for (const theme of ["light", "dark"] as const) {
         page.getByRole("button", { name: /^Upcoming:/ }),
       ).toBeVisible();
       await limit.hover();
-      await expect(page.getByRole("tooltip")).toHaveText(
-        "Limited due to Extreme heat",
-      );
+      await expect(
+        page.getByRole("tooltip", {
+          name: "Limited due to Extreme heat",
+          exact: true,
+        }),
+      ).toBeVisible();
       expect(
         await nuclear.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);
