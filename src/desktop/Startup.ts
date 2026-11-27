@@ -149,8 +149,7 @@ function revealMenu(entrance: HTMLElement): void {
       );
   };
   focusMain();
-  // Reduced motion shortens transitions rather than removing them, so the restored visibility
-  // only takes effect once that transition starts and ends over the next two frames.
+  // Retry after the browser paints if the restored screen cannot receive focus immediately.
   if (
     menu?.querySelector("[data-main-action]") &&
     document.activeElement === document.body
