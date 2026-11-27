@@ -133,10 +133,12 @@ const frame: MapFrame = {
   cameraY: 0,
   scale: 0.75,
   background: [0.2, 0.3, 0.4],
+  cityService: 1,
   lighting: {
     direction: [0.4, 0.8, -0.4],
     color: [1, 0.95, 0.82],
     ambient: 0.5,
+    night: 0,
     shadow: 0.2,
   },
   visible: true,
@@ -512,6 +514,37 @@ it("keeps the idle canvas asleep when React recreates equivalent frame inputs", 
   renderer.update(instances, { ...idleFrame, cameraX: 5 });
   flush(32);
   expect(renderer.diagnostics().frames).toBe(2);
+  renderer.dispose();
+});
+
+it("paints city service changes without uploading any geometry", () => {
+  const { renderer, gl } = setup();
+  const city: MapInstance = {
+    id: "city",
+    model: getStructureModel("city-small"),
+    position: [0, 0, 0],
+    active: false,
+    fog: 0,
+    onPlayerGrid: true,
+  };
+  const instances = [city];
+  renderer.update(instances, { ...frame, motionAllowed: false });
+  flush(0);
+  gl.bufferData.mockClear();
+  gl.bufferSubData.mockClear();
+  gl.uniform1f.mockClear();
+
+  renderer.update(instances, {
+    ...frame,
+    motionAllowed: false,
+    cityService: 0.5,
+  });
+  flush(16);
+
+  expect(renderer.diagnostics().frames).toBe(2);
+  expect(gl.uniform1f).toHaveBeenCalledWith({ name: "uCityService" }, 0.5);
+  expect(gl.bufferData).not.toHaveBeenCalled();
+  expect(gl.bufferSubData).not.toHaveBeenCalled();
   renderer.dispose();
 });
 

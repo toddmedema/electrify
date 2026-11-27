@@ -12,10 +12,12 @@ const frame: MapFrame = {
   cameraY: 110,
   scale: 0.75,
   background: [0, 0, 0],
+  cityService: 1,
   lighting: {
     direction: [0, 1, 0],
     color: [1, 1, 1],
     ambient: 0.5,
+    night: 0,
     shadow: 0.2,
   },
   visible: true,

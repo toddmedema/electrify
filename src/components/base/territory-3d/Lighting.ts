@@ -65,6 +65,7 @@ export function mapLighting(input: LightingInput): MapLighting {
       (input.dark ? 0.3 : 0.46) +
       daylight * (input.dark ? 0.23 : 0.19) +
       cloud * 0.09,
+    night: 1 - daylight,
     shadow:
       (0.12 + daylight * 0.13) *
       smooth(Math.abs(altitude) / 0.3) *
@@ -95,5 +96,6 @@ export function interpolateMapLighting(
     color: vector(from.color, to.color),
     ambient: blend(from.ambient, to.ambient),
     shadow: blend(from.shadow, to.shadow),
+    night: blend(from.night, to.night),
   };
 }

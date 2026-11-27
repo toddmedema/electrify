@@ -21,6 +21,7 @@ import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
 import { getSunriseSunset } from "../../helpers/DateTime";
+import { currentTick } from "../../helpers/GameSelectors";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
 import { readMapWeather } from "../base/territory-3d/MapWeather";
@@ -192,6 +193,11 @@ export default function TerritoryHexMap({
   const threeDReady = rendererState === "ready";
   const motion = useFacilityMapMotion(game.speed);
   const weather = React.useMemo(() => readMapWeather(game), [game]);
+  const now = currentTick(game);
+  const cityService =
+    now && now.demandW > 0
+      ? Math.max(0, Math.min(1, now.supplyW / now.demandW))
+      : 1;
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
@@ -1285,6 +1291,7 @@ export default function TerritoryHexMap({
                   height: size.height,
                   dpr: window.devicePixelRatio || 1,
                   background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
+                  cityService,
                   visible: size.width > 0 && size.height > 0,
                   motionAllowed: motion.allowed,
                   playbackRate: motion.rate,
