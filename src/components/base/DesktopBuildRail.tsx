@@ -91,7 +91,6 @@ function railSites(game: GameType, options: FacilityShoppingType[]) {
       .map((facility) => {
         const selection = selectProject(facility);
         let minimumDue = Infinity;
-        let minimumConstructionDue = Infinity;
         // Within one terrain, the cheapest legal connection also has the cheapest project.
         const pricedSites = new Set<string>();
         for (const tile of candidates) {
@@ -102,16 +101,9 @@ function railSites(game: GameType, options: FacilityShoppingType[]) {
           if (!quote.facility) continue;
           pricedSites.add(siteType);
           const downpayment = quote.facility.buildCost * DOWNPAYMENT_PERCENT;
-          minimumDue = Math.min(
-            minimumDue,
-            quote.connection?.price ?? downpayment,
-          );
-          minimumConstructionDue = Math.min(
-            minimumConstructionDue,
-            quote.connectionCost + downpayment,
-          );
+          minimumDue = Math.min(minimumDue, quote.connectionCost + downpayment);
         }
-        return [facility.name, { minimumDue, minimumConstructionDue }] as const;
+        return [facility.name, { minimumDue }] as const;
       }),
   );
 }
@@ -393,7 +385,7 @@ export default function DesktopBuildRail({
           ? [peerQuote.facility]
           : [];
       }
-      return (sites.get(item.name)?.minimumConstructionDue ?? Infinity) <= cash
+      return (sites.get(item.name)?.minimumDue ?? Infinity) <= cash
         ? [item]
         : [];
     });

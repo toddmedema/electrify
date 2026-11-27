@@ -7,7 +7,11 @@ import type {
   TerritoryTileId,
 } from "../Types";
 import { isStorage } from "../Types";
-import { tilePurchaseQuotes, territoryBuildAvailability } from "./Territories";
+import {
+  tilePurchaseQuote,
+  tilePurchaseQuotes,
+  territoryBuildAvailability,
+} from "./Territories";
 import {
   getTerritoryTile,
   ownsTerritoryTile,
@@ -24,6 +28,7 @@ import {
 } from "./TerritoryConnections";
 import { currentTick } from "./GameSelectors";
 import { facilityConstructionReview } from "./FacilityConstructionReview";
+import { getDateFromMinute, MINUTES_PER_MONTH } from "./DateTime";
 
 /** Only identity, options and size survive a site change; prices are always resolved again. */
 export type ProjectSelection =
@@ -107,13 +112,30 @@ export function withTerritoryCatalogueLimits(
   });
 }
 
+/** Price the proposed facility as if its connection were already available. */
+export function withProjectSiteOwnership(
+  game: GameType,
+  { tileId, price }: { tileId: TerritoryTileId; price: number },
+): GameType {
+  return {
+    ...game,
+    territoryNetwork: {
+      ...game.territoryNetwork!,
+      tilePurchases: [
+        ...(game.territoryNetwork?.tilePurchases ?? []),
+        { tileId, minute: game.date.minute, price },
+      ],
+    },
+  };
+}
+
 /** A quote-only projection uses the same ownership and named-site validators as the command.
  * No receipt or cash change is dispatched until the player confirms the final review. */
 export function projectSiteQuote(
   game: GameType,
   project: ProjectSelection,
   tileId: TerritoryTileId,
-  connections = tilePurchaseQuotes(game),
+  connections?: ReturnType<typeof tilePurchaseQuotes>,
 ) {
   const tile = getTerritoryTile(tileId, game);
   if (!tile) return { reason: "Choose a discovered site." };
@@ -131,28 +153,18 @@ export function projectSiteQuote(
       reason: tileConnectionStatus(pending, game),
     };
   const owned = ownsTerritoryTile(game, tile);
-  const connection = owned ? undefined : connections.get(tileId);
+  const connection = owned
+    ? undefined
+    : connections
+      ? connections.get(tileId)
+      : tilePurchaseQuote(game, tileId);
   if (!owned && !connection)
     return {
       reason: "Connect an adjacent site first, or choose a highlighted site.",
     };
-  const projected =
-    owned || !game.territoryNetwork
-      ? game
-      : {
-          ...game,
-          territoryNetwork: {
-            ...game.territoryNetwork,
-            tilePurchases: [
-              ...(game.territoryNetwork.tilePurchases ?? []),
-              {
-                tileId,
-                minute: game.date.minute,
-                price: connection!.price,
-              },
-            ],
-          },
-        };
+  const projected = connection
+    ? withProjectSiteOwnership(game, connection)
+    : game;
   const facility = getBuildFacilityQuote(
     projected,
     project,
@@ -190,7 +202,7 @@ export function projectSiteCapitalCost(quote: ReadyProjectSite): number {
 
 export function projectReview(
   game: GameType,
-  quote: ReadyProjectSite,
+  quote: Pick<ReadyProjectSite, "facility" | "tile" | "connection">,
   financed: boolean,
   availableCash = currentTick(game)?.cash ?? 0,
 ) {
@@ -200,19 +212,33 @@ export function projectReview(
     financed,
     quote.tile.id,
   );
-  const required = quote.connectionCost + construction.terms.amountDue;
-  const key = JSON.stringify([
-    quote.connection?.quoteKey,
-    construction.key,
-    availableCash,
-  ]);
+  const required =
+    (quote.connection?.price ?? 0) + construction.terms.amountDue;
+  const connection = quote.connection;
+  const connects = connection
+    ? getDateFromMinute(
+        Math.max(
+          connection.connectionMinute,
+          game.date.minute + connection.buildMonths * MINUTES_PER_MONTH,
+        ),
+        game.startingYear,
+      )
+    : undefined;
+  const online =
+    connects && connects.minute > construction.online.minute
+      ? connects
+      : construction.online;
+  const buildKey = connects
+    ? JSON.stringify([construction.key, connects.year, connects.month])
+    : construction.key;
   return {
     terms: construction.terms,
     required,
     remaining: availableCash - required,
     availableCash,
-    online: construction.online,
-    key,
-    buildKey: construction.key,
+    online,
+    connects,
+    key: JSON.stringify([connection?.quoteKey, buildKey, availableCash]),
+    buildKey,
   };
 }

@@ -23,6 +23,7 @@ export const purchaseFacility =
     territoryId?: TerritoryId,
     tileId?: TerritoryTileId,
     reviewKey?: string,
+    connectionQuoteKey?: string,
   ): AppThunk<Promise<FacilityPurchaseResult>> =>
   async (dispatch, getState) => {
     const initial = getState();
@@ -52,7 +53,9 @@ export const purchaseFacility =
       dispatch(facilityPurchased(built.id));
       dispatch(
         snackbarOpen({
-          message: buildConsequenceMessage(facility),
+          message: connectionQuoteKey
+            ? `Connection and ${facility.name} construction started.`
+            : buildConsequenceMessage(facility),
           open: true,
           timeout: 8000,
           actionLabel: "Events",
@@ -67,6 +70,9 @@ export const purchaseFacility =
         financed,
         territoryId,
         ...(tileId !== undefined ? { tileId } : {}),
+        ...(connectionQuoteKey !== undefined
+          ? { connectionQuoteKey, reviewKey }
+          : {}),
       };
       if (multiplayer && getState().game.multiplayer) {
         await multiplayer.submit({

@@ -72,8 +72,14 @@ for (const theme of ["light", "dark"] as const) {
       });
     }
     await page
-      .getByRole("button", { name: "How interties work", exact: true })
+      .getByRole("button", { name: "How power trading works", exact: true })
       .click();
+    await expect(
+      page.getByRole("heading", { name: "Agreements", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/set buying and selling alongside your connections/),
+    ).toBeVisible();
     const sources = page.locator(".manual-sources a");
     await expect(sources.first()).toBeVisible();
     for (const citation of await sources.all()) {
