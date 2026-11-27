@@ -349,7 +349,7 @@ export const SCENARIOS: ScenarioType[] = [
       {
         skipBeacon: true,
         card: "FACILITIES",
-        target: `${BUILD_DOCK}, #tab-BUILD_STORAGE, [aria-label="Pick site for Lithium Battery"]:not([aria-disabled="true"])`,
+        target: `${BUILD_DOCK}, #tab-BUILD_STORAGE:not([aria-selected="true"]), [aria-label="Pick site for Lithium Battery"]:not([aria-disabled="true"])`,
         desktop: {
           target:
             '[aria-label="Choose sites for Battery"]:not([aria-disabled="true"])',
@@ -719,7 +719,7 @@ export const SCENARIOS: ScenarioType[] = [
         advanceOn: (s) => s.card.name === "AGREEMENTS",
         action: "Open Agreements",
         content: (
-          <TutorialPrompt text="Valley and Ridge share a border with your territory. Look for a shared border when making an agreement with a neighboring utility." />
+          <TutorialPrompt text="For an agreement with a neighboring utility, your territories need to share a border. Valley Electric and Ridge Electric both border your grid." />
         ),
       },
       {
