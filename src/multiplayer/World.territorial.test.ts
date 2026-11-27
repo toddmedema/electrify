@@ -6,8 +6,11 @@ import {
   YEARS_PER_TICK,
 } from "../Constants";
 import type { FacilityUpgradeType, FrontierTerritoryId } from "../Types";
+import { isStorage } from "../Types";
 import { DEMAND_TYPES } from "../data/DemandProfiles";
+import { storagePowerW } from "../data/FacilityCapacity";
 import { peerCorridorId } from "../data/Multiplayer";
+import { facilityExpansionQuote } from "../helpers/FacilityExpansion";
 import { currentTick } from "../helpers/GameSelectors";
 import {
   multiplayerClaimQuote,
@@ -354,6 +357,71 @@ test("construction is booked on an owned vacant tile only and exact placements s
   forged.grids[0].facilities.at(-1)!.tileId = peerTile;
   expect(() => hydrateWorld(forged)).toThrow(/invalid grids/i);
 });
+
+test.each([
+  ["Wind", 1e9],
+  ["Battery", 5e9],
+] as const)(
+  "rejects a booked %s expansion beyond its territorial site capacity",
+  (name, forgedSize) => {
+    const world = createWorld(
+      {
+        ...COOP_TEST_SPEC,
+        territorialVersion: 1,
+        customScenario: {
+          ...COOP_TEST_SPEC.customScenario!,
+          startingYear: 2035,
+          facilities: [
+            { name: "Wind", fuel: "Wind", peakW: 60e6 },
+            { name: "Battery", peakWh: 50e6 },
+          ],
+        },
+      },
+      coopSeats(2),
+      "expansion-capacity",
+      "opening",
+    );
+    const [grid] = world.grids;
+    const plant = grid.facilities.find((facility) => facility.name === name)!;
+    const quote = facilityExpansionQuote(grid, plant.id, 100e6);
+    if (quote.status !== "ready") throw new Error(quote.reason);
+    expect(
+      action(world, "0", "expandFacility", {
+        facilityId: plant.id,
+        targetSize: quote.targetSize,
+        quoteKey: quote.quoteKey,
+        financed: false,
+      }),
+    ).toBeUndefined();
+    const checkpoint = save(world);
+    const savedPlant = checkpoint.grids[0].facilities.find(
+      ({ id }) => id === plant.id,
+    )!;
+    const project = savedPlant.expansionInProgress!;
+    expect(
+      hydrateWorld(checkpoint).grids[0].facilities.find(
+        ({ id }) => id === plant.id,
+      )?.expansionInProgress,
+    ).toEqual(project);
+
+    // Keep the stored review terms coherent while exceeding what this tile can host.
+    project.targetSize = forgedSize;
+    if (isStorage(savedPlant)) {
+      project.targetPeakWh = forgedSize;
+      project.targetPeakW =
+        savedPlant.peakW +
+        storagePowerW(name, forgedSize) -
+        storagePowerW(name, savedPlant.peakWh);
+    } else {
+      project.targetPeakW = forgedSize;
+    }
+    const reviewed = JSON.parse(project.quoteKey);
+    reviewed[3] = project.targetSize;
+    reviewed[4] = project.targetPeakW;
+    project.quoteKey = JSON.stringify(reviewed);
+    expect(() => hydrateWorld(checkpoint)).toThrow(/invalid grids/i);
+  },
+);
 
 test("a withdrawn or replaced proposal cannot be accepted from an older room view", () => {
   const world = create();

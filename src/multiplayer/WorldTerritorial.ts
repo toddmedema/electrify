@@ -194,6 +194,16 @@ export function validTerritorialOwnership(world: World, initial: World) {
         )
       )
         return false;
+      const expansion = facility.expansionInProgress;
+      if (
+        expansion &&
+        !tileFitsFacility(tile, {
+          ...facility,
+          peakW: expansion.targetPeakW,
+          peakWh: expansion.targetPeakWh,
+        })
+      )
+        return false;
       occupied.add(tile.id);
     }
   }
