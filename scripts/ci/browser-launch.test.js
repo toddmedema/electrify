@@ -4,6 +4,7 @@ const { browserLaunchOptions } = require("./browser-launch");
 
 test("all test browsers deny Firebase and Windows preserves the existing disabled features", () => {
   const { args } = browserLaunchOptions("linux");
+  assert.ok(args.includes("--no-proxy-server"));
   assert.deepEqual(browserLaunchOptions("darwin"), { args });
   const { server } = require("playwright-core/lib/coreBundle");
   const chromium = server.createPlaywright({

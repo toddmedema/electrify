@@ -27,7 +27,7 @@ ${expected.description}`,
     );
   }
 
-  onEnd(result: FullResult) {
+  async onEnd(result: FullResult) {
     if (this.mismatched && result.status === "passed")
       return { status: "failed" as const };
   }
