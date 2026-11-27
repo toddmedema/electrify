@@ -455,6 +455,9 @@
     right: 12px;
     bottom: max(12px, var(--game-dock-clearance));
   }
+}
+
+:is(.regionalMapWorkspace, .multiplayerTerritoryMap) {
   .tileWorkspaceSurface.tileWorkspaceInspector .tileWorkspaceHeading {
     display: flex;
     align-items: flex-start;

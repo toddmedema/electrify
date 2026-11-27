@@ -569,8 +569,8 @@ test(
     await expect(
       territorialMap(host).locator("canvas.territory3DCanvas"),
     ).toHaveAttribute("data-renderer", "ready");
+    await host.mouse.move(1, 1);
     if (!compact) {
-      await host.mouse.move(1, 1);
       await reviewScreenshot(host, {
         path: info.outputPath("territorial-desktop.png"),
         animations: "disabled",
