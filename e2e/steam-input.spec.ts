@@ -182,6 +182,14 @@ async function select(
   ).toBeFocused();
 }
 
+async function openControllerFleet(page: Page) {
+  await select(page, page.getByRole("button", { name: "Fleet", exact: true }));
+  await input(page, "confirm");
+  await expect(
+    page.getByRole("button", { name: "Map", exact: true }),
+  ).toBeVisible();
+}
+
 /** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
 async function selectMapTile(page: Page, id: TerritoryTileId) {
   const target = page.locator(`[data-map-target="${id}"]`);
@@ -726,6 +734,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await expect(build).toHaveCount(0);
 
   // Confirm lifts a reorder handle; directions must move the row rather than leave it.
+  await openControllerFleet(page);
   const rows = page.locator(".facilities:visible .facilityRow");
   const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
   const grip = rows.first().getByRole("button", { name: /^Reorder / });
@@ -791,6 +800,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
   await input(page, "nextChart");
   const chart = page.locator(
     '.accessibleChart > [role="img"][tabindex="0"]:focus',
@@ -1932,6 +1942,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(
       page.getByRole("button", { name: "Build", exact: true }),
     ).toBeFocused();
+    await openControllerFleet(page);
     await capture("fleet");
     const inspect = page.getByRole("button", {
       name: "Inspect Coal",

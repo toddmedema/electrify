@@ -186,7 +186,7 @@ export default function Navigation({
             className="gameDockAction"
             aria-label={regionalViewLabel}
             aria-controls={regionalGridView.paneId}
-            data-game-destination={openFleet ? "FLEET" : "FACILITIES"}
+            data-game-base-view={openFleet ? "FACILITIES" : "FLEET"}
             onClick={regionalGridView.onToggle}
           >
             <Badge>{openFleet ? <FactoryIcon /> : <MapOutlinedIcon />}</Badge>
