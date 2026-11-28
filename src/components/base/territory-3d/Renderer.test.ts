@@ -708,7 +708,7 @@ it("rebuilds lost GPU resources and notifies readiness only after restored drawi
   expect(renderer.diagnostics().phases["facility-0"]).toBe(phase);
   renderer.dispose();
 });
-it("fails gracefully without WebGL2 or when shader compilation fails", () => {
+it("fails gracefully without WebGL2", () => {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest.spyOn(canvas, "getContext").mockReturnValue(null);
   const state = jest.fn(),
@@ -717,14 +717,27 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   expect(state).toHaveBeenCalledWith("unavailable");
   expect(callbacks.size).toBe(0);
   renderer.dispose();
-  const gl = mockContext();
-  gl.getShaderParameter.mockReturnValue(false);
-  const broken = setup(gl, true);
-  expect(broken.state).toHaveBeenCalledWith("unavailable");
-  expect(gl.deleteShader).toHaveBeenCalledTimes(1);
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
-  broken.renderer.dispose();
 });
+
+it.each([
+  { mode: "inland", inlandOnly: true as const, attempts: 1 },
+  {
+    mode: "default ocean and flat fallback",
+    inlandOnly: undefined,
+    attempts: 2,
+  },
+])(
+  "releases every failed $mode shader and program",
+  ({ inlandOnly, attempts }) => {
+    const gl = mockContext();
+    gl.getShaderParameter.mockReturnValue(false);
+    const { renderer, state } = setup(gl, inlandOnly);
+    expect(state).toHaveBeenCalledWith("unavailable");
+    expect(gl.deleteShader).toHaveBeenCalledTimes(attempts);
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(attempts);
+    renderer.dispose();
+  },
+);
 
 it("draws inland geometry without compiling an ocean program", () => {
   const gl = mockContext();
