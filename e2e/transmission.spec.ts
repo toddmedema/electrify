@@ -202,12 +202,10 @@ test("island grids do not offer interties or power exchange", async ({
     page.getByRole("button", { name: "Insights", exact: true }),
   );
   await insights.getByRole("button", { name: /Layers \(/ }).click();
-  await expect(
-    insights.getByRole("checkbox", { name: "Power exchange" }),
-  ).toHaveCount(0);
-  await expect(
-    insights.getByRole("heading", { name: "Power exchange" }),
-  ).toHaveCount(0);
+  await expect(insights.getByRole("checkbox", { name: "Trade" })).toHaveCount(
+    0,
+  );
+  await expect(insights.getByRole("heading", { name: "Trade" })).toHaveCount(0);
 });
 
 test("unified facility rows support keyboard inspection and dispatch reordering", async ({

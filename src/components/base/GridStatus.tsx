@@ -172,7 +172,7 @@ export default function GridStatus({
     !tutorial &&
     (territoryNetwork
       ? onNavigate && {
-          label: "Manage agreements",
+          label: "Open Trade",
           run: () => onNavigate("AGREEMENTS"),
         }
       : legacyInterties &&

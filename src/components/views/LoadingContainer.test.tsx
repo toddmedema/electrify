@@ -114,7 +114,7 @@ it.each([
       const onError = jest.fn();
       await mapDispatchToProps(dispatch as never).load(parsed!.game, onError);
       expect(onError.mock.calls).toEqual(
-        forged ? [[expect.stringContaining("power agreement history")]] : [],
+        forged ? [[expect.stringContaining("trade history")]] : [],
       );
       expect(dispatch.mock.calls).toEqual(forged ? [] : [[loaded()]]);
       expect(parseSave(wire) === null).toBe(forged);

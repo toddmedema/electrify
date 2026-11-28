@@ -21,9 +21,9 @@ const missions = [
     actions: ["Fleet", "Build", "Programs", "Insights"],
   },
   {
-    name: "Agreements",
+    name: "Trade",
     id: 112,
-    actions: ["Fleet", "Agreements", "Build", "Programs", "Insights", "Events"],
+    actions: ["Fleet", "Trade", "Build", "Programs", "Insights", "Events"],
   },
 ];
 

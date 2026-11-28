@@ -1,4 +1,3 @@
-import * as React from "react";
 import { ListItem } from "@mui/material";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
@@ -21,7 +20,6 @@ export default function FleetAgreements({
   onDragStart: () => void;
   onDragEnd: (move: ReprioritizePowerAgreementAction | null) => void;
 }) {
-  const heading = React.useId();
   const agreements = dispatchOrderedAgreements(game);
   const tick = currentTick(game);
   const importedW = tick?.importedW ?? 0;
@@ -41,9 +39,9 @@ export default function FleetAgreements({
   const wattsPerMWh = totalMWh > 0 ? contractedW / totalMWh : 0;
   const awaitingReading = !meteredW && !totalMWh && contractedW > 0;
   return (
-    <section className="fleetAgreements" aria-labelledby={heading}>
+    <section className="fleetAgreements" aria-label="Fleet trade">
       <div className="facilitySectionLabel fleetAgreementsHeading">
-        <strong id={heading}>Agreements</strong>
+        <strong>Trade</strong>
         <span className="facilitySectionFlow">
           {exchange.join(" · ") || "No imports or exports"}
         </span>
@@ -71,7 +69,7 @@ export default function FleetAgreements({
               ref={list.innerRef}
               {...list.droppableProps}
               role="list"
-              aria-label="Agreement dispatch order"
+              aria-label="Trade dispatch order"
             >
               {agreements.map((agreement, index) => {
                 const ratingW = agreement.nominalW * agreement.deliverability;

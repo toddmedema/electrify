@@ -1282,7 +1282,7 @@ test("controller cycles six right-hand panels around the persistent map", async 
   const original = await viewport.elementHandle();
   for (const name of [
     "Fleet",
-    "Agreements",
+    "Trade",
     "Programs",
     "Insights",
     "Events",

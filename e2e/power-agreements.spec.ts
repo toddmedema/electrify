@@ -20,12 +20,12 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=116");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const agreements = page.getByRole("region", {
-      name: "Agreements",
+      name: "Trade",
       exact: true,
     });
     await openPane(
       agreements,
-      page.getByRole("button", { name: "Agreements", exact: true }),
+      page.getByRole("button", { name: "Trade", exact: true }),
     );
     let line = agreements.locator(".territoryAgreements");
     await expect(
@@ -35,10 +35,7 @@ for (const theme of ["light", "dark"] as const) {
       line.getByRole("heading", { name: "Regional nuclear" }),
     ).toBeVisible();
     await expect(
-      agreements.getByRole("heading", { name: "Supply agreements" }),
-    ).toHaveCount(0);
-    await expect(
-      agreements.getByRole("heading", { name: "Power purchase agreements" }),
+      agreements.getByRole("heading", { name: "Supply trades" }),
     ).toHaveCount(0);
     const inherited = line.getByRole("article", { name: "Regional nuclear" });
     await expect(inherited.getByText("95MW", { exact: true })).toBeVisible();
@@ -93,7 +90,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
       agreements,
-      page.getByRole("button", { name: "Agreements", exact: true }),
+      page.getByRole("button", { name: "Trade", exact: true }),
     );
     line = agreements.locator(".territoryAgreements");
     await expect(
@@ -107,7 +104,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await expect(review).toBeVisible();
     const offer = line.getByRole("button", {
-      name: "Review Valley Electric supply agreement",
+      name: "Review Valley Electric supply trade",
       exact: true,
     });
     await expect(offer).toHaveText("Review");
@@ -143,10 +140,10 @@ for (const theme of ["light", "dark"] as const) {
       "Local generation can reduce purchases",
     );
     const table = dialog.getByRole("table", {
-      name: "Replacement agreement terms",
+      name: "Replacement trade terms",
     });
     await expect(table.getByRole("rowheader")).toHaveText([
-      "Agreement price",
+      "Trade price",
       "Reference price",
       "Discount",
       "Min payment",
@@ -173,7 +170,7 @@ for (const theme of ["light", "dark"] as const) {
     ).not.toContainText("60 MW");
     const agreementRate = async () =>
       Number(
-        (await dialog.getByRole("row", { name: /Agreement price/ }).innerText())
+        (await dialog.getByRole("row", { name: /Trade price/ }).innerText())
           .match(/\$([\d,.]+)\/MWh/)![1]
           .replaceAll(",", ""),
       );
@@ -227,9 +224,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(savings).toContainText(/-?\$[\d.,]+[kMBT]? over 5 years/, {
       timeout: 45000,
     });
-    await expect(savings).toContainText(
-      "Compared with omitting this agreement",
-    );
+    await expect(savings).toContainText("Compared with omitting this trade");
     const impactLabel = dialog.getByRole("rowheader", {
       name: "Forecasted grid impact",
     });
@@ -285,7 +280,7 @@ for (const theme of ["light", "dark"] as const) {
       "5 years",
     );
     const accept = dialog.getByRole("button", {
-      name: "Accept agreement",
+      name: "Accept trade",
       exact: true,
     });
     await accept.focus();
@@ -298,7 +293,7 @@ for (const theme of ["light", "dark"] as const) {
       .locator(".powerAgreement")
       .filter({ hasText: "Scheduled · starts 1 Jan 2020" });
     const confirmation = page.locator(".snackbarContent");
-    await expect(confirmation).toContainText("Agreement accepted");
+    await expect(confirmation).toContainText("Trade accepted");
     const dismiss = confirmation.getByRole("button", {
       name: "Dismiss notification",
     });
@@ -322,7 +317,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await signedAgreement.locator("summary").click();
     const details = signedAgreement.getByRole("table", {
-      name: "Agreement details",
+      name: "Trade details",
     });
     await expect(
       details.getByRole("row", { name: /^First month/ }),
@@ -342,7 +337,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
       agreements,
-      page.getByRole("button", { name: "Agreements", exact: true }),
+      page.getByRole("button", { name: "Trade", exact: true }),
     );
     await expect(line).toContainText("Scheduled · starts 1 Jan 2020");
     await expect(line).toContainText("Dec 2024");
@@ -381,7 +376,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     await openPane(
       agreements,
-      page.getByRole("button", { name: "Agreements", exact: true }),
+      page.getByRole("button", { name: "Trade", exact: true }),
     );
     const expired = line.getByRole("article", { name: "Regional nuclear" });
     await expect(expired).toContainText("Expired 1 Jan 2020");
@@ -398,7 +393,7 @@ for (const theme of ["light", "dark"] as const) {
       name: "Regional nuclear recorded history",
     });
     await expect(
-      history.getByRole("table", { name: "Recorded agreement history" }),
+      history.getByRole("table", { name: "Recorded trade history" }),
     ).toContainText("0 MWh used");
     await expectDialogToFit(history);
     await page.keyboard.press("Escape");

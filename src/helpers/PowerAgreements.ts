@@ -563,7 +563,7 @@ export function connectionAgreements(
   });
 }
 
-/** The Fleet list contains current and scheduled contracts. Agreements keeps the expired history. */
+/** The Fleet list contains current and scheduled trades. The Trade panel keeps expired history. */
 export function dispatchOrderedAgreements(game: GameType) {
   const minute = game.date.minute;
   const compare = agreementDispatchComparator(game);

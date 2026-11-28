@@ -703,7 +703,6 @@ function FacilitySupplyChart({
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
   const height = useFleetChartHeight(anchor);
-  const exchangeLabel = hasTerritoryNetwork(game) ? "Agreements" : undefined;
   // A portrait tablet's sheet starts where this block ends.
   React.useLayoutEffect(() => {
     const element = anchor.current;
@@ -735,7 +734,6 @@ function FacilitySupplyChart({
         height={height}
         exactHeight
         timeline={game.timeline}
-        exchangeLabel={exchangeLabel}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
         speed={game.speed}
@@ -1483,7 +1481,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                   {game.multiplayer && (
                     <section>
                       <Typography component="h3" variant="subtitle1">
-                        Co-op power sharing
+                        Co-op trade
                       </Typography>
                       <TradingControls
                         game={game}

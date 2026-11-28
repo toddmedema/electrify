@@ -2437,9 +2437,7 @@ it("keeps restored co-op trading choices reachable through territory agreements"
     undefined,
     "AGREEMENTS",
   );
-  expect(
-    screen.getByRole("heading", { name: "Co-op power sharing" }),
-  ).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Co-op trade" })).toBeVisible();
   const buying = screen.getByRole("combobox", { name: "Buying" });
   expect(buying).toHaveTextContent("None");
   await user.click(buying);

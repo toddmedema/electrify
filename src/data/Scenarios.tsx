@@ -693,7 +693,7 @@ export const SCENARIOS: ScenarioType[] = [
   },
   {
     id: 112,
-    name: "Mission 7: Agreements",
+    name: "Mission 7: Trade",
     icon: "transmission",
     summary: "Buy backup power from a neighbor",
     locationId: "BurlingtonVT",
@@ -711,7 +711,7 @@ export const SCENARIOS: ScenarioType[] = [
     intertiesEnabled: true,
     endTitle: "Mission complete!",
     endMessage:
-      "You put a regional power agreement to work. Use Agreements to track delivery and plan for contracts ending.",
+      "You put a regional power trade to work. Use Trade to track delivery and check end dates.",
     facilities: UTILITY_AREAS.champlain.facilities,
     tutorialSteps: [
       {
@@ -720,21 +720,21 @@ export const SCENARIOS: ScenarioType[] = [
         revealActions: ["AGREEMENTS"],
         target: "#agreementsNav",
         advanceOn: (s) => s.card.name === "AGREEMENTS",
-        action: "Open Agreements",
+        action: "Open Trade",
         content: (
-          <TutorialPrompt text="For an agreement with a neighboring utility, your territories need to share a border. Valley Electric and Ridge Electric both border your grid." />
+          <TutorialPrompt text="To trade with a neighboring utility, your territories need to share a border. Valley Electric and Ridge Electric both border your grid." />
         ),
       },
       {
         card: "AGREEMENTS",
         target: [
-          '[aria-label="Review Valley Electric supply agreement"]',
+          '[aria-label="Review Valley Electric supply trade"]',
           '[role="dialog"] .MuiDialogActions-root button.MuiButton-contained',
         ].join(", "),
         advanceOn: acceptedAgreement,
-        action: "Review and accept a power agreement",
+        action: "Review and accept a supply trade",
         content: (
-          <TutorialPrompt text="Try Valley Electric. Check the price and minimum payment. You can have one agreement at a time with each neighboring utility." />
+          <TutorialPrompt text="Try Valley Electric. Check the price and minimum payment. You can have one supply trade at a time with each neighbor." />
         ),
       },
       {
@@ -744,7 +744,7 @@ export const SCENARIOS: ScenarioType[] = [
           tutorialViewedMapTool.match(action) && action.payload === "FLEET",
         action: "Open Fleet to see power flows",
         content: (
-          <TutorialPrompt text="Fleet lists your agreements below its chart. Check when your new contract starts in the Agreements panel." />
+          <TutorialPrompt text="Fleet shows your trades below the chart. Open Trade to check when delivery starts." />
         ),
       },
       {
@@ -752,22 +752,22 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#speedChangeButtons",
         action: "Run the clock until your grid imports power",
         content: (
-          <TutorialPrompt text="After it starts, the agreement can cover demand your plants can’t meet." />
+          <TutorialPrompt text="Once delivery starts, the trade can cover demand your plants can’t meet." />
         ),
         capstone: {
           preserveProgress: true,
           success: hasImportedFromAgreement,
           successMessage: "Your grid drew power from a neighboring utility.",
-          failureMessage: "Keep the agreement active and run the clock.",
+          failureMessage: "Keep the trade active and run the clock.",
         },
       },
       {
         card: "FLEET",
         target: '.fleetAgreements [role="list"]',
         nextLabel: "Finish tutorial",
-        action: "Read your agreement flows",
+        action: "Read your trade flows",
         content: (
-          <TutorialPrompt text="The Agreements section shows how much each contract is supplying. Drag a row higher to use that contract’s power first." />
+          <TutorialPrompt text="Trade shows how much power each supplier is delivering. Drag a row higher to use that supply first." />
         ),
       },
     ],

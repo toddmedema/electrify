@@ -54,7 +54,7 @@ export const MAP_VIEWS: {
   { id: "FLEET", label: "Fleet", triggerId: "fleetNav", icon: <FactoryIcon /> },
   {
     id: "AGREEMENTS",
-    label: "Agreements",
+    label: "Trade",
     triggerId: "agreementsNav",
     icon: <HandshakeIcon />,
   },

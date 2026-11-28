@@ -33,15 +33,13 @@ it("preserves negative savings and the requested horizon without competing metri
     </BuildDetails>,
   );
   expect(screen.getByRole("status")).toHaveTextContent("-$1.3M over 5 years");
-  expect(
-    screen.getByText("Compared with omitting this agreement"),
-  ).toBeVisible();
+  expect(screen.getByText("Compared with omitting this trade")).toBeVisible();
   expect(screen.getByText("60 → 100%")).toBeVisible();
   expect(screen.queryByRole("heading")).not.toBeInTheDocument();
 });
 it.each([
-  [{}, "Calculating…", "Compared with omitting this agreement"],
-  [{ updating: true }, "Updating…", "Compared with omitting this agreement"],
+  [{}, "Calculating…", "Compared with omitting this trade"],
+  [{ updating: true }, "Updating…", "Compared with omitting this trade"],
   [
     { blocked: "coop" as const },
     "Unavailable in co-op",
@@ -91,7 +89,7 @@ it("keeps recorded payments separate and does not manufacture unavailable earlie
     />,
   );
   expect(
-    screen.getByRole("table", { name: "Recorded agreement history" }),
+    screen.getByRole("table", { name: "Recorded trade history" }),
   ).toHaveTextContent("50 MWh used · $1k paid");
   expect(screen.getByText("Earlier history unavailable")).toBeVisible();
   expect(screen.queryByRole("status")).not.toBeInTheDocument();

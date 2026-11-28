@@ -163,7 +163,7 @@ export default function AcquisitionReviewDialog({
       afterFacts={
         <div className="acquisitionReviewDetails">
           <details className="acquisitionDisclosure" open>
-            <summary>Plants &amp; purchased power</summary>
+            <summary>Plants &amp; trade</summary>
             <div>
               {!!offer.facilities.length && (
                 <>
@@ -185,12 +185,12 @@ export default function AcquisitionReviewDialog({
               )}
               {offer.kind === "regional" && (
                 <Typography component="h3" variant="subtitle2">
-                  Purchased power
+                  Supply trades
                 </Typography>
               )}
               {!!offer.contracts.length ? (
                 <DecisionImpactPreview
-                  label="Purchased power"
+                  label="Supply trades"
                   facts={offer.contracts.map((contract) => ({
                     concept: "supply",
                     label: contract.name,
@@ -200,7 +200,7 @@ export default function AcquisitionReviewDialog({
                 />
               ) : (
                 <Typography variant="body2">
-                  No purchased-power contracts transfer.
+                  No supply trades transfer.
                 </Typography>
               )}
               {offer.targetId === "valley-electric" && (

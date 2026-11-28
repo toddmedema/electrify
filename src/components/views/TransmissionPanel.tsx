@@ -1299,7 +1299,7 @@ export default function TransmissionPanel({
                                       variant="body2"
                                       color="textSecondary"
                                     >
-                                      Market buying is off. Existing agreements
+                                      Market buying is off. Signed trades
                                       continue.
                                     </Typography>
                                   )}

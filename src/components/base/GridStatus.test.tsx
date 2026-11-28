@@ -79,7 +79,7 @@ it("closes before navigating from the diagnosis", () => {
   const status = screen.getByRole("button", { name: /^Current grid status/ });
   for (const [name, target] of [
     ["Manage fleet", "FLEET"],
-    ["Manage agreements", "AGREEMENTS"],
+    ["Open Trade", "AGREEMENTS"],
   ]) {
     props.onNavigate.mockImplementation(() =>
       expect(
@@ -202,7 +202,7 @@ it.each([
       controls.getByRole("button", { name: "About reserve" }),
       forecast,
       controls.getByRole("button", { name: "Manage fleet" }),
-      controls.getByRole("button", { name: "Manage agreements" }),
+      controls.getByRole("button", { name: "Open Trade" }),
     ]);
     expect(forecast).toHaveClass("MuiButton-contained");
   },
@@ -238,7 +238,7 @@ it.each([101, 105])(
     );
     expect(
       screen.queryByRole("button", {
-        name: /Manage agreements|Manage interties/,
+        name: /Open Trade|Manage interties/,
       }),
     ).not.toBeInTheDocument();
   },
@@ -298,7 +298,7 @@ it("retains tutorial facts while allowing only revealed navigation", () => {
   expect(screen.getByRole("heading", { name: /^Now ·/ })).toBeVisible();
   expect(
     screen.queryByRole("button", {
-      name: /Manage fleet|Manage agreements|Manage interties|View supply forecast/,
+      name: /Manage fleet|Open Trade|Manage interties|View supply forecast/,
     }),
   ).not.toBeInTheDocument();
   rerender(

@@ -2860,7 +2860,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "On 1 Jan 2020, 100 MW of nuclear agreement coverage will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
+      "On 1 Jan 2020, 100 MW of nuclear supply will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
       {
         title: "Legacy power contracts change in 2020",
         importance: "NOTABLE",
@@ -2872,7 +2872,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "Champlain’s 100 MW nuclear agreement has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
+      "Champlain’s 100 MW nuclear trade has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
       {
         title: "Legacy power purchases reduced",
         importance: "CRITICAL",

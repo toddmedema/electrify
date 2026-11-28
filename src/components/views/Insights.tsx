@@ -190,7 +190,7 @@ export const INSIGHT_LAYERS: readonly InsightLayerDefinition[] = [
   { id: "spareCapacity", label: "Lowest reserve", group: "Grid" },
   {
     id: "powerExchange",
-    label: "Power exchange",
+    label: "Trade",
     group: "Grid",
     availability: "transmission",
   },

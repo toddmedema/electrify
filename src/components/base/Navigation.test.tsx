@@ -112,13 +112,13 @@ describe("Navigation", () => {
     expect(
       screen.queryByRole("button", { name: "Map" }),
     ).not.toBeInTheDocument();
-    for (const name of ["Fleet", "Agreements"])
+    for (const name of ["Fleet", "Trade"])
       expect(screen.getByRole("button", { name })).toBeEnabled();
     act(() => {
       store.dispatch(delta({ scenarioId: 103 }));
     });
     expect(screen.getByRole("button", { name: "Build" })).toBeEnabled();
-    for (const name of ["Map", "Fleet", "Agreements"])
+    for (const name of ["Map", "Fleet", "Trade"])
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     view.unmount();
   });
@@ -302,8 +302,8 @@ describe("Navigation", () => {
     [4, 3, ["Fleet", "Programs", "Insights"]],
     [3, 0, ["Fleet", "Programs", "Insights"]],
     [5, 0, ["Fleet", "Programs", "Insights"]],
-    [112, 0, ["Fleet", "Agreements", "Programs", "Insights", "Events"]],
-    [112, 4, ["Fleet", "Agreements", "Programs", "Insights", "Events"]],
+    [112, 0, ["Fleet", "Trade", "Programs", "Insights", "Events"]],
+    [112, 4, ["Fleet", "Trade", "Programs", "Insights", "Events"]],
   ])(
     "shows only taught actions in tutorial %s step %s",
     (scenarioId, tutorialStep, actions) => {

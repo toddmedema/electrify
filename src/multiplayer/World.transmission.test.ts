@@ -488,7 +488,7 @@ it("applies agreement priority to the owning grid and restores it from a shared 
       ...envelope,
       command: { ...command, payload: { ...command.payload, id: "missing" } },
     }),
-  ).toMatch(/agreement/);
+  ).toMatch(/trade/);
   expect(
     applyCommand(world, "0", { ...envelope, sequence: 3, command }),
   ).toBeUndefined();

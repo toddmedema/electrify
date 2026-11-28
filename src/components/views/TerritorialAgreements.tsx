@@ -42,7 +42,7 @@ export default function TerritorialAgreements({
   return (
     <div className="territoryAgreements multiplayerAgreements">
       {game.multiplayer?.peers?.some(({ connected }) => connected) && (
-        <section aria-label="Peer trading rules">
+        <section aria-label="Co-op trade rules">
           {price !== undefined && (
             <Typography variant="body2">
               Peer market price {formatPricePerMWh(price)}

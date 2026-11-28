@@ -106,10 +106,10 @@ describe("tutorial mission metadata", () => {
       expect(capstones).toHaveLength(1);
     });
   });
-  it("starts the Agreements lesson on the Champlain grid with real agreements", () => {
+  it("starts the Trade lesson on the Champlain grid with real agreements", () => {
     const mission = getScenario(112)!;
     expect(mission).toMatchObject({
-      name: "Mission 7: Agreements",
+      name: "Mission 7: Trade",
       seed: 249007,
       locationId: "BurlingtonVT",
       startingYear: 2005,

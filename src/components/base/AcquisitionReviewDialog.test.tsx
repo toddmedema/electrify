@@ -104,7 +104,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     expect(screen.getByRole("button", { name: "Pay cash" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Take loan" })).toBeEnabled();
 
-    const assets = disclosure("Plants & purchased power");
+    const assets = disclosure("Plants & trade");
     expect(within(assets).getByText("Operating plants")).toBeVisible();
     expect(
       within(assets)
@@ -125,7 +125,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
     for (const contract of quote.contracts)
       expect(within(assets).getByText(contract.name)).toBeVisible();
 
-    await user.click(within(assets).getByText("Plants & purchased power"));
+    await user.click(within(assets).getByText("Plants & trade"));
     expect(within(assets).getByText("Operating plants")).not.toBeVisible();
 
     const financing = disclosure("Financing breakdown");
@@ -151,7 +151,7 @@ it.each(["valley-electric", "ridge-electric"] as const)(
 
 it("keeps Valley’s inherited supply and future reduction discoverable", async () => {
   review("valley-electric");
-  const assets = disclosure("Plants & purchased power");
+  const assets = disclosure("Plants & trade");
   const schedule = disclosure("Supply & operating changes");
   await userEvent.click(
     within(schedule).getByText("Supply & operating changes"),
@@ -171,7 +171,7 @@ it.each([2017, 2024])(
   "keeps the current Valley supply and its reduction date discoverable in %i",
   (year) => {
     review("valley-electric", year);
-    const assets = disclosure("Plants & purchased power");
+    const assets = disclosure("Plants & trade");
     expect(
       within(assets).getByText(/nuclear purchase is now/),
     ).toHaveTextContent("76MW");
@@ -183,13 +183,11 @@ it("explains expired power rights from a 2025 purchase", () => {
   const { quote, preview } = review("valley-electric", 2025);
   expect(quote.contracts).toEqual([]);
   expect(screen.getByText(expectedMargin(preview))).toBeVisible();
-  const assets = disclosure("Plants & purchased power");
+  const assets = disclosure("Plants & trade");
   expect(
     within(assets).getByText(/nuclear purchase has expired/),
   ).toBeVisible();
-  expect(
-    within(assets).getByText("No purchased-power contracts transfer."),
-  ).toBeVisible();
+  expect(within(assets).getByText("No supply trades transfer.")).toBeVisible();
   expect(screen.queryByText(/Retire the acquired oil/)).not.toBeInTheDocument();
 });
 

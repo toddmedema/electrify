@@ -237,27 +237,25 @@ test("Mission 6 · read a shortage forecast and finish a new generator", async (
 });
 
 async function signValleyAgreement(page: Page) {
-  await action(page, "Agreements");
+  await action(page, "Trade");
   await page
     .getByRole("button", {
-      name: "Review Valley Electric supply agreement",
+      name: "Review Valley Electric supply trade",
       exact: true,
     })
     .click();
   await expect(
     page.getByRole("dialog", {
-      name: "Review Valley Electric supply agreement",
+      name: "Review Valley Electric supply trade",
     }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Accept agreement", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Accept trade", exact: true }).click();
   await goal(page, "Open Fleet to see power flows");
 }
 
 async function openFleetBesideAgreements(page: Page) {
   await action(page, "Fleet");
-  // Expose the heading, chart and Close button even after Agreements opens.
+  // Expose the heading, chart and Close button even after Trade opens.
   const title = page.getByRole("heading", { name: "Fleet", exact: true });
   const box = (await title.boundingBox())!;
   const x = box.x + box.width / 2;
@@ -268,14 +266,14 @@ async function openFleetBesideAgreements(page: Page) {
   await page.mouse.up();
 }
 
-test("closing a tool keeps Agreements waiting for Fleet selection", async ({
+test("closing a tool keeps Trade waiting for Fleet selection", async ({
   page,
 }) => {
   await startMission(page, 112);
   const floating = page.viewportSize()!.width >= 1024;
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const agreements = page.getByRole("region", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   if (floating) await openFleetBesideAgreements(page);
@@ -285,7 +283,7 @@ test("closing a tool keeps Agreements waiting for Fleet selection", async ({
     await fleet.getByRole("button", { name: "Close Fleet" }).click();
     await expect(agreements).toHaveAttribute("data-map-window-front", "true");
   } else {
-    await agreements.getByRole("button", { name: "Close Agreements" }).click();
+    await agreements.getByRole("button", { name: "Close Trade" }).click();
   }
   await expect(fleet).toHaveCount(0);
   await goal(page, "Open Fleet to see power flows");
@@ -293,7 +291,7 @@ test("closing a tool keeps Agreements waiting for Fleet selection", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("selecting Fleet directly displays the agreement clock objective", async ({
+test("selecting Fleet directly displays the trade clock objective", async ({
   page,
 }) => {
   await startMission(page, 112);
@@ -312,14 +310,14 @@ test("selecting Fleet directly displays the agreement clock objective", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
+test("an open tile keeps Trade waiting until Fleet is revealed", async ({
   page,
 }) => {
   await startMission(page, 112);
   const floating = page.viewportSize()!.width >= 1024;
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const closeAgreements = page.getByRole("button", {
-    name: "Close Agreements",
+    name: "Close Trade",
     exact: true,
   });
   if (floating) await action(page, "Fleet");
@@ -331,7 +329,7 @@ test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
   const inspector = page.getByRole("dialog", { name: "Biomass", exact: true });
   await expect(inspector).toBeVisible();
   if (floating) {
-    await action(page, "Agreements");
+    await action(page, "Trade");
     await closeAgreements.click();
     await expect(inspector).toHaveAttribute("data-map-window-front", "true");
     await expect(fleet).toHaveAttribute("data-map-window-front", "false");
@@ -347,7 +345,7 @@ test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
+test("Mission 7 · sign a trade and find live imports in Fleet", async ({
   page,
 }) => {
   await startMission(page, 112);
@@ -367,11 +365,11 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
   await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   await goal(page, "Run the clock until your grid imports power");
   const agreements = fleet.getByRole("region", {
-    name: "Agreements",
+    name: "Fleet trade",
   });
   const agreementHeading = agreements.locator(".fleetAgreementsHeading");
   const dispatchOrder = agreements.getByRole("list", {
-    name: "Agreement dispatch order",
+    name: "Trade dispatch order",
   });
   const rows = dispatchOrder.getByRole("listitem");
   await expect(agreementHeading).toBeInViewport();
@@ -394,13 +392,13 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     scale: "css",
   });
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await goal(page, "Read your agreement flows");
+  await goal(page, "Read your trade flows");
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const chart = page.locator("#chartSupplyDemand");
   await expect(
-    chart.locator(".chartLegendLabel").getByText("Agreements", { exact: true }),
+    chart.locator(".chartLegendLabel").getByText("Trade", { exact: true }),
   ).toBeVisible();
   await expect(dispatchOrder).toHaveClass(/tutorialTarget/);
   await expect(agreementHeading).toContainText(
@@ -430,7 +428,7 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     )
     .toBeGreaterThan(0);
   await reviewScreenshot(agreements, {
-    path: test.info().outputPath("fleet-agreement-dispatch.png"),
+    path: test.info().outputPath("fleet-trade-dispatch.png"),
     animations: "disabled",
     scale: "css",
     style: ".snackbar, .tutorialTargetRing { visibility: hidden; }",

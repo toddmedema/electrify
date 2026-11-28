@@ -614,9 +614,7 @@ test(
       .toBeTruthy();
 
     for (const page of [host, guest])
-      await page
-        .getByRole("button", { name: "Agreements", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Trade", exact: true }).click();
     await host
       .getByRole("button", {
         name: "Review connection with WindyWren",
