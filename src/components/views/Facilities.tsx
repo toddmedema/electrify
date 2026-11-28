@@ -726,7 +726,6 @@ function FacilitySupplyChart({
       ref={anchor}
       tabIndex={-1}
       className="operatingEvidence facilitySupplyChart"
-      style={{ "--fleet-plot-height": `${height}px` } as React.CSSProperties}
       aria-label="Supply and demand"
     >
       <ChartSupplyDemand

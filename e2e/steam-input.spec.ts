@@ -1262,6 +1262,49 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   ).toBe(true);
 });
 
+test("first controller Confirm opens the keyboard-focused Build rail @docked-controller", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const paused = page.locator('.speedToggles button[value="PAUSED"]');
+  await paused.click();
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+  const rail = page.locator(".desktopBuildRail #buildNav");
+  await expect(rail).toBeEnabled();
+  await rail.focus();
+  await expect(rail).toBeFocused();
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Gameplay",
+  );
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-controller-input",
+    "true",
+  );
+  const activations = await page.evaluateHandle(() => {
+    const count = { build: 0 };
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest("#buildNav")
+        )
+          count.build++;
+      },
+      true,
+    );
+    return count;
+  });
+  await input(page, "confirm");
+  expect(await activations.evaluate((count) => count.build)).toBe(1);
+  await expect(
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toBeVisible();
+});
+
 test("controller cycles six tools around the persistent map", async ({
   page,
 }) => {

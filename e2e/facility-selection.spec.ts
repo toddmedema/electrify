@@ -328,7 +328,6 @@ for (const theme of ["light", "dark"]) {
     // A narrow window can still have a mouse. The context menu must stay within it.
     for (const width of [600, 561, 560, 360]) {
       await page.setViewportSize({ width, height: 800 });
-      await page.keyboard.press("Escape");
       await expect(heading).toContainText("Generating");
       // The stacked top bar remounts the mission summary and its forecast can wrap
       // the headline when the announced event appears.
@@ -384,6 +383,10 @@ for (const theme of ["light", "dark"]) {
           ),
         });
       }
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeHidden();
+      await expect(pane.locator(".bulkSelected")).toHaveCount(0);
+      await expect(heading).toContainText("Generating");
     }
   });
 }

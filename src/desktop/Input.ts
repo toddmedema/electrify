@@ -378,17 +378,23 @@ export function startDesktopInput(
     )
       return;
     document.documentElement.dataset.controllerInput = "true";
-    // The first action after a pointer can replace the Build rail with a dock
-    // button. Resolve that action against the controller layout the player enters.
-    if (!getInputPresentation().active)
-      flushSync(() => present({ active: true }));
     // Prefer one-shot intent over a held direction repeating in the same sample.
     // One intent per sample also keeps simultaneous buttons out of a newly opened dialog.
     const action =
       frame.actions.find(
         (action) => !["up", "down", "left", "right"].includes(action),
       ) ?? frame.actions[0];
-    act(action);
+    const entering = !getInputPresentation().active;
+    // Confirm belongs to the control the player focused. Entering controller
+    // layout can unmount it (for example, the floating Build rail).
+    if (entering && action === "confirm") {
+      act(action);
+      present({ active: true });
+    } else {
+      // Navigation must see the new dock and its pane order on the first press.
+      if (entering) flushSync(() => present({ active: true }));
+      act(action);
+    }
     sync();
   });
   const stopFocus = desktop.onGameFocusChanged((focused) => {
