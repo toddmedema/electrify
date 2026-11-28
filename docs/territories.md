@@ -201,5 +201,5 @@ the acquiring company's current facilities, including new construction.
 If several companies acquire the same utility, each sees its own fleet there.
 Other viewers see the first acquirer in room roster order. Automatic peer market
 quantities remain bounded, without player wire controls or new wire fees. Buying
-and selling choices remain available under Agreements → Co-op power sharing,
+and selling choices remain available under Trade → Co-op trade,
 including when a restored company previously disabled either direction.

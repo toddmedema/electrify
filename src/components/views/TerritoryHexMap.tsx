@@ -2,6 +2,8 @@ import { CouchPlayerText, couchPlayerColor } from "../../couch/PlayerColor";
 import * as React from "react";
 import { Button, Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
+import UtilityLogoIcon from "../base/UtilityLogoIcon";
+import { utilityBranding } from "../../helpers/UtilityBranding";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
 import type { GameType, TerrainType, TerritoryId } from "../../Types";
 import { isLandTerritoryId } from "../../data/Territories";
@@ -235,8 +237,15 @@ export default function TerritoryHexMap({
     seed,
     startingYear,
     location,
+    utilityLogo,
     date: { year },
   } = game;
+  const seat = game.multiplayer?.seat;
+  const utilityLogos = game.multiplayer?.utilityLogos;
+  const branding = React.useMemo(
+    () => utilityBranding(seed, utilityLogo, utilityLogos, seat),
+    [seed, utilityLogo, utilityLogos, seat],
+  );
   const cityGrowth = React.useMemo(() => {
     const growth = new Map<TerritoryId, readonly CityGrowthSector[]>();
     if (regional) return growth;
@@ -1560,6 +1569,9 @@ export default function TerritoryHexMap({
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
             const showName = showNames && !!cityLabel;
+            const cityLogo = showName
+              ? branding.forOwner(view.ownerKey)
+              : undefined;
             const quote = purchaseQuotes?.get(tile.id);
             const projectSite = projectSites?.get(key);
             const projectPrice = projectSite
@@ -1753,22 +1765,30 @@ export default function TerritoryHexMap({
                 )}
                 {showName && (
                   <strong>
-                    <span>{cityLabel}</span>
-                    {utility && (
-                      <span>
-                        <CouchPlayerText
-                          seatId={
-                            view.ownerKey?.startsWith("peer:")
-                              ? view.ownerKey.slice(5)
-                              : view.owned
-                                ? game.multiplayer?.seat
-                                : undefined
-                          }
-                        >
-                          {view.owned && !regional ? "You" : view.ownerName}
-                        </CouchPlayerText>
-                      </span>
+                    {cityLogo && (
+                      <UtilityLogoIcon
+                        logo={cityLogo}
+                        className="territoryCityLogo"
+                      />
                     )}
+                    <span className="territoryCityLabelText">
+                      <span>{cityLabel}</span>
+                      {utility && (
+                        <span>
+                          <CouchPlayerText
+                            seatId={
+                              view.ownerKey?.startsWith("peer:")
+                                ? view.ownerKey.slice(5)
+                                : view.owned
+                                  ? game.multiplayer?.seat
+                                  : undefined
+                            }
+                          >
+                            {view.owned && !regional ? "You" : view.ownerName}
+                          </CouchPlayerText>
+                        </span>
+                      )}
+                    </span>
                   </strong>
                 )}
                 {projectSite && (

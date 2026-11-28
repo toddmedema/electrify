@@ -183,6 +183,7 @@ function accumulateTick(
     // Territory balances describe a constrained dispatch frame, not a monthly average.
     // Retaining the first frame would disagree with the averaged company chart totals.
     delete sample.territories;
+    delete sample.agreementImportedW;
     sample.renewableCapacityFactors = factors;
     summary.chartAverage = {
       ...sample,

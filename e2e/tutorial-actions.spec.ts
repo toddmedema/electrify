@@ -21,9 +21,9 @@ const missions = [
     actions: ["Fleet", "Build", "Programs", "Insights"],
   },
   {
-    name: "Agreements",
+    name: "Trade",
     id: 112,
-    actions: ["Fleet", "Agreements", "Build", "Programs", "Insights", "Events"],
+    actions: ["Fleet", "Trade", "Build", "Programs", "Insights", "Events"],
   },
 ];
 
@@ -59,8 +59,8 @@ for (const mission of missions) {
     for (const [name, key] of [
       ["Fleet", "q"],
       ["Fleet", "f"],
-      ["Agreements", "w"],
-      ["Agreements", "a"],
+      ["Trade", "w"],
+      ["Trade", "a"],
       ["Events", "e"],
       ["Programs", "r"],
       ["Programs", "p"],

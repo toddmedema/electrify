@@ -84,7 +84,8 @@ import {
 } from "./GameActions";
 import {
   acceptAgreement,
-  compareAgreementDispatchPriority,
+  agreementDispatchComparator,
+  movedAgreementOrder,
   agreementIntervalMinutes,
   recordAgreementSettlements,
 } from "../helpers/PowerAgreements";
@@ -2328,6 +2329,17 @@ export const gameSlice = createSlice({
     ) => {
       applyReprioritizeTransmissionLine(state, action.payload);
     },
+    reprioritizePowerAgreement: (
+      state,
+      action: PayloadAction<
+        import("../Types").ReprioritizePowerAgreementAction
+      >,
+    ) => {
+      const order = movedAgreementOrder(state, action.payload);
+      if (!order || !state.transmission) return;
+      state.transmission.agreementDispatchOrder = order;
+      state.timeline = reforecastSupply(state);
+    },
     upgradeTransmissionLine: (
       state,
       action: PayloadAction<UpgradeTransmissionLineAction>,
@@ -2494,6 +2506,7 @@ export const gameSlice = createSlice({
         return {
           ...cloneDeep(initialGame),
           difficulty: state.difficulty,
+          ...(state.utilityLogo && { utilityLogo: state.utilityLogo }),
           scenarioId: LEGACY_CAMPAIGN_ID,
           startingYear: LEGACY_GENERATIONS[0].startYear,
           date: getDateFromMinute(0, LEGACY_GENERATIONS[0].startYear),
@@ -2788,6 +2801,7 @@ export const {
   cancelTransmissionLine,
   togglePauseTransmissionLine,
   reprioritizeTransmissionLine,
+  reprioritizePowerAgreement,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -2803,9 +2817,16 @@ export const {
 export function startLegacyCampaign(
   dispatch: (action: { type: string; payload?: unknown }) => unknown,
   difficulty: DifficultyType,
+  utilityLogo?: GameType["utilityLogo"],
 ): void {
   dispatch(quit(undefined));
-  dispatch(delta({ difficulty, customScenario: undefined }));
+  dispatch(
+    delta({
+      difficulty,
+      customScenario: undefined,
+      ...(utilityLogo && { utilityLogo }),
+    }),
+  );
   dispatch(start(LEGACY_CAMPAIGN_ID));
 }
 
@@ -2847,7 +2868,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "On 1 Jan 2020, 100 MW of nuclear agreement coverage will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
+      "On 1 Jan 2020, 100 MW of nuclear supply will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
       {
         title: "Legacy power contracts change in 2020",
         importance: "NOTABLE",
@@ -2859,7 +2880,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "Champlain’s 100 MW nuclear agreement has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
+      "Champlain’s 100 MW nuclear trade has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
       {
         title: "Legacy power purchases reduced",
         importance: "CRITICAL",
@@ -6225,14 +6246,14 @@ function* supplyFacilitiesFinancesPhases(
     excludedAgreementId,
     entitlementMinute,
   );
-  // Use fully paid blocks before adding monthly-minimum usage, then pay-as-used supply.
+  // Honor the player's order when set. Otherwise use fully paid blocks first.
   const entitlementOffers = [
     ...readyAgreements.map((source) => ({
       ...source,
       capacityW: source.paused ? 0 : source.capacityW,
     })),
     ...legacyAgreements,
-  ].sort(compareAgreementDispatchPriority);
+  ].sort(agreementDispatchComparator(state));
   const entitlementCapacityW = entitlementOffers.reduce(
     (sum, offer) => sum + offer.capacityW,
     0,
@@ -7076,6 +7097,12 @@ function* supplyFacilitiesFinancesPhases(
   if (state.utilityExpansion) {
     now.entitlementImportedW = entitlementDeliveredW;
     now.entitlementImportCapacityW = entitlementCapacityW;
+    now.agreementImportedW = Object.fromEntries(
+      entitlementOffers.map(({ id }, index) => [
+        id,
+        coveredReservations[index].watts,
+      ]),
+    );
   }
   now.importedW = importedW;
   now.exportedW = exportedW;

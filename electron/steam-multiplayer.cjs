@@ -138,6 +138,8 @@ const MESSAGE_KINDS = new Set([
   "save-result",
   "browse",
   "campaign",
+  "utility-logo-pick",
+  "utility-logo-claims",
   "keepalive",
   "scenario",
   "records",
@@ -1147,6 +1149,7 @@ class SteamMultiplayer {
       this.hostId === this.service.identity.steamId &&
       payload.kind !== "command" &&
       payload.kind !== "save-request" &&
+      payload.kind !== "utility-logo-pick" &&
       !REPLICATION_GUEST_KINDS.has(payload.kind)
     )
       throw new Error("Invalid guest message");
@@ -1175,6 +1178,12 @@ class SteamMultiplayer {
           MAX_CAMPAIGN_BYTES)
     )
       throw new Error("Invalid campaign selection");
+    if (
+      (payload.kind === "utility-logo-pick" &&
+        (this.hostId !== this.service.identity.steamId || !senderConnection)) ||
+      (payload.kind === "utility-logo-claims" && sender !== this.hostId)
+    )
+      throw new Error("Invalid company logo sender");
     if (payload.kind === "scenario") validScenarioMessage(payload);
     if (payload.kind === "command") {
       const envelope = payload.envelope;

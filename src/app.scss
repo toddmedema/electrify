@@ -2677,6 +2677,7 @@ $pane_header_height: 48px;
 
 // A lifted row is opaque, so its text never collides with the row it passes over.
 .facilityRow.dragging,
+.fleetAgreementRow.dragging,
 .transmissionLine.dragging {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
@@ -5942,6 +5943,9 @@ $homeSmokeCycle: 5.6s;
   font-weight: 400;
   color: var(--font-color-faded);
 }
+.facilities .fleetAgreementsHeading {
+  flex-wrap: wrap;
+}
 .facilityRowHeader {
   position: relative;
   display: flex;
@@ -6002,6 +6006,26 @@ $homeSmokeCycle: 5.6s;
 // The combined grip and icon target already spaces the row from the edge.
 .base_main .facilityDragHandle + .facilityDisclosure .facility {
   padding-left: 8px;
+}
+.base_main .facilityDisclosure.fleetAgreementDragHandle {
+  cursor: grab;
+  touch-action: pan-y;
+
+  .facility {
+    padding-left: 4px;
+  }
+  .fleetAgreementGrip {
+    flex-shrink: 0;
+    width: 16px;
+    height: 20px;
+    color: var(--font-color-faded);
+  }
+  .transmissionListIcon {
+    flex-shrink: 0;
+  }
+}
+.fleetAgreementRow.dragging .fleetAgreementDragHandle {
+  cursor: grabbing;
 }
 .facilityRowIcon.MuiListItemAvatar-root {
   min-width: 3rem;
@@ -6119,6 +6143,7 @@ $homeSmokeCycle: 5.6s;
   }
 }
 .base_main .facilityRow,
+.base_main .fleetAgreementRow,
 .base_main .transmissionLine {
   container: facility-row / inline-size;
 }
@@ -9252,4 +9277,66 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   text-align: center;
   color: var(--font-color-secondary);
   z-index: 2100;
+}
+
+.utilityLogoPicker {
+  width: 100%;
+  max-width: 16rem;
+  .MuiSelect-select {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    box-sizing: content-box;
+  }
+}
+
+.scenarioStartControls .utilityLogoPicker {
+  justify-self: center;
+  max-width: 320px;
+}
+
+.utilityLogoChoice {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.utilityLogoIcon {
+  display: block;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+}
+
+.utilityLogoIcon.transmissionListIcon {
+  width: 40px;
+  height: 40px;
+}
+
+.utilityLogoPicker .utilityLogoIcon,
+.utilityLogoOption .utilityLogoIcon {
+  width: 40px;
+  height: 40px;
+}
+
+.utilityLogoTaken {
+  min-width: 0;
+  margin-inline-start: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tradeUtilityName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (pointer: coarse) {
+  .utilityLogoPicker .utilityLogoIcon,
+  .utilityLogoOption .utilityLogoIcon {
+    width: 44px;
+    height: 44px;
+  }
 }

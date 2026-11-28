@@ -11,6 +11,7 @@ import type {
 export interface Seat {
   id: string;
   name: string;
+  utilityLogo?: import("../data/UtilityLogos").UtilityLogoId;
 }
 /** What the host chose: an authored scenario or a custom game, at one difficulty for all. */
 export interface MatchSpec {

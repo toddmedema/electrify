@@ -110,7 +110,7 @@ export const MANUAL_ENTRY = {
   PRICING: "Pricing",
   POWER_AND_ENERGY: "Power and energy",
   RESERVE_CAPACITY: "Reserve capacity",
-  AGREEMENTS: "Agreements",
+  AGREEMENTS: "Trade",
   ROUND_TRIP_EFFICIENCY: "Round-trip efficiency",
   SCORE: "Score",
   SYMBOLS: "Symbol guide",
@@ -122,7 +122,7 @@ export const MANUAL_ENTRY = {
 export const MANUAL_SECTION = {
   SUPPLY_DEMAND: "Supply & Demand",
   LOWEST_RESERVE: "Lowest reserve",
-  POWER_EXCHANGE: "Power exchange",
+  POWER_EXCHANGE: "Trade in Insights",
   DEMAND_BY_USE: "Demand by use",
   SUPPLY_BY_FUEL: "Supply by Fuel",
   STORED_ENERGY: "Stored Energy",
@@ -1120,17 +1120,21 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
     title: MANUAL_ENTRY.AGREEMENTS,
     group: "Gameplay",
     keywords:
-      "power purchase contracts ppa transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind CO2e quebec california washington IEA EIA line capacity access",
+      "power purchase agreements contracts ppa transmission power exchange imports exports neighbor trading purchased emissions backup surplus peak price hydro solar wind CO2e quebec california washington IEA EIA line capacity access",
     entry: (
       <div>
         <p>
           On the 3D map, open{" "}
           <GameNavigationLabel destination="AGREEMENTS">
-            Agreements
+            Trade
           </GameNavigationLabel>{" "}
-          to review your power purchase agreements and available offers. In
-          co-op on the map, set buying and selling under{" "}
-          <strong>Co-op power sharing</strong>.
+          to review supply trades and available offers. In co-op on the map, set
+          buying and selling under <strong>Co-op trade</strong>.
+        </p>
+        <p>
+          In <strong>Fleet</strong>, Trade shows current imports and exports and
+          how much power each trade is supplying. Drag a row higher to use that
+          supply first.
         </p>
         <p>
           In scenarios where{" "}
@@ -1142,17 +1146,17 @@ export const MANUAL_ENTRIES: ManualEntryType[] = [
           connections.
         </p>
         <p>
-          A regional connection carries power. An agreement sets the pricing,
+          A regional connection carries power. A supply trade sets the pricing,
           capacity and dates for part of what you can buy through that
           connection. Contracted supply serves your customers before market
           purchases.
         </p>
         <p>
-          Acquiring another utility can bring its agreements with their original
-          end dates. When a replacement is available, review how much power it
-          can deliver, the rate, the term and any monthly energy minimum. A
-          minimum means you pay for the difference if you use less. When an
-          agreement expires, the connection stays available for market
+          Acquiring another utility can bring its supply trades with their
+          original end dates. When a replacement is available, review how much
+          power it can deliver, the rate, the term and any monthly energy
+          minimum. A minimum means you pay for the difference if you use less.
+          When a trade expires, the connection stays available for market
           purchases.
         </p>
         <p>

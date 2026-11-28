@@ -30,12 +30,18 @@ it("restarts a later failed CEO term at the beginning of the campaign with its o
     outcome: "bankrupt",
   };
   store.dispatch(
-    delta({ difficulty: "Employee", inGame: true, scenarioId: 122 }),
+    delta({
+      difficulty: "Employee",
+      inGame: true,
+      scenarioId: 122,
+      utilityLogo: "sunburst",
+    }),
   );
   store.dispatch(victoryOpen(victory));
   mapDispatchToProps(store.dispatch).onRetry(victory);
   expect(store.getState().game.scenarioId).toBe(117);
   expect(store.getState().game.difficulty).toBe("CEO");
+  expect(store.getState().game.utilityLogo).toBe("sunburst");
   expect(store.getState().game.date.monthsElapsed).toBe(0);
   expect(store.getState().card.name).toBe("LOADING");
   expect(store.getState().ui.victory).toBeNull();
@@ -66,6 +72,7 @@ it.each([
         scenarioId: victory.scenarioId,
         difficulty,
         inGame: true,
+        utilityLogo: "grid-pylon",
         date: { ...store.getState().game.date, monthsElapsed: 144 },
       }),
     );
@@ -78,6 +85,7 @@ it.each([
     const { game, card, ui } = store.getState();
     expect(game.scenarioId).toBe(victory.scenarioId);
     expect(game.difficulty).toBe(difficulty);
+    expect(game.utilityLogo).toBe("grid-pylon");
     expect(game.inGame).toBe(false);
     expect(game.date.monthsElapsed).toBe(0);
     expect(game.timeline).toEqual([]);

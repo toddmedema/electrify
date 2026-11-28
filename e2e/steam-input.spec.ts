@@ -850,7 +850,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   }
   const programs = page.getByRole("region", { name: "Programs", exact: true });
   await input(page, "nextPane");
-  for (const destination of ["Fleet", "Agreements", "Events", "Programs"]) {
+  for (const destination of ["Fleet", "Trade", "Events", "Programs"]) {
     await input(page, "nextPane");
     await expect(
       page.getByRole("region", { name: destination, exact: true }),
@@ -1404,7 +1404,7 @@ test("controller cycles six tools around the persistent map", async ({
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   for (const name of [
     "Fleet",
-    "Agreements",
+    "Trade",
     "Events",
     "Programs",
     "Insights",
@@ -2069,7 +2069,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await select(page, fleet);
     await input(page, "right");
     await expect(
-      page.getByRole("button", { name: "Agreements", exact: true }),
+      page.getByRole("button", { name: "Trade", exact: true }),
     ).toBeFocused();
     await input(page, "left");
     await expect(fleet).toBeFocused();

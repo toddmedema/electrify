@@ -25,7 +25,7 @@ export default function UtilityContractSchedule({
       {!!plan.supplyChanges.length && (
         <>
           <Typography component="h4" variant="subtitle2">
-            Purchased power
+            Supply trades
           </Typography>
           <Box component="ul" sx={{ pl: 2.5, my: 1, "& li + li": { mt: 1 } }}>
             {plan.supplyChanges.map((change) => (
@@ -73,8 +73,8 @@ export default function UtilityContractSchedule({
             )),
         )}
       <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
-        Inherited agreements keep their original expiry dates. Review
-        replacement supplies before coverage ends.
+        Inherited trades keep their original expiry dates. Review replacement
+        supplies before coverage ends.
       </Typography>
       <Typography component="h4" variant="subtitle2" sx={{ mt: 2 }}>
         Utility operations

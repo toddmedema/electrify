@@ -1348,12 +1348,12 @@ test("map windows move, resize, stack and remember their bounds", async ({
   const map = await startMap();
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const agreements = page.getByRole("region", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   const fleetAction = page.getByRole("button", { name: "Fleet", exact: true });
   const agreementsAction = page.getByRole("button", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   await fleetAction.click();
@@ -1440,7 +1440,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
           ?.getAttribute("aria-label"),
       overlap,
     );
-  await expect.poll(atOverlap).toBe("Agreements");
+  await expect.poll(atOverlap).toBe("Trade");
   await reviewScreenshot(page.locator(".gameStage"), {
     path: info.outputPath("stacked-map-windows.png"),
     animations: "disabled",
@@ -1977,11 +1977,11 @@ test("tile inspection shares the desktop window stack", async ({
   const capital = map.locator('[data-map-target="champlain:city"]');
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const agreements = page.getByRole("region", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   await page.getByRole("button", { name: "Fleet", exact: true }).click();
-  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  await page.getByRole("button", { name: "Trade", exact: true }).click();
   const fleetBounds = await fleet.boundingBox();
   const agreementsBounds = await agreements.boundingBox();
 
@@ -2065,7 +2065,7 @@ test("tile inspection shares the desktop window stack", async ({
   await capital.click();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 
-  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  await page.getByRole("button", { name: "Trade", exact: true }).click();
   await expect(agreements).toHaveAttribute("data-map-window-front", "true");
   await page.keyboard.press("Escape");
   await expect(agreements).toHaveCount(0);

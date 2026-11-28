@@ -104,7 +104,7 @@ describe("Navigation", () => {
     expect(
       screen.queryByRole("button", { name: "Build" }),
     ).not.toBeInTheDocument();
-    for (const name of ["Fleet", "Agreements", "Programs"])
+    for (const name of ["Fleet", "Trade", "Programs"])
       expect(screen.getByRole("button", { name })).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Map" }),
@@ -268,7 +268,7 @@ describe("Navigation", () => {
         .map((button) => button.getAttribute("aria-label")),
     ).toEqual([
       "Fleet",
-      "Agreements",
+      "Trade",
       "Events",
       "Programs",
       "Insights",
@@ -302,8 +302,8 @@ describe("Navigation", () => {
     [4, 3, ["Fleet", "Programs", "Insights"]],
     [3, 0, ["Fleet", "Programs", "Insights"]],
     [5, 0, ["Fleet", "Programs", "Insights"]],
-    [112, 0, ["Fleet", "Agreements", "Events", "Programs", "Insights"]],
-    [112, 4, ["Fleet", "Agreements", "Events", "Programs", "Insights"]],
+    [112, 0, ["Fleet", "Trade", "Events", "Programs", "Insights"]],
+    [112, 4, ["Fleet", "Trade", "Events", "Programs", "Insights"]],
   ])(
     "shows only taught actions in tutorial %s step %s",
     (scenarioId, tutorialStep, actions) => {

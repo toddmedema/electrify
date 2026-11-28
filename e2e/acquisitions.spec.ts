@@ -481,7 +481,7 @@ for (const theme of ["light", "dark"] as const) {
     ).toHaveCount(0);
     const tools = [
       "Fleet",
-      "Agreements",
+      "Trade",
       "Programs",
       "Insights",
       "Events",
@@ -883,14 +883,14 @@ for (const theme of ["light", "dark"] as const) {
       network.locator('[data-map-target][aria-pressed="true"]'),
     ).toHaveCount(0);
     await expect(
-      page.getByRole("tab", { name: /^(Territories|Fleet|Agreements)$/ }),
+      page.getByRole("tab", { name: /^(Territories|Fleet|Trade)$/ }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Map", exact: true }),
     ).toHaveCount(0);
     for (const name of [
       "Fleet",
-      "Agreements",
+      "Trade",
       "Programs",
       "Insights",
       "Events",
@@ -1120,7 +1120,7 @@ for (const theme of ["light", "dark"] as const) {
       review.getByRole("region", { name: "Operating plants" }),
     ).toBeVisible();
     await expect(
-      review.getByRole("region", { name: "Purchased power" }),
+      review.getByRole("region", { name: "Supply trades" }),
     ).toBeVisible();
     await expect(review).toContainText("Inherited debt");
     await review.getByRole("button", { name: "Cancel", exact: true }).click();

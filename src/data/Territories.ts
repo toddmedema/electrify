@@ -47,7 +47,7 @@ export const TERRITORIES: readonly TerritoryDefinition[] = [
     id: "valley-electric",
     name: "Valley Electric",
     description:
-      "Acquire a residential and commercial utility with plants and dated power agreements.",
+      "Acquire a residential and commercial utility with plants and dated supply trades.",
     kind: "utility",
     corridorId: "vt-champlain-valley",
     sites: sites(5, 3, 3),

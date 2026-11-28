@@ -6,7 +6,7 @@ import {
   tutorialCoal,
   tutorialMap,
 } from "./tutorial-fixture";
-import { dragCoalAbovePumpedHydro } from "./layout";
+import { dragCoalAbovePumpedHydro, dragFleetRowAbove } from "./layout";
 
 const hud = (page: Page) => page.locator(".tutorialHud");
 const goal = (page: Page, text: string, timeout?: number) =>
@@ -237,27 +237,32 @@ test("Mission 6 · read a shortage forecast and finish a new generator", async (
 });
 
 async function signValleyAgreement(page: Page) {
-  await action(page, "Agreements");
+  await action(page, "Trade");
+  const logo = page
+    .getByRole("article", { name: "Valley Electric supply", exact: true })
+    .locator("[data-utility-logo]");
+  await expect(logo).toBeVisible();
+  const supplierLogo = await logo.getAttribute("data-utility-logo");
+  expect(supplierLogo).toBeTruthy();
   await page
     .getByRole("button", {
-      name: "Review Valley Electric supply agreement",
+      name: "Review Valley Electric supply trade",
       exact: true,
     })
     .click();
   await expect(
     page.getByRole("dialog", {
-      name: "Review Valley Electric supply agreement",
+      name: "Review Valley Electric supply trade",
     }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Accept agreement", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Accept trade", exact: true }).click();
   await goal(page, "Open Fleet to see power flows");
+  return supplierLogo;
 }
 
 async function openFleetBesideAgreements(page: Page) {
   await action(page, "Fleet");
-  // Expose the heading, chart and Close button even after Agreements opens.
+  // Expose the heading, chart and Close button even after Trade opens.
   const title = page.getByRole("heading", { name: "Fleet", exact: true });
   const box = (await title.boundingBox())!;
   const x = box.x + box.width / 2;
@@ -268,14 +273,14 @@ async function openFleetBesideAgreements(page: Page) {
   await page.mouse.up();
 }
 
-test("closing a tool keeps Agreements waiting for Fleet selection", async ({
+test("closing a tool keeps Trade waiting for Fleet selection", async ({
   page,
 }) => {
   await startMission(page, 112);
   const floating = page.viewportSize()!.width >= 1024;
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const agreements = page.getByRole("region", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   if (floating) await openFleetBesideAgreements(page);
@@ -285,7 +290,7 @@ test("closing a tool keeps Agreements waiting for Fleet selection", async ({
     await fleet.getByRole("button", { name: "Close Fleet" }).click();
     await expect(agreements).toHaveAttribute("data-map-window-front", "true");
   } else {
-    await agreements.getByRole("button", { name: "Close Agreements" }).click();
+    await agreements.getByRole("button", { name: "Close Trade" }).click();
   }
   await expect(fleet).toHaveCount(0);
   await goal(page, "Open Fleet to see power flows");
@@ -293,7 +298,7 @@ test("closing a tool keeps Agreements waiting for Fleet selection", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("selecting Fleet directly displays the agreement clock objective", async ({
+test("selecting Fleet directly displays the trade clock objective", async ({
   page,
 }) => {
   await startMission(page, 112);
@@ -312,14 +317,14 @@ test("selecting Fleet directly displays the agreement clock objective", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
+test("an open tile keeps Trade waiting until Fleet is revealed", async ({
   page,
 }) => {
   await startMission(page, 112);
   const floating = page.viewportSize()!.width >= 1024;
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const closeAgreements = page.getByRole("button", {
-    name: "Close Agreements",
+    name: "Close Trade",
     exact: true,
   });
   if (floating) await action(page, "Fleet");
@@ -331,7 +336,7 @@ test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
   const inspector = page.getByRole("dialog", { name: "Biomass", exact: true });
   await expect(inspector).toBeVisible();
   if (floating) {
-    await action(page, "Agreements");
+    await action(page, "Trade");
     await closeAgreements.click();
     await expect(inspector).toHaveAttribute("data-map-window-front", "true");
     await expect(fleet).toHaveAttribute("data-map-window-front", "false");
@@ -347,7 +352,39 @@ test("an open tile keeps Agreements waiting until Fleet is revealed", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
+test("a chosen company logo appears at the left of the player's city label @minimum-phone", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  const picker = page.getByRole("combobox", { name: /Company logo/ });
+  await expect(picker).toContainText("Random");
+  await expect(picker.locator("svg.utilityLogoIcon")).toBeVisible();
+  await picker.click();
+  await expect(page.getByRole("option")).toHaveCount(21);
+  await page.getByRole("option", { name: "Sunburst", exact: true }).click();
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+
+  const map = tutorialMap(page);
+  await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+  const name = map
+    .locator('[data-owned="true"] > strong')
+    .filter({ hasText: "Burlington" });
+  const logo = name.locator('img[data-utility-logo="sunburst"]');
+  await expect(logo.first()).toBeVisible();
+  await expect
+    .poll(() =>
+      logo.first().evaluate((img: HTMLImageElement) => img.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  const leftEdges = await name
+    .first()
+    .evaluate((label) =>
+      [...label.children].map((child) => child.getBoundingClientRect().left),
+    );
+  expect(leftEdges[0]).toBeLessThan(leftEdges[1]);
+});
+
+test("Mission 7 · sign a trade and find live imports in Fleet", async ({
   page,
 }) => {
   await startMission(page, 112);
@@ -357,7 +394,7 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     await action(page, "Fleet");
     await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   }
-  await signValleyAgreement(page);
+  const supplierLogo = await signValleyAgreement(page);
   if (floating) {
     await expect(fleet).toHaveAttribute("data-map-window-front", "false");
   } else {
@@ -366,6 +403,21 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
   await action(page, "Fleet");
   await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   await goal(page, "Run the clock until your grid imports power");
+  const agreements = fleet.getByRole("region", {
+    name: "Fleet trade",
+  });
+  const agreementHeading = agreements.locator(".fleetAgreementsHeading");
+  const dispatchOrder = agreements.getByRole("list", {
+    name: "Trade dispatch order",
+  });
+  const rows = dispatchOrder.getByRole("listitem");
+  await expect(agreementHeading).toBeInViewport();
+  await expect(rows).toHaveCount(3);
+  await expect(
+    agreements.getByRole("button", {
+      name: /^Reorder Valley Electric supply,/,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -379,21 +431,63 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     scale: "css",
   });
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await goal(page, "Find External power on the chart");
+  await goal(page, "Read your trade flows");
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const chart = page.locator("#chartSupplyDemand");
   await expect(
-    chart
-      .locator(".chartLegendLabel")
-      .getByText("External power", { exact: true }),
+    chart.locator(".chartLegendLabel").getByText("Trade", { exact: true }),
   ).toBeVisible();
+  await expect(dispatchOrder).toHaveClass(/tutorialTarget/);
+  await expect(agreementHeading).toContainText(
+    /Importing [1-9][\d.]*\s*[kMG]?W/,
+  );
+  const valley = agreements.getByRole("button", {
+    name: /^Reorder Valley Electric supply, Importing/,
+  });
+  await expect(valley).toBeVisible();
+  await expect(valley.locator("img")).toHaveAttribute(
+    "data-utility-logo",
+    supplierLogo!,
+  );
+  const lastId = (await rows.last().getAttribute("data-rfd-draggable-id"))!;
+  const last = rows.and(page.locator(`[data-rfd-draggable-id="${lastId}"]`));
+  await expect(last).toBeInViewport({ ratio: 0.9 });
+  await expect(rows.first()).toBeInViewport({ ratio: 0.6 });
+  await dragFleetRowAbove(
+    page,
+    last,
+    last.getByRole("button"),
+    rows.first().getByRole("button"),
+  );
+  await expect(rows.first()).toHaveAttribute("data-rfd-draggable-id", lastId);
+  await expect
+    .poll(() =>
+      rows
+        .first()
+        .locator(".outputProgressBar")
+        .evaluate((bar) => new DOMMatrix(getComputedStyle(bar).transform).a),
+    )
+    .toBeGreaterThan(0);
+  await reviewScreenshot(agreements, {
+    path: test.info().outputPath("fleet-trade-dispatch.png"),
+    animations: "disabled",
+    scale: "css",
+    style: ".snackbar, .tutorialTargetRing { visibility: hidden; }",
+  });
   await reviewScreenshot(page, {
     path: test.info().outputPath("tutorial-agreements-fleet.png"),
     animations: "disabled",
     style: ".snackbar { visibility: hidden; }",
   });
+  const firstHandle = rows.first().getByRole("button");
+  await firstHandle.focus();
+  await page.keyboard.press("Space");
+  await expect(rows.first()).toHaveClass(/dragging/);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", lastId);
   await next(page, "Finish tutorial");
   await complete(page);
   await expect(

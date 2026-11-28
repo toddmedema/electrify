@@ -24,7 +24,7 @@ export const GAME_TOOLS: {
   },
   {
     id: "AGREEMENTS",
-    label: "Agreements",
+    label: "Trade",
     triggerId: "agreementsNav",
     icon: <HandshakeIcon />,
     keys: ["W", "A"],

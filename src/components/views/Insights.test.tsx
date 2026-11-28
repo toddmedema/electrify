@@ -395,7 +395,7 @@ jest.mock("../base/ChartForecastPowerExchange", () => ({
   }) => (
     <div
       role="img"
-      aria-label="Power exchange inspection"
+      aria-label="Trade inspection"
       data-chart="power-exchange"
       data-sync-key={syncKey}
       data-points={timeline?.length}
@@ -1760,13 +1760,13 @@ describe("Insights layers", () => {
     renderInsights(100, exchangeGame);
 
     const exchange = screen.getByRole("region", {
-      name: "Power exchange evidence",
+      name: "Trade evidence",
     });
     // The reading of what is flowing now stays, but is no longer the whole layer
     expect(within(exchange).getByText("Power flowing")).toBeVisible();
     expect(within(exchange).getByText("Available capacity")).toBeVisible();
     const chart = within(exchange).getByRole("img", {
-      name: "Power exchange inspection",
+      name: "Trade inspection",
     });
     expect(chart).toHaveAttribute("data-sync-key", "insights");
     expect(Number(chart.getAttribute("data-points"))).toBeGreaterThan(100);
@@ -1783,16 +1783,18 @@ describe("Insights layers", () => {
     renderInsights(100, exchangeGame);
 
     const expand = screen.getByRole("button", {
-      name: "Expand Power exchange chart",
+      name: "Expand Trade chart",
     });
     act(() => expand.focus());
     fireEvent.click(expand);
-    const dialog = screen.getByRole("dialog", { name: "Power exchange" });
+    const dialog = screen.getByRole("dialog", { name: "Trade" });
     expect(
-      within(dialog).getByRole("img", { name: "Power exchange inspection" }),
+      within(dialog).getByRole("img", { name: "Trade inspection" }),
     ).toHaveAttribute("data-sync-key", "insights-expanded");
     expect(
-      within(dialog).getByRole("button", { name: "What is Power exchange?" }),
+      within(dialog).getByRole("button", {
+        name: "What is Trade in Insights?",
+      }),
     ).toBeVisible();
     fireEvent.keyDown(dialog, { key: "Escape" });
     await waitFor(() =>
@@ -2133,11 +2135,9 @@ describe("Insights layers", () => {
     renderInsights(100, game);
     await user.click(labelledButton(/Layers/));
 
+    expect(screen.queryByRole("checkbox", { name: "Trade" })).toBeNull();
     expect(
-      screen.queryByRole("checkbox", { name: "Power exchange" }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole("heading", { name: "Power exchange", level: 3 }),
+      screen.queryByRole("heading", { name: "Trade", level: 3 }),
     ).toBeNull();
   });
 });

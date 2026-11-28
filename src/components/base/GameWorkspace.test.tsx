@@ -235,7 +235,7 @@ it.each([360, SIDE_TOOL_MIN_WIDTH - 1])(
     ).not.toBeInTheDocument();
     for (const name of [
       "Fleet",
-      "Agreements",
+      "Trade",
       "Programs",
       "Insights",
       "Events",
@@ -271,8 +271,8 @@ it("keeps desktop map tools open and only closes the selected window", async () 
   const fleet = screen.getByRole("region", { name: "Fleet" });
   const notes = within(fleet).getByRole("textbox", { name: "Facility notes" });
   fireEvent.change(notes, { target: { value: "Inspect this plant" } });
-  await app.user.click(app.action("Agreements"));
-  const agreements = screen.getByRole("region", { name: "Agreements" });
+  await app.user.click(app.action("Trade"));
+  const agreements = screen.getByRole("region", { name: "Trade" });
   expect(agreements).toHaveAttribute("data-map-window-front", "true");
 
   await app.user.click(notes);
@@ -295,20 +295,20 @@ it("keeps desktop map tools open and only closes the selected window", async () 
   expect(notes).toHaveFocus();
   expect(agreements).not.toBeInTheDocument();
   act(() => resize(1280));
-  expect(screen.getByRole("region", { name: "Agreements" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Trade" })).toBeVisible();
 
-  await app.user.click(app.action("Agreements"));
-  expect(screen.getByRole("region", { name: "Agreements" })).toHaveAttribute(
+  await app.user.click(app.action("Trade"));
+  expect(screen.getByRole("region", { name: "Trade" })).toHaveAttribute(
     "data-map-window-front",
     "true",
   );
-  await app.user.click(app.action("Agreements"));
+  await app.user.click(app.action("Trade"));
   expect(
-    screen.queryByRole("region", { name: "Agreements" }),
+    screen.queryByRole("region", { name: "Trade" }),
   ).not.toBeInTheDocument();
   expect(fleet).toBeVisible();
   expect(notes).toHaveValue("Inspect this plant");
-  expect(app.action("Agreements")).toHaveFocus();
+  expect(app.action("Trade")).toHaveFocus();
   expect(app.action("Fleet")).toHaveAttribute("aria-expanded", "true");
   await app.user.keyboard("{Escape}");
   expect(fleet).not.toBeInTheDocument();

@@ -154,20 +154,16 @@ test("exchange direction stays readable on narrow screens and with reduced motio
   await expect(
     track.locator("#chartForecastPowerExchange .uplot"),
   ).toBeVisible();
-  await track
-    .getByRole("button", { name: "Expand Power exchange chart" })
-    .click();
+  await track.getByRole("button", { name: "Expand Trade chart" }).click();
   const expanded = page.getByRole("dialog", {
-    name: "Power exchange",
+    name: "Trade",
     exact: true,
   });
   await expect(expanded.locator(".uplot")).toBeVisible();
   await expect(
     expanded.getByRole("button", { name: /^What is / }),
   ).toBeVisible();
-  await expanded
-    .getByRole("button", { name: "Close Power exchange chart" })
-    .click();
+  await expanded.getByRole("button", { name: "Close Trade chart" }).click();
   await expect(expanded).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("exchange-dark.png") });
   await page.emulateMedia({ reducedMotion: "reduce" });

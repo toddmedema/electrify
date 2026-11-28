@@ -17,6 +17,7 @@ type NumericTickKey = {
 type ObjectTickKey = Exclude<keyof TickPresentFutureType, NumericTickKey>;
 // Exhaustive: a new nonnumeric tick field needs an explicit transport representation.
 const objectFields = {
+  agreementImportedW: "dictionary",
   agreementAvailableMWh: "dictionary",
   agreementUsefulMWh: "dictionary",
   agreementPayments: "dictionary",

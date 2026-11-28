@@ -8,7 +8,10 @@ import {
   isTerritoryTileId,
   territoryVisibilityDistance,
 } from "../helpers/TerritoryTiles";
-import { validPowerAgreementAction } from "../helpers/PowerAgreements";
+import {
+  movedAgreementOrder,
+  validPowerAgreementAction,
+} from "../helpers/PowerAgreements";
 import { isBuyingRule, isSellingRule } from "../helpers/TradingRules";
 import {
   acquisitionPaymentDue,
@@ -370,7 +373,11 @@ const GAME_COMMAND_VALIDATORS = {
   acceptPowerAgreement: (game, payload) =>
     validPowerAgreementAction(game, payload)
       ? { payload }
-      : { error: "This agreement quote has changed. Review it again." },
+      : { error: "This trade offer has changed. Review it again." },
+  reprioritizePowerAgreement: (game, payload) =>
+    movedAgreementOrder(game, payload)
+      ? { payload }
+      : { error: "Choose an available trade and dispatch position" },
   acquireUtility: (game, payload) => {
     if (!validAcquisitionAction(payload))
       return { error: "Choose a valid acquisition" };

@@ -158,7 +158,7 @@ it("breaks supply into the four legend groups and keeps the full demand breakdow
     ...stack,
     startingYear: 2020,
   };
-  expect(formatProductionTooltip(0, state)).toContain("Interties: 30W");
+  expect(formatProductionTooltip(0, state)).toContain("Trade: 30W");
   expect(formatProductionTooltip(0, state)).toContain("Storage: 0W");
   expect(formatProductionTooltip(0, state)).toContain("Storage charging: 10W");
   expect(formatProductionTooltip(1, state).split("\n").slice(1, 6)).toEqual([
@@ -166,13 +166,13 @@ it("breaks supply into the four legend groups and keeps the full demand breakdow
     "Variable: 40W",
     "Dispatchable: 80W",
     "Storage: 10W",
-    "Interties: 0W",
+    "Trade: 0W",
   ]);
   expect(formatProductionTooltip(1, state)).not.toContain("Coal");
   expect(formatProductionTooltip(1, state)).not.toContain("discharging");
   expect(formatProductionTooltip(1, state)).not.toContain("importing");
   expect(formatProductionTooltip(1, state)).toContain("Demand: 120W");
-  expect(formatProductionTooltip(1, state)).toContain("Interties: 20W");
+  expect(formatProductionTooltip(1, state)).toContain("Trade: 20W");
   expect(formatProductionTooltip(1, state)).toContain("Total load: 140W");
   expect(formatProductionTooltip(1, state)).not.toContain("Blackout:");
 });
@@ -252,7 +252,7 @@ it("shows imported supply when no generators are producing", () => {
     />,
   );
   expect(screen.getByText("Demand")).toBeVisible();
-  expect(screen.getByText("Interties")).toBeVisible();
+  expect(screen.getByText("Trade")).toBeVisible();
   expect(screen.queryByText("Supply to customers")).not.toBeInTheDocument();
   expect(screen.getByRole("img")).toHaveAccessibleName(
     /Total supply: latest 50W/,
@@ -343,8 +343,8 @@ it("keeps simultaneous inward and outward flows distinct around the customer-dem
   });
   expect(label).toContain("Storage: 20W");
   expect(label).toContain("Storage charging: 15W");
-  expect(label).toContain("Interties: 10W");
-  expect(label).toContain("Interties: 5W");
+  expect(label).toContain("Trade: 10W");
+  expect(label).toContain("Trade: 5W");
   expect(label).not.toContain("Blackout:");
 });
 
@@ -417,29 +417,25 @@ it("keeps weather in the chart tooltip without a separate weather strip", () => 
   );
 });
 
-it("names pooled external power in the legend, summaries and tooltip", () => {
+it("names Trade in the legend, chart summary and tooltip", () => {
   render(
     <ChartSupplyDemand
       timeline={timeline}
       currentMinute={0}
       location={LOCATIONS.SF}
       startingYear={2020}
-      exchangeLabel="External power"
       legend
     />,
   );
-  expect(screen.getByText("External power")).toBeVisible();
+  expect(screen.getByText("Trade")).toBeVisible();
   expect(screen.queryByText("Interties")).not.toBeInTheDocument();
-  expect(screen.getByRole("img")).toHaveAccessibleName(
-    /External power imports/,
-  );
+  expect(screen.getByRole("img")).toHaveAccessibleName(/Trade imports/);
   const stack = supplyDemandStack(timeline, []);
   expect(
     formatProductionTooltip(0, {
       timeline,
       ...stack,
       startingYear: 2020,
-      exchangeLabel: "External power",
     }),
-  ).toContain("External power: 30W");
+  ).toContain("Trade: 30W");
 });

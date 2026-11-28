@@ -394,6 +394,60 @@ test("V2 joins immediately by invite and lets the host remove a guest", async ({
   expect(campaign.errors).toEqual([]);
 });
 
+test(
+  "co-op players cannot use another company's claimed logo",
+  { tag: "@mobile" },
+  async ({ newIsolatedContext }, info) => {
+    const campaign = new V2Campaign(newIsolatedContext);
+    const width = info.project.use.viewport?.width ?? 1280;
+    const host = await campaign.addPlayer(width);
+    const invite = await campaign.create(host);
+    const picker = (page: Page) =>
+      page.getByRole("combobox", { name: /Company logo/ });
+    const pick = async (page: Page, name: string) => {
+      await picker(page).click();
+      await page.getByRole("option", { name, exact: true }).click();
+      await expect(picker(page)).toContainText(name);
+    };
+    await expect(picker(host)).toContainText("Random");
+    await pick(host, "Sunburst");
+
+    const guest = await campaign.addPlayer(width);
+    await campaign.requestJoin(guest, invite);
+    await campaign.waitForGuest(host, guest);
+    await expect(picker(guest)).toContainText("Random");
+    await picker(guest).click();
+    await expect(
+      guest.getByRole("option", { name: /Sunburst.*Taken by SolarSam/ }),
+    ).toBeDisabled();
+    await guest
+      .getByRole("option", { name: "Grid pylon", exact: true })
+      .click();
+    await expect(picker(guest)).toContainText("Grid pylon");
+    await picker(host).click();
+    await expect(
+      host.getByRole("option", { name: /Grid pylon.*Taken by WindyWren/ }),
+    ).toBeDisabled();
+    await host.getByRole("option", { name: "Random", exact: true }).click();
+    await picker(guest).click();
+    await expect(
+      guest.getByRole("option", { name: "Sunburst", exact: true }),
+    ).toBeEnabled();
+    await guest.getByRole("option", { name: "Sunburst", exact: true }).click();
+    await expect(picker(guest)).toContainText("Sunburst");
+
+    await campaign.start(host);
+    for (const page of [host, guest]) {
+      const view = (await projection(page))!.game!.multiplayer!;
+      const logos = view.utilityLogos!;
+      expect(new Set(Object.values(logos)).size).toBe(2);
+      const guestSeat = page === guest ? view.seat : view.peers![0].id;
+      expect(logos[guestSeat]).toBe("sunburst");
+    }
+    expect(campaign.errors).toEqual([]);
+  },
+);
+
 test("focus skips a guest who is still exiting after a quick second kick", async ({
   newIsolatedContext,
 }) => {
@@ -682,9 +736,7 @@ test(
       .toBeTruthy();
 
     for (const page of [host, guest])
-      await page
-        .getByRole("button", { name: "Agreements", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Trade", exact: true }).click();
     await host
       .getByRole("button", {
         name: "Review connection with WindyWren",

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import {
   LEGACY_GENERATIONS,
@@ -5,6 +6,8 @@ import {
 } from "../../data/LegacyCampaign";
 import { DifficultyType } from "../../Types";
 import DifficultyPicker from "../base/DifficultyPicker";
+import UtilityLogoPicker from "../base/UtilityLogoPicker";
+import type { UtilityLogoId } from "../../data/UtilityLogos";
 import ScreenPage from "../base/ScreenPage";
 import ScenarioLeaderboard from "../base/ScenarioLeaderboard";
 import { LEGACY_CAMPAIGN_ID } from "../../data/LegacyCampaign";
@@ -16,7 +19,7 @@ export interface CampaignSetupProps {
   activeGeneration?: number;
   busy?: boolean;
   onDifficulty: (difficulty: DifficultyType) => void;
-  onStart: () => void;
+  onStart: (utilityLogo?: UtilityLogoId) => void;
   onBack: () => void;
   onResume?: () => void;
 }
@@ -32,6 +35,7 @@ export default function CampaignSetup({
   onBack,
   onResume,
 }: CampaignSetupProps): React.JSX.Element {
+  const [utilityLogo, setUtilityLogo] = useState<UtilityLogoId>();
   return (
     <ScreenPage
       title="Legacy campaign"
@@ -63,6 +67,11 @@ export default function CampaignSetup({
               unlockedThrough={unlockedThrough}
             />
           </Box>
+          <UtilityLogoPicker
+            logo={utilityLogo}
+            onChange={(logo) => setUtilityLogo(logo ?? undefined)}
+            disabled={busy}
+          />
           <Box component="section" aria-labelledby="campaign-terms-title">
             <Typography
               id="campaign-terms-title"
@@ -122,7 +131,7 @@ export default function CampaignSetup({
           className="scenarioStartButton"
           variant={onResume ? "outlined" : "contained"}
           disabled={busy}
-          onClick={onStart}
+          onClick={() => onStart(utilityLogo)}
           sx={{ minHeight: 44 }}
         >
           {onResume ? "Start new campaign" : "Start campaign"}
