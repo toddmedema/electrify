@@ -112,30 +112,40 @@ async function select(
   // role queries across the map for every focus and geometry read dominates the journey on CI.
   const navigation = () =>
     control.evaluateAll((targets) => {
-      const surfaces = Array.from(
+      const visibleSurfaces = Array.from(
         document.querySelectorAll(
           '[role="dialog"],[role="menu"],[role="listbox"]',
         ),
-      )
-        .filter((node) => {
-          const bounds = node.getBoundingClientRect();
-          return (
-            bounds.width > 0 &&
-            bounds.height > 0 &&
-            node.checkVisibility({ visibilityProperty: true })
-          );
-        })
-        .map((node) => [
+      ).filter((node) => {
+        const bounds = node.getBoundingClientRect();
+        return (
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          node.checkVisibility({ visibilityProperty: true })
+        );
+      });
+      const element = targets[0];
+      const active = document.activeElement as HTMLElement | null;
+      const focused = !!element && active === element;
+      const controlledIds =
+        focused && element.matches('[role="combobox"][aria-expanded="true"]')
+          ? element.getAttribute("aria-controls")?.split(/\s+/)
+          : undefined;
+      const state = {
+        count: targets.length,
+        surfaces: visibleSurfaces.map((node) => [
           node.getAttribute("role"),
           node.id,
           node.getAttribute("aria-label"),
-        ]);
-      const element = targets[0];
-      const active = document.activeElement as HTMLElement | null;
-      const state = {
-        count: targets.length,
-        surfaces,
-        focused: !!element && active === element,
+        ]),
+        ownedListbox: visibleSurfaces.findIndex(
+          (node) =>
+            node.getAttribute("role") === "listbox" &&
+            !!node.id &&
+            controlledIds?.includes(node.id) &&
+            document.getElementById(node.id) === node,
+        ),
+        focused,
       };
       if (!element || !active || active === document.body || state.focused)
         return { ...state, direction: "down", key: "body" };
@@ -172,16 +182,24 @@ async function select(
   let movement = await navigation();
   const expectedSurfaces = movement.surfaces;
   const visited = new Map<string, number>();
-  for (let attempt = 0; attempt < limit; attempt++) {
+  for (let attempt = 0; attempt <= limit; attempt++) {
     expect(
       movement.count,
       "the target must remain available during navigation",
     ).toBe(1);
+    // A combobox may open its own listbox on focus. Every other popup, including
+    // ones already open before traversal, must still match the starting state.
+    const surfaces =
+      movement.surfaces.length === expectedSurfaces.length + 1
+        ? movement.surfaces.filter(
+            (_, index) => index !== movement.ownedListbox,
+          )
+        : movement.surfaces;
     expect(
-      movement.surfaces,
+      surfaces,
       "directional focus traversal must not open or dismiss a popup",
     ).toEqual(expectedSurfaces);
-    if (movement.focused) return;
+    if (movement.focused || attempt === limit) break;
     const count = visited.get(movement.key) ?? 0;
     visited.set(movement.key, count + 1);
     const direction =
@@ -193,10 +211,10 @@ async function select(
     await input(page, direction as InputAction);
     movement = await navigation();
   }
-  await expect(
-    control,
+  expect(
+    movement.focused,
     "reachable through the rendered control positions",
-  ).toBeFocused();
+  ).toBe(true);
 }
 
 async function reorderFirstFleetRow(page: Page) {
