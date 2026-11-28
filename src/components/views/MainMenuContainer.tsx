@@ -4,7 +4,8 @@ import { connect } from "react-redux";
 import { AppStateType, SaveMetadata } from "../../Types";
 import { store } from "../../Store";
 import { TUTORIALS } from "../../data/Scenarios";
-import { getPlayedScenarioIds } from "../../LocalStorage";
+import { achievementJournal } from "../../achievements/Journal";
+import { useAchievements } from "../../achievements/useAchievements";
 import { navigate } from "../../reducers/Card";
 import { startTutorial } from "../../reducers/Game";
 import { change as changeSettings } from "../../reducers/Settings";
@@ -12,21 +13,21 @@ import { feedbackOpen } from "../../reducers/UI";
 import { selectContinueSave } from "../../SaveModel";
 import { showMultiplayerLobby } from "../../multiplayer/Registry";
 import { resumeSavedGame, runSaveTransition } from "../../SaveSession";
-import MainMenu, { DispatchProps, StateProps } from "./MainMenu";
+import MainMenu, { DispatchProps, Props, StateProps } from "./MainMenu";
 import { loadSavedGames } from "./SavedGamesLoader";
 
-function getNextTutorial() {
-  const played = getPlayedScenarioIds();
-  return TUTORIALS.find((tutorial) => !played.includes(tutorial.id));
+function getNextTutorial(completed: readonly number[]) {
+  return TUTORIALS.find((tutorial) => !completed.includes(tutorial.id));
 }
 
-const mapStateToProps = (state: AppStateType): StateProps => {
+type MenuStateProps = Omit<StateProps, "hasUnfinishedTutorials">;
+
+const mapStateToProps = (state: AppStateType): MenuStateProps => {
   const saved = selectContinueSave(state.saves?.entries || []);
   return {
     audioEnabled: state.settings.audioEnabled,
     hasSavedGame: !!saved,
     hasSavedGames: !!state.saves?.entries.length,
-    hasUnfinishedTutorials: !!getNextTutorial(),
   };
 };
 
@@ -70,7 +71,9 @@ export const mapDispatchToProps = (
       dispatch(navigate("NEW_GAME"));
     },
     onTutorials: () => {
-      const tutorial = getNextTutorial();
+      const tutorial = getNextTutorial(
+        achievementJournal.getSnapshot().progress.tutorials,
+      );
       if (tutorial)
         void runSaveTransition(() => startTutorial(dispatch, tutorial.id));
     },
@@ -79,6 +82,14 @@ export const mapDispatchToProps = (
 
 const MainMenuContainer = connect(mapStateToProps, (dispatch: AppDispatch) =>
   mapDispatchToProps(dispatch),
-)(MainMenu);
+)(function MainMenuWithTutorials(props: Omit<Props, "hasUnfinishedTutorials">) {
+  const { tutorials } = useAchievements().progress;
+  return (
+    <MainMenu
+      {...props}
+      hasUnfinishedTutorials={!!getNextTutorial(tutorials)}
+    />
+  );
+});
 
 export default MainMenuContainer;

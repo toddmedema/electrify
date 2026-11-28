@@ -57,6 +57,23 @@ test("stale tabs see claimed guest history and preserve other account writes", (
   ]);
 });
 
+test("legacy browser tutorials can be claimed once and ignore non-tutorial plays", () => {
+  const storage = memoryStorage();
+  const firstTab = new AchievementJournal(() => storage);
+  firstTab.importTutorialHistory([0, 1, 1, 101]);
+  expect(firstTab.getSnapshot().progress.tutorials).toEqual([0, 1]);
+  expect(firstTab.getSnapshot().notifications).toEqual([]);
+  firstTab.activate("alice");
+  expect(firstTab.getSnapshot().progress.tutorials).toEqual([0, 1]);
+
+  const returningTab = new AchievementJournal(() => storage);
+  returningTab.importTutorialHistory([0, 1, 2]);
+  returningTab.activate("bob");
+  expect(returningTab.getSnapshot().progress.tutorials).toEqual([]);
+  returningTab.activate("alice");
+  expect(returningTab.getSnapshot().progress.tutorials).toEqual([0, 1]);
+});
+
 test("storage failures retain live awards and can persist them later without duplicate notifications", () => {
   const storage = memoryStorage();
   let blocked = true;

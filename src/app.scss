@@ -3806,22 +3806,6 @@ $pane_header_height: 48px;
     border-radius: var(--radius-sm);
   }
 
-  .tutorialCompleteSummary {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 0 12px 8px;
-    padding: 12px 12px;
-    border: 1px solid var(--border-tile);
-    border-radius: var(--radius-lg);
-    background: var(--bg-raised);
-
-    & > span {
-      display: flex;
-      flex-direction: column;
-    }
-  }
-
   .tutorialCatalog {
     padding-top: 4px;
   }
@@ -7302,8 +7286,7 @@ $programs_column: 800px;
     background: transparent;
   }
 
-  .tutorialSpotlight,
-  .tutorialCompleteSummary {
+  .tutorialSpotlight {
     margin: 0 0 $space-2;
   }
 

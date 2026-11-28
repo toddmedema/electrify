@@ -89,9 +89,7 @@ for (const theme of ["light", "dark"] as const) {
     const headings = await page
       .getByRole("heading", { level: 2 })
       .allTextContents();
-    expect(headings.indexOf("Campaign")).toBeGreaterThan(
-      headings.indexOf("Learn the basics"),
-    );
+    expect(headings.slice(0, 2)).toEqual(["Tutorials", "Campaign"]);
     expect(headings.indexOf("Campaign")).toBeLessThan(
       headings.indexOf("Challenges"),
     );

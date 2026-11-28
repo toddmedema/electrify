@@ -426,13 +426,6 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
     ...before,
     eventLogReadThroughId: after.eventLogReadThroughId,
   });
-  expect(
-    await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("plays")!).plays.filter(
-        (play: { scenarioId: number }) => play.scenarioId === 0,
-      ),
-    ),
-  ).toEqual([expect.objectContaining({ timesPlayed: 1 })]);
   await page
     .locator("#appbar:visible")
     .getByRole("button", { name: "slow speed", exact: true })
@@ -449,7 +442,7 @@ test("the first-time tour opens real tools and preserves the chosen grid", async
   ).toHaveCount(0);
 });
 
-test("ignoring first-time tips records Mission 1 and prevents another offer", async ({
+test("ignoring first-time tips prevents another offer", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120000);

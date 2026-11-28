@@ -1,15 +1,13 @@
 import { UnknownAction } from "@reduxjs/toolkit";
-import { getPlayedScenarioIds } from "../../LocalStorage";
+import { achievementJournal } from "../../achievements/Journal";
+import { emptyRecord } from "../../achievements/Progress";
 import { SaveMetadata } from "../../Types";
 import type { AppDispatch } from "../../Store";
 import { TUTORIALS } from "../../data/Scenarios";
 import { navigate } from "../../reducers/Card";
+import { quit, start } from "../../reducers/GameActions";
 import { mapDispatchToProps } from "./MainMenuContainer";
 
-jest.mock("../../LocalStorage", () => ({
-  ...jest.requireActual("../../LocalStorage"),
-  getPlayedScenarioIds: jest.fn(),
-}));
 jest.mock("../../SaveSession", () => ({
   saveSessionMiddleware:
     () => (next: (action: unknown) => unknown) => (action: unknown) =>
@@ -21,34 +19,38 @@ jest.mock("../../SaveSession", () => ({
   resumeSavedGame: jest.fn(),
 }));
 
-const mockedPlayed = getPlayedScenarioIds as jest.MockedFunction<
-  typeof getPlayedScenarioIds
->;
 let entries: SaveMetadata[] = [];
 
-function startFromMenu(): UnknownAction[] {
+function selectMenuAction(action: "onStart" | "onTutorials"): UnknownAction[] {
   const actions: UnknownAction[] = [];
   const dispatch = ((action: UnknownAction) => {
     actions.push(action);
     return action;
   }) as AppDispatch;
-  mapDispatchToProps(dispatch, () => entries).onStart();
+  mapDispatchToProps(dispatch, () => entries)[action]();
   return actions;
 }
 
-describe("MainMenuContainer onStart", () => {
+describe("MainMenuContainer", () => {
   beforeEach(() => {
-    mockedPlayed.mockReturnValue([]);
+    localStorage.clear();
+    achievementJournal.refresh();
     entries = [];
   });
 
   it("opens the game selection for a brand-new player", () => {
-    expect(startFromMenu()).toEqual([navigate("NEW_GAME")]);
+    expect(selectMenuAction("onStart")).toEqual([navigate("NEW_GAME")]);
   });
 
-  it("opens the mission list after any tutorial is complete", () => {
-    mockedPlayed.mockReturnValue([TUTORIALS[0].id]);
-    expect(startFromMenu()).toEqual([navigate("NEW_GAME")]);
+  it("starts the next tutorial after a lesson is restored from the account", () => {
+    achievementJournal.merge({
+      ...emptyRecord(),
+      tutorials: [TUTORIALS[0].id],
+    });
+    expect(selectMenuAction("onTutorials")).toEqual([
+      quit(),
+      start(TUTORIALS[1].id),
+    ]);
   });
 
   it("opens the mission list when an unfinished save exists", () => {
@@ -60,6 +62,6 @@ describe("MainMenuContainer onStart", () => {
         lastPlayedAt: "2026-10-01",
       } as SaveMetadata,
     ];
-    expect(startFromMenu()).toEqual([navigate("NEW_GAME")]);
+    expect(selectMenuAction("onStart")).toEqual([navigate("NEW_GAME")]);
   });
 });

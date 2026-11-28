@@ -8,11 +8,9 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import {
-  getPlayedScenarioIds,
-  getScenarioPlayCounts,
-  recordScenarioPlayed,
-} from "../../LocalStorage";
+import { getPlayedScenarioIds } from "../../LocalStorage";
+import { achievementJournal } from "../../achievements/Journal";
+import { emptyRecord } from "../../achievements/Progress";
 import { TUTORIALS } from "../../data/Scenarios";
 import { setSpeed } from "../../reducers/Game";
 import uiReducer, { delta, dialogOpen, dialogClose } from "../../reducers/UI";
@@ -113,7 +111,10 @@ function mount({
   return testStore;
 }
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  achievementJournal.refresh();
+});
 
 it.each([100000000, 0])(
   "explains the chosen data-center demand (%s W)",
@@ -145,12 +146,12 @@ it("waits for a launched grid and any other dialog before recording the offer on
     screen.getByRole("dialog", { name: "New to Electrify?" }),
   ).toBeVisible();
   expect(testStore.getState().game.speed).toBe("PAUSED");
-  expect(getScenarioPlayCounts()[TUTORIALS[0].id]).toBe(1);
+  expect(getPlayedScenarioIds()).toEqual([]);
   expect(testStore.getState().ui.dataCenterGuideRequested).toBe(false);
 });
 
 it.each(["skip", "escape", "backdrop"])(
-  "dismisses by %s and leaves time paused and Mission 1 recorded",
+  "dismisses by %s and leaves time paused with Mission 1 available",
   async (method) => {
     const testStore = mount();
     const dialog = screen.getByRole("dialog");
@@ -169,7 +170,7 @@ it.each(["skip", "escape", "backdrop"])(
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
     );
     expect(testStore.getState().game.speed).toBe("PAUSED");
-    expect(getScenarioPlayCounts()[TUTORIALS[0].id]).toBe(1);
+    expect(achievementJournal.getSnapshot().progress.tutorials).toEqual([]);
   },
 );
 
@@ -212,7 +213,7 @@ it("uses the existing tutorial highlights and advances when the named controls a
   ).not.toBeInTheDocument();
   expect(testStore.getState().card.name).toBe("FACILITIES");
   expect(testStore.getState().game).toEqual(before);
-  expect(getScenarioPlayCounts()[TUTORIALS[0].id]).toBe(1);
+  expect(achievementJournal.getSnapshot().progress.tutorials).toEqual([]);
 });
 
 it("keeps time paused while exploring tools and exits the tour with Escape", async () => {
@@ -229,12 +230,11 @@ it("keeps time paused while exploring tools and exits the tour with Escape", asy
   expect(testStore.getState().game.speed).toBe("PAUSED");
 });
 
-it("does not reoffer to someone who has played Mission 1", () => {
-  recordScenarioPlayed(TUTORIALS[0].id);
+it("does not offer tips when Mission 1 is in synced progress", () => {
+  achievementJournal.merge({ ...emptyRecord(), tutorials: [TUTORIALS[0].id] });
   const testStore = mount();
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(testStore.getState().game.speed).toBe("NORMAL");
-  expect(getScenarioPlayCounts()[TUTORIALS[0].id]).toBe(1);
 });
 
 it.each([{ requested: false }])(

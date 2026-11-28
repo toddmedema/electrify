@@ -22,12 +22,12 @@ import {
   ChevronRightGlyph,
   ChevronUpGlyph,
 } from "../base/Glyphs";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import SortIcon from "@mui/icons-material/Sort";
 import ExtensionOutlinedIcon from "@mui/icons-material/ExtensionOutlined";
 import NavigableCardRow from "../base/NavigableCardRow";
 import ScreenPage from "../base/ScreenPage";
 import { getScenarioPlayCounts } from "../../LocalStorage";
+import { useAchievements } from "../../achievements/useAchievements";
 import { getScenarioLocation } from "../../helpers/Locations";
 import {
   CUSTOM_SCENARIO_ID,
@@ -266,8 +266,11 @@ export default function NewGame(props: Props): React.JSX.Element {
     React.useState<HTMLElement | null>(null);
   const playCounts = getScenarioPlayCounts();
   const ids = Object.keys(playCounts).map(Number);
-  const completedTutorials = TUTORIALS.filter((s) => ids.includes(s.id)).length;
-  const nextTutorial = TUTORIALS.find((s) => ids.indexOf(s.id) === -1);
+  const { tutorials } = useAchievements().progress;
+  const completedTutorials = TUTORIALS.filter((s) =>
+    tutorials.includes(s.id),
+  ).length;
+  const nextTutorial = TUTORIALS.find((s) => !tutorials.includes(s.id));
   const scenarios = SCENARIOS.filter(
     (s) => !s.tutorialSteps && !isLegacyCampaignScenario(s.id),
   ).sort(
@@ -376,28 +379,14 @@ export default function NewGame(props: Props): React.JSX.Element {
                 </Button>
               }
             >
-              Learn the basics
+              {nextTutorial ? "Tutorials" : "Tutorials (Completed)"}
             </MissionSectionHeader>
-            {nextTutorial ? (
+            {nextTutorial && (
               <TutorialSpotlight
                 tutorial={nextTutorial}
                 completedTutorials={completedTutorials}
                 onSelect={() => props.onTutorial(nextTutorial.id)}
               />
-            ) : (
-              <div className="tutorialCompleteSummary">
-                <CheckCircleIcon color="action" />
-                <span>
-                  <strong>Tutorials complete</strong>
-                  <Typography
-                    component="span"
-                    variant="body2"
-                    color="textSecondary"
-                  >
-                    You can repeat any lesson whenever you want.
-                  </Typography>
-                </span>
-              </div>
             )}
             {showAllTutorials && (
               <div
@@ -410,7 +399,7 @@ export default function NewGame(props: Props): React.JSX.Element {
                   <MissionListItem
                     key={s.id}
                     s={s}
-                    completed={ids.indexOf(s.id) !== -1}
+                    completed={tutorials.includes(s.id)}
                     onSelect={() => props.onTutorial(s.id)}
                   />
                 ))}

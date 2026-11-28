@@ -2,6 +2,7 @@ import { expect, test, Locator, Page } from "./fixtures";
 import { expectReadableText, foregroundContrast } from "./contrast";
 import { TUTORIALS } from "../src/data/Scenarios";
 import { readSavedGame } from "./save-fixture";
+import { reviewScreenshot } from "./review-screenshot";
 
 async function actionAfterPlay(page: Page) {
   const friends = page.getByRole("button", {
@@ -127,9 +128,9 @@ test("loading hands off to a smooth logo rise and individually staggered control
   ).toBeFocused();
 });
 
-test("finishing every tutorial removes the shortcut while leaving the lessons replayable", async ({
+test("finishing every tutorial leaves a compact heading and replayable lessons", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.addInitScript(
     (ids) => {
       localStorage.setItem(
@@ -156,14 +157,38 @@ test("finishing every tutorial removes the shortcut while leaving the lessons re
     page.getByRole("heading", { name: "Choose a game", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Tutorials complete", { exact: true }),
+    page.getByRole("heading", { name: "Tutorials (Completed)", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByText("Tutorials complete", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("progressbar")).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "All tutorials" })).toHaveCount(
+    0,
+  );
+  if (
+    testInfo.project.name === "desktop-chromium" ||
+    testInfo.project.name === "mobile-390px"
+  ) {
+    await reviewScreenshot(page, {
+      path: testInfo.outputPath(
+        `tutorials-completed-${testInfo.project.name}.png`,
+      ),
+      animations: "disabled",
+    });
+  }
   await page
     .getByRole("button", { name: `View all ${TUTORIALS.length}`, exact: true })
     .click();
   await expect(
     page.getByRole("group", { name: "All tutorials" }).getByRole("button"),
   ).toHaveCount(TUTORIALS.length);
+  await page
+    .getByRole("button", { name: "Review Electricity", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Step 1 of 5" }),
+  ).toBeVisible();
 });
 
 test("warm reloads and new tabs keep the minimum loading time and animate again", async ({

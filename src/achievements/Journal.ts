@@ -1,4 +1,9 @@
-import { emptyRecord, mergeRecords, validRecord } from "./Progress";
+import {
+  emptyRecord,
+  mergeRecords,
+  TUTORIAL_IDS,
+  validRecord,
+} from "./Progress";
 import type { AchievementRecord } from "./Progress";
 
 export const ACHIEVEMENT_STORAGE_KEY = "electrify-achievements-v1";
@@ -6,6 +11,7 @@ export type AchievementSyncState =
   "local" | "syncing" | "synced" | "offline" | "failed";
 interface DeviceJournal {
   version: 1;
+  tutorialHistoryImported?: true;
   guest: AchievementRecord;
   accounts: Record<string, AchievementRecord>;
 }
@@ -128,6 +134,8 @@ export class AchievementJournal {
           };
         this.root = {
           version: 1,
+          tutorialHistoryImported:
+            next.tutorialHistoryImported || this.root.tutorialHistoryImported,
           guest: this.guestClaimPending
             ? this.root.guest
             : mergeRecords(next.guest, this.root.guest),
@@ -154,6 +162,18 @@ export class AchievementJournal {
       this.refresh();
       this.persist();
     }
+  }
+  /** Old browser play counts belong to the device's guest history until claimed. */
+  importTutorialHistory(playedIds: readonly number[]) {
+    this.refresh();
+    if (this.unreadable || this.root.tutorialHistoryImported) return;
+    const guest = mergeRecords(this.root.guest, {
+      ...emptyRecord(),
+      tutorials: TUTORIAL_IDS.filter((id) => playedIds.includes(id)),
+    });
+    this.root = { ...this.root, guest, tutorialHistoryImported: true };
+    this.persist();
+    if (!this.snapshot.uid) this.publish({ progress: guest });
   }
   activate(uid?: string) {
     if (uid === this.snapshot.uid) return;

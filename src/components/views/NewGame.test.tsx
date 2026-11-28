@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { achievementJournal } from "../../achievements/Journal";
+import { emptyRecord } from "../../achievements/Progress";
 import { CUSTOM_SCENARIO_ID, SCENARIOS, TUTORIALS } from "../../data/Scenarios";
 import { GameType } from "../../Types";
 import NewGame, { Props } from "./NewGame";
@@ -38,7 +40,10 @@ function challengeRows(): HTMLElement[] {
 const viewAllTutorialsName = `View all ${TUTORIALS.length}`;
 
 describe("NewGame", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    achievementJournal.refresh();
+  });
 
   it("opens the campaign between lessons and challenges without listing its generations as challenges", () => {
     const onCampaign = jest.fn();
@@ -48,7 +53,7 @@ describe("NewGame", () => {
       screen
         .getAllByRole("heading", { level: 2 })
         .map((heading) => heading.textContent),
-    ).toEqual(["Learn the basics", "Campaign", "Challenges", "Custom game"]);
+    ).toEqual(["Tutorials", "Campaign", "Challenges", "Custom game"]);
     fireEvent.click(
       screen.getByRole("button", { name: "View legacy campaign" }),
     );
@@ -307,8 +312,13 @@ describe("NewGame", () => {
   });
 
   it("turns the first incomplete tutorial into an explicit continuation", () => {
-    recordPlayed(TUTORIALS[0].id);
     render(<NewGame {...props()} />);
+    act(() => {
+      achievementJournal.merge({
+        ...emptyRecord(),
+        tutorials: [TUTORIALS[0].id],
+      });
+    });
 
     const next = screen.getByTestId(`tutorial-spotlight-${TUTORIALS[1].id}`);
     expect(next).toHaveTextContent(TUTORIALS[1].summary as string);
@@ -323,7 +333,10 @@ describe("NewGame", () => {
   });
 
   it("marks completed lessons with a solid contrast-colour check", () => {
-    recordPlayed(TUTORIALS[0].id);
+    achievementJournal.merge({
+      ...emptyRecord(),
+      tutorials: [TUTORIALS[0].id],
+    });
     /* eslint-disable testing-library/no-container, testing-library/no-node-access --
        The badge's painted tick is the behaviour under test; SVG paths carry no accessible text */
     const { container } = render(<NewGame {...props()} />);

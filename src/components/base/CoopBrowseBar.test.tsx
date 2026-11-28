@@ -228,7 +228,9 @@ test("choosing together drops the lessons and the personal recommendations", () 
     />,
   );
   expect(screen.getByText("Choose a game together")).toBeInTheDocument();
-  expect(screen.queryByText("Learn the basics")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: /^Tutorials/ }),
+  ).not.toBeInTheDocument();
   expect(screen.queryByText("For you")).not.toBeInTheDocument();
   expect(
     within(screen.getByTestId("challenge-list")).getAllByTestId(
