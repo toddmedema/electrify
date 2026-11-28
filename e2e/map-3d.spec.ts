@@ -2004,10 +2004,16 @@ test("tile inspection shares the desktop window stack", async ({
   await capital.click();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 
-  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  const agreementsTrigger = page.getByRole("button", {
+    name: "Agreements",
+    exact: true,
+  });
+  await agreementsTrigger.click();
   await expect(agreements).toHaveAttribute("data-map-window-front", "true");
   await page.keyboard.press("Escape");
   await expect(agreements).toHaveCount(0);
+  await expect(agreementsTrigger).toBeFocused();
+  await expect(agreementsTrigger).toHaveCSS("outline-style", "solid");
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
   await page.keyboard.press("Escape");
   await expect(inspector).toHaveCount(0);

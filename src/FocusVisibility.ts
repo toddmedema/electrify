@@ -12,9 +12,40 @@ export function hasNavigationFocus(element: HTMLElement): boolean {
   const { keyboardNavigation, controllerInput } =
     element.ownerDocument.documentElement.dataset;
   return (
-    (keyboardNavigation === "true" || controllerInput === "true") &&
+    (keyboardNavigation === "true" ||
+      controllerInput === "true" ||
+      element.hasAttribute("data-keyboard-restored-focus")) &&
     element.matches(":focus-visible")
   );
+}
+
+function canShowKeyboardFocus(event: KeyboardEvent): boolean {
+  return (
+    event.isTrusted &&
+    !event.isComposing &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey
+  );
+}
+
+/** Keep the keyboard cue on a tool's returning trigger until focus or input changes. */
+export function restoreToolTriggerFocus(
+  trigger: HTMLElement | null,
+  event?: KeyboardEvent,
+): void {
+  if (!trigger) return;
+  if (event && canShowKeyboardFocus(event)) {
+    trigger.setAttribute("data-keyboard-restored-focus", "");
+    trigger.addEventListener(
+      "blur",
+      () => trigger.removeAttribute("data-keyboard-restored-focus"),
+      { once: true },
+    );
+  }
+  trigger.focus({ preventScroll: true });
+  if (trigger.ownerDocument.activeElement !== trigger)
+    trigger.removeAttribute("data-keyboard-restored-focus");
 }
 
 /** Touch focus can be inherited by buttons opened from a text field or an auto-focused menu.
@@ -27,7 +58,10 @@ export function installFocusVisibility(): () => void {
   if (window.matchMedia("(hover: none) and (pointer: coarse)").matches)
     root.dataset.touchInput = "true";
   const pointer = (event: PointerEvent) => {
-    if (event.isTrusted) delete root.dataset.keyboardNavigation;
+    if (event.isTrusted) {
+      delete root.dataset.keyboardNavigation;
+      document.activeElement?.removeAttribute("data-keyboard-restored-focus");
+    }
     if (event.pointerType === "touch") root.dataset.touchInput = "true";
     else delete root.dataset.touchInput;
   };
@@ -40,14 +74,7 @@ export function installFocusVisibility(): () => void {
     const navigatesFocus = navigationKeys.includes(event.key) || stepsSlider;
     // Browsers can report :focus-visible after any key, including gameplay shortcuts.
     // Keep their focus heuristic, but only show gameplay cues after keyboard navigation.
-    if (
-      navigatesFocus &&
-      event.isTrusted &&
-      !event.isComposing &&
-      !event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey
-    )
+    if (navigatesFocus && canShowKeyboardFocus(event))
       root.dataset.keyboardNavigation = "true";
     if (navigatesFocus || ["Enter", " ", "Escape"].includes(event.key))
       delete root.dataset.touchInput;

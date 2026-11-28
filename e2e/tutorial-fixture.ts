@@ -38,7 +38,10 @@ export const tutorialCoal = (page: Page) =>
   tutorialMap(page).locator('[data-map-facility="Coal"][data-owned="true"]');
 
 export async function openTutorialFleet(page: Page) {
-  await tutorialCoal(page).click();
+  const coal = tutorialCoal(page);
+  // The map can accept input before loading has enabled the tutorial objective.
+  await expect(coal).toHaveClass(/tutorialTarget/);
+  await coal.click();
   await expect(
     page.getByRole("dialog", { name: "Coal", exact: true }),
   ).toBeVisible();

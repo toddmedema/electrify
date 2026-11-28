@@ -402,7 +402,7 @@ button,
 }
 
 // Suppress both the shared ring and the browser's own outline on gameplay focus targets.
-#{focus.$workspace-without-navigation} :focus-visible {
+#{focus.$without-navigation}:focus-visible {
   outline: none !important;
 }
 

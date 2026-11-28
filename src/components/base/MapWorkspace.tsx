@@ -2,6 +2,7 @@ import * as React from "react";
 import { TransitionGroup } from "react-transition-group";
 import MapPanelSlide from "./MapPanelSlide";
 import { useAppDispatch, useAppSelector } from "../../Store";
+import { restoreToolTriggerFocus } from "../../FocusVisibility";
 import { navigate, tutorialViewedMapTool } from "../../reducers/GameActions";
 import { useControllerInput } from "../../desktop/InputPresentation";
 import { SIDE_TOOL_MIN_WIDTH, useWorkspaceLayout } from "../../WorkspaceLayout";
@@ -157,7 +158,7 @@ export default function MapWorkspace({
     if (projectBusy && (requestedPanel || requestedProject)) returnToMap();
   }, [projectBusy, requestedPanel, requestedProject, returnToMap]);
   const close = React.useCallback(
-    (tool: MapTool, focusTrigger = true) => {
+    (tool: MapTool, focusTrigger = true, dismissedBy?: KeyboardEvent) => {
       const remaining = windows.filter((item) => item !== tool);
       setStack({ card, destination, windows: remaining });
       if (!floating || tool === destination) {
@@ -166,7 +167,7 @@ export default function MapWorkspace({
       }
       if (!focusTrigger) return;
       const trigger = MAP_TOOLS.find((item) => item.id === tool)!.triggerId;
-      document.getElementById(trigger)?.focus({ preventScroll: true });
+      restoreToolTriggerFocus(document.getElementById(trigger), dismissedBy);
     },
     [card, destination, dispatch, floating, windows],
   );
@@ -255,7 +256,7 @@ export default function MapWorkspace({
       event.stopImmediatePropagation();
       if (active === "TILE") tileClose.current?.();
       else if (active === "PROGRAMS" && programBack) programBack();
-      else close(active);
+      else close(active, true, event);
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);

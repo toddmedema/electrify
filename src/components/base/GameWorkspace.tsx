@@ -9,6 +9,7 @@ import {
   useToolScroll,
 } from "./GameToolMemory";
 import { useAppDispatch, useAppSelector } from "../../Store";
+import { restoreToolTriggerFocus } from "../../FocusVisibility";
 import { hasTerritoryNetwork } from "../../helpers/Territories";
 import { navigate } from "../../reducers/Card";
 import { selectTutorialActions } from "../../reducers/Tutorial";
@@ -225,7 +226,11 @@ function Workspace({
   }, [active]);
   const destination = (tool: GameTool) =>
     tool === "BUILD_GENERATORS" ? buildCategory : tool;
-  const close = (tool: GameTool, focusTrigger = true) => {
+  const close = (
+    tool: GameTool,
+    focusTrigger = true,
+    dismissedBy?: KeyboardEvent,
+  ) => {
     // Only what is on screen stays open; a tool that didn't fit is not revealed by closing another.
     const remaining = visible.filter((item) => item !== tool);
     setRemembered(remaining);
@@ -235,9 +240,8 @@ function Workspace({
       dispatch(navigate(next ? destination(next) : baseView));
     }
     if (!focusTrigger) return;
-    document
-      .getElementById(GAME_TOOLS.find((item) => item.id === tool)!.triggerId)
-      ?.focus({ preventScroll: true });
+    const trigger = GAME_TOOLS.find((item) => item.id === tool)!.triggerId;
+    restoreToolTriggerFocus(document.getElementById(trigger), dismissedBy);
   };
   React.useEffect(() => {
     const escape = (event: KeyboardEvent) => {
@@ -262,7 +266,7 @@ function Workspace({
         return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      close(target);
+      close(target, true, event);
     };
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
