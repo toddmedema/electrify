@@ -4,6 +4,8 @@ const navigationKeys = [
   "ArrowDown",
   "ArrowLeft",
   "ArrowRight",
+  "Home",
+  "End",
 ];
 
 export function hasNavigationFocus(element: HTMLElement): boolean {
@@ -30,7 +32,12 @@ export function installFocusVisibility(): () => void {
     else delete root.dataset.touchInput;
   };
   const keyboard = (event: KeyboardEvent) => {
-    const navigatesFocus = navigationKeys.includes(event.key);
+    // Sliders use Page Up and Page Down for larger steps. Elsewhere they scroll the page.
+    const stepsSlider =
+      (event.key === "PageUp" || event.key === "PageDown") &&
+      event.target instanceof HTMLInputElement &&
+      event.target.type === "range";
+    const navigatesFocus = navigationKeys.includes(event.key) || stepsSlider;
     // Browsers can report :focus-visible after any key, including gameplay shortcuts.
     // Keep their focus heuristic, but only show gameplay cues after keyboard navigation.
     if (

@@ -40,17 +40,20 @@ test("gameplay shortcuts leave the build surface quiet until keyboard navigation
     ? rail
     : map.getByRole("heading", { name: "Build", exact: true });
 
-  if (desktop) {
-    await pause.click();
-    await page.keyboard.press("g");
-  } else {
-    const build = page
-      .getByRole("navigation", { name: "Game actions" })
-      .getByRole("button", { name: "Build", exact: true });
-    if (info.project.use.hasTouch) await build.tap();
-    else await build.click();
-  }
-  await expect(anchor).toBeFocused();
+  const openBuild = async () => {
+    if (desktop) {
+      await pause.click();
+      await page.keyboard.press("g");
+    } else {
+      const build = page
+        .getByRole("navigation", { name: "Game actions" })
+        .getByRole("button", { name: "Build", exact: true });
+      if (info.project.use.hasTouch) await build.tap();
+      else await build.click();
+    }
+    await expect(anchor).toBeFocused();
+  };
+  await openBuild();
 
   await page.keyboard.press("2");
   await expect(pause).toHaveAttribute("aria-pressed", "false");
@@ -85,6 +88,17 @@ test("gameplay shortcuts leave the build surface quiet until keyboard navigation
     animations: "disabled",
     scale: "css",
   });
+
+  if (!desktop) {
+    if (info.project.use.hasTouch) await firstControl.tap();
+    else await firstControl.click();
+    await expect(anchor).toHaveCount(0);
+  }
+  await openBuild();
+  await page.keyboard.press("2");
+  await expect(pause).toHaveAttribute("aria-pressed", "false");
+  await expect(anchor).toBeFocused();
+  await expect(anchor).toHaveCSS("outline-style", "none");
 });
 
 test("wheeling over Power or Energy steps its size in both axes", async ({
