@@ -9,7 +9,7 @@ type ScenarioMod = NonNullable<
 >;
 
 test("new custom launches use territorial rules", () => {
-  expect(newMatchSpec(COOP_TEST_SPEC).territorialVersion).toBe(1);
+  expect(newMatchSpec(COOP_TEST_SPEC).territorialVersion).toBe(2);
 });
 
 test("authored and modded launches keep their own maps", () => {

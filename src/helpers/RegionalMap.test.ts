@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
+import { waterPorts } from "../components/base/TerritoryHexGeometry";
 import { resolve } from "node:path";
-import { getRegionalGeography, regionalHexes } from "../data/RegionalGeography";
+import {
+  getRegionalGeography,
+  hexRadius,
+  regionalHexes,
+  REGIONAL_MAP_RADIUS,
+} from "../data/RegionalGeography";
 import { LEGACY_SCENARIOS } from "../data/LegacyCampaign";
 import { SCENARIOS } from "../data/Scenarios";
 import { CHERNOBYL_SCENARIO_ID } from "../data/ChernobylScenario";
@@ -70,6 +76,148 @@ it("uses the drawn water direction and keeps local references distinct from fall
   expect(
     getRegionalGeography(arbitrary, 2050, 999, customerSources).utility,
   ).toBe("Example City model grid");
+});
+
+it("renders isolated inland water as lakes, including a lone edge sample", () => {
+  const { terrainAt } = getRegionalGeography(cities.Manassas, 2026, 106);
+  expect(terrainAt({ q: 1, r: 2 })).toBe("lake");
+  expect(terrainAt({ q: 0, r: 5 })).toBe("lake");
+});
+
+it("keeps coastal water, including a clipped shore with a known offshore point", () => {
+  const oslo = getRegionalGeography(cities.Oslo, 2026, 999);
+  const sanFrancisco = getRegionalGeography(cities.SF, 2026, 100);
+  expect(oslo.terrainAt({ q: -5, r: 5 })).toBe("ocean");
+  expect(sanFrancisco.terrainAt({ q: -4, r: 0 })).toBe("ocean");
+});
+
+it("preserves tidal water where the sampled harbor opening is too narrow", () => {
+  const { terrainAt } = getRegionalGeography(cities.Auckland, 2026, 999);
+  expect(terrainAt({ q: -2, r: 2 })).toBe("ocean");
+  expect(terrainAt({ q: -1, r: 2 })).toBe("ocean");
+});
+
+it.each([
+  { city: "Belgrade", q: 0, r: -5, ports: [1, 5] },
+  { city: "MexicoCity", q: -3, r: -2, ports: [0] },
+])(
+  "keeps the river approach stable at $city's opening map edge",
+  ({ city, q, r, ports }) => {
+    const game = createGame({ scenarioId: 106, seed: 931 });
+    const location = cities[city];
+    const board = regionalMapViews({ ...game, location });
+    const cell = board.find(({ tile }) => tile.q === q && tile.r === r)!;
+    expect(cell.tile.terrain).toBe("river");
+    const visibleTerrain = new Map(
+      board.map(({ tile }) => [`${tile.q},${tile.r}`, tile.terrain]),
+    );
+    expect(waterPorts(cell.tile, visibleTerrain, cell.offMapRiverEdge)).toEqual(
+      ports,
+    );
+    const { terrainAt } = getRegionalGeography(location, 2026, 106);
+    const expandedTerrain = new Map(
+      regionalHexes(REGIONAL_MAP_RADIUS + 1).map((coordinate) => [
+        `${coordinate.q},${coordinate.r}`,
+        terrainAt(coordinate),
+      ]),
+    );
+    expect(waterPorts(cell.tile, expandedTerrain)).toEqual(ports);
+  },
+);
+
+it.each([
+  { city: "Austin", upstream: { q: -5, r: 1 }, downstream: { q: 3, r: 2 } },
+  { city: "Paris", upstream: { q: -3, r: -2 }, downstream: { q: 5, r: -1 } },
+  { city: "Madrid", upstream: { q: 0, r: -5 }, downstream: { q: -2, r: 5 } },
+])(
+  "keeps the main river connected across $city",
+  ({ city, upstream, downstream }) => {
+    const { terrainAt } = getRegionalGeography(cities[city], 2026, 999);
+    const river = [upstream];
+    const seen = new Set([`${upstream.q},${upstream.r}`]);
+    for (const { q, r } of river) {
+      for (const [dq, dr] of HEX_NEIGHBORS) {
+        const next = { q: q + dq, r: r + dr };
+        const key = `${next.q},${next.r}`;
+        if (
+          seen.has(key) ||
+          hexRadius(next) > REGIONAL_MAP_RADIUS ||
+          terrainAt(next) !== "river"
+        )
+          continue;
+        seen.add(key);
+        river.push(next);
+      }
+    }
+    expect(terrainAt(upstream)).toBe("river");
+    expect(river).toContainEqual(downstream);
+  },
+);
+
+it("leaves room between river arms through the sampled region and expanded board", () => {
+  const cells = regionalHexes(REGIONAL_MAP_RADIUS + 4);
+  const crowded: { city: string; q: number; r: number }[] = [];
+  for (const [city, location] of Object.entries(cities)) {
+    const { terrainAt } = getRegionalGeography(location, 2026, 999);
+    for (const { q, r } of cells) {
+      if (terrainAt({ q, r }) !== "river") continue;
+      const arms = HEX_NEIGHBORS.filter(
+        ([dq, dr]) => terrainAt({ q: q + dq, r: r + dr }) === "river",
+      );
+      const sidesTouch = arms.some(([aq, ar], index) =>
+        arms
+          .slice(index + 1)
+          .some(([bq, br]) => hexRadius({ q: aq - bq, r: ar - br }) === 1),
+      );
+      if (sidesTouch) crowded.push({ city, q, r });
+    }
+  }
+  expect(crowded).toEqual([]);
+});
+
+it("gives each river reach in the sampled regions an outlet", () => {
+  const cells = regionalHexes(REGIONAL_MAP_RADIUS);
+  const stranded: { city: string; q: number; r: number }[] = [];
+  for (const [city, location] of Object.entries(cities)) {
+    const { terrainAt } = getRegionalGeography(location, 2026, 999);
+    const remaining = new Set(
+      cells
+        .filter((cell) => terrainAt(cell) === "river")
+        .map(({ q, r }) => `${q},${r}`),
+    );
+    for (const root of cells) {
+      if (!remaining.delete(`${root.q},${root.r}`)) continue;
+      const reach = [root];
+      let outlet = false;
+      for (const { q, r } of reach) {
+        for (const [dq, dr] of HEX_NEIGHBORS) {
+          const next = { q: q + dq, r: r + dr };
+          const terrain = terrainAt(next);
+          if (
+            terrain === "lake" ||
+            terrain === "ocean" ||
+            (terrain === "river" && hexRadius(next) > REGIONAL_MAP_RADIUS)
+          )
+            outlet = true;
+          if (remaining.delete(`${next.q},${next.r}`)) reach.push(next);
+        }
+      }
+      if (!outlet) stranded.push({ city, ...root });
+    }
+  }
+  expect(stranded).toEqual([]);
+});
+
+it("keeps the three rivers connected at Pittsburgh's confluence", () => {
+  const { terrainAt } = getRegionalGeography(cities.PIT, 2026, 103);
+  const confluences = regionalHexes(REGIONAL_MAP_RADIUS).filter(
+    ({ q, r }) =>
+      terrainAt({ q, r }) === "river" &&
+      HEX_NEIGHBORS.filter(
+        ([dq, dr]) => terrainAt({ q: q + dq, r: r + dr }) === "river",
+      ).length === 3,
+  );
+  expect(confluences).toHaveLength(1);
 });
 
 it("uses researched utility names for the selected starting year", () => {

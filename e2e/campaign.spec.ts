@@ -35,7 +35,7 @@ import { buildStorySnapshot } from "../src/helpers/Story";
 
 const REVIEW_PROJECTS = ["desktop-chromium", "mobile-390px", "mobile-360px"];
 
-async function setCampaignPreferences(page: Page, theme: "light" | "dark") {
+async function configureCampaign(page: Page, theme: "light" | "dark") {
   await page.addInitScript(
     ({ mode, key, journal }) => {
       localStorage.clear();
@@ -53,12 +53,28 @@ async function setCampaignPreferences(page: Page, theme: "light" | "dark") {
   );
 }
 
+async function startMediumCampaign(page: Page) {
+  await page.goto("/?campaign=legacy");
+  await page
+    .getByRole("group", { name: "Difficulty", exact: true })
+    .getByRole("button", { name: DIFFICULTY_LABELS.Manager, exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start campaign", exact: true })
+    .click();
+  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await page
+    .getByRole("button", { name: "pause", exact: true })
+    .first()
+    .click();
+}
+
 for (const theme of ["light", "dark"] as const) {
-  test(`campaign catalogue and setup navigation work in ${theme}`, async ({
+  test(`the campaign catalogue and difficulty selection work in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
-    await setCampaignPreferences(page, theme);
+    await configureCampaign(page, theme);
     await page.goto("/");
     await page.getByRole("button", { name: "Play", exact: true }).click();
     await expect(
@@ -180,26 +196,22 @@ for (const theme of ["light", "dark"] as const) {
         exact: true,
       }),
     ).toHaveAttribute("aria-pressed", "true");
-  });
-
-  test(`historical builds and the saved first CEO handover work in ${theme}`, async ({
-    page,
-  }, info) => {
-    test.skip(!REVIEW_PROJECTS.includes(info.project.name));
-    await setCampaignPreferences(page, theme);
-    await page.goto("/?campaign=legacy");
-    await page
-      .getByRole("group", { name: "Difficulty", exact: true })
-      .getByRole("button", { name: DIFFICULTY_LABELS.Manager, exact: true })
-      .click();
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();
     await expect(page.locator(".facilities:visible")).toBeVisible();
-    await page
-      .getByRole("button", { name: "pause", exact: true })
-      .first()
-      .click();
+    const opened = await readSavedGame(page);
+    expect(opened?.scenarioId).toBe(117);
+    expect(opened?.difficulty).toBe("Manager");
+    expect(opened?.campaign?.generationIndex).toBe(0);
+  });
+
+  test(`historical builds and the first saved CEO handover work in ${theme}`, async ({
+    page,
+  }, info) => {
+    test.skip(!REVIEW_PROJECTS.includes(info.project.name));
+    await configureCampaign(page, theme);
+    await startMediumCampaign(page);
     const build = await openBuild(page);
     const size = build.getByRole("slider");
     await expect(size).toHaveAttribute("min", "-14");
@@ -394,36 +406,24 @@ for (const theme of ["light", "dark"] as const) {
     expect(successor?.timeline[0].cash).toBe(closed?.timeline[0].cash);
   });
 
-  test(`the saved preview for the ninth campaign term wraps and advances in ${theme}`, async ({
+  test(`the saved eighth-term handover previews the final goals in ${theme}`, async ({
     page,
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
-    await setCampaignPreferences(page, theme);
-    await page.goto("/?campaign=legacy");
-    await page
-      .getByRole("group", { name: "Difficulty", exact: true })
-      .getByRole("button", { name: DIFFICULTY_LABELS.Manager, exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Start campaign", exact: true })
-      .click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
-    await page
-      .getByRole("button", { name: "pause", exact: true })
-      .first()
-      .click();
-
+    await configureCampaign(page, theme);
+    await startMediumCampaign(page);
     // A protocol fixture reaches the longest incoming term. Full campaign balance has separate
     // real-action simulation coverage; this checks goal wrapping, scrolling, and saved previews.
     await editSavedGame(page, (save) => {
       let game = save.game;
       loadSimData(game.location);
-      while (game.campaign!.generationIndex <= 7) {
-        game = closeProtocolGeneration(game);
-        if (game.campaign!.generationIndex === 7) break;
-        game = gameReducer(game, continueLegacyCampaign());
+      while (game.campaign!.generationIndex < 7) {
+        game = gameReducer(
+          closeProtocolGeneration(game),
+          continueLegacyCampaign(),
+        );
       }
-      Object.assign(save, serializeSave(game));
+      Object.assign(save, serializeSave(closeProtocolGeneration(game)));
       expect(
         parseSave(JSON.parse(JSON.stringify(encodeSave(save)))),
       ).not.toBeNull();

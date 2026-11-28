@@ -22,7 +22,8 @@ import {
 import { territoryHexDistance } from "../helpers/TerritoryTiles";
 import { COOP_TEST_SPEC, coopSeats } from "../testing/MultiplayerFixtures";
 import { loadSimData } from "../testing/SimData";
-import type { Command, World } from "./Types";
+import type { Command, MatchSpec, World } from "./Types";
+import { newMatchSpec } from "./WorkerProtocol";
 import {
   applyCommand,
   checkpointWorld,
@@ -68,6 +69,59 @@ function create(count = 2) {
 function save(world: World): World {
   return JSON.parse(JSON.stringify(checkpointWorld(world)));
 }
+
+test("loads the published territorial board and routes rivers only for new matches", () => {
+  loadSimData("PIT");
+  try {
+    const spec: MatchSpec = {
+      ...COOP_TEST_SPEC,
+      customScenario: {
+        ...COOP_TEST_SPEC.customScenario!,
+        locationId: "PIT",
+        facilities: [{ name: "Solar", fuel: "Sun", peakW: 50e6 }],
+      },
+    };
+    const seats = coopSeats(4);
+    const pinnedTile = "frontier:2:-2";
+    const v1 = createWorld(
+      { ...spec, territorialVersion: 1 },
+      seats,
+      "pit-1",
+      "epoch",
+    );
+    // Exact match recorded on the deployed master d6745546.
+    const old = save(v1);
+    old.rules =
+      "coop-2-2042c23bfc633ac2af2ed66e310f561043f220bd925052f9167d9ef9b7d9db0a";
+    expect(old.grids[3].multiplayer?.territorial?.startingTileIds).toEqual([
+      "frontier:3:-3",
+      "frontier:2:-3",
+      pinnedTile,
+      "frontier:4:-4",
+    ]);
+    const restored = hydrateWorld(old);
+    expect(restored.grids[3].multiplayer?.territorial).toEqual(
+      v1.grids[3].multiplayer?.territorial,
+    );
+    expect(
+      multiplayerTerritoryTile(restored.grids[3], pinnedTile)?.terrain,
+    ).not.toBe("river");
+
+    const v2 = createWorld(newMatchSpec(spec), seats, "pit-1", "epoch");
+    expect(v2.spec.territorialVersion).toBe(2);
+    expect(v2.grids[3].multiplayer?.territorial?.startingTileIds).not.toContain(
+      pinnedTile,
+    );
+    expect(multiplayerTerritoryTile(v2.grids[3], pinnedTile)?.terrain).toBe(
+      "river",
+    );
+    expect(hydrateWorld(save(v2)).grids[3].multiplayer?.territorial).toEqual(
+      v2.grids[3].multiplayer?.territorial,
+    );
+  } finally {
+    loadSimData("SF");
+  }
+});
 
 function send(world: World, seat: string, command: Command) {
   return applyCommand(world, seat, {

@@ -174,7 +174,8 @@ function layoutFor(
         terrain: geography.terrainAt(coordinates),
       };
       cells.set(tileId(extra), extra);
-      ordinary.push(extra);
+      if (land(extra)) ordinary.push(extra);
+      if (freshwater(extra)) reservoirs.push(extra);
     }
     return ordinary;
   };
@@ -290,7 +291,17 @@ function layoutFor(
   }
 
   const tiles: RegionalTile[] = [];
+  const offMapRiverEdges = new Map<FrontierTerritoryId, number | null>();
   for (const [id, cell] of cells) {
+    if (cell.terrain === "river") {
+      const edge = HEX_NEIGHBORS.findIndex(([dq, dr]) => {
+        const next = { q: cell.q + dq, r: cell.r + dr };
+        return (
+          !cells.has(tileId(next)) && geography.terrainAt(next) === "river"
+        );
+      });
+      offMapRiverEdges.set(id, edge >= 0 ? edge : null);
+    }
     const base = { ...cell, id, territoryId: id };
     const facility = placements.get(id);
     tiles.push(
@@ -312,6 +323,7 @@ function layoutFor(
   }
   return {
     tiles,
+    offMapRiverEdges,
     developed,
     buildSites: new Set(ordinary.filter(connectedVacant).map(tileId)),
     facilityIds: new Map(
@@ -372,7 +384,7 @@ export function regionalMapViews(
     layouts.set(game.location, cached);
   }
   const {
-    layout: { tiles, developed, buildSites, facilityIds },
+    layout: { tiles, offMapRiverEdges, developed, buildSites, facilityIds },
     utility,
   } = cached;
   const current = new Map(
@@ -386,6 +398,7 @@ export function regionalMapViews(
       facilityId === undefined ? undefined : current.get(facilityId);
     return {
       tile,
+      offMapRiverEdge: offMapRiverEdges.get(tile.id),
       ownerName: owned ? utility : "Regional terrain",
       ownerKey: owned ? "you" : undefined,
       owned,

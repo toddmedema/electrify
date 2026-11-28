@@ -36,6 +36,7 @@ const CAMERA_OVERSCAN = HEX_WIDTH / 2;
 const FOG_MIX = [0, 0.15, 0.35, 0.6];
 const FOG_SATURATION = [1, 0.8, 0.45, 0.15];
 const CITY_WINDOW_MATERIAL = 5;
+const RIVER_WATER_MATERIAL = 6;
 const NIGHT_BACKGROUND: Vec3 = [0.022, 0.032, 0.047];
 const VERTEX = `#version 300 es
 precision highp float;
@@ -57,8 +58,10 @@ flat out vec4 vMaterial;
 out vec3 vSurfacePosition;
 void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
-  if (aMaterial.z == 2.0) {
+  if (aMaterial.z == 2.0 || aMaterial.z == ${RIVER_WATER_MATERIAL}.0) {
     world.y += mix(${WATERSHED_LEVEL_OFFSETS[0]}, ${WATERSHED_LEVEL_OFFSETS[1]}, uWeather.z);
+    // Elevated headwater vertices represent a higher *dry* channel only.
+    if (aMaterial.z == ${RIVER_WATER_MATERIAL}.0) world.y -= aPosition.y * uWeather.z;
   }
   vSurfacePosition = world.xyz;
   if (uShadow) {
@@ -95,18 +98,18 @@ uniform float uNight;
 uniform float uShadowAlpha;
 uniform bool uShadow;
 out vec4 color;
-float frostGrain(vec2 point) {
+float surfaceGrain(vec2 point) {
   vec3 hash = fract(vec3(point.xyx) * 0.1031);
   hash += dot(hash, hash.yzx + 33.33);
   return fract((hash.x + hash.y) * hash.z);
 }
-float frostPatch(vec2 point) {
+float surfaceNoise(vec2 point) {
   vec2 cell = floor(point);
   vec2 edge = fract(point);
   edge = edge * edge * (3.0 - 2.0 * edge);
   return mix(
-    mix(frostGrain(cell), frostGrain(cell + vec2(1.0, 0.0)), edge.x),
-    mix(frostGrain(cell + vec2(0.0, 1.0)), frostGrain(cell + 1.0), edge.x),
+    mix(surfaceGrain(cell), surfaceGrain(cell + vec2(1.0, 0.0)), edge.x),
+    mix(surfaceGrain(cell + vec2(0.0, 1.0)), surfaceGrain(cell + 1.0), edge.x),
     edge.y
   );
 }
@@ -138,9 +141,9 @@ void main() {
     // Anchor the glaze to the landscape. Bare rock and shaded foliage show through.
     vec2 surface = vSurfacePosition.xz + vSurfacePosition.y * vec2(0.22, -0.37);
     float exposure = smoothstep(0.08, 0.76, normal.y);
-    float patches = frostPatch(surface * vec2(7.0, 10.0));
+    float patches = surfaceNoise(surface * vec2(7.0, 10.0));
     vec2 crystal = surface * vec2(28.0, 37.0);
-    float grain = frostGrain(floor(crystal));
+    float grain = surfaceGrain(floor(crystal));
     vec2 facet = fract(crystal) - 0.5;
     float facetEdge = abs(facet.x + facet.y * 0.7) + abs(facet.y) * 0.55;
     float crystals = (1.0 - smoothstep(0.18, 0.39, facetEdge))
@@ -151,7 +154,8 @@ void main() {
   }
   vec3 lit = base * (uAmbient + (1.0 - uAmbient) * band);
   lit *= mix(vec3(1.0), uLightColor, 0.65);
-  if (vMaterial.z == 1.0 || vMaterial.z == 2.0) {
+  bool riverWater = vMaterial.z == ${RIVER_WATER_MATERIAL}.0;
+  if (vMaterial.z == 1.0 || vMaterial.z == 2.0 || riverWater) {
     // A bounded sky tint and broad glint, with the normal shadow pass laid over both.
     float cloud = uWeather.x;
     vec3 sky = mix(uLightColor * uAmbient, uBackground, 0.35 + cloud * 0.35);
@@ -163,6 +167,12 @@ void main() {
     lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
   }
   lit *= mix(1.0, 0.40, uNight);
+  // Preserve a blue-green surface in low light, before applying distance fog.
+  if (riverWater) {
+    float current = surfaceNoise(vSurfacePosition.xz * 7.0);
+    lit += vec3(0.036, 0.106, 0.138) * uNight;
+    lit += vec3(0.024, 0.044, 0.054) * (current - 0.42);
+  }
   if (cityWindow) {
     lit = mix(lit, vec3(1.0, 0.78, 0.40), vMaterial.x * (0.10 + uNight * 0.83));
   } else {
@@ -434,15 +444,16 @@ export class MapRenderer {
       for (const { part, pose } of items) {
         const vertices = part.mesh.positions;
         triangles += vertices.length / 9;
-        const watershed = part.material === "watershed-water";
+        const river = part.material === "river-water";
+        const watershed = river || part.material === "watershed-water";
+        const waterLevel = this.paintedFrame?.weather?.waterLevel;
+        const riverRiseFade = river ? waterLevelOffset([0, 1], waterLevel) : 0;
         const surfaceOffset = watershed
-          ? waterLevelOffset(
-              WATERSHED_LEVEL_OFFSETS,
-              this.paintedFrame?.weather?.waterLevel,
-            )
+          ? waterLevelOffset(WATERSHED_LEVEL_OFFSETS, waterLevel)
           : 0;
+        const offsetAt = (y: number) => surfaceOffset - y * riverRiseFade;
         if (watershed || part.material === "water")
-          waterSurfaceY.push(pose[13] + vertices[1] + surfaceOffset);
+          waterSurfaceY.push(pose[13] + vertices[1] + offsetAt(vertices[1]));
         for (let i = 0; i < vertices.length; i += 3)
           for (let axis = 0; axis < 3; axis++) {
             const value =
@@ -450,7 +461,7 @@ export class MapRenderer {
               pose[axis + 4] * vertices[i + 1] +
               pose[axis + 8] * vertices[i + 2] +
               pose[axis + 12] +
-              (axis === 1 ? surfaceOffset : 0);
+              (axis === 1 ? offsetAt(vertices[i + 1]) : 0);
             min[axis] = Math.min(min[axis], value);
             max[axis] = Math.max(max[axis], value);
           }
@@ -966,8 +977,16 @@ export class MapRenderer {
               ? 4
               : cityWindow
                 ? CITY_WINDOW_MATERIAL
-                : 0;
-    pose[23] = instance.frost && pose[22] !== 1 && pose[22] !== 2 ? 1 : 0;
+                : part.material === "river-water"
+                  ? RIVER_WATER_MATERIAL
+                  : 0;
+    pose[23] =
+      instance.frost &&
+      pose[22] !== 1 &&
+      pose[22] !== 2 &&
+      pose[22] !== RIVER_WATER_MATERIAL
+        ? 1
+        : 0;
   }
 
   private draw(moving: boolean, lighting: MapLighting): void {
