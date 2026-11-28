@@ -1,4 +1,5 @@
 @use "sass:map";
+@use "focus-visibility" as focus;
 
 // ===============================================
 // Palette
@@ -398,6 +399,11 @@ button,
   // container would hide it; none restyle its colour or width.
   outline: 2px solid var(--focus-ring) !important;
   outline-offset: 2px;
+}
+
+// Suppress both the shared ring and the browser's own outline on gameplay focus targets.
+#{focus.$workspace-without-navigation} :focus-visible {
+  outline: none !important;
 }
 
 // These controls retain their outer ring even when controller focus uses a scaled offset.
@@ -3097,7 +3103,7 @@ $pane_header_height: 48px;
   &:focus-visible {
     outline: none;
   }
-  &:focus-visible::after {
+  &#{focus.$visible}::after {
     outline: 2px solid var(--interactive-blue);
     outline-offset: -2px;
   }
@@ -6004,7 +6010,7 @@ $homeSmokeCycle: 5.6s;
   }
   // The disclosure excludes the grip. Draw its keyboard ring around the whole header,
   // inside the scroll pane so both vertical edges remain visible.
-  &:has(> .facilityDisclosure:focus-visible)::before {
+  &:has(> .facilityDisclosure#{focus.$visible})::before {
     content: "";
     position: absolute;
     inset: 0;

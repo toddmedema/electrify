@@ -29,6 +29,64 @@ async function startMap(page: Page, theme: "light" | "dark") {
   return network;
 }
 
+test("gameplay shortcuts leave the build surface quiet until keyboard navigation", async ({
+  page,
+}, info) => {
+  const desktop = page.viewportSize()!.width >= 1024;
+  const map = await startMap(page, "dark");
+  const rail = map.getByRole("complementary", { name: "Build facilities" });
+  const pause = page.getByRole("button", { name: "pause", exact: true });
+  const anchor = desktop
+    ? rail
+    : map.getByRole("heading", { name: "Build", exact: true });
+
+  if (desktop) {
+    await pause.click();
+    await page.keyboard.press("g");
+  } else {
+    const build = page
+      .getByRole("navigation", { name: "Game actions" })
+      .getByRole("button", { name: "Build", exact: true });
+    if (info.project.use.hasTouch) await build.tap();
+    else await build.click();
+  }
+  await expect(anchor).toBeFocused();
+
+  await page.keyboard.press("2");
+  await expect(pause).toHaveAttribute("aria-pressed", "false");
+  await page.keyboard.press("Space");
+  await expect(pause).toHaveAttribute("aria-pressed", "true");
+  await expect(anchor).toBeFocused();
+  await expect(anchor).toHaveCSS("outline-style", "none");
+  await reviewScreenshot(desktop ? rail : page, {
+    path: info.outputPath("gameplay-build-focus.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+
+  await page.keyboard.press("Tab");
+  const firstControl = desktop
+    ? rail.getByRole("button", { name: /^Power:/ })
+    : map.getByRole("button", { name: "Close project" });
+  await expect(firstControl).toBeFocused();
+  await expect(firstControl).toHaveCSS("outline-style", "solid");
+  if (desktop) {
+    await expect(
+      rail.getByRole("slider", { name: "Generator capacity", exact: true }),
+    ).toBeVisible();
+  }
+  await page.keyboard.press("Tab");
+  await expect(firstControl).not.toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(firstControl).toBeFocused();
+  await expect(firstControl).toHaveCSS("outline-style", "solid");
+  await reviewScreenshot(desktop ? rail : page, {
+    path: info.outputPath("keyboard-build-focus.png"),
+    animations: "disabled",
+    scale: "css",
+  });
+});
+
 test("wheeling over Power or Energy steps its size in both axes", async ({
   page,
 }, info) => {

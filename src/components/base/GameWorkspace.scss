@@ -1,3 +1,5 @@
+@use "../../focus-visibility" as focus;
+
 // The fleet is centered within the stage. Desktop tools occupy their own tracks; compact tools rise above it.
 // On the root, because toasts render outside the workspace and clear the same dock.
 :root {
@@ -603,7 +605,7 @@ html:has(
     &:active {
       cursor: grabbing;
     }
-    .gameToolTitle:focus-visible {
+    .gameToolTitle#{focus.$visible} {
       outline: 2px solid var(--focus-ring) !important;
       outline-offset: 2px;
     }

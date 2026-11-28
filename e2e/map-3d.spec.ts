@@ -951,15 +951,16 @@ test("keyboard selection draws a centered 3D mountain outline and Escape clears 
 }, info) => {
   const { map, canvas } = await startPausedMap(page);
   const { mountain, tile } = await nearestUnownedMountain(map);
-  // Force keyboard focus-visible before focusing a tile that is outside the tab order.
+  // Enter keyboard navigation before focusing a tile that is outside the tab order.
   await page.keyboard.press("Tab");
   await mountain.focus();
   await expect(mountain).toBeFocused();
   await expect(mountain).toHaveAttribute("aria-pressed", "true");
   if (!info.project.use.hasTouch)
-    expect(
-      await mountain.evaluate((button) => button.matches(":focus-visible")),
-    ).toBe(true);
+    await expect(mountain.locator(".territoryTileHitArea")).toHaveCSS(
+      "background-image",
+      /^radial-gradient/,
+    );
   await expect(mountain).toHaveCSS("outline-style", "none");
   await expect(mountain.locator(".territoryTileHitArea")).toHaveCSS(
     "outline-style",
@@ -2012,6 +2013,8 @@ test("tile inspection shares the desktop window stack", async ({
   await expect(inspector).toHaveCount(0);
   await expect(capital).toHaveAttribute("aria-pressed", "false");
   await expect(capital).toBeFocused();
+  await expect(capital).toHaveCSS("outline-style", "none");
+  await expect(capital.locator("strong")).toHaveCSS("outline-style", "none");
   await expect(fleet).toBeVisible();
 
   await capital.press("Enter");

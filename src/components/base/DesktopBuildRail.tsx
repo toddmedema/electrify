@@ -1,4 +1,5 @@
 import * as React from "react";
+import { hasNavigationFocus } from "../../FocusVisibility";
 import { Button } from "@mui/material";
 import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
@@ -448,7 +449,7 @@ export default function DesktopBuildRail({
         onMouseEnter={(event) => open(event.currentTarget, false)}
         onMouseLeave={leaveSizing}
         onFocus={(event) => {
-          if (event.currentTarget.matches(":focus-visible"))
+          if (hasNavigationFocus(event.currentTarget))
             open(event.currentTarget, false);
         }}
         onClick={(event) => {

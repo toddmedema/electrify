@@ -27,6 +27,10 @@ jest.mock(
   ),
 );
 
+afterEach(() => {
+  delete document.documentElement.dataset.keyboardNavigation;
+});
+
 function show(siteId?: TerritoryTileId, prepare?: (game: GameType) => void) {
   const game = createGame({ scenarioId: 116, seed: 188 });
   game.startingYear = 2025;
@@ -391,6 +395,7 @@ it("enters a technology preview with Right Arrow and Escape returns to the icon"
 });
 
 it("returns keyboard focus after dismissing sizing and technology previews with Escape", async () => {
+  document.documentElement.dataset.keyboardNavigation = "true";
   const { onProject } = show();
   const size = screen.getByRole("button", { name: /Power:/ });
   await userEvent.tab();

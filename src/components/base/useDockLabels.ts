@@ -1,4 +1,5 @@
 import * as React from "react";
+import { hasNavigationFocus } from "../../FocusVisibility";
 
 const LONG_PRESS_MS = 500;
 const MOVE_TOLERANCE_PX = 10;
@@ -65,7 +66,7 @@ export default function useDockLabels() {
         if (event.pointerType === "mouse") setLabelId(undefined);
       },
       onFocus: (event: React.FocusEvent<HTMLButtonElement>) => {
-        if (event.currentTarget.matches(":focus-visible")) {
+        if (hasNavigationFocus(event.currentTarget)) {
           setFromTouch(false);
           setLabelId(event.currentTarget.id);
         }
