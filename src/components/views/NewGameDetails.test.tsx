@@ -197,8 +197,11 @@ describe("NewGameDetails leaderboard", () => {
     const onDelta = jest.fn();
     render(<NewGameDetails {...props({ onDelta })} />);
 
-    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Easy" })).toHaveAttribute(
+    const difficulty = within(
+      screen.getByRole("group", { name: "Difficulty" }),
+    );
+    expect(difficulty.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(difficulty.getByRole("button", { name: "Easy" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

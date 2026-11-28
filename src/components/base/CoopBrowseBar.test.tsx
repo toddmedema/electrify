@@ -24,6 +24,7 @@ const controls = {
   copyCode: jest.fn(),
   openSaves: jest.fn(),
   kick: jest.fn(),
+  pickUtilityLogo: jest.fn(),
 };
 beforeEach(() => {
   jest.clearAllMocks();
@@ -52,6 +53,22 @@ test("guests see who they follow and every player's state as a named icon", () =
   expect(
     screen.queryByRole("button", { name: "Manage lobby" }),
   ).not.toBeInTheDocument();
+});
+
+test("players can choose a logo unless another company has claimed it", () => {
+  render(
+    <CoopBrowseBar
+      coop={coop({ selfId: "b", utilityLogos: { a: "sunburst" } })}
+    />,
+  );
+  const picker = screen.getByRole("combobox", { name: /Company logo/ });
+  expect(picker).toHaveTextContent("Random");
+  fireEvent.mouseDown(picker);
+  expect(
+    screen.getByRole("option", { name: /Sunburst.*Taken by Alice/ }),
+  ).toHaveAttribute("aria-disabled", "true");
+  fireEvent.click(screen.getByRole("option", { name: "Grid pylon" }));
+  expect(controls.pickUtilityLogo).toHaveBeenCalledWith("grid-pylon");
 });
 
 test("a host alone invites friends first, can copy the code and cannot start yet", () => {

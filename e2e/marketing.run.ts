@@ -29,7 +29,9 @@ test("capture marketing scene", async ({ page }, info) => {
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".facilities .facilityRow").first()).toBeVisible();
+  await expect(
+    page.locator('#mapPane canvas[data-renderer="ready"]'),
+  ).toBeVisible();
 
   if (scene.view === "overview" || scene.view === "reliability") {
     await openTool(page, "Insights");

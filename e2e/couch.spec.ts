@@ -868,7 +868,7 @@ test("TV couch intertie construction requires approval from both company owners"
     .toBe(2);
   await claimToPeerBorder(p1, "local-p2", readP1);
   for (const seat of [p1, p2])
-    await seat.getByRole("button", { name: "Agreements", exact: true }).click();
+    await seat.getByRole("button", { name: "Trade", exact: true }).click();
   await p1
     .getByRole("button", { name: "Review connection with P2 Utility" })
     .click();
@@ -1179,7 +1179,7 @@ test("TV couch applies padded bounds and exposes shared clock reasons through co
   const p2Color = await verifySeatPalette(p2, "local-p2", "normal speed");
   expect(p1Color).not.toBe(p2Color);
   for (const seat of [p1, p2])
-    await seat.getByRole("button", { name: "Agreements", exact: true }).click();
+    await seat.getByRole("button", { name: "Trade", exact: true }).click();
   const peerInP1 = p1
     .locator('[data-peer-id="local-p2"]')
     .getByText("P2 Utility", { exact: true });

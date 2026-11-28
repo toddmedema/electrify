@@ -11,6 +11,7 @@ import {
   setSpeed,
   togglePauseFacility,
   reprioritizeFacility,
+  reprioritizePowerAgreement,
   reprioritizeTransmissionLine,
   retrofitFacility,
   cancelRetrofit,
@@ -27,7 +28,7 @@ import {
   setFacilityDragActive,
   snackbarOpen,
 } from "../../reducers/UI";
-import { AppStateType } from "../../Types";
+import { AppStateType, GameType } from "../../Types";
 import Facilities, { DispatchProps, StateProps } from "./Facilities";
 import { TRANSMISSION_CORRIDORS } from "../../data/AdjacentMarkets";
 import { focusEvidence } from "../../helpers/Evidence";
@@ -48,6 +49,19 @@ const mapStateToProps = (state: AppStateType): StateProps => {
 };
 
 const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
+  const finishDrag = (
+    resumeSpeed: GameType["speed"],
+    action?: ReturnType<
+      | typeof reprioritizeFacility
+      | typeof reprioritizeTransmissionLine
+      | typeof reprioritizePowerAgreement
+    >,
+  ) => {
+    dispatch(setFacilityDragActive(false));
+    if (action) dispatch(action);
+    if (resumeSpeed !== "PAUSED" && !multiplayerRuntime())
+      dispatch(setSpeed(resumeSpeed));
+  };
   return {
     onArrivalShown: (id) => dispatch(acknowledgeFacilityArrival(id)),
     onEvidenceReady: (request, element) => {
@@ -99,18 +113,21 @@ const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       resumeSpeed,
       intertie,
     ) => {
-      dispatch(setFacilityDragActive(false));
-      if (destinationIndex !== null) {
-        dispatch(
-          (intertie ? reprioritizeTransmissionLine : reprioritizeFacility)({
-            spotInList: sourceIndex,
-            delta: destinationIndex - sourceIndex,
-          }),
-        );
-      }
-      if (resumeSpeed !== "PAUSED" && !multiplayerRuntime()) {
-        dispatch(setSpeed(resumeSpeed));
-      }
+      finishDrag(
+        resumeSpeed,
+        destinationIndex === null
+          ? undefined
+          : (intertie ? reprioritizeTransmissionLine : reprioritizeFacility)({
+              spotInList: sourceIndex,
+              delta: destinationIndex - sourceIndex,
+            }),
+      );
+    },
+    onAgreementDragEnd: (move, resumeSpeed) => {
+      finishDrag(
+        resumeSpeed,
+        move ? reprioritizePowerAgreement(move) : undefined,
+      );
     },
     onSelect: (id) => {
       dispatch(selectFacility(id));

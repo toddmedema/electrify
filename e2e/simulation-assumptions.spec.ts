@@ -75,7 +75,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("button", { name: "How power trading works", exact: true })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Agreements", exact: true }),
+      page.getByRole("heading", { name: "Trade", exact: true }),
     ).toBeVisible();
     await expect(
       page.getByText(/set buying and selling alongside your connections/),

@@ -13,6 +13,11 @@ import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import { coopControls } from "../../multiplayer/Registry";
 import type { CoopSelectionType } from "../../Types";
 import CoopInviteCode from "./CoopInviteCode";
+import UtilityLogoPicker from "./UtilityLogoPicker";
+import {
+  claimedUtilityLogo,
+  type UtilityLogoId,
+} from "../../data/UtilityLogos";
 
 /** State labels stay visible alongside the roster icons. */
 function PlayerState({
@@ -159,6 +164,13 @@ export default function CoopBrowseBar({
 }): React.JSX.Element | null {
   const kicked = React.useRef<string>();
   if (!coop) return null;
+  const pickUtilityLogo = coopControls()?.pickUtilityLogo;
+  const choices = coop.utilityLogos ?? {};
+  const taken = new Map<UtilityLogoId, string>();
+  for (const player of coop.players) {
+    const logo = claimedUtilityLogo(choices, player.id);
+    if (logo && player.id !== coop.selfId) taken.set(logo, player.name);
+  }
   const guests = coop.players.filter((player) => !player.host);
   const ready = guests.filter((player) => player.ready).length;
   const host = coop.role === "host";
@@ -252,6 +264,24 @@ export default function CoopBrowseBar({
               </RemovalCollapse>
             ))}
           </TransitionGroup>
+          {coop.selfId && pickUtilityLogo && (
+            <UtilityLogoPicker
+              logo={claimedUtilityLogo(choices, coop.selfId)}
+              onChange={pickUtilityLogo}
+              taken={taken}
+              disabled={coop.starting || coop.ready || coop.utilityLogoPending}
+            />
+          )}
+          {coop.utilityLogoPending && (
+            <span className="srOnly" role="status">
+              Confirming logo…
+            </span>
+          )}
+          {coop.utilityLogoError && (
+            <Typography variant="body2" color="error" role="status">
+              {coop.utilityLogoError}
+            </Typography>
+          )}
           {!coop.starting && host && coop.inviteCode && (
             <div className="coopBrowseActions">
               <CoopInviteCode
@@ -320,7 +350,12 @@ export function CoopStartButton({
       size="large"
       variant={coop.ready ? "outlined" : "contained"}
       color="primary"
-      disabled={coop.starting || disabled || coop.receivingScenario}
+      disabled={
+        coop.starting ||
+        disabled ||
+        coop.receivingScenario ||
+        coop.utilityLogoPending
+      }
       aria-pressed={coop.ready}
       onClick={() => coopControls()?.ready(!coop.ready)}
       startIcon={coop.ready ? <CheckIcon /> : undefined}

@@ -218,7 +218,7 @@ if (typeof window !== "undefined") {
 
 /** From this width the desktop-only speed and full fleet layout are available. */
 export const SIDE_LAYOUT_MIN_WIDTH = 1300;
-/** From this width the game workspace opens tools in side columns beside the fleet. */
+/** From this width the workspace can use the wide map layout and floating tools. */
 export const SIDE_TOOL_MIN_WIDTH = 1024;
 export const SIDE_LAYOUT_MEDIA = `(min-width:${SIDE_LAYOUT_MIN_WIDTH}px)`;
 
@@ -226,7 +226,7 @@ export function isBigScreen(): boolean {
   return getViewportWidth() >= 700;
 }
 
-/** Wide enough for a tool to sit beside the fleet instead of rising over it as a sheet. */
+/** Wide enough for the wide map layout. */
 export function isSideToolLayout(): boolean {
   return getViewportWidth() >= SIDE_TOOL_MIN_WIDTH;
 }

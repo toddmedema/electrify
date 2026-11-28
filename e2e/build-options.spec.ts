@@ -2,7 +2,7 @@ import { expectReadableText } from "./contrast";
 import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expectContinuousDialogSurface } from "./dialog-surface";
-import { expect, test } from "./fixtures";
+import { expect, type Page, test } from "./fixtures";
 import {
   openBuild,
   returnToTerritoryMap,
@@ -522,17 +522,121 @@ for (const theme of ["light", "dark"] as const) {
   }
 }
 
+async function startCompactBuildScenario(page: Page, theme: "light" | "dark") {
+  await page.addInitScript((mode) => {
+    localStorage.clear();
+    localStorage.setItem("theme", mode);
+  }, theme);
+  await page.goto("/?scenario=103");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await openFleet(page);
+}
+
 for (const theme of ["light", "dark"] as const) {
+  test(`generator charts show monthly output in ${theme} @minimum-phone`, async ({
+    page,
+  }, testInfo) => {
+    await startCompactBuildScenario(page, theme);
+    await page.locator(".button-buildFacility").click();
+    await page.locator(".button-buildGenerator").click();
+    const cards = page.locator(".buildOption");
+    for (const name of ["Solar", "Hydro"]) {
+      const card = cards.filter({
+        has: page.getByRole("button", {
+          name: `Review purchase of ${name}`,
+          exact: true,
+        }),
+      });
+      const output = card.getByRole("group", { name: /^Typical monthly/ });
+      await expect(output).toBeVisible();
+      await output.scrollIntoViewIfNeeded();
+      const caption = output.locator(".buildOptionOutputCaption");
+      const lowCaption = await caption.textContent();
+      const chart = output.locator("svg");
+      await chart.hover({ position: { x: 0, y: 12 } });
+      await expect(caption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
+      const { width, height } = (await chart.boundingBox())!;
+      const layout = () =>
+        output.evaluate((element) => {
+          const parent = element.getBoundingClientRect();
+          return ["svg", ".buildOptionOutputCaption"].map((selector) => {
+            const rect = element
+              .querySelector(selector)!
+              .getBoundingClientRect();
+            return {
+              x: rect.x - parent.x,
+              y: rect.y - parent.y,
+              width: rect.width,
+              height: rect.height,
+            };
+          });
+        });
+      const initialLayout = await layout();
+      const months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+      for (const [index, month] of months.entries()) {
+        // Recheck the live target after scrolling and each React caption update.
+        await chart.hover({
+          position: {
+            x: (index / 11) * (width - 0.1),
+            y: height / 2,
+          },
+        });
+        await expect(caption).toHaveText(
+          new RegExp(
+            `^${month}: \\d+(?:\\.\\d+)?% ${name === "Hydro" ? "of typical water" : "capacity"}$`,
+          ),
+        );
+        const percentage = Number(
+          (await caption.innerText()).match(/: (\d+(?:\.\d+)?)%/)![1],
+        );
+        expect(percentage).toBe(Number(percentage.toPrecision(2)));
+        expect(await layout()).toEqual(initialLayout);
+      }
+      const textLayout = await caption.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return {
+          height: range.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+          whiteSpace: getComputedStyle(element).whiteSpace,
+        };
+      });
+      expect(textLayout.height).toBeLessThanOrEqual(textLayout.lineHeight);
+      expect(textLayout.whiteSpace).toBe("nowrap");
+      if (testInfo.project.use.hasTouch) {
+        await chart.tap({ position: { x: 1, y: height / 2 } });
+      } else {
+        await output.focus();
+        await output.press("Home");
+      }
+      await expect(caption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
+      await reviewScreenshot(card, {
+        path: testInfo.outputPath(`${name}-monthly-${theme}.png`),
+        animations: "disabled",
+      });
+      await page.mouse.move(0, 0);
+      await output.evaluate((element: HTMLElement) => element.blur());
+      await expect(caption).toHaveText(lowCaption!);
+    }
+  });
+
   test(`build options remain compact and usable in ${theme} @minimum-phone`, async ({
     page,
   }, testInfo) => {
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-    }, theme);
-    await page.goto("/?scenario=103");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openFleet(page);
+    await startCompactBuildScenario(page, theme);
     for (const kind of ["Generator", "Storage"]) {
       await page.locator(".button-buildFacility").click();
       await page.locator(`.button-build${kind}`).click();
@@ -608,97 +712,27 @@ for (const theme of ["light", "dark"] as const) {
         expect(strokes[0]).toBe(
           theme === "light" ? "rgb(84, 110, 122)" : "rgb(154, 169, 186)",
         );
-        for (const name of ["Solar", "Hydro"]) {
-          const card = cards.filter({
+        // Inspect a chart before comparing and sorting, as a player can in this journey.
+        const hydroOutput = cards
+          .filter({
             has: page.getByRole("button", {
-              name: `Review purchase of ${name}`,
+              name: "Review purchase of Hydro",
               exact: true,
             }),
-          });
-          const output = card.getByRole("group", { name: /^Typical monthly/ });
-          await expect(output).toBeVisible();
-          await output.scrollIntoViewIfNeeded();
-          const caption = output.locator(".buildOptionOutputCaption");
-          const lowCaption = await caption.textContent();
-          const chart = output.locator("svg");
-          await chart.hover({ position: { x: 0, y: 12 } });
-          await expect(caption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
-          const { width, height } = (await chart.boundingBox())!;
-          const layout = () =>
-            output.evaluate((element) => {
-              const parent = element.getBoundingClientRect();
-              return ["svg", ".buildOptionOutputCaption"].map((selector) => {
-                const rect = element
-                  .querySelector(selector)!
-                  .getBoundingClientRect();
-                return {
-                  x: rect.x - parent.x,
-                  y: rect.y - parent.y,
-                  width: rect.width,
-                  height: rect.height,
-                };
-              });
-            });
-          const initialLayout = await layout();
-          const months = [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Apr",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-          ];
-          for (const [index, month] of months.entries()) {
-            // Recheck the live target after scrolling and each React caption update.
-            await chart.hover({
-              position: {
-                x: (index / 11) * (width - 0.1),
-                y: height / 2,
-              },
-            });
-            await expect(caption).toHaveText(
-              new RegExp(
-                `^${month}: \\d+(?:\\.\\d+)?% ${name === "Hydro" ? "of typical water" : "capacity"}$`,
-              ),
-            );
-            const percentage = Number(
-              (await caption.innerText()).match(/: (\d+(?:\.\d+)?)%/)![1],
-            );
-            expect(percentage).toBe(Number(percentage.toPrecision(2)));
-            expect(await layout()).toEqual(initialLayout);
-          }
-          const textLayout = await caption.evaluate((element) => {
-            const range = document.createRange();
-            range.selectNodeContents(element);
-            return {
-              height: range.getBoundingClientRect().height,
-              lineHeight: parseFloat(getComputedStyle(element).lineHeight),
-              whiteSpace: getComputedStyle(element).whiteSpace,
-            };
-          });
-          expect(textLayout.height).toBeLessThanOrEqual(textLayout.lineHeight);
-          expect(textLayout.whiteSpace).toBe("nowrap");
-          if (testInfo.project.use.hasTouch) {
-            await chart.tap({ position: { x: 1, y: height / 2 } });
-          } else {
-            await output.focus();
-            await output.press("Home");
-          }
-          await expect(caption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
-          await reviewScreenshot(card, {
-            path: testInfo.outputPath(`${name}-monthly-${theme}.png`),
-            animations: "disabled",
-          });
-          await page.mouse.move(0, 0);
-          await output.evaluate((element: HTMLElement) => element.blur());
-          await expect(caption).toHaveText(lowCaption!);
+          })
+          .getByRole("group", { name: /^Typical monthly/ });
+        const hydroCaption = hydroOutput.locator(".buildOptionOutputCaption");
+        const restingCaption = await hydroCaption.innerText();
+        if (testInfo.project.use.hasTouch) {
+          await hydroOutput.locator("svg").tap({ position: { x: 1, y: 12 } });
+        } else {
+          await hydroOutput.focus();
+          await hydroOutput.press("Home");
         }
+        await expect(hydroCaption).toHaveText(/^Jan: \d+(?:\.\d+)?%/);
+        await page.mouse.move(0, 0);
+        await hydroOutput.evaluate((element: HTMLElement) => element.blur());
+        await expect(hydroCaption).toHaveText(restingCaption);
         await first.scrollIntoViewIfNeeded();
         // Metrics reflow at a readable minimum width.
         const cells = await metrics

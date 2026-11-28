@@ -1,7 +1,9 @@
-import { CouchPlayerText, couchPlayerColor } from "../../couch/PlayerColor";
+import { couchPlayerColor } from "../../couch/PlayerColor";
 import * as React from "react";
 import { Button, Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
+import UtilityLogoIcon from "../base/UtilityLogoIcon";
+import { utilityBranding } from "../../helpers/UtilityBranding";
 import RapidConnectionIcon from "../base/RapidConnectionIcon";
 import type { GameType, TerrainType, TerritoryId } from "../../Types";
 import { isLandTerritoryId } from "../../data/Territories";
@@ -20,13 +22,14 @@ import { tilePurchaseQuotes } from "../../helpers/Territories";
 import { cityGrowthAt, type CityGrowthSector } from "../../helpers/CityDemand";
 import { projectSiteCapitalCost } from "../../helpers/ProjectBuild";
 import type { ReadyProjectSite } from "../../helpers/ProjectBuild";
-import { getSunriseSunset } from "../../helpers/DateTime";
+import { getSunriseSunset, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { currentTick } from "../../helpers/GameSelectors";
 import type { RendererState } from "../base/territory-3d/TerritoryCanvas3D";
 import type { SceneCamera } from "../base/territory-3d/TerritoryScene3D";
 import { readMapWeather } from "../base/territory-3d/MapWeather";
 import WeatherAtmosphere from "../base/territory-3d/WeatherAtmosphere";
-import { useAppSelector } from "../../Store";
+import { useAppDispatch, useAppSelector } from "../../Store";
+import { setMapFocus } from "../../reducers/UI";
 import {
   citySizeLabel,
   formatTerrainPercent,
@@ -78,6 +81,9 @@ const RENDERER_MESSAGES = {
 const PAN_OVERSCAN = HEX_WIDTH / 4;
 const MIN_TILE_TARGET_HEIGHT = 44;
 const CAMERA_SHIFT_MS = 180;
+const HANDOVER_CAMERA_SHIFT_MS = 600;
+// Widen all nine openings while keeping the final board's phone targets at least 44px high.
+const LEGACY_ZOOM_STEP = 0.045;
 
 const CITY_GROWTH_LABEL: Record<CityGrowthSector, string> = {
   Residential: "homes",
@@ -198,6 +204,8 @@ export default function TerritoryHexMap({
   const viewport = React.useRef<HTMLDivElement>(null);
   const stage = React.useRef<HTMLDivElement>(null);
   const buyingControl = React.useRef<HTMLButtonElement>(null);
+  const dispatch = useAppDispatch();
+  const mapFocus = useAppSelector((state) => state.ui?.mapFocus);
   const runId = useAppSelector((state) => state.ui?.evidenceRunId);
   const { formatPurchasePrice: money } = useMoney();
   const { pendingIds, availableCash, message, purchase } =
@@ -229,8 +237,15 @@ export default function TerritoryHexMap({
     seed,
     startingYear,
     location,
+    utilityLogo,
     date: { year },
   } = game;
+  const seat = game.multiplayer?.seat;
+  const utilityLogos = game.multiplayer?.utilityLogos;
+  const branding = React.useMemo(
+    () => utilityBranding(seed, utilityLogo, utilityLogos, seat),
+    [seed, utilityLogo, utilityLogos, seat],
+  );
   const cityGrowth = React.useMemo(() => {
     const growth = new Map<TerritoryId, readonly CityGrowthSector[]>();
     if (regional) return growth;
@@ -311,7 +326,10 @@ export default function TerritoryHexMap({
       setBuyMode(false);
       onCloseInspection?.();
       onDeselect?.();
-      buyingControl.current?.focus({ preventScroll: true });
+      const entry =
+        buyingControl.current ??
+        map.querySelector<HTMLButtonElement>(".territoryMapLayerToggle");
+      entry?.focus({ preventScroll: true });
     };
     window.addEventListener("keydown", escape, true);
     return () => window.removeEventListener("keydown", escape, true);
@@ -371,6 +389,7 @@ export default function TerritoryHexMap({
   // Fit the starting view to the screen, then leave zoom under the player's control.
   const baseScale =
     size.openingWidth > 0 && size.openingWidth < 600 ? 0.75 : 0.875;
+  const minZoom = MIN_TILE_TARGET_HEIGHT / (HEX_HEIGHT * baseScale);
   const scale = baseScale * zoom;
   const worldWidth = size.width / scale;
   const worldHeight = size.height / scale;
@@ -403,6 +422,7 @@ export default function TerritoryHexMap({
         | CameraTarget
         | ((current: ReturnType<typeof camera.getSnapshot>) => CameraTarget),
       animate = false,
+      duration = CAMERA_SHIFT_MS,
     ) => {
       cancelCameraShift();
       const current = camera.getSnapshot();
@@ -440,17 +460,17 @@ export default function TerritoryHexMap({
       const shift = (time: number) => {
         start ??= time;
         const elapsed = time - start;
-        if (elapsed >= CAMERA_SHIFT_MS) {
+        if (elapsed >= duration) {
           cameraShiftFrame.current = undefined;
           move(next);
           return;
         }
-        const remaining = 1 - elapsed / CAMERA_SHIFT_MS;
+        const remaining = 1 - elapsed / duration;
         const progress = 1 - remaining * remaining * remaining;
         move({
           x: current.x + (next.x - current.x) * progress,
           y: current.y + (next.y - current.y) * progress,
-          zoom: current.zoom,
+          zoom: current.zoom + (next.zoom - current.zoom) * progress,
         });
         cameraShiftFrame.current = requestAnimationFrame(shift);
       };
@@ -460,8 +480,12 @@ export default function TerritoryHexMap({
   );
   React.useLayoutEffect(() => {
     moveStage(camera.getSnapshot());
-    return cancelCameraShift;
-  }, [camera, mapBounds, moveStage, cancelCameraShift]);
+  }, [camera, moveStage]);
+  // Bounds and unmount invalidate a shift. Zoom frames only update the stage transform.
+  React.useLayoutEffect(
+    () => cancelCameraShift,
+    [mapBounds, cancelCameraShift],
+  );
   const focusAfterNavigation = React.useRef<TerritoryMapTileKey>();
   const pointer = React.useRef<{
     id: number;
@@ -509,27 +533,56 @@ export default function TerritoryHexMap({
     activation.current = undefined;
     suppressClick.current = true;
   };
+  const legacyGeneration = regional
+    ? game.campaign?.generationIndex
+    : undefined;
+  const legacyTermStart =
+    (game.campaign?.termStartMonth ?? 0) * MINUTES_PER_MONTH;
+  // One company and scene across terms. Keep the renderer mounted during the handover.
+  const sceneRunKey = `${runId}:${game.seed}:${legacyGeneration === undefined ? game.scenarioId : game.startingYear}`;
   const framedRun = React.useRef<{
     runId?: number;
     seed: number;
     scenarioId: number;
+    legacyGeneration?: number;
   }>();
   React.useLayoutEffect(() => {
+    const previous = framedRun.current;
+    const sameRun = previous?.runId === runId && previous?.seed === game.seed;
     if (
       !size.width ||
       !size.height ||
-      (framedRun.current?.runId === runId &&
-        framedRun.current?.seed === game.seed &&
-        framedRun.current?.scenarioId === game.scenarioId)
+      (sameRun && previous?.scenarioId === game.scenarioId)
     )
       return;
-    framedRun.current = { runId, seed: game.seed, scenarioId: game.scenarioId };
+    framedRun.current = {
+      runId,
+      seed: game.seed,
+      scenarioId: game.scenarioId,
+      legacyGeneration,
+    };
+    const legacy = legacyGeneration ?? 0;
+    const handover = sameRun && previous?.legacyGeneration === legacy - 1;
     const focus = hexCenter(
-      byKey.get(activeSelected ?? activeRoving!)?.tile ?? { q: 0, r: 0 },
+      (legacy > 0
+        ? homeTile
+        : byKey.get(activeSelected ?? activeRoving!)?.tile) ?? { q: 0, r: 0 },
     );
+    const openingZoom = Math.max(minZoom, 1 - legacy * LEGACY_ZOOM_STEP);
     const bounds = views.reduce(
-      (bounds, { tile, owned }) => {
+      (bounds, { tile, owned, operatingFacility }) => {
         if (!owned) return bounds;
+        // At handover the city and surviving sites form the inherited grid. Frame
+        // the same grid when opening a mid-term save, without chasing new work.
+        if (
+          legacy > 0 &&
+          !tile.city &&
+          !(
+            operatingFacility &&
+            operatingFacility.minuteCreated < legacyTermStart
+          )
+        )
+          return bounds;
         const point = hexCenter(tile);
         return {
           minX: Math.min(bounds.minX, point.x),
@@ -546,20 +599,30 @@ export default function TerritoryHexMap({
           y: (bounds.minY + bounds.maxY) / 2,
         }
       : focus;
-    const rangeX = Math.max(0, size.width / (2 * baseScale) - HEX_WIDTH);
-    const rangeY = Math.max(0, size.height / (2 * baseScale) - HEX_WIDTH);
-    // Start toward the useful land without clipping the capital or resumed selection.
-    // Frame once per run: purchases, frontier reveals and resize keep the player's camera.
-    setCamera({
-      x: Math.max(focus.x - rangeX, Math.min(center.x, focus.x + rangeX)),
-      y: Math.max(focus.y - rangeY, Math.min(center.y, focus.y + rangeY)),
-      zoom: 1,
-    });
+    const halfScale = 2 * baseScale * openingZoom;
+    const rangeX = Math.max(0, size.width / halfScale - HEX_WIDTH);
+    const rangeY = Math.max(0, size.height / halfScale - HEX_WIDTH);
+    // Keep the capital visible while widening toward the established grid.
+    // Frame once per run or generation. New purchases and resize keep the player's camera.
+    setCamera(
+      {
+        x: Math.max(focus.x - rangeX, Math.min(center.x, focus.x + rangeX)),
+        y: Math.max(focus.y - rangeY, Math.min(center.y, focus.y + rangeY)),
+        zoom: openingZoom,
+      },
+      handover && motion.allowed,
+      HANDOVER_CAMERA_SHIFT_MS,
+    );
     setBuyMode(false);
   }, [
     runId,
     game.seed,
     game.scenarioId,
+    legacyGeneration,
+    legacyTermStart,
+    homeTile,
+    minZoom,
+    motion.allowed,
     size.width,
     size.height,
     baseScale,
@@ -568,6 +631,65 @@ export default function TerritoryHexMap({
     byKey,
     views,
     setCamera,
+  ]);
+  React.useLayoutEffect(() => {
+    if (!mapFocus || !size.width || !size.height || !homeTile) return;
+    // Let an old inspector restore its focus before moving the camera to the news.
+    if (
+      !projectPending &&
+      onDeselect &&
+      (selected || inspected || projectPlanning)
+    ) {
+      onDeselect();
+      return;
+    }
+    const affected = views.filter(
+      ({ tile, operatingFacility }) =>
+        tile.id === mapFocus.tileId ||
+        (operatingFacility &&
+          mapFocus.facilityIds?.includes(operatingFacility.id)),
+    );
+    const points = affected.length
+      ? affected.map(({ tile }) => hexCenter(tile))
+      : [hexCenter(homeTile)];
+    const xs = points.map(({ x }) => x);
+    const ys = points.map(({ y }) => y);
+    const left = Math.min(...xs);
+    const right = Math.max(...xs);
+    const top = Math.min(...ys);
+    const bottom = Math.max(...ys);
+    const minZoom = MIN_TILE_TARGET_HEIGHT / (HEX_HEIGHT * baseScale);
+    const fit =
+      Math.min(
+        size.width / (right - left + 2 * HEX_WIDTH),
+        size.height / (bottom - top + 2 * HEX_HEIGHT),
+      ) / baseScale;
+
+    dispatch(setMapFocus(undefined));
+    clearHover();
+    setBuyMode(false);
+    setCamera({
+      x: (left + right) / 2,
+      y: (top + bottom) / 2,
+      zoom: Math.min(camera.getZoom(), Math.max(minZoom, fit)),
+    });
+    viewport.current?.focus({ preventScroll: true });
+  }, [
+    baseScale,
+    camera,
+    clearHover,
+    dispatch,
+    homeTile,
+    inspected,
+    mapFocus,
+    onDeselect,
+    projectPending,
+    projectPlanning,
+    selected,
+    setCamera,
+    size.height,
+    size.width,
+    views,
   ]);
   React.useLayoutEffect(() => {
     const element = viewport.current;
@@ -599,7 +721,6 @@ export default function TerritoryHexMap({
       const x = box.left + box.width / 2;
       const y = box.top + box.height / 2;
       // Limit zoom at the camera so the projected hexes stay large enough to tap.
-      const minZoom = MIN_TILE_TARGET_HEIGHT / (HEX_HEIGHT * baseScale);
       // Keep the same point on the ground under the pointer or pinch midpoint.
       setCamera((point) => {
         const zoom = Math.max(minZoom, Math.min(2, point.zoom * factor));
@@ -618,7 +739,7 @@ export default function TerritoryHexMap({
         };
       });
     },
-    [baseScale, setCamera],
+    [baseScale, minZoom, setCamera],
   );
   React.useEffect(() => {
     const element = viewport.current;
@@ -1156,6 +1277,7 @@ export default function TerritoryHexMap({
               : "Territory map"
         }
         data-camera-scale={scale}
+        tabIndex={-1}
         ref={viewport}
         onDragOver={(event) => {
           if (!onProjectDrop) return;
@@ -1348,7 +1470,7 @@ export default function TerritoryHexMap({
                 minute={game.date.minute}
                 minuteOfDay={game.date.minuteOfDay}
                 speed={game.speed}
-                runKey={`${runId}:${game.seed}:${game.scenarioId}`}
+                runKey={sceneRunKey}
                 daylight={getSunriseSunset(game.date, game.location)}
                 dark={dark}
                 camera={camera}
@@ -1447,6 +1569,9 @@ export default function TerritoryHexMap({
             const cityLabel =
               tile.city?.name ?? (tile.city && citySizeLabel(tile.city.size));
             const showName = showNames && !!cityLabel;
+            const cityLogo = showName
+              ? branding.forOwner(view.ownerKey)
+              : undefined;
             const quote = purchaseQuotes?.get(tile.id);
             const projectSite = projectSites?.get(key);
             const projectPrice = projectSite
@@ -1640,22 +1765,13 @@ export default function TerritoryHexMap({
                 )}
                 {showName && (
                   <strong>
-                    <span>{cityLabel}</span>
-                    {utility && (
-                      <span>
-                        <CouchPlayerText
-                          seatId={
-                            view.ownerKey?.startsWith("peer:")
-                              ? view.ownerKey.slice(5)
-                              : view.owned
-                                ? game.multiplayer?.seat
-                                : undefined
-                          }
-                        >
-                          {view.owned && !regional ? "You" : view.ownerName}
-                        </CouchPlayerText>
-                      </span>
+                    {cityLogo && (
+                      <UtilityLogoIcon
+                        logo={cityLogo}
+                        className="territoryCityLogo"
+                      />
                     )}
+                    <span>{cityLabel}</span>
                   </strong>
                 )}
                 {projectSite && (

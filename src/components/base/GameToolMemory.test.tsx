@@ -192,11 +192,11 @@ test.each(["keyboard", "controller"])(
   async (device) => {
     function Workspace({ tool = true }) {
       const ref = React.useRef<HTMLDivElement>(null);
-      useToolFocusMemory(ref, inputMemory, tool ? "Programs" : "fleet");
+      useToolFocusMemory(ref, inputMemory, tool ? "Programs" : "map");
       return (
         <div ref={ref}>
           <button>Programs dock</button>
-          <div className="gameFleet" hidden={tool}>
+          <div className="gameMapStage" hidden={tool}>
             <button>Fleet action</button>
           </div>
           {tool && (

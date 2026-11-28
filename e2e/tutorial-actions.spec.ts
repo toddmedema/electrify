@@ -21,9 +21,9 @@ const missions = [
     actions: ["Fleet", "Build", "Programs", "Insights"],
   },
   {
-    name: "Agreements",
+    name: "Trade",
     id: 112,
-    actions: ["Fleet", "Agreements", "Build", "Programs", "Insights", "Events"],
+    actions: ["Fleet", "Trade", "Build", "Programs", "Insights", "Events"],
   },
 ];
 
@@ -57,19 +57,28 @@ for (const mission of missions) {
     ).toHaveCount(Number(desktop && mission.actions.includes("Build")));
 
     for (const [name, key] of [
-      ["Build", "q"],
+      ["Fleet", "q"],
+      ["Fleet", "f"],
+      ["Trade", "w"],
+      ["Trade", "a"],
+      ["Events", "e"],
+      ["Programs", "r"],
+      ["Programs", "p"],
+      ["Insights", "t"],
+      ["Insights", "i"],
+      ["Scenario", "y"],
+      ["Scenario", "s"],
+      ["Build", "b"],
       ["Build", "g"],
-      ["Build", "s"],
-      ["Programs", "w"],
-      ["Insights", "e"],
-      ["Events", "r"],
-      ["Scenario", "t"],
+      ["Build", "Shift+s"],
     ]) {
-      if (!mission.actions.includes(name)) await page.keyboard.press(key);
+      if (mission.actions.includes(name)) continue;
+      await page.keyboard.press(key);
+      await expect(
+        page.locator(".gameToolPanel:visible, .tileWorkspaceBuilding:visible"),
+        `${key} should leave ${name} closed`,
+      ).toHaveCount(0);
     }
-    await expect(
-      page.locator(".gameToolPanel:visible, .tileWorkspaceBuilding:visible"),
-    ).toHaveCount(0);
     const target = page.locator(".tutorialTarget").first();
     await expect(target).toBeInViewport();
     await target.click({ trial: true });

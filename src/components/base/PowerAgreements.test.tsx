@@ -144,7 +144,7 @@ it.each([1, 2, 3] as PowerAgreementTermsVersion[])(
     expect(details).toHaveAttribute("open");
     expect(within(agreement).getByText(/Market now/)).toBeVisible();
     expect(
-      within(details).getByRole("table", { name: "Agreement details" }),
+      within(details).getByRole("table", { name: "Trade details" }),
     ).toBeVisible();
   },
 );
@@ -173,9 +173,7 @@ it("shows recorded usage as a labeled share of available energy in Details", () 
   const agreement = screen.getByRole("article", { name: "Regional nuclear" });
   fireEvent.click(within(agreement).getByText("Details"));
   expect(
-    within(agreement).getByLabelText(
-      "Share of available contracted energy used",
-    ),
+    within(agreement).getByLabelText("Share of available energy used"),
   ).toHaveAttribute("value", "65");
   expect(within(agreement).getByText(/65.0% used/)).toBeVisible();
 });
@@ -186,20 +184,20 @@ it("uses a short offer action with a unique accessible contract name", () => {
     "Regional nuclear",
   );
   const offer = screen.getByRole("button", {
-    name: "Review Valley Electric supply agreement",
+    name: "Review Valley Electric supply trade",
   });
   expect(offer).toHaveTextContent(/^Review$/);
   expect(
     screen.queryByRole("heading", {
-      name: "Power purchase agreements",
+      name: "Supply trades",
     }),
   ).not.toBeInTheDocument();
   fireEvent.click(offer);
   const dialog = screen.getByRole("dialog", {
-    name: "Review Valley Electric supply agreement",
+    name: "Review Valley Electric supply trade",
   });
   expect(
-    within(dialog).getByRole("table", { name: "Agreement terms" }),
+    within(dialog).getByRole("table", { name: "Trade terms" }),
   ).toBeVisible();
 });
 
@@ -237,7 +235,7 @@ it("retains expired recorded history without a live commitment or forecast", () 
   );
   expect(
     within(screen.getByRole("dialog")).getByRole("table", {
-      name: "Recorded agreement history",
+      name: "Recorded trade history",
     }),
   ).toBeVisible();
   expect(mockForecast.mock.lastCall?.[1]).toBeUndefined();
@@ -257,7 +255,7 @@ it("quotes the Ridge supplier's own reference price", () => {
   expect(reference).not.toBe(otherMarket);
   fireEvent.click(
     screen.getByRole("button", {
-      name: "Review Ridge Electric supply agreement",
+      name: "Review Ridge Electric supply trade",
     }),
   );
   expect(
@@ -269,16 +267,14 @@ it("quotes the Ridge supplier's own reference price", () => {
 
 it("shows the direct discount alongside monthly energy and deliverable power", () => {
   const { game, line, dialog, quote } = review();
-  expect(agreementSummary(game, line.corridorId)).toContain(
-    "209MW under agreement",
-  );
+  expect(agreementSummary(game, line.corridorId)).toContain("209MW committed");
   const table = within(dialog).getByRole("table");
   expect(
     within(table)
       .getAllByRole("rowheader")
       .map((cell) => cell.textContent),
   ).toEqual([
-    "Agreement price",
+    "Trade price",
     "Reference price",
     "Discount",
     "Min payment",
@@ -354,7 +350,7 @@ it.each([20, -40])(
     const { dialog, marketPrice, quote } = review(temperature);
     expect(quote.priceToday).toBeLessThan(marketPrice);
     expect(
-      within(dialog).getByRole("row", { name: /Agreement price/ }),
+      within(dialog).getByRole("row", { name: /Trade price/ }),
     ).toHaveTextContent(`${rate(quote.priceToday)}Follows inflation`);
     const comparison = within(dialog).getByRole("row", {
       name: /Reference price/,
@@ -375,7 +371,7 @@ it("changes price and end date with duration and signs that exact canonical quot
   fireEvent.change(slider, { target: { value: "1" } });
   const short = powerAgreementQuote(game, quote.id, 3, 1)!;
   expect(
-    within(dialog).getByRole("row", { name: /Agreement price/ }),
+    within(dialog).getByRole("row", { name: /Trade price/ }),
   ).toHaveTextContent(rate(short.priceToday));
   expect(short.priceToday).toBeGreaterThan(quote.priceToday);
   expect(
@@ -403,9 +399,7 @@ it("changes price and end date with duration and signs that exact canonical quot
   expect(
     within(dialog).getByRole("row", { name: /^Final month/ }),
   ).toHaveTextContent("Dec 2024");
-  fireEvent.click(
-    within(dialog).getByRole("button", { name: "Accept agreement" }),
-  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Accept trade" }));
   expect(dispatch).toHaveBeenCalledWith(
     acceptPowerAgreement({
       blockId: selected.id,
@@ -431,7 +425,7 @@ function sharedReview() {
   );
   const dialog = screen.getByRole("dialog");
   const accept = within(dialog).getByRole("button", {
-    name: "Accept agreement",
+    name: "Accept trade",
   });
   return { ...mounted, submit, dialog, accept };
 }
@@ -447,9 +441,7 @@ it("keeps co-op acceptance pending until the host records and acknowledges the a
   const quote = powerAgreementQuote(game, "champlain-quebec")!;
   fireEvent.click(accept);
   expect(dialog).toBeVisible();
-  expect(store.getState().ui.snackbar.message).not.toMatch(
-    /Agreement accepted/,
-  );
+  expect(store.getState().ui.snackbar.message).not.toMatch(/Trade accepted/);
   expect(submit).toHaveBeenCalledWith({
     kind: "action",
     name: "acceptPowerAgreement",
@@ -479,14 +471,12 @@ it("keeps co-op acceptance pending until the host records and acknowledges the a
     );
   });
   expect(dialog).toBeVisible();
-  expect(store.getState().ui.snackbar.message).not.toMatch(
-    /Agreement accepted/,
-  );
+  expect(store.getState().ui.snackbar.message).not.toMatch(/Trade accepted/);
   await act(async () => acknowledge());
   await waitFor(() =>
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
   );
-  expect(store.getState().ui.snackbar.message).toMatch(/Agreement accepted/);
+  expect(store.getState().ui.snackbar.message).toMatch(/Trade accepted/);
   expect(store.getState().game.transmission!.acceptedAgreements).toHaveLength(
     1,
   );
@@ -498,14 +488,12 @@ it("does not report success for a co-op acknowledgement without a recorded agree
   fireEvent.click(accept);
   await waitFor(() =>
     expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      /Agreement terms changed/,
+      /Trade terms changed/,
     ),
   );
   expect(dialog).toBeVisible();
   expect(accept).toBeEnabled();
-  expect(store.getState().ui.snackbar.message).not.toMatch(
-    /Agreement accepted/,
-  );
+  expect(store.getState().ui.snackbar.message).not.toMatch(/Trade accepted/);
 });
 
 it("keeps a rejected co-op quote recoverable and submits the refreshed host terms on retry", async () => {
@@ -535,11 +523,9 @@ it("keeps a rejected co-op quote recoverable and submits the refreshed host term
   );
   expect(accept).toBeEnabled();
   expect(
-    within(dialog).getByRole("row", { name: /Agreement price/ }),
+    within(dialog).getByRole("row", { name: /Trade price/ }),
   ).toHaveTextContent(rate(fresh.priceToday));
-  expect(store.getState().ui.snackbar.message).not.toMatch(
-    /Agreement accepted/,
-  );
+  expect(store.getState().ui.snackbar.message).not.toMatch(/Trade accepted/);
   submit.mockImplementationOnce(async () => {
     store.dispatch(
       multiplayerSnapshot(
@@ -567,7 +553,7 @@ it("keeps a rejected co-op quote recoverable and submits the refreshed host term
       durationYears: fresh.durationYears,
     },
   });
-  expect(store.getState().ui.snackbar.message).toMatch(/Agreement accepted/);
+  expect(store.getState().ui.snackbar.message).toMatch(/Trade accepted/);
 });
 
 it("displays exact converted agreement prices without changing the quoted terms", () => {

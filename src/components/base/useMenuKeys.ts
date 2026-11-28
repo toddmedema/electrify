@@ -59,7 +59,8 @@ export function restoreMenuFocus(returnSelector: string): void {
     // action (or the player may have moved on), so never overwrite focus within it.
     if (home?.contains(document.activeElement)) return;
     // The workspace restores the control and scroll position inside its previous tool.
-    if (document.activeElement?.closest("[data-game-tool],.gameFleet")) return;
+    if (document.activeElement?.closest("[data-game-tool],.gameMapStage"))
+      return;
     const target = home
       ? home.querySelector<HTMLElement>("[data-main-action]")
       : trigger;

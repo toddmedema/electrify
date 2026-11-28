@@ -13,6 +13,8 @@ import { scenarioDetailsUrl, scenarioListUrl } from "../../ScenarioUrl";
 import { navigate } from "../../reducers/Card";
 import { delta as uiDelta } from "../../reducers/UI";
 import { launchRun } from "../../reducers/GameActions";
+import { delta } from "../../reducers/Game";
+import { randomUtilityLogo } from "../../helpers/UtilityLogoAssignment";
 import { selectContinueSave } from "../../SaveModel";
 import { resumeSavedGame } from "../../SaveSession";
 import { startWithSaveGuard } from "./StartGame";
@@ -102,7 +104,7 @@ export default function ChallengeLanding() {
       onContinue={saved || game.inGame ? continueGame : undefined}
       onBack={leave}
       onDelta={() => undefined}
-      onStart={() =>
+      onStart={(_scenarioId, utilityLogo) =>
         startWithSaveGuard(store.dispatch, () => {
           if (
             difficultyLockReason(
@@ -114,6 +116,9 @@ export default function ChallengeLanding() {
           logEvent("challenge_accept", { scenarioId: invitation.scenarioId });
           getHistoryApi().replaceState(null, "", scenarioListUrl());
           store.dispatch(launchRun(invitation));
+          store.dispatch(
+            delta({ utilityLogo: utilityLogo ?? randomUtilityLogo() }),
+          );
         })
       }
     />

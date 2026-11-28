@@ -45,7 +45,7 @@ test("regional map starts with two connected sites and keeps Fleet and intertie 
     exact: true,
   });
   await city.click();
-  const cityDetails = map.getByRole("dialog", {
+  const cityDetails = page.getByRole("dialog", {
     name: "San Francisco",
     exact: true,
   });
@@ -63,7 +63,7 @@ test("regional map starts with two connected sites and keeps Fleet and intertie 
       .replace(/^Inspect /, "")
       .replace(/ on map$/, "");
     await plant.press("Enter");
-    const plantDetails = map.getByRole("dialog", {
+    const plantDetails = page.getByRole("dialog", {
       name: plantName,
       exact: true,
     });
@@ -86,19 +86,24 @@ test("regional map starts with two connected sites and keeps Fleet and intertie 
   await expect(
     page.locator("#facilitiesPane #chartSupplyDemand"),
   ).toBeVisible();
-  await dock.getByRole("button", { name: "Map", exact: true }).click();
+  await expect(canvas).toHaveAttribute("data-renderer", "ready");
+  await dock.getByRole("button", { name: "Fleet", exact: true }).click();
+  await expect(page.locator("#facilitiesPane")).toBeHidden();
+  await expect(canvas).toBeVisible();
   const plots = vacantSites(map);
   await expect.poll(() => plots.count()).toBeGreaterThanOrEqual(2);
   await plots.first().press("Enter");
-  const site = map.getByRole("dialog").filter({ hasText: "Connected site" });
+  const site = page.getByRole("dialog").filter({ hasText: "Connected site" });
   await expect(site).toBeVisible();
   await reviewScreenshot(page, {
     path: info.outputPath("connected-opening-site.png"),
     animations: "disabled",
   });
-  await site.getByRole("button", { name: "Build", exact: true }).click();
+  await site.getByRole("button", { name: "Build", exact: true }).press("Enter");
   const build = page.getByRole("region", { name: "Build", exact: true });
-  await expect(build).toBeVisible();
+  await expect(
+    build.getByRole("heading", { name: "Build", exact: true }),
+  ).toBeFocused();
   await build.getByRole("tab", { name: "Interties", exact: true }).click();
   await expect(
     build.getByRole("button", {
@@ -108,6 +113,58 @@ test("regional map starts with two connected sites and keeps Fleet and intertie 
   ).toBeVisible();
   await build.getByRole("button", { name: "Close Build", exact: true }).click();
   await expect(map).toBeVisible();
+});
+
+test("the regional desktop rail selects a capacity for the real construction review", async ({
+  page,
+}, { project }) => {
+  test.skip(project.use.hasTouch || page.viewportSize()!.width < 1024);
+  await startRegionalGame(page);
+  const rail = regionalMap(page).getByRole("complementary", {
+    name: "Build facilities",
+  });
+  await expect(rail).toBeVisible();
+  await expect(
+    regionalDock(page).getByRole("button", { name: "Build", exact: true }),
+  ).toHaveCount(0);
+  const initial = await rail.boundingBox();
+  const map = await regionalMap(page).boundingBox();
+  expect(initial!.x).toBeCloseTo(map!.x);
+
+  await rail.getByRole("button", { name: /^Power:/ }).click();
+  const sizing = rail.getByRole("slider", { name: "Generator capacity" });
+  await sizing.fill("11");
+  const power = await sizing.getAttribute("aria-valuetext");
+  await sizing.press("Escape");
+  await rail.getByRole("button", { name: "Choose Solar", exact: true }).click();
+  const build = page.getByRole("region", { name: "Build", exact: true });
+  await expect(build).toHaveAttribute("data-resizable", "true");
+  await build
+    .getByRole("button", { name: "Review purchase of Solar", exact: true })
+    .click();
+  const purchase = page.getByRole("dialog", { name: `Build ${power} Solar?` });
+  await expect(purchase).toBeVisible();
+  await purchase
+    .getByRole("button", { name: "Take loan", exact: true })
+    .click();
+  await expect(purchase).toHaveCount(0);
+  await expect(build).toBeVisible();
+
+  const capacity = build.getByRole("slider", { name: /^Capacity/ });
+  await capacity.fill("10");
+  await build.getByRole("tab", { name: "Storage", exact: true }).click();
+  await build.getByRole("tab", { name: "Generators", exact: true }).click();
+  await expect(capacity).toHaveValue("10");
+
+  const buildEntry = rail.getByRole("button", { name: "Build", exact: true });
+  await build.getByRole("button", { name: "Close Build", exact: true }).click();
+  await page.keyboard.press("Shift+s");
+  const storage = build.getByRole("tab", { name: "Storage", exact: true });
+  await expect(storage).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Escape");
+  await expect(buildEntry).toBeFocused();
+  await page.keyboard.press("b");
+  await expect(storage).toHaveAttribute("aria-selected", "true");
 });
 
 test("regional fleet and map details remain reachable without WebGL2", async ({
@@ -133,7 +190,7 @@ test("regional fleet and map details remain reachable without WebGL2", async ({
     .getByRole("button", { name: "Inspect San Francisco on map", exact: true })
     .press("Enter");
   await expect(
-    map.getByRole("dialog", { name: "San Francisco", exact: true }),
+    page.getByRole("dialog", { name: "San Francisco", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await regionalDock(page)
@@ -167,4 +224,38 @@ test("a new custom grid starts on the 3D map for the selected city", async ({
     map.getByRole("button", { name: "Inspect Paris on map", exact: true }),
   ).toBeVisible();
   await expect.poll(() => vacantSites(map).count()).toBeGreaterThanOrEqual(2);
+});
+
+test("map layers align with the desktop dock and clear the flush phone dock", async ({
+  page,
+}) => {
+  await startRegionalGame(page);
+  const dock = regionalDock(page);
+  const map = regionalMap(page);
+  const layers = map.getByRole("button", { name: "Map layers", exact: true });
+  await expect(layers).toBeInViewport();
+
+  const bottom = (box: { y: number; height: number }) => box.y + box.height;
+  const right = (box: { x: number; width: number }) => box.x + box.width;
+  const width = page.viewportSize()!.width;
+  const [mapBox, dockBox, layersBox] = await Promise.all([
+    map.boundingBox(),
+    dock.boundingBox(),
+    layers.boundingBox(),
+  ]);
+  if (width < 700) {
+    expect(dockBox!.x).toBeCloseTo(mapBox!.x);
+    expect(right(dockBox!)).toBeCloseTo(right(mapBox!));
+    expect(dockBox!.y).toBeCloseTo(bottom(mapBox!));
+    expect(dockBox!.y - bottom(layersBox!)).toBeGreaterThanOrEqual(8);
+    await expect(dock).toHaveCSS("border-top-width", "0px");
+    await expect(dock).toHaveCSS("box-shadow", "none");
+  } else if (width >= 1024) {
+    expect(bottom(layersBox!)).toBeCloseTo(bottom(dockBox!));
+    expect(layersBox!.x - right(dockBox!)).toBeGreaterThanOrEqual(8);
+  } else {
+    expect(dockBox!.y - bottom(layersBox!)).toBeGreaterThanOrEqual(8);
+  }
+  await layers.click();
+  await expect(page.getByRole("dialog", { name: "Map layers" })).toBeVisible();
 });

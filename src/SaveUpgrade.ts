@@ -12,6 +12,7 @@ import {
 } from "./helpers/TerritoryTiles";
 import type { BuyingRuleType, SellingRuleType, GameType } from "./Types";
 import { inheritedConnection } from "./helpers/PowerAgreements";
+import { isRetiredUtilityLogo } from "./data/UtilityLogos";
 import { facilityTerritoryId } from "./helpers/Territories";
 
 type DecodedSave = Record<string, unknown>;
@@ -471,6 +472,17 @@ const migrations: readonly Migration[] = [
     } catch {
       return null;
     }
+  },
+  // 28 -> 29: saves without a Fleet agreement order keep automatic dispatch.
+  (save) => save,
+  // 29 -> 30: unbranded companies get a mark from their existing seed.
+  (save) => save,
+  // 30 -> 31: a retired company mark returns to Random without changing the run.
+  (save) => {
+    if (!object(save.game)) return null;
+    if (!isRetiredUtilityLogo(save.game.utilityLogo)) return save;
+    const { utilityLogo: _retired, ...game } = save.game;
+    return { ...save, game };
   },
 ];
 

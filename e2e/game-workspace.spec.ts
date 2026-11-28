@@ -25,10 +25,9 @@ async function startGame(
   );
   await page.goto(`/?scenario=${scenarioId}`);
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  if (scenarioId !== 116) await openFleet(page);
-  await expect(page.locator(".gameStage .facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   await page.keyboard.press("0");
-  await expect(page.locator(".facilities > .paneHeader")).toHaveCount(0);
+  await expect(page.locator("#mapPane > .paneHeader")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Facilities", exact: true }),
   ).toHaveCount(0);
@@ -128,15 +127,15 @@ test("map notifications follow the full desktop header and clear the compact doc
   await expectBelowHeader();
 });
 
-for (const side of [false, true]) {
-  test(`purchases ${side ? "keep Build open in a side panel" : "close Build in an overlay"}`, async ({
+for (const floating of [false, true]) {
+  test(`purchases ${floating ? "keep the Build window open" : "close the compact Build panel"}`, async ({
     page,
   }, info) => {
     test.skip(
-      side && !!info.project.use.hasTouch,
-      "Side-panel coverage uses the desktop project",
+      floating && !!info.project.use.hasTouch,
+      "Floating window coverage uses the desktop project",
     );
-    const width = side
+    const width = floating
       ? 1300
       : info.project.use.hasTouch
         ? page.viewportSize()!.width
@@ -148,11 +147,14 @@ for (const side of [false, true]) {
       ["Storage", "Pumped Hydro"],
       ["Interties", "Pacific Northwest intertie"],
     ]) {
-      const build = await openBuild(page);
-      await build.getByRole("tab", { name: category, exact: true }).click();
-      const before = await page
+      const before = await (
+        await openFleet(page)
+      )
         .locator(".facilityRow, .transmissionLine")
         .count();
+      await page.getByRole("button", { name: "Close Fleet" }).click();
+      const build = await openBuild(page);
+      await build.getByRole("tab", { name: category, exact: true }).click();
       await build
         .getByRole("button", {
           name: `Review purchase of ${purchase}`,
@@ -164,10 +166,7 @@ for (const side of [false, true]) {
         .getByRole("button", { name: "Take loan", exact: true })
         .click();
       await expect(page.getByRole("dialog")).toHaveCount(0);
-      await expect(page.locator(".facilityRow, .transmissionLine")).toHaveCount(
-        before + 1,
-      );
-      if (side) {
+      if (floating) {
         await expect(build).toBeVisible();
         await build
           .getByRole("button", { name: "Close Build", exact: true })
@@ -175,95 +174,16 @@ for (const side of [false, true]) {
       } else {
         await expect(build).toHaveCount(0);
       }
+      const fleet = await openFleet(page);
+      await expect(
+        fleet.locator(".facilityRow, .transmissionLine"),
+      ).toHaveCount(before + 1);
+      await page.getByRole("button", { name: "Close Fleet" }).click();
     }
   });
 }
 
 for (const theme of ["light", "dark"] as const) {
-  test(`main game content stays centered at 1800px while tools use spare width in ${theme}`, async ({
-    page,
-  }, testInfo) => {
-    test.skip(testInfo.project.name !== "desktop-chromium");
-    await page.setViewportSize({ width: 3200, height: 1100 });
-    await startGame(page, theme, 111);
-    const fleet = page.locator(".gameFleet");
-    const build = page.getByRole("region", { name: "Build", exact: true });
-    const insights = page.getByRole("region", {
-      name: "Insights",
-      exact: true,
-    });
-    const expectCenteredFleet = async (left: number, right: number) => {
-      const box = (await fleet.boundingBox())!;
-      expect(box.width).toBe(Math.min(1800, right - left));
-      expect(
-        Math.abs(box.x + box.width / 2 - (left + right) / 2),
-      ).toBeLessThanOrEqual(1);
-      expect((await page.locator("#appbar").boundingBox())!.width).toBe(
-        page.viewportSize()!.width,
-      );
-      expect(
-        (await page.locator(".gameStage .facilities").boundingBox())!.width,
-      ).toBe(box.width);
-      expect(
-        (await page.locator(".unifiedFacilitiesList").boundingBox())!.width,
-      ).toBeLessThanOrEqual(box.width);
-    };
-    await expectCenteredFleet(0, 3200);
-    await reviewScreenshot(page, {
-      path: testInfo.outputPath(`centered-fleet-${theme}.png`),
-      animations: "disabled",
-    });
-    await openBuild(page);
-    await expectCenteredFleet(480, 3200);
-    await page.locator("#insightsNav").click();
-    await expect(insights).toBeVisible();
-    await expectCenteredFleet(480, 2720);
-    await expectSideRails(page);
-    await reviewScreenshot(page, {
-      path: testInfo.outputPath(`centered-fleet-tools-${theme}.png`),
-      animations: "disabled",
-    });
-    // Three and four rails still leave a capped, centered fleet on a 4K display.
-    await page.setViewportSize({ width: 3840, height: 1100 });
-    await page.locator("#programsNav").click();
-    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
-    await expectCenteredFleet(960, 3360);
-    await expectSideRails(page);
-    await expect(insights.locator("#chartForecastSupplyDemand")).toBeVisible({
-      timeout: 60_000,
-    });
-    await reviewScreenshot(page, {
-      path: testInfo.outputPath(`centered-fleet-three-panels-${theme}.png`),
-      animations: "disabled",
-    });
-    await page.locator("#eventsNav").click();
-    await expect(page.locator(".gameToolPanel:visible")).toHaveCount(4);
-    await expectCenteredFleet(960, 2880);
-    await expectSideRails(page);
-    await reviewScreenshot(page, {
-      path: testInfo.outputPath(`centered-fleet-four-panels-${theme}.png`),
-      animations: "disabled",
-    });
-    await page
-      .getByRole("button", { name: "Close Programs", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Close Events", exact: true })
-      .click();
-    // Only shrink once the open tools leave less than 1800px for the main content.
-    await page.setViewportSize({ width: 2240, height: 1100 });
-    await expectCenteredFleet(480, 1760);
-    await expectSideRails(page);
-    await build
-      .getByRole("button", { name: "Close Build", exact: true })
-      .click();
-    await expectCenteredFleet(0, 1760);
-    await insights
-      .getByRole("button", { name: "Close Insights", exact: true })
-      .click();
-    await expectCenteredFleet(0, 2240);
-  });
-
   test(`mission header uses regular event text and matching button hover in ${theme}`, async ({
     page,
   }, testInfo) => {
@@ -308,6 +228,7 @@ for (const theme of ["light", "dark"] as const) {
     await startGame(page, theme);
     const status = page.locator(".gridHealth");
     await expect(status).toHaveClass(/gridHealth-stable/);
+    await openFleet(page);
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
@@ -419,7 +340,7 @@ for (const theme of ["light", "dark"] as const) {
     await session.detach();
     await expect(insights).not.toHaveClass(/Mui-focusVisible/);
     // A physical keyboard on the same touch device still receives visible focus when closing.
-    await page.keyboard.press("e");
+    await page.keyboard.press("t");
     await expect(insightsPane).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(insights).toBeFocused();
@@ -452,6 +373,28 @@ test("Escape closes the game menu before an unsaved program decision", async ({
   await expect(
     programs.getByRole("region", { name: "Electricity pricing" }),
   ).toBeVisible();
+});
+
+test("opening Fleet focuses its heading and inspecting a facility keeps keyboard focus on the row", async ({
+  page,
+}) => {
+  await startGame(page, "dark");
+  const fleet = await openFleet(page);
+  const title = page.getByRole("heading", { name: "Fleet", exact: true });
+  await expect(title).toBeFocused();
+  if (await page.locator(".gameWorkspace").getAttribute("data-map-windows")) {
+    await openBuild(page);
+    await page.getByRole("button", { name: "Fleet", exact: true }).click();
+    await expect(title).toBeFocused();
+  }
+  const inspect = fleet.getByRole("button", {
+    name: "Inspect Coal",
+    exact: true,
+  });
+  await expect(inspect).toHaveAttribute("aria-expanded", "false");
+  await inspect.press("Enter");
+  await expect(inspect).toHaveAttribute("aria-expanded", "true");
+  await expect(inspect).toBeFocused();
 });
 
 test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
@@ -625,78 +568,46 @@ test("Insights and Events reopen at the scroll position the player left", async 
 
 async function expectWorkspaceDock(page: Page) {
   await expect(async () => {
-    // Read one layout snapshot after navigation instead of mixing animation frames
-    // across separate boundingBox requests.
-    const { stage, facilities, fleet, dock, width, single } =
-      await page.evaluate(() => {
-        const box = (selector: string) => {
-          const element = document.querySelector(selector);
-          if (!element) throw new Error(`Missing layout element: ${selector}`);
-          const { x, y, width, height } = element.getBoundingClientRect();
-          return { x, y, width, height };
-        };
-        return {
-          stage: box(".gameStage"),
-          facilities: box(".gameStage .facilities"),
-          fleet: box(".gameFleet"),
-          dock: box("#navfooter"),
-          width: window.innerWidth,
-          single:
-            document
-              .querySelector(".gameWorkspace")
-              ?.getAttribute("data-workspace-layout") === "single",
-        };
-      });
-    expect(dock.height).toBeGreaterThan(0);
-    if (single) {
-      // The active tool gets the whole stage, with navigation reserved beneath it.
-      expect(dock.y).toBeGreaterThanOrEqual(stage.y + stage.height - 1);
-      expect(dock.y + dock.height).toBeLessThanOrEqual(
-        page.viewportSize()!.height,
-      );
-      expect(dock.x).toBeGreaterThanOrEqual(0);
-      expect(dock.x + dock.width).toBeLessThanOrEqual(width);
-      return;
-    }
-    expect(facilities.height).toBeGreaterThan(0);
-    // The dock overlays the full-height fleet instead of reserving a blank footer band.
-    expect(
-      Math.abs(facilities.y + facilities.height - stage.y - stage.height),
-    ).toBeLessThanOrEqual(1);
-    expect(dock.y).toBeLessThan(facilities.y + facilities.height);
-    expect(dock.y + dock.height).toBeLessThanOrEqual(stage.y + stage.height);
-    // Centered on the window, so opening a side tool doesn't move it, unless that would cover
-    // the tool: then it centres on the free stage. Either way it stays clear of side tools.
-    const center = dock.x + dock.width / 2;
-    expect(
-      Math.min(
-        Math.abs(center - width / 2),
-        Math.abs(center - (fleet.x + fleet.width / 2)),
-      ),
-    ).toBeLessThanOrEqual(1);
-    expect(dock.x).toBeGreaterThanOrEqual(fleet.x);
-    expect(dock.x + dock.width).toBeLessThanOrEqual(fleet.x + fleet.width);
+    const { stage, map, dock, width, height } = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const { x, y, width, height } = document
+          .querySelector(selector)!
+          .getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return {
+        stage: box(".gameStage"),
+        map: box(".gameMapStage"),
+        dock: box("#navfooter"),
+        width: window.innerWidth,
+        height: window.innerHeight,
+      };
+    });
+    expect(map).toEqual(stage);
+    expect(dock.height).toBeGreaterThanOrEqual(44);
+    expect(dock.y + dock.height).toBeLessThanOrEqual(height + 1);
+    expect(dock.x).toBeGreaterThanOrEqual(0);
+    expect(dock.x + dock.width).toBeLessThanOrEqual(width + 1);
+    expect(Math.abs(dock.x + dock.width / 2 - width / 2)).toBeLessThanOrEqual(
+      1,
+    );
   }).toPass({ timeout: 12000 });
 }
 
-async function expectSideRails(page: Page) {
-  const fleet = (await page.locator(".gameFleet").boundingBox())!;
-  // However many tools are open, the fleet keeps at least the widest phone's width.
-  expect(fleet.width).toBeGreaterThanOrEqual(430);
+async function expectWindowsToClearDock(page: Page) {
+  const dock = (await page.locator("#navfooter").boundingBox())!;
   const panels = await page
     .locator(".gameToolPanel:visible")
     .evaluateAll((elements) =>
       elements.map((element) => {
-        const { left, right, width } = element.getBoundingClientRect();
-        return { left, right, width };
+        const { width, bottom } = element.getBoundingClientRect();
+        return { width, bottom };
       }),
     );
   for (const panel of panels) {
     expect(panel.width).toBeGreaterThanOrEqual(360);
     expect(panel.width).toBeLessThanOrEqual(480);
-    expect(
-      panel.right <= fleet.x + 1 || panel.left >= fleet.x + fleet.width - 1,
-    ).toBe(true);
+    expect(panel.bottom).toBeLessThanOrEqual(dock.y + 1);
   }
   await expectWorkspaceDock(page);
 }
@@ -708,7 +619,9 @@ for (const theme of ["light", "dark"] as const) {
     await startGame(page, theme);
     const dock = page.locator("#navfooter");
     await expect(page.locator(".gameToolPanel")).toHaveCount(0);
-    for (const label of ["Build", "Programs", "Insights", "Events"]) {
+    const labels = ["Programs", "Insights", "Events"];
+    if (page.viewportSize()!.width < 1024) labels.push("Build");
+    for (const label of labels) {
       const action = dock.getByRole("button", { name: label, exact: true });
       await expect(action).toBeVisible();
       await expect(action).not.toContainText(label);
@@ -724,13 +637,9 @@ for (const theme of ["light", "dark"] as const) {
       animations: "disabled",
     });
 
-    // Opening a tool keeps the fleet mounted and its selected plant intact.
-    await page
-      .getByRole("button", { name: "Inspect Coal", exact: true })
-      .click();
-    const fleet = page.locator(".gameStage .facilities");
-    await fleet.evaluate((element) =>
-      element.setAttribute("data-workspace-fleet", "kept"),
+    const map = page.locator(".gameMapStage");
+    await map.evaluate((element) =>
+      element.setAttribute("data-test-mounted", "kept"),
     );
     await dock.getByRole("button", { name: "Insights", exact: true }).click();
     const insights = page.getByRole("region", {
@@ -742,53 +651,29 @@ for (const theme of ["light", "dark"] as const) {
       "aria-expanded",
       "true",
     );
-    await expect(fleet).toHaveAttribute("data-workspace-fleet", "kept");
+    await expect(map).toHaveAttribute("data-test-mounted", "kept");
     await expect(page.locator("#rateSlider")).toHaveCount(0);
     await expect(insights.locator("#chartForecastSupplyDemand")).toBeVisible({
       timeout: 60_000,
     });
-    await expect(
-      insights.getByRole("heading", { name: "Insights", exact: true }),
-    ).toHaveCount(1);
-    // The daily Fleet chart has keyboard detail inspection. Single tool deliberately
-    // returns to Fleet first; opening Insights again must preserve the selected plant.
-    const single =
-      (await page.locator(".gameStage").getAttribute("data-layout")) ===
-      "single";
-    if (single) {
-      await expect(fleet).toBeHidden();
-      await openPane(
-        fleet,
-        dock.getByRole("button", { name: "Insights", exact: true }),
-      );
-    }
-    const chart = page.locator("#chartSupplyDemand").getByRole("img");
+    const fleet = await openFleet(page);
+    const chart = fleet.locator("#chartSupplyDemand").getByRole("img");
     await chart.focus();
     await chart.press("Enter");
     await expect(page.locator(".chartTooltip:visible")).toHaveCount(1);
     await chart.press("Escape");
     await expect(page.locator(".chartTooltip:visible")).toHaveCount(0);
-    if (single)
-      await dock.getByRole("button", { name: "Insights", exact: true }).click();
-    await expect(insights).toBeVisible();
-    await insights
-      .getByRole("heading", { name: "Insights", exact: true })
-      .focus();
-    await settleSheets(page);
-    const [sheetBox, stageBox] = await Promise.all([
-      insights.boundingBox(),
-      page.locator(".gameStage").boundingBox(),
-    ]);
-    expect(sheetBox!.y).toBeGreaterThan(0);
-    expect(
-      Math.abs(sheetBox!.y + sheetBox!.height - stageBox!.y - stageBox!.height),
-    ).toBeLessThanOrEqual(1);
-    if (
-      (await page.locator(".gameStage").getAttribute("data-layout")) !==
-      "single"
-    ) {
-      await expectSideRails(page);
-    }
+    await page
+      .getByRole("button", { name: "Close Fleet", exact: true })
+      .click();
+    await openPane(
+      insights,
+      dock.getByRole("button", { name: "Insights", exact: true }),
+    );
+    await expect(
+      insights.getByRole("heading", { name: "Insights", exact: true }),
+    ).toBeVisible();
+    await expectWorkspaceDock(page);
     expect(
       await insights.evaluate(
         (element) => element.scrollWidth - element.clientWidth,
@@ -806,9 +691,7 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await expect(page.locator(".gameToolPanel")).toHaveCount(0);
     await expect(page.locator("#insightsNav")).toBeFocused();
-    await expect(
-      page.getByRole("button", { name: "Pause Coal", exact: true }),
-    ).toBeVisible();
+    await expect(map).toHaveAttribute("data-test-mounted", "kept");
 
     await dock.getByRole("button", { name: "Events", exact: true }).click();
     await expect(
@@ -831,7 +714,9 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   await startGame(page, "light");
   const dock = page.locator("#navfooter");
   const status = page.locator(".gridHealth");
-  for (const name of ["Build", "Programs", "Insights", "Events"]) {
+  const labels = ["Programs", "Insights", "Events"];
+  if (page.viewportSize()!.width < 1024) labels.push("Build");
+  for (const name of labels) {
     const action = dock.getByRole("button", { name, exact: true });
     await expect(action).toBeVisible();
     await expect(action).not.toContainText(name);
@@ -856,14 +741,14 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
     // Pointer and keyboard users see each tool's shortcut key.
     await page.locator("#buildNav").hover();
     await expect(
-      page.getByRole("tooltip", { name: "Build (Q, B)", exact: true }),
+      page.getByRole("tooltip", { name: "Build (B)", exact: true }),
     ).toBeVisible();
     await page.mouse.move(0, 0);
     // The diagnostic exercised pointer input; switch back to real keyboard modality.
     await page.keyboard.press("Tab");
     await page.locator("#programsNav").focus();
     await expect(
-      page.getByRole("tooltip", { name: "Programs (W)", exact: true }),
+      page.getByRole("tooltip", { name: "Programs (R, P)", exact: true }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("tooltip")).toHaveCount(0);
@@ -874,9 +759,7 @@ test("dock labels support pointer, keyboard and touch without accidental tool ac
   const session = await page.context().newCDPSession(page);
   const dockBox = (await dock.boundingBox())!;
   const y = dockBox.y + dockBox.height / 2;
-  if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
-  ) {
+  if (page.viewportSize()!.width < 700) {
     // Holding owns the slide preview; a quick swipe still scrolls the compact rail.
     const actions = ["Build", "Programs", "Insights", "Events"];
     for (const label of actions) {
@@ -1002,10 +885,16 @@ test("comparison controls keep keyboard focus when the Build layout changes", as
   await expect(remove).toBeFocused();
   for (const width of [390, 1280, 360, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    await expect(page.locator(".gameStage")).toHaveAttribute(
-      "data-layout",
-      width < 700 ? "single" : "side",
-    );
+    if (width < 700)
+      await expect(page.locator(".gameWorkspace")).not.toHaveAttribute(
+        "data-map-windows",
+        "true",
+      );
+    else
+      await expect(page.locator(".gameWorkspace")).toHaveAttribute(
+        "data-map-windows",
+        "true",
+      );
     await expect(remove).toBeFocused();
     await expect(
       page.getByRole("region", { name: "Generator comparison" }),
@@ -1218,10 +1107,8 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await page.locator(".button-buildFacility").click();
   const build = page.getByRole("region", { name: "Build", exact: true });
   await expect(build).toBeVisible();
-  // A sheet shows one tool at a time; side columns keep Programs open beside Build.
-  if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) === "single"
-  )
+  // Floating desktop windows can stay open together.
+  if (!(await page.locator(".gameWorkspace").getAttribute("data-map-windows")))
     await expect(programs).toHaveCount(0);
   else await expect(programs).toBeVisible();
   const storageTab = page.getByRole("tab", { name: "Storage", exact: true });
@@ -1237,140 +1124,45 @@ test("Programs owns pricing and Build keeps purchase dialogs above its sheet", a
   await expect(build).toBeVisible();
   await page.getByRole("button", { name: "Close Build", exact: true }).click();
   await expect(build).toHaveCount(0);
-  await expect(page.locator(".gameStage .facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
 });
 
-test("wide screens keep several tools beside the fleet and remember them across compact layouts", async ({
+test("desktop map windows restore after narrowing around the active tool", async ({
   page,
 }, testInfo) => {
   test.skip(
     !!testInfo.project.use.hasTouch,
-    "Desktop rails use a wide pointer workspace",
+    "Desktop windows use a fine pointer",
   );
-  await page.setViewportSize({ width: 2240, height: 1100 });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startGame(page, "light");
-  await page.locator("#buildNav").click();
-  await expectWorkspaceDock(page);
-  await page.locator("#insightsNav").click();
-  await expect(page.locator(".gameToolPanel")).toHaveCount(2);
-  await expect
-    .poll(() =>
-      page
-        .locator("#buildNav, #insightsNav")
-        .evaluateAll(
-          (elements) =>
-            new Set(
-              elements.map(
-                (element) => getComputedStyle(element).backgroundColor,
-              ),
-            ).size,
-        ),
-    )
-    .toBe(1);
-  await expect(page.locator("#chartForecastSupplyDemand")).toBeVisible({
-    timeout: 60_000,
-  });
-  await settleSheets(page);
-  await expect(page.locator(".gameStage")).toHaveAttribute(
-    "data-layout",
-    "side",
+  const map = page.locator(".gameMapStage");
+  await map.evaluate((element) =>
+    element.setAttribute("data-test-mounted", "kept"),
   );
-  await expectSideRails(page);
-  await expect(
-    page.locator(".gameToolHeader").getByRole("tablist"),
-  ).toHaveCount(0);
-  // Three tools fit beside a phone-width fleet at this width.
+  await openFleet(page);
   await page.locator("#programsNav").click();
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
-  for (const name of ["Build", "Programs", "Insights"])
-    await expect(page.getByRole("region", { name, exact: true })).toBeVisible();
-  // A fourth doesn't, so the least recently opened tool steps aside.
-  await page.locator("#eventsNav").click();
-  await expect(
-    page.getByRole("region", { name: "Events", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "Build", exact: true }),
-  ).toBeHidden();
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
-  await expectSideRails(page);
-  await expect(
-    page.getByRole("button", { name: /^(?:Unpin|Pin) /i }),
-  ).toHaveCount(0);
-  // Events is the most recently opened tool, but the player is working in Programs.
-  // Narrowing preserves the focused decision instead of hiding it for the newer tool.
-  const rate = page.locator("#rateSlider input");
-  const value = await rate.inputValue();
-  await reviewScreenshot(page, {
-    path: testInfo.outputPath("workspace-side-rails-desktop.png"),
-    style:
-      ".gameToolTitle:focus { outline: none !important; box-shadow: none !important; }",
-    animations: "disabled",
-  });
+  const programs = page.getByRole("region", { name: "Programs", exact: true });
+  const rate = programs.locator("#rateSlider input");
   await rate.focus();
+  const value = await rate.inputValue();
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+  await expectWindowsToClearDock(page);
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-  await expect(
-    page.getByRole("region", { name: "Programs", exact: true }),
-  ).toBeVisible();
   await expect(rate).toBeFocused();
   await expect(rate).toHaveValue(value);
-  await page.setViewportSize({ width: 2240, height: 1100 });
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
-  await expect(
-    page.getByRole("region", { name: "Events", exact: true }),
-  ).toBeVisible();
+  await expect(map).toHaveAttribute("data-test-mounted", "kept");
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
   await expect(rate).toBeFocused();
-  await expectSideRails(page);
-
-  // A compact sheet reveals a remembered tool rather than closing an unseen one.
-  await page.setViewportSize({ width: 1023, height: 900 });
-  await expect(page.locator(".gameStage")).toHaveAttribute(
-    "data-layout",
-    "single",
-  );
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-  await expectWorkspaceDock(page);
-  await page.locator("#eventsNav").click();
-  await expect(
-    page.getByRole("region", { name: "Events", exact: true }),
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(
-    page.getByRole("region", { name: "Programs", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator("#eventsNav")).toBeFocused();
-  await page.setViewportSize({ width: 1800, height: 900 });
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
-  await page.locator("#programsNav").click();
-  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-  await expectSideRails(page);
-
-  // Reviewing a Programs decision must not consume Escape from the opposite rail.
-  const programs = page.getByRole("region", { name: "Programs", exact: true });
-  await programs.getByRole("button", { name: /^Efficiency rebates ·/ }).click();
-  const decision = programs.getByRole("heading", {
-    name: "Efficiency rebates",
-    exact: true,
-  });
-  await expect(decision).toBeVisible();
-  await page.locator("#insightsNav").click();
-  await expect(
-    page.getByRole("heading", { name: "Insights", exact: true }),
-  ).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(
-    page.getByRole("region", { name: "Insights", exact: true }),
-  ).toHaveCount(0);
-  await expect(decision).toBeVisible();
-  await expect(page.locator("#insightsNav")).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(decision).toHaveCount(0);
-  await expect(programs.locator("#rateSlider input")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(programs).toHaveCount(0);
-  await expect(page.locator("#programsNav")).toBeFocused();
+  await expect(page.locator("#facilitiesPane")).toBeVisible();
+  await expect(map).toHaveAttribute("data-test-mounted", "kept");
 });
 
 for (const theme of ["light", "dark"] as const) {
@@ -1385,7 +1177,6 @@ for (const theme of ["light", "dark"] as const) {
     await rate.focus();
     await rate.press("ArrowRight");
     const value = await rate.inputValue();
-    const stage = page.locator(".gameStage");
     const appbar = page.locator("#appbar");
     const ultra = page.getByRole("button", {
       name: "ultra speed",
@@ -1405,7 +1196,6 @@ for (const theme of ["light", "dark"] as const) {
       ]);
       expect(profitBox!.x).toBeGreaterThan(cashBox!.x + cashBox!.width);
       expect(dateBox!.x).toBeGreaterThan(profitBox!.x + profitBox!.width);
-      await expect(stage).toHaveAttribute("data-layout", "side");
       if (width >= 1120) {
         await expect(appbar).toHaveClass(/appbarSingleRow/);
       } else {
@@ -1413,7 +1203,7 @@ for (const theme of ["light", "dark"] as const) {
       }
       if (desktop) {
         await expect(ultra).toBeInViewport();
-        await expectSideRails(page);
+        await expectWindowsToClearDock(page);
       } else {
         await expect(ultra).toHaveCount(0);
       }
@@ -1633,7 +1423,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("short desktop rails keep their heading, scroll body, and floating dock reachable", async ({
+test("short desktop windows keep their heading, scroll body, and floating dock reachable", async ({
   page,
 }, testInfo) => {
   test.skip(!!testInfo.project.use.hasTouch, "A short desktop viewport");
@@ -1653,7 +1443,7 @@ test("short desktop rails keep their heading, scroll body, and floating dock rea
   expect(panel!.y + panel!.height).toBeLessThanOrEqual(
     stage!.y + stage!.height,
   );
-  await expectSideRails(page);
+  await expectWindowsToClearDock(page);
   await expect(
     page.getByRole("button", { name: "Close Insights", exact: true }),
   ).toBeInViewport();
@@ -1682,15 +1472,15 @@ for (const width of [360, 390]) {
   }, testInfo) => {
     await page.setViewportSize({ width, height: 640 });
     await startGame(page, "dark");
-    await expect(page.locator(".gameStage")).toHaveAttribute(
-      "data-layout",
-      "single",
+    await expect(page.locator(".gameWorkspace")).not.toHaveAttribute(
+      "data-map-windows",
+      "true",
     );
     await expectWorkspaceDock(page);
-    await page
+    const fleet = await openFleet(page);
+    await fleet
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
-    const fleet = page.locator(".facilities");
     await fleet.locator(".facilitiesBody").evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
@@ -1720,9 +1510,9 @@ for (const width of [360, 390]) {
       commit.boundingBox(),
       page.locator("#navfooter").boundingBox(),
     ]);
-    expect(
-      Math.abs(panel!.y + panel!.height - stage!.y - stage!.height),
-    ).toBeLessThanOrEqual(1);
+    expect(panel!.y + panel!.height).toBeLessThanOrEqual(
+      stage!.y + stage!.height + 1,
+    );
     expect(commitBox!.y + commitBox!.height).toBeLessThanOrEqual(
       dockBox!.y + 1,
     );

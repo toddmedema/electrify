@@ -26,6 +26,8 @@ import {
 import { formatScore } from "../../helpers/Format";
 import { reliabilityRuleText } from "../../helpers/ObjectiveRules";
 import ScenarioLeaderboard from "../base/ScenarioLeaderboard";
+import UtilityLogoPicker from "../base/UtilityLogoPicker";
+import type { UtilityLogoId } from "../../data/UtilityLogos";
 
 export interface StateProps {
   challenge?: ChallengeInvitation;
@@ -40,13 +42,14 @@ export interface StateProps {
 export interface DispatchProps {
   onBack: () => void;
   onDelta: (delta: Partial<GameType>) => void;
-  onStart: (scenarioId: number) => void;
+  onStart: (scenarioId: number, utilityLogo?: UtilityLogoId) => void;
 }
 
 interface State {
   scenario: ScenarioType | null;
   location: LocationType | null;
   victoryDialogOpen?: boolean;
+  utilityLogo?: UtilityLogoId;
 }
 
 export interface Props extends StateProps, DispatchProps {}
@@ -72,6 +75,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
       this.setState({
         scenario,
         location: getScenarioLocation(scenario) || null,
+        utilityLogo: undefined,
       });
     }
   }
@@ -79,7 +83,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
   public render() {
     const { onBack, onDelta, onStart, game, uid, challenge, onContinue, coop } =
       this.props;
-    const { scenario, location, victoryDialogOpen } = this.state;
+    const { scenario, location, victoryDialogOpen, utilityLogo } = this.state;
 
     const toggleVictoryDialog = (e: React.SyntheticEvent) => {
       this.setState({ victoryDialogOpen: !victoryDialogOpen });
@@ -203,6 +207,14 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     {reliabilityRuleText(game.difficulty, scenario)}
                   </Typography>
                 )}
+                {!coop && (
+                  <UtilityLogoPicker
+                    logo={utilityLogo}
+                    onChange={(logo) =>
+                      this.setState({ utilityLogo: logo ?? undefined })
+                    }
+                  />
+                )}
                 {coop ? (
                   <CoopStartButton
                     className="scenarioStartButton"
@@ -215,7 +227,7 @@ export default class NewGameDetails extends React.Component<Props, State> {
                     size="large"
                     variant="contained"
                     color="primary"
-                    onClick={() => onStart(scenario.id)}
+                    onClick={() => onStart(scenario.id, utilityLogo)}
                     disabled={!!challengeLock}
                     startIcon={
                       challengeLock ? <LockOutlinedIcon /> : <PlayCircleIcon />

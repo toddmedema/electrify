@@ -136,24 +136,6 @@ it.each(["standalone", "ios"])(
   },
 );
 
-it.each(["invalid", "true", "null", '"single"', ""])(
-  "rejects a malformed stored workspace: %p",
-  (workspace) => {
-    localStorage.setItem("workspace", workspace);
-    expect(settings().initialSettings.workspace).toBe("automatic");
-  },
-);
-
-it("rejects an invalid runtime workspace and persists the valid fallback", () => {
-  const { default: reducer, initialSettings, change } = settings();
-  const updated = reducer(
-    initialSettings,
-    change({ workspace: "tv" } as unknown as Parameters<typeof change>[0]),
-  );
-  expect(updated.workspace).toBe("automatic");
-  expect(settings().initialSettings.workspace).toBe("automatic");
-});
-
 it.each([
   "",
   "NaN",
@@ -183,7 +165,6 @@ it("persists independent padding choices and rejects invalid runtime values", ()
     );
     expect(updated.screenEdgePadding).toBe(padding);
     expect(settings().initialSettings.screenEdgePadding).toBe(padding);
-    expect(updated.workspace).toBe("automatic");
     expect(updated.interfaceScale).toBe(1);
   }
   const invalid = reducer(
@@ -207,7 +188,6 @@ it("projects zero padding to seats without overwriting shared shell preferences"
     initialSettings,
     change({
       screenEdgePadding: 4,
-      workspace: "automatic",
       interfaceScale: 1.5,
       audioEnabled: true,
     }),
@@ -215,13 +195,11 @@ it("projects zero padding to seats without overwriting shared shell preferences"
   const seat = reducer(shell, applyPresentation(seatPresentation(shell)));
   expect(seat).toMatchObject({
     screenEdgePadding: 0,
-    workspace: "single",
     interfaceScale: 1.5,
     audioEnabled: false,
   });
   expect(settings().initialSettings).toMatchObject({
     screenEdgePadding: 4,
-    workspace: "automatic",
     interfaceScale: 1.5,
     audioEnabled: true,
   });

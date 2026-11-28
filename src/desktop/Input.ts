@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { revealControl } from "../components/base/RevealControl";
 import type { AppStore } from "../Store";
 import type {
@@ -62,12 +63,6 @@ export function startDesktopInput(
   const gameplay = () =>
     !!document.querySelector(".base_main:not([inert]) .gameWorkspace");
   const controls = () => visibleControls(inputScope());
-  const primaryView = (availableControls: readonly HTMLElement[]) =>
-    availableControls.some(
-      (control) => control.dataset.gameBaseView === "FLEET",
-    )
-      ? "FLEET"
-      : "FACILITIES";
   const speedButtons = () =>
     // A roving group exposes one tab stop; semantic speed actions address every option.
     visibleControls(inputScope(), { tabStopsOnly: false }).filter((button) =>
@@ -178,16 +173,12 @@ export function startDesktopInput(
   const pane = (delta: number) => {
     if (mapFocusFrame !== undefined) cancelAnimationFrame(mapFocusFrame);
     mapFocusFrame = undefined;
-    const availableControls = controls();
-    const buttons = availableControls.filter(
+    const buttons = controls().filter(
       (button) =>
         button.matches(".gameActionDock button") &&
-        button.dataset.gameBaseView === undefined &&
         button.dataset.gameDestination !== "FACILITIES" &&
-        // The map's Build action starts project selection. Bumpers cycle the map and its tools.
-        !button.matches(
-          '.gameWorkspace[data-map-workspace="true"] .gameDockBuild',
-        ),
+        // A territorial Build action starts project selection outside the tool stack.
+        !button.matches(".gameDockBuild:not([data-game-destination])"),
     );
     const card = store.getState().card.name;
     const active =
@@ -199,16 +190,20 @@ export function startDesktopInput(
     const current = opened + 1;
     const next = (current + delta + buttons.length + 1) % (buttons.length + 1);
     if (next === 0) {
-      const view = primaryView(availableControls);
-      store.dispatch(navigate(view));
-      if (view === "FLEET") return;
+      store.dispatch(navigate("FACILITIES"));
       mapFocusFrame = requestAnimationFrame(() => {
         mapFocusFrame = undefined;
         if (!live || !foreground || store.getState().card.name !== "FACILITIES")
           return;
-        controls()
-          .find((control) => control.matches(".territoryMapBuyToggle"))
-          ?.focus({ preventScroll: true });
+        const mapControls = controls();
+        const entry =
+          mapControls.find((control) =>
+            control.matches(".territoryMapBuyToggle"),
+          ) ??
+          mapControls.find((control) =>
+            control.matches(".territoryMapLayerToggle"),
+          );
+        entry?.focus({ preventScroll: true });
       });
     } else {
       const button = buttons[next - 1];
@@ -229,22 +224,18 @@ export function startDesktopInput(
       element.matches('.accessibleChart > [role="img"][tabindex="0"]'),
     );
     if (!charts.length) {
-      const regional = availableControls.some(
-        (control) => control.dataset.gameBaseView !== undefined,
+      const fleet = availableControls.find(
+        (control) => control.id === "fleetNav",
       );
-      const destination = regional ? "FLEET" : "FACILITIES";
-      const covered = inputScope().querySelector(
-        '.gameStage[data-layout="single"] .gameToolPanel:not([hidden])',
-      );
-      if ((regional || covered) && store.getState().card.name !== destination) {
-        store.dispatch(navigate(destination));
+      if (fleet && store.getState().card.name !== "FLEET") {
+        store.dispatch(navigate("FLEET"));
         if (chartFrame !== undefined) cancelAnimationFrame(chartFrame);
         chartFrame = requestAnimationFrame(() => {
           chartFrame = undefined;
           if (
             live &&
             foreground &&
-            store.getState().card.name === destination &&
+            store.getState().card.name === "FLEET" &&
             !overlay(inputScope())
           )
             chart(delta);
@@ -387,14 +378,23 @@ export function startDesktopInput(
     )
       return;
     document.documentElement.dataset.controllerInput = "true";
-    present({ active: true });
     // Prefer one-shot intent over a held direction repeating in the same sample.
     // One intent per sample also keeps simultaneous buttons out of a newly opened dialog.
     const action =
       frame.actions.find(
         (action) => !["up", "down", "left", "right"].includes(action),
       ) ?? frame.actions[0];
-    act(action);
+    const entering = !getInputPresentation().active;
+    // Confirm belongs to the control the player focused. Entering controller
+    // layout can unmount it (for example, the floating Build rail).
+    if (entering && action === "confirm") {
+      act(action);
+      present({ active: true });
+    } else {
+      // Navigation must see the new dock and its pane order on the first press.
+      if (entering) flushSync(() => present({ active: true }));
+      act(action);
+    }
     sync();
   });
   const stopFocus = desktop.onGameFocusChanged((focused) => {

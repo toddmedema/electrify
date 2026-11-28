@@ -1,5 +1,5 @@
-import { SHORTCUTS, TOOL_SHORTCUTS } from "./KeyboardShortcuts";
-import { GAME_TOOLS } from "./Navigation";
+import { SHORTCUTS } from "./KeyboardShortcuts";
+import { GAME_TOOLS } from "./GameNavigation";
 import { keyMap } from "../Compositor";
 
 /**
@@ -56,17 +56,19 @@ describe("the keyboard shortcuts", () => {
     expect(bound.has("shift+9")).toBe(true);
   });
 
-  it("maps Q, W, E, R and T to the action bar's tools in its order", () => {
-    expect(GAME_TOOLS.map((tool) => TOOL_SHORTCUTS[tool.id])).toEqual([
-      ["Q", "B"],
-      ["W"],
-      ["E"],
-      ["R"],
-      ["T"],
+  it("maps the six consecutive keys and their aliases to the dock in order", () => {
+    expect(GAME_TOOLS.map(({ id, keys }) => [id, keys])).toEqual([
+      ["FLEET", ["Q", "F"]],
+      ["AGREEMENTS", ["W", "A"]],
+      ["EVENTS", ["E"]],
+      ["PROGRAMS", ["R", "P"]],
+      ["INSIGHTS", ["T", "I"]],
+      ["SCENARIO", ["Y", "S"]],
+      ["BUILD_GENERATORS", ["B"]],
     ]);
-    GAME_TOOLS.forEach((tool) => {
-      expect(keyMap[`TOOL_${tool.id}` as keyof typeof keyMap]).toEqual(
-        TOOL_SHORTCUTS[tool.id].map((key) => key.toLowerCase()),
+    GAME_TOOLS.forEach(({ id, keys }) => {
+      expect(keyMap[`TOOL_${id}` as keyof typeof keyMap]).toEqual(
+        keys.map((key) => key.toLowerCase()),
       );
     });
   });
@@ -74,7 +76,7 @@ describe("the keyboard shortcuts", () => {
   it("gives the desktop-only actions keys of their own", () => {
     // Building and reordering used to be mouse-only, on the screen most likely to have a keyboard
     expect(bound.has("g")).toBe(true);
-    expect(bound.has("s")).toBe(true);
+    expect(keyMap.BUILD_STORAGE).toBe("shift+s");
     expect(bound.has("[")).toBe(true);
     expect(bound.has("]")).toBe(true);
   });

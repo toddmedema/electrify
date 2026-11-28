@@ -4,7 +4,7 @@ import { test } from "./advance-world";
 import { crossplayFixture } from "./crossplay-fixture";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { reviewScreenshot } from "./review-screenshot";
-import { openPane, selectTerritoryMapTile } from "./layout";
+import { openFleet, openPane, selectTerritoryMapTile } from "./layout";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { RoomView } from "../src/multiplayer/Types";
 import type { GameType } from "../src/Types";
@@ -19,7 +19,7 @@ const entry = (page: Page) =>
   page.getByRole("button", { name: "Play with friends", exact: true });
 const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
-const grid = (page: Page) => page.locator(".facilities:visible");
+const grid = (page: Page) => page.locator("#mapPane");
 
 type MultiplayerWindow = Window & {
   observedRoomView?: RoomView;
@@ -394,6 +394,60 @@ test("V2 joins immediately by invite and lets the host remove a guest", async ({
   expect(campaign.errors).toEqual([]);
 });
 
+test(
+  "co-op players cannot use another company's claimed logo",
+  { tag: "@mobile" },
+  async ({ newIsolatedContext }, info) => {
+    const campaign = new V2Campaign(newIsolatedContext);
+    const width = info.project.use.viewport?.width ?? 1280;
+    const host = await campaign.addPlayer(width);
+    const invite = await campaign.create(host);
+    const picker = (page: Page) =>
+      page.getByRole("combobox", { name: /Company logo/ });
+    const pick = async (page: Page, name: string) => {
+      await picker(page).click();
+      await page.getByRole("option", { name, exact: true }).click();
+      await expect(picker(page)).toContainText(name);
+    };
+    await expect(picker(host)).toContainText("Random");
+    await pick(host, "Sunburst");
+
+    const guest = await campaign.addPlayer(width);
+    await campaign.requestJoin(guest, invite);
+    await campaign.waitForGuest(host, guest);
+    await expect(picker(guest)).toContainText("Random");
+    await picker(guest).click();
+    await expect(
+      guest.getByRole("option", { name: /Sunburst.*Taken by SolarSam/ }),
+    ).toBeDisabled();
+    await guest
+      .getByRole("option", { name: "Grid pylon", exact: true })
+      .click();
+    await expect(picker(guest)).toContainText("Grid pylon");
+    await picker(host).click();
+    await expect(
+      host.getByRole("option", { name: /Grid pylon.*Taken by WindyWren/ }),
+    ).toBeDisabled();
+    await host.getByRole("option", { name: "Random", exact: true }).click();
+    await picker(guest).click();
+    await expect(
+      guest.getByRole("option", { name: "Sunburst", exact: true }),
+    ).toBeEnabled();
+    await guest.getByRole("option", { name: "Sunburst", exact: true }).click();
+    await expect(picker(guest)).toContainText("Sunburst");
+
+    await campaign.start(host);
+    for (const page of [host, guest]) {
+      const view = (await projection(page))!.game!.multiplayer!;
+      const logos = view.utilityLogos!;
+      expect(new Set(Object.values(logos)).size).toBe(2);
+      const guestSeat = page === guest ? view.seat : view.peers![0].id;
+      expect(logos[guestSeat]).toBe("sunburst");
+    }
+    expect(campaign.errors).toEqual([]);
+  },
+);
+
 test("focus skips a guest who is still exiting after a quick second kick", async ({
   newIsolatedContext,
 }) => {
@@ -492,6 +546,74 @@ for (const count of [2, 3, 4]) {
       await expect(clock(host)).toHaveAccessibleDescription(
         /SolarSam \(you\) selected 24×/,
       );
+      if (!info.project.use.isMobile && buyer.viewportSize()!.width >= 1024) {
+        const fleet = await openFleet(buyer);
+        const rail = territorialMap(buyer).getByRole("complementary", {
+          name: "Build facilities",
+        });
+        const trigger = rail.getByRole("button", {
+          name: "Build",
+          exact: true,
+        });
+        await expect(trigger).toHaveId("buildNav");
+        await trigger.click();
+        const build = buyer.getByRole("region", { name: "Build", exact: true });
+        await expect(build).toHaveAttribute("data-resizable", "true");
+        await expect(fleet).toBeVisible();
+        await build
+          .getByRole("button", { name: "Close Build", exact: true })
+          .click();
+        await expect(build).toHaveCount(0);
+        await expect(fleet).toBeVisible();
+        await expect(trigger).toBeFocused();
+        await buyer
+          .getByRole("button", { name: "Close Fleet", exact: true })
+          .click();
+      } else if (count === 2) {
+        const dockBuild = buyer
+          .getByRole("navigation", { name: "Game actions" })
+          .getByRole("button", { name: "Build", exact: true });
+        const project = buyer.getByRole("dialog", {
+          name: "Build",
+          exact: true,
+        });
+        const storage = project.getByRole("tab", {
+          name: "Storage",
+          exact: true,
+        });
+        const battery = project
+          .getByRole("tabpanel", {
+            name: "Storage",
+            exact: true,
+          })
+          .getByRole("button", {
+            name: "Review purchase of Lithium Battery",
+            exact: true,
+          });
+        const generators = project.getByRole("tab", {
+          name: "Generators",
+          exact: true,
+        });
+        const close = project.getByRole("button", {
+          name: "Close project",
+          exact: true,
+        });
+        await dockBuild.click();
+        await storage.click();
+        await close.click();
+        await expect(project).toHaveCount(0);
+        await dockBuild.click();
+        await expect(storage).toHaveAttribute("aria-selected", "true");
+        await expect(battery).toBeVisible();
+        await generators.click();
+        await close.click();
+        await expect(project).toHaveCount(0);
+        await buyer.keyboard.press("Shift+s");
+        await expect(storage).toHaveAttribute("aria-selected", "true");
+        await expect(battery).toBeVisible();
+        await generators.click();
+        await close.click();
+      }
       const buyerGame = (await projection(buyer))!.game!;
       const before = buyerGame.facilities.length;
       const site = multiplayerTerritoryTiles(buyerGame).find(
@@ -614,9 +736,7 @@ test(
       .toBeTruthy();
 
     for (const page of [host, guest])
-      await page
-        .getByRole("button", { name: "Agreements", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Trade", exact: true }).click();
     await host
       .getByRole("button", {
         name: "Review connection with WindyWren",

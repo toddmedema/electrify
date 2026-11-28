@@ -1,4 +1,5 @@
 import { validTerritoryWeather } from "./helpers/TerritoryWildfire";
+import { isUtilityLogo } from "./data/UtilityLogos";
 import { validFacilityExpansion } from "./helpers/FacilityExpansion";
 import { validPowerAgreements } from "./helpers/PowerAgreements";
 import { POLICY_IDS } from "./data/Policies";
@@ -388,6 +389,7 @@ export function parseSave(
     !isValidDifficulty(game.difficulty) ||
     typeof game.scenarioId !== "number" ||
     typeof game.seed !== "number" ||
+    (game.utilityLogo !== undefined && !isUtilityLogo(game.utilityLogo)) ||
     !Number.isInteger(game.seed) ||
     game.seed < 0 ||
     game.seed > 4294967295 ||
@@ -594,6 +596,7 @@ export function parseSave(
             !Number.isFinite(tick.expensesInterest) ||
             tick.expensesExpansionInterest > tick.expensesInterest)) ||
         [
+          tick.agreementImportedW,
           tick.agreementAvailableMWh,
           tick.agreementUsefulMWh,
           tick.agreementPayments,

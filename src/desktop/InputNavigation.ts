@@ -153,13 +153,13 @@ function spatialDestination(
     return undefined;
   };
   const scrolling = vertical ? scrollParent(target) : undefined;
-  const pane = target.closest("[data-game-tool],.gameFleet");
+  const pane = target.closest("[data-game-tool],.gameMapStage");
   const cx = (from.left + from.right) / 2;
   const cy = (from.top + from.bottom) / 2;
   const candidates = controls.flatMap((element) => {
     if (element === target) return [];
     // Up/Down follows this pane to its boundary; Left/Right crosses columns.
-    const otherPane = element.closest("[data-game-tool],.gameFleet");
+    const otherPane = element.closest("[data-game-tool],.gameMapStage");
     if (vertical && pane && otherPane && pane !== otherPane) return [];
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) return [];

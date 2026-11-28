@@ -61,6 +61,54 @@ test.each(["new", "restored"])(
   },
 );
 
+test("co-op logos are unique across viewpoints and follow saved companies to new players", () => {
+  const seats = coopSeats(3);
+  seats[1].utilityLogo = "sunburst";
+  const world = createWorld(COOP_TEST_SPEC, seats, "logo-match", "epoch");
+  const logos = roomView(world, "0").game!.multiplayer!.utilityLogos!;
+  expect(logos["1"]).toBe("sunburst");
+  expect(new Set(Object.values(logos)).size).toBe(3);
+  expect(roomView(world, "1").game!.multiplayer!.utilityLogos).toEqual(logos);
+  const restored = restoreWorld(checkpointWorld(world), "claimed", [
+    { id: "4", name: "First" },
+    { id: "5", name: "Second" },
+    { id: "6", name: "Third" },
+  ]);
+  expect(roomView(restored, "5").game!.multiplayer!.utilityLogos).toEqual({
+    4: logos["0"],
+    5: logos["1"],
+    6: logos["2"],
+  });
+  seats[2].utilityLogo = "sunburst";
+  expect(() =>
+    createWorld(COOP_TEST_SPEC, seats, "duplicate", "epoch"),
+  ).toThrow("Each company needs a different logo");
+});
+
+test("retired logos return saved co-op companies to Random without reusing another player's mark", () => {
+  const world = create(4);
+  const saved = checkpointWorld(world);
+  const previous = {
+    ...saved,
+    gameSchema: 30,
+    rules:
+      "coop-2-39f519a24b392d1e5797644a6590744f142e054e3ddd2c63b12fb9b0e1fbe3b7",
+    seats: saved.seats.map((seat, index) => ({
+      ...seat,
+      ...(index < 2 && { utilityLogo: index === 0 ? "hookwater" : "sunburst" }),
+    })),
+  };
+  const reopened = restoreWorld(previous, "resumed");
+  expect(reopened.seats[0].utilityLogo).toBeUndefined();
+  expect(reopened.seats[1].utilityLogo).toBe("sunburst");
+  expect(reopened.grids[0].date).toEqual(world.grids[0].date);
+  const logos = roomView(reopened, "0").game!.multiplayer!.utilityLogos!;
+  expect(logos["0"]).toBeTruthy();
+  expect(logos["1"]).toBe("sunburst");
+  expect(new Set(Object.values(logos)).size).toBe(4);
+  expect(previous.seats[0].utilityLogo).toBe("hookwater");
+});
+
 test("resuming hands saved companies to the players who claimed them", () => {
   const world = create(3);
   world.outcomes["2"] = {

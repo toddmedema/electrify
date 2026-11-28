@@ -8,6 +8,7 @@ import type {
   PowerAgreementMonth,
   PowerAgreementSettlement,
   PowerAgreementTermsVersion,
+  ReprioritizePowerAgreementAction,
   TransmissionLineOperatingType,
   UtilityId,
 } from "../Types";
@@ -96,7 +97,7 @@ const AGREEMENT_DISPATCH_PRIORITY: Record<PowerAgreementTermsVersion, number> =
     3: 1,
   };
 /** Assign scarce readiness and useful delivery to fully paid blocks before monthly minima. */
-export function compareAgreementDispatchPriority(
+function compareAgreementDispatchPriority(
   a: AgreementDispatchSource,
   b: AgreementDispatchSource,
 ): number {
@@ -106,6 +107,18 @@ export function compareAgreementDispatchPriority(
     a.pricePerMWh - b.pricePerMWh ||
     a.id.localeCompare(b.id)
   );
+}
+
+export function agreementDispatchComparator(
+  game: Pick<GameType, "transmission">,
+): (a: AgreementDispatchSource, b: AgreementDispatchSource) => number {
+  const order = game.transmission?.agreementDispatchOrder;
+  if (!order?.length) return compareAgreementDispatchPriority;
+  const positions = new Map(order.map((id, index) => [id, index]));
+  return (a, b) =>
+    (positions.get(a.id) ?? order.length) -
+      (positions.get(b.id) ?? order.length) ||
+    compareAgreementDispatchPriority(a, b);
 }
 
 /** Calibrated game rule: one-year reward 1%, ten-year reward 20%. */
@@ -550,6 +563,46 @@ export function connectionAgreements(
   });
 }
 
+/** The Fleet list contains current and scheduled trades. The Trade panel keeps expired history. */
+export function dispatchOrderedAgreements(game: GameType) {
+  const minute = game.date.minute;
+  const compare = agreementDispatchComparator(game);
+  return AGREEMENT_UTILITIES.flatMap((utilityId) =>
+    utilityOwnedAt(game, utilityId, minute)
+      ? connectionAgreements(game, utilityId)
+      : [],
+  )
+    .filter(({ endMinute, nominalW }) => endMinute > minute && nominalW > 0)
+    .map((source) => ({ ...source, pricePerMWh: source.priceToday }))
+    .sort(compare);
+}
+
+/** Take a relative move so a stale index cannot reorder a different contract in co-op. */
+export function movedAgreementOrder(
+  game: GameType,
+  value: unknown,
+): string[] | undefined {
+  const move = value as Partial<ReprioritizePowerAgreementAction> | null;
+  if (
+    !game.transmission ||
+    typeof move?.id !== "string" ||
+    typeof move.targetId !== "string" ||
+    move.id === move.targetId ||
+    (move.place !== "before" && move.place !== "after")
+  )
+    return undefined;
+  const ids = dispatchOrderedAgreements(game).map(({ id }) => id);
+  const source = ids.indexOf(move.id);
+  const target = ids.indexOf(move.targetId);
+  if (source < 0 || target < 0) return undefined;
+  const destination =
+    target + (move.place === "after" ? 1 : 0) - (source < target ? 1 : 0);
+  if (source === destination) return undefined;
+  ids.splice(source, 1);
+  ids.splice(destination, 0, move.id);
+  return ids;
+}
+
 export function validPowerAgreements(game: GameType): boolean {
   const receipts = game.transmission?.acceptedAgreements;
   if (
@@ -610,6 +663,24 @@ export function validPowerAgreements(game: GameType): boolean {
             : {}),
         }) ||
       Object.keys(receipt).length !== (receipt.termsVersion === 3 ? 9 : 6)
+    )
+      return false;
+  }
+  const order = game.transmission?.agreementDispatchOrder;
+  if (order !== undefined) {
+    if (!Array.isArray(order) || !order.length || order.length > MAX_ACCOUNTS)
+      return false;
+    const minute = game.date.minute;
+    const ownedIds = new Set(
+      AGREEMENT_UTILITIES.flatMap((id) =>
+        utilityOwnedAt(game, id, minute)
+          ? agreementTermsAt(game, id, minute).map((term) => term.id)
+          : [],
+      ),
+    );
+    if (
+      new Set(order).size !== order.length ||
+      order.some((id) => !ownedIds.has(id))
     )
       return false;
   }

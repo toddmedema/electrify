@@ -13,50 +13,56 @@ export const GAME_TOOLS: {
   label: string;
   triggerId: string;
   icon: React.ReactElement;
+  keys: string[];
 }[] = [
   {
-    id: "BUILD_GENERATORS",
-    label: "Build",
-    triggerId: "buildNav",
-    icon: <ConceptIcon concept="build" />,
+    id: "FLEET",
+    label: "Fleet",
+    triggerId: "fleetNav",
+    icon: <FactoryIcon />,
+    keys: ["Q", "F"],
   },
   {
-    id: "PROGRAMS",
-    label: "Programs",
-    triggerId: "programsNav",
-    icon: <ConceptIcon concept="customers" />,
-  },
-  {
-    id: "INSIGHTS",
-    label: "Insights",
-    triggerId: "insightsNav",
-    icon: <InsertChartIcon />,
+    id: "AGREEMENTS",
+    label: "Trade",
+    triggerId: "agreementsNav",
+    icon: <HandshakeIcon />,
+    keys: ["W", "A"],
   },
   {
     id: "EVENTS",
     label: "Events",
     triggerId: "eventsNav",
     icon: <HistoryIcon />,
+    keys: ["E"],
+  },
+  {
+    id: "PROGRAMS",
+    label: "Programs",
+    triggerId: "programsNav",
+    icon: <ConceptIcon concept="customers" />,
+    keys: ["R", "P"],
+  },
+  {
+    id: "INSIGHTS",
+    label: "Insights",
+    triggerId: "insightsNav",
+    icon: <InsertChartIcon />,
+    keys: ["T", "I"],
   },
   {
     id: "SCENARIO",
     label: "Scenario",
     triggerId: "scenarioNav",
     icon: <ConceptIcon concept="goal" />,
+    keys: ["Y", "S"],
   },
-];
-export const MAP_VIEWS: {
-  id: MapPanelView;
-  label: string;
-  triggerId: string;
-  icon: React.ReactElement;
-}[] = [
-  { id: "FLEET", label: "Fleet", triggerId: "fleetNav", icon: <FactoryIcon /> },
   {
-    id: "AGREEMENTS",
-    label: "Agreements",
-    triggerId: "agreementsNav",
-    icon: <HandshakeIcon />,
+    id: "BUILD_GENERATORS",
+    label: "Build",
+    triggerId: "buildNav",
+    icon: <ConceptIcon concept="build" />,
+    keys: ["B"],
   },
 ];
 
@@ -64,12 +70,10 @@ export function GameNavigationLabel({
   destination,
   children,
 }: {
-  destination: GameTool | MapPanelView;
+  destination: GameTool;
   children: React.ReactNode;
 }): React.JSX.Element {
-  const item = [...GAME_TOOLS, ...MAP_VIEWS].find(
-    ({ id }) => id === destination,
-  )!;
+  const item = GAME_TOOLS.find(({ id }) => id === destination)!;
   return (
     <strong className="gameNavigationLabel">
       <span aria-hidden="true">{item.icon}</span>

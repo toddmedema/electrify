@@ -217,7 +217,11 @@ for (const theme of ["light", "dark"]) {
       }
       await openBuild(page);
       await page.locator("#insightsNav").click();
-      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+      for (const name of ["Fleet", "Build", "Insights"])
+        await expect(
+          page.getByRole("region", { name, exact: true }),
+        ).toBeVisible();
       await expect(aligned).toPass();
     }
   });
@@ -284,7 +288,7 @@ for (const theme of ["light", "dark"]) {
     const chart = pane.locator("#chartSupplyDemand");
     const image = chart.getByRole("img");
     await expect(chart.getByText("Storage", { exact: true })).toBeVisible();
-    await expect(chart.getByText("Interties", { exact: true })).toBeVisible();
+    await expect(chart.getByText("Trade", { exact: true })).toBeVisible();
     await expect(
       chart.getByText("Variable (solar, wind)", { exact: true }),
     ).toBeVisible();
@@ -317,7 +321,7 @@ for (const theme of ["light", "dark"]) {
     await image.press("ArrowRight");
     await expect(time).not.toHaveText(firstTime!);
     await selectPoint(exporting);
-    await expect(details).toContainText("Interties:");
+    await expect(details).toContainText("Trade:");
     await selectPoint(discharging);
     await expect(details).toContainText("Storage:");
     await image.press("End");
@@ -650,7 +654,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await plot.focus();
   await plot.press("Home");
   for (let index = 0; index < shortage; index++) await plot.press("ArrowRight");
-  await expect(chart.locator(".chartTooltip")).toContainText("Interties:");
+  await expect(chart.locator(".chartTooltip")).toContainText("Trade:");
   await expect(chart.locator(".chartTooltip")).toContainText(
     /\d+(?:\.\d+)?(?:MW|GW) unmet/,
   );
@@ -729,8 +733,8 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   for (const direction of [
     "Storage:",
     "Storage charging:",
-    "Interties:",
-    "Interties:",
+    "Trade:",
+    "Trade:",
   ]) {
     await expect(details).toContainText(direction);
   }

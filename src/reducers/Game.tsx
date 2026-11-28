@@ -84,7 +84,8 @@ import {
 } from "./GameActions";
 import {
   acceptAgreement,
-  compareAgreementDispatchPriority,
+  agreementDispatchComparator,
+  movedAgreementOrder,
   agreementIntervalMinutes,
   recordAgreementSettlements,
 } from "../helpers/PowerAgreements";
@@ -2328,6 +2329,17 @@ export const gameSlice = createSlice({
     ) => {
       applyReprioritizeTransmissionLine(state, action.payload);
     },
+    reprioritizePowerAgreement: (
+      state,
+      action: PayloadAction<
+        import("../Types").ReprioritizePowerAgreementAction
+      >,
+    ) => {
+      const order = movedAgreementOrder(state, action.payload);
+      if (!order || !state.transmission) return;
+      state.transmission.agreementDispatchOrder = order;
+      state.timeline = reforecastSupply(state);
+    },
     upgradeTransmissionLine: (
       state,
       action: PayloadAction<UpgradeTransmissionLineAction>,
@@ -2494,6 +2506,7 @@ export const gameSlice = createSlice({
         return {
           ...cloneDeep(initialGame),
           difficulty: state.difficulty,
+          ...(state.utilityLogo && { utilityLogo: state.utilityLogo }),
           scenarioId: LEGACY_CAMPAIGN_ID,
           startingYear: LEGACY_GENERATIONS[0].startYear,
           date: getDateFromMinute(0, LEGACY_GENERATIONS[0].startYear),
@@ -2788,6 +2801,7 @@ export const {
   cancelTransmissionLine,
   togglePauseTransmissionLine,
   reprioritizeTransmissionLine,
+  reprioritizePowerAgreement,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -2803,9 +2817,16 @@ export const {
 export function startLegacyCampaign(
   dispatch: (action: { type: string; payload?: unknown }) => unknown,
   difficulty: DifficultyType,
+  utilityLogo?: GameType["utilityLogo"],
 ): void {
   dispatch(quit(undefined));
-  dispatch(delta({ difficulty, customScenario: undefined }));
+  dispatch(
+    delta({
+      difficulty,
+      customScenario: undefined,
+      ...(utilityLogo && { utilityLogo }),
+    }),
+  );
   dispatch(start(LEGACY_CAMPAIGN_ID));
 }
 
@@ -2847,7 +2868,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "On 1 Jan 2020, 100 MW of nuclear agreement coverage will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
+      "On 1 Jan 2020, 100 MW of nuclear supply will end. Québec and Ridge coverage will also fall; sign replacements or build new supply.",
       {
         title: "Legacy power contracts change in 2020",
         importance: "NOTABLE",
@@ -2859,7 +2880,7 @@ export function recordExpansionMilestones(state: GameType): void {
     logGameEvent(
       state,
       "WORLD_EVENT",
-      "Champlain’s 100 MW nuclear agreement has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
+      "Champlain’s 100 MW nuclear trade has ended. Inherited Québec coverage is now 60 MW; Ridge’s inherited firm coverage is 20 MW if acquired.",
       {
         title: "Legacy power purchases reduced",
         importance: "CRITICAL",
@@ -6181,58 +6202,56 @@ function* supplyFacilitiesFinancesPhases(
     preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
   // A pregame build estimate includes the inherited supply already in place on opening day.
   const entitlementMinute = simulated && now.minute < 0 ? 0 : agreementStart;
-  // Eligibility belongs to the elapsed contract interval; physical readiness must
-  // share this dispatch frame's weather/scarcity budget with ordinary imports.
-  const readyAgreements = entitlementSources(
+  // Eligibility belongs to the elapsed interval, with this frame's physical supply.
+  // Reserve a manually ordered portfolio together so an older trade can claim capacity
+  // before a lower-ranked firm trade. Automatic dispatch keeps firm readiness first.
+  const manualAgreementOrder = !!transmission.agreementDispatchOrder?.length;
+  const readinessAgreements = entitlementSources(
     state,
     now,
     sharedClearing?.commitments,
-    true,
+    !manualAgreementOrder,
     false,
     excludedAgreementId,
     entitlementMinute,
   );
+  const readinessReservations = readinessAgreements.map((source) => ({
+    offer: source.offer,
+    watts: source.capacityW,
+  }));
   if (sharedClearing) {
-    sharedClearing.commitments.push(
-      ...readyAgreements.map((source) => ({
-        offer: source.offer,
-        watts: source.capacityW,
-      })),
-    );
-    // Every company's supplier readiness is assigned before buyer dispatch and physical spot flows.
+    sharedClearing.commitments.push(...readinessReservations);
+    // Every company assigns supplier readiness before buyer dispatch and physical spot flows.
     yield { kind: "ready" };
   }
   const commitmentReservations =
-    sharedClearing?.commitments ??
-    readyAgreements.map((source) => ({
-      offer: source.offer,
-      watts: source.capacityW,
-    }));
-  const legacyAgreements = entitlementSources(
-    state,
-    now,
-    [
-      ...commitmentReservations,
-      ...(sharedImports ?? []).filter(
-        (reservation) =>
-          !commitmentReservations.some(
-            (commitment) => commitment.offer === reservation.offer,
+    sharedClearing?.commitments ?? readinessReservations;
+  const legacyAgreements = manualAgreementOrder
+    ? []
+    : entitlementSources(
+        state,
+        now,
+        [
+          ...commitmentReservations,
+          ...(sharedImports ?? []).filter(
+            (reservation) =>
+              !commitmentReservations.some(
+                (commitment) => commitment.offer === reservation.offer,
+              ),
           ),
-      ),
-    ],
-    false,
-    true,
-    excludedAgreementId,
-    entitlementMinute,
-  );
-  // Use fully paid blocks before adding monthly-minimum usage, then pay-as-used supply.
+        ],
+        false,
+        true,
+        excludedAgreementId,
+        entitlementMinute,
+      );
   const entitlementOffers = [
-    ...readyAgreements.map((source) => ({
+    ...readinessAgreements.map((source) => ({
       ...source,
       capacityW: source.paused ? 0 : source.capacityW,
     })),
     ...legacyAgreements,
-  ].sort(compareAgreementDispatchPriority);
+  ].sort(agreementDispatchComparator(state));
   const entitlementCapacityW = entitlementOffers.reduce(
     (sum, offer) => sum + offer.capacityW,
     0,
@@ -7029,7 +7048,7 @@ function* supplyFacilitiesFinancesPhases(
     entitlementLeftW -= delivered;
     importCostPerHour += delivered * offer.pricePerMWh;
     const availableW = (
-      readyAgreements.find((source) => source.id === offer.id) ?? offer
+      readinessAgreements.find((source) => source.id === offer.id) ?? offer
     ).capacityW;
     const minutes = agreementIntervalMinutes(
       agreementStart,
@@ -7076,6 +7095,12 @@ function* supplyFacilitiesFinancesPhases(
   if (state.utilityExpansion) {
     now.entitlementImportedW = entitlementDeliveredW;
     now.entitlementImportCapacityW = entitlementCapacityW;
+    now.agreementImportedW = Object.fromEntries(
+      entitlementOffers.map(({ id }, index) => [
+        id,
+        coveredReservations[index].watts,
+      ]),
+    );
   }
   now.importedW = importedW;
   now.exportedW = exportedW;

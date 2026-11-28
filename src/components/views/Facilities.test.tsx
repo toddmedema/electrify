@@ -221,6 +221,7 @@ function renderFacilities(
         onCancelExpansion={handlers.onCancelExpansion}
         onFacilityDragStart={() => undefined}
         onFacilityDragEnd={() => undefined}
+        onAgreementDragEnd={() => undefined}
         onSelect={(id) => {
           handlers.onSelect(id);
           setSelected(id);
@@ -533,6 +534,7 @@ describe("the fleet list", () => {
       onReprioritize: noop,
       onFacilityDragStart: noop,
       onFacilityDragEnd: noop,
+      onAgreementDragEnd: noop,
       onSelect: noop,
     };
     const store = configureStore({ reducer: { ui: uiReducer } });
@@ -617,6 +619,7 @@ describe("the fleet list", () => {
       onReprioritize: () => undefined,
       onFacilityDragStart,
       onFacilityDragEnd,
+      onAgreementDragEnd: () => undefined,
       onSelect: () => undefined,
     };
     render(
@@ -2434,9 +2437,7 @@ it("keeps restored co-op trading choices reachable through territory agreements"
     undefined,
     "AGREEMENTS",
   );
-  expect(
-    screen.getByRole("heading", { name: "Co-op power sharing" }),
-  ).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Co-op trade" })).toBeVisible();
   const buying = screen.getByRole("combobox", { name: "Buying" });
   expect(buying).toHaveTextContent("None");
   await user.click(buying);

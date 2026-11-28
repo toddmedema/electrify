@@ -19,7 +19,6 @@ import { openEvidence } from "../../helpers/Evidence";
 import { getDateFromMinute, MINUTES_PER_MONTH } from "../../helpers/DateTime";
 import { selectProjection } from "../../helpers/Projection";
 import Facilities from "../views/FacilitiesContainer";
-import { GameWorkspaceContext } from "./GameWorkspaceContext";
 import GridStatus from "./GridStatus";
 import {
   projectionReady,
@@ -79,7 +78,7 @@ it("closes before navigating from the diagnosis", () => {
   const status = screen.getByRole("button", { name: /^Current grid status/ });
   for (const [name, target] of [
     ["Manage fleet", "FLEET"],
-    ["Manage agreements", "AGREEMENTS"],
+    ["Open Trade", "AGREEMENTS"],
   ]) {
     props.onNavigate.mockImplementation(() =>
       expect(
@@ -202,7 +201,7 @@ it.each([
       controls.getByRole("button", { name: "About reserve" }),
       forecast,
       controls.getByRole("button", { name: "Manage fleet" }),
-      controls.getByRole("button", { name: "Manage agreements" }),
+      controls.getByRole("button", { name: "Open Trade" }),
     ]);
     expect(forecast).toHaveClass("MuiButton-contained");
   },
@@ -238,7 +237,7 @@ it.each([101, 105])(
     );
     expect(
       screen.queryByRole("button", {
-        name: /Manage agreements|Manage interties/,
+        name: /Open Trade|Manage interties/,
       }),
     ).not.toBeInTheDocument();
   },
@@ -255,20 +254,18 @@ it("repeatedly opens and focuses the legacy trading controls, which still update
   dispatch(navigate("INSIGHTS"));
   function Fleet() {
     const card = useSelector((state: AppStateType) => state.card.name);
-    return card === "FLEET" ? <Facilities /> : null;
+    return card === "FLEET" ? <Facilities territoryView="FLEET" /> : null;
   }
   render(
     <Provider store={store}>
       <ThemeProvider theme={createAppTheme("light")}>
-        <GameWorkspaceContext.Provider value={true}>
-          <GridStatus
-            game={game}
-            now={game.timeline[0]}
-            onEvidence={(target) => dispatch(openEvidence(target))}
-            onNavigate={(card) => dispatch(navigate(card))}
-          />
-          <Fleet />
-        </GameWorkspaceContext.Provider>
+        <GridStatus
+          game={game}
+          now={game.timeline[0]}
+          onEvidence={(target) => dispatch(openEvidence(target))}
+          onNavigate={(card) => dispatch(navigate(card))}
+        />
+        <Fleet />
       </ThemeProvider>
     </Provider>,
   );
@@ -298,7 +295,7 @@ it("retains tutorial facts while allowing only revealed navigation", () => {
   expect(screen.getByRole("heading", { name: /^Now ·/ })).toBeVisible();
   expect(
     screen.queryByRole("button", {
-      name: /Manage fleet|Manage agreements|Manage interties|View supply forecast/,
+      name: /Manage fleet|Open Trade|Manage interties|View supply forecast/,
     }),
   ).not.toBeInTheDocument();
   rerender(

@@ -13,7 +13,6 @@ import { isDesktopApp } from "../Desktop";
 import { isInstalledWebApp } from "../InstalledApp";
 import { getLocalStorage } from "../Globals";
 import { normalizeInterfaceScale } from "../InterfaceScale";
-import { WORKSPACE_CHOICES, normalizeWorkspace } from "../WorkspaceLayout";
 import {
   normalizeScreenEdgePadding,
   SCREEN_EDGE_PADDINGS,
@@ -22,10 +21,6 @@ import {
 function storedVolume(key: string): number {
   const value = getStorageNumber(key, 1);
   return Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
-}
-
-function storedWorkspace(): SettingsType["workspace"] {
-  return getStorageChoice("workspace", WORKSPACE_CHOICES, "automatic");
 }
 
 function storedInterfaceScale(): number {
@@ -48,8 +43,6 @@ function normalizedChanges(
   const changes = { ...payload };
   if (Object.prototype.hasOwnProperty.call(changes, "interfaceScale"))
     changes.interfaceScale = normalizeInterfaceScale(changes.interfaceScale);
-  if (Object.prototype.hasOwnProperty.call(changes, "workspace"))
-    changes.workspace = normalizeWorkspace(changes.workspace);
   if (Object.prototype.hasOwnProperty.call(changes, "screenEdgePadding"))
     changes.screenEdgePadding = normalizeScreenEdgePadding(
       changes.screenEdgePadding,
@@ -68,7 +61,6 @@ export const initialSettings: SettingsType = {
   // asked, and it is what every other app on their machine does
   theme: getStorageChoice("theme", THEME_CHOICES, "system"),
   interfaceScale: storedInterfaceScale(),
-  workspace: storedWorkspace(),
   screenEdgePadding: storedScreenEdgePadding(),
 };
 

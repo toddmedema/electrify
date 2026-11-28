@@ -58,6 +58,10 @@ export function coopSelection(
         member.id === lobby.selfId || lobby.connected.includes(member.id),
       ready: readyFor(member.ready),
     })),
+    selfId: lobby.selfId,
+    utilityLogos: session.utilityLogos,
+    utilityLogoError: session.utilityLogoError,
+    utilityLogoPending: !!session.utilityLogoRequest,
     ready: readyFor(
       lobby.members.find((member) => member.id === lobby.selfId)?.ready,
     ),

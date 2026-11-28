@@ -47,6 +47,8 @@ import {
   selectActiveEventGroups,
   selectUpcomingStoryEvents,
 } from "../components/views/StoryEventSelectors";
+import UtilityLogoPicker from "../components/base/UtilityLogoPicker";
+import type { UtilityLogoId } from "../data/UtilityLogos";
 import "./couch.scss";
 
 type Device = DesktopInputFrame & { id: string };
@@ -1341,6 +1343,37 @@ export default function CouchRoot({ onClose }: { onClose: () => void }) {
                           : item,
                       ),
                     )
+                  }
+                />
+                <UtilityLogoPicker
+                  label={`P${index + 1} logo`}
+                  logo={seat.utilityLogo}
+                  disabled={busy || stage !== "join" || !!saved}
+                  taken={
+                    new Map<UtilityLogoId, string>(
+                      seats.flatMap((other) =>
+                        other.id !== seat.id && other.utilityLogo
+                          ? [[other.utilityLogo, other.name]]
+                          : [],
+                      ),
+                    )
+                  }
+                  onChange={(logo) =>
+                    setSeats((previous) => {
+                      if (
+                        logo &&
+                        previous.some(
+                          (other) =>
+                            other.id !== seat.id && other.utilityLogo === logo,
+                        )
+                      )
+                        return previous;
+                      return previous.map((item) =>
+                        item.id === seat.id
+                          ? { ...item, utilityLogo: logo ?? undefined }
+                          : item,
+                      );
+                    })
                   }
                 />
                 <Typography>

@@ -82,7 +82,7 @@ for (const theme of ["light", "dark"] as const) {
     const floating = page.viewportSize()!.width >= SIDE_TOOL_MIN_WIDTH;
     const destinations = [
       ["Manage fleet", "Fleet"],
-      ["Manage agreements", "Agreements"],
+      ["Open Trade", "Trade"],
       ["View supply forecast", "Insights"],
     ];
     for (const [index, [action, region]] of destinations.entries()) {
@@ -141,6 +141,8 @@ for (const theme of ["light", "dark"] as const) {
         name: "Buying",
         exact: true,
       });
+      await expect(page.locator(".facilitySupplyChart .uplot")).toBeVisible();
+      await expect(buying).toBeInViewport();
       await buying.click();
       await page.getByRole("option", { name: choice, exact: true }).click();
       await expect(buying).toContainText(choice);
@@ -155,7 +157,7 @@ for (const theme of ["light", "dark"] as const) {
     await expect(dialog).toBeVisible();
     await expect(
       dialog.getByRole("button", {
-        name: /Manage agreements|Manage interties/,
+        name: /Open Trade|Manage interties/,
       }),
     ).toHaveCount(0);
   });

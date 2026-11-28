@@ -116,6 +116,9 @@ interface CoopControls {
   start: (spec: import("./Types").MatchSpec) => void;
   /** Guest: mark Ready for the selection on screen, or clear it. */
   ready: (ready: boolean) => void;
+  pickUtilityLogo?: (
+    logo: import("../data/UtilityLogos").UtilityLogoId | null,
+  ) => void;
   /** Leave the lobby, after confirming. */
   back: () => void;
   /** Host: copy the lobby code for friends to enter. */

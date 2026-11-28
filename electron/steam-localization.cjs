@@ -69,7 +69,7 @@ module.exports = {
     durationMonths: 60,
   },
   112: {
-    name: "Mission 7: Agreements",
+    name: "Mission 7: Trade",
     durationMonths: 24,
   },
   113: {

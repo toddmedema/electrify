@@ -25,7 +25,10 @@ const state = (
   steam: { available: true, online: true, cloudEnabled: false, presentation },
 });
 
-function mount(presentation?: DesktopState["steam"]["presentation"]) {
+function mount(
+  presentation?: DesktopState["steam"]["presentation"],
+  interfaceScale = 1.25,
+) {
   window.electrifyDesktop = {
     apiVersion: 1,
     getState: () => Promise.resolve(state(presentation)),
@@ -39,8 +42,7 @@ function mount(presentation?: DesktopState["steam"]["presentation"]) {
     preloadedState: {
       settings: {
         ...initialSettings,
-        interfaceScale: 1.75,
-        workspace: "automatic" as const,
+        interfaceScale,
         screenEdgePadding: 4 as const,
       },
     },
@@ -84,8 +86,7 @@ it.each([
     expect(play).toHaveFocus();
     expect(localStorage.getItem("couchPromptShown")).toBe("true");
     expect(store.getState().settings).toMatchObject({
-      interfaceScale: 1.75,
-      workspace: "automatic",
+      interfaceScale: 1.25,
       screenEdgePadding: 4,
     });
     fireEvent.click(screen.getByRole("button", { name: "Play" }));
@@ -102,7 +103,18 @@ it("qualifies a connected controller before it becomes the active input, includi
   expect(prompt()).toBeVisible();
 });
 
-it("applies only scale and Single tool on acceptance, retaining hardware padding", async () => {
+it.each([1.5, 1.75])(
+  "keeps an existing %sx scale without offering smaller controls",
+  async (interfaceScale) => {
+    const { store } = mount({ bigPicture: true }, interfaceScale);
+    await act(async () => undefined);
+    expect(prompt()).toBeNull();
+    expect(localStorage.getItem("couchPromptShown")).toBeNull();
+    expect(store.getState().settings.interfaceScale).toBe(interfaceScale);
+  },
+);
+
+it("applies the larger scale on acceptance, retaining hardware padding", async () => {
   const { store } = mount({ bigPicture: true });
   fireEvent.click(
     await screen.findByRole("button", { name: "Use couch settings" }),
@@ -110,11 +122,9 @@ it("applies only scale and Single tool on acceptance, retaining hardware padding
   expect(prompt()).toBeNull();
   expect(store.getState().settings).toMatchObject({
     interfaceScale: 1.5,
-    workspace: "single",
     screenEdgePadding: 4,
   });
   expect(localStorage.getItem("interfaceScale")).toBe("1.5");
-  expect(localStorage.getItem("workspace")).toBe("single");
   expect(screen.getByRole("button", { name: "Play" })).toHaveFocus();
 });
 
@@ -131,8 +141,7 @@ it.each(["dismiss", "restart"])(
     act(() => updateInputPresentation({ connected: true }));
     expect(prompt()).toBeNull();
     expect(restored.store.getState().settings).toMatchObject({
-      interfaceScale: 1.75,
-      workspace: "automatic",
+      interfaceScale: 1.25,
       screenEdgePadding: 4,
     });
   },

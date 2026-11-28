@@ -7,6 +7,7 @@ import {
   closeTileSurface,
   readTerritoryMapCamera,
   openMapProjectCatalogue,
+  openPane,
   returnToTerritoryMap,
   setMapProjectCapacity,
   showMapFacilityStatus,
@@ -15,7 +16,10 @@ import { reviewScreenshot } from "./review-screenshot";
 import { getBuildFacilityQuote } from "../src/data/Facilities";
 import gameReducer, { buildFacility } from "../src/reducers/Game";
 import { getTerritoryTile } from "../src/helpers/TerritoryTiles";
-import { HEX_HEIGHT } from "../src/components/base/TerritoryHexGeometry";
+import {
+  hexCenter,
+  HEX_HEIGHT,
+} from "../src/components/base/TerritoryHexGeometry";
 import { SceneBuilder } from "../src/components/base/territory-3d/SceneBuilder";
 import { getStructureModel } from "../src/components/base/territory-3d/StructureModels";
 import { territoryTileViews } from "../src/helpers/TerritoryMapState";
@@ -1344,12 +1348,12 @@ test("map windows move, resize, stack and remember their bounds", async ({
   const map = await startMap();
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const agreements = page.getByRole("region", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   const fleetAction = page.getByRole("button", { name: "Fleet", exact: true });
   const agreementsAction = page.getByRole("button", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   await fleetAction.click();
@@ -1436,7 +1440,7 @@ test("map windows move, resize, stack and remember their bounds", async ({
           ?.getAttribute("aria-label"),
       overlap,
     );
-  await expect.poll(atOverlap).toBe("Agreements");
+  await expect.poll(atOverlap).toBe("Trade");
   await reviewScreenshot(page.locator(".gameStage"), {
     path: info.outputPath("stacked-map-windows.png"),
     animations: "disabled",
@@ -1510,6 +1514,64 @@ test("map windows move, resize, stack and remember their bounds", async ({
     left: clamped.left,
     width: clamped.width - 32,
   });
+});
+
+test("View in a wildfire damage toast centers the struck map site", async ({
+  page,
+}) => {
+  await startPausedMap(page, "light");
+  const front = "champlain:site-9";
+  const struck = "champlain:site-8";
+  const target = await editSavedGame(page, ({ game }) => {
+    expect(game.facilities.some((facility) => facility.tileId === struck)).toBe(
+      true,
+    );
+    game.date = getDateFromMinute(
+      FIRE_SPREAD_MINUTES - TICK_MINUTES,
+      game.startingYear,
+    );
+    game.speed = "PAUSED";
+    game.territoryWeather = {
+      dryness: 0.81,
+      fires: [
+        {
+          startsMinute: 0,
+          tiles: [
+            { tileId: front, ignitesMinute: 0 },
+            { tileId: struck, ignitesMinute: FIRE_SPREAD_MINUTES },
+          ],
+        },
+      ],
+    };
+    return hexCenter(getTerritoryTile(struck, game)!);
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const map = page.getByRole("region", { name: "Territory map", exact: true });
+  await expect(map.locator("canvas")).toHaveAttribute("data-renderer", "ready");
+  const events = page.getByRole("region", { name: "Events", exact: true });
+  await openPane(events, page.locator("#eventsNav"));
+  const cameraBefore = await readTerritoryMapCamera(map);
+  expect(
+    Math.hypot(cameraBefore.x - target.x, cameraBefore.y - target.y),
+  ).toBeGreaterThan(1);
+  await page.getByRole("button", { name: "normal speed", exact: true }).click();
+
+  const toast = page
+    .locator(".snackbarContent")
+    .filter({ hasText: "Paused: Wildfire damage" });
+  await toast.getByRole("button", { name: "View", exact: true }).click();
+  await expect(events).toHaveCount(0);
+  await expect(map).toBeFocused();
+  await expect
+    .poll(async () => {
+      const { x, y } = await readTerritoryMapCamera(map);
+      return Math.hypot(x - target.x, y - target.y);
+    })
+    .toBeLessThan(1);
+  await expect(
+    map.locator(`[data-map-target="${struck}"]`),
+  ).toHaveAccessibleDescription(/Wildfire damage/);
 });
 
 test("shows an advancing wildfire and scar on the 3D map", async ({
@@ -1915,11 +1977,11 @@ test("tile inspection shares the desktop window stack", async ({
   const capital = map.locator('[data-map-target="champlain:city"]');
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
   const agreements = page.getByRole("region", {
-    name: "Agreements",
+    name: "Trade",
     exact: true,
   });
   await page.getByRole("button", { name: "Fleet", exact: true }).click();
-  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  await page.getByRole("button", { name: "Trade", exact: true }).click();
   const fleetBounds = await fleet.boundingBox();
   const agreementsBounds = await agreements.boundingBox();
 
@@ -2003,7 +2065,7 @@ test("tile inspection shares the desktop window stack", async ({
   await capital.click();
   await expect(inspector).toHaveAttribute("data-map-window-front", "true");
 
-  await page.getByRole("button", { name: "Agreements", exact: true }).click();
+  await page.getByRole("button", { name: "Trade", exact: true }).click();
   await expect(agreements).toHaveAttribute("data-map-window-front", "true");
   await page.keyboard.press("Escape");
   await expect(agreements).toHaveCount(0);

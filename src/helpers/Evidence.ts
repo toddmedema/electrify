@@ -1,5 +1,4 @@
 import type { AppThunk } from "../Store";
-import { getTutorialStep } from "../data/Scenarios";
 import type {
   CardNameType,
   EvidenceRequestType,
@@ -12,24 +11,19 @@ export function evidenceCard(
   target: EvidenceTargetType,
 ): CardNameType | undefined {
   if (target === "mission-details") return "SCENARIO";
-  if (target === "supply-demand" || target === "interties") return "FACILITIES";
+  if (target === "supply-demand" || target === "interties") return "FLEET";
   if (target === "finances") return "INSIGHTS";
-  return target.card === "FACILITIES" && target.view === "BUILD_GENERATORS"
-    ? "BUILD_GENERATORS"
-    : target.card;
+  if (target.card === "FACILITIES")
+    return target.view === "BUILD_GENERATORS" ? "BUILD_GENERATORS" : "FLEET";
+  return target.card;
 }
 
 /** Presentation only: deliberate controls retain their own existing game actions. */
 export const openEvidence =
   (target: EvidenceTargetType): AppThunk =>
   (dispatch, getState) => {
-    const { card, game } = getState();
-    const destination = evidenceCard(target);
-    // Fleet holds the evidence anchors; choose it before issuing the focus request.
-    const name =
-      destination === "FACILITIES" && !getTutorialStep(game)
-        ? "FLEET"
-        : destination;
+    const { card } = getState();
+    const name = evidenceCard(target);
     if (name && (name !== card.name || typeof target === "object")) {
       dispatch(
         navigate({

@@ -57,7 +57,6 @@ it("shares one build screen, defaults to generators and keeps tab changes out of
     "aria-selected",
     "true",
   );
-  expect(screen.getAllByRole("button", { name: "close" })).toHaveLength(1);
   expect(
     screen.getByRole("tabpanel", { name: "Generators" }),
   ).toHaveTextContent("Generator catalog");
@@ -70,8 +69,6 @@ it("shares one build screen, defaults to generators and keeps tab changes out of
   expect(screen.queryByRole("tab", { name: "Interties" })).toBeNull();
   expect(store.getState().card.history).toHaveLength(1);
   expect(window.history.length).toBe(browserHistoryLength);
-  fireEvent.click(screen.getByRole("button", { name: "close" }));
-  expect(store.getState().card.name).toBe("FACILITIES");
 });
 
 function swipe(target: Element, dx: number, dy = 0) {

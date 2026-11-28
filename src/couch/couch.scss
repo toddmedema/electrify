@@ -114,6 +114,10 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   gap: 16px;
   flex-wrap: wrap;
   padding: 8px 0;
+  .utilityLogoPicker {
+    display: flex;
+    margin: 8px 0;
+  }
 }
 .couchCompanyResult {
   padding: 16px;

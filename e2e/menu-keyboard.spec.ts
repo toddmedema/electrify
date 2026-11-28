@@ -228,11 +228,10 @@ test("screen-edge padding persists independently and reaches dialogs at every sc
     exact: true,
   });
   await expect(
-    page.getByRole("button", { name: "Automatic", exact: true }),
-  ).toBeVisible();
+    page.getByRole("group", { name: "Workspace", exact: true }),
+  ).toHaveCount(0);
   await expect(scale).toBeVisible();
   await expect(scale).toHaveValue("1");
-  await page.getByRole("button", { name: "Single tool", exact: true }).click();
   await scale.selectOption("1.5");
   await expect(frame).toHaveCSS("padding-left", `${margin}px`);
   await page
@@ -402,7 +401,7 @@ test("global shortcuts keep shifted fleet actions and manual typing separate", a
   await expect(search).toHaveValue("q?123");
   await search.press("Escape");
   await expect(search).toHaveCount(0);
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(page.locator("#facilitiesPane")).toBeVisible();
   await expect(paused).toHaveAttribute("aria-pressed", "true");
 });
 

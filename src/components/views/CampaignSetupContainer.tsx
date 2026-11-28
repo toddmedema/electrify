@@ -11,6 +11,7 @@ import { delta as uiDelta } from "../../reducers/UI";
 import { runSaveTransition } from "../../SaveSession";
 import CampaignSetup from "./CampaignSetup";
 import { getHistoryApi } from "../../Globals";
+import { randomUtilityLogo } from "../../helpers/UtilityLogoAssignment";
 import { scenarioListUrl } from "../../ScenarioUrl";
 
 export default function CampaignSetupContainer(): React.JSX.Element {
@@ -47,7 +48,7 @@ export default function CampaignSetupContainer(): React.JSX.Element {
               dispatch(navigate("FACILITIES"));
             }
       }
-      onStart={() => {
+      onStart={(utilityLogo) => {
         void runSaveTransition(() => {
           getHistoryApi().replaceState(null, "", scenarioListUrl());
           startLegacyCampaign(
@@ -56,6 +57,7 @@ export default function CampaignSetupContainer(): React.JSX.Element {
               difficulty,
               unlockedDifficulty(achievementJournal.getSnapshot().progress),
             ),
+            utilityLogo ?? randomUtilityLogo(),
           );
         });
       }}

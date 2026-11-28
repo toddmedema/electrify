@@ -1281,8 +1281,7 @@ $topbar_height: 56px;
   }
 }
 
-// Short windows and large text must scroll the operating header with the body instead of
-// squeezing the charts and controls beneath a growing fixed status stack.
+// Short Settings and Manual pages scroll the entire column.
 @media (max-width: $tablet_width) and (max-height: 600px) {
   #gameCard {
     overflow-y: auto;
@@ -1290,15 +1289,7 @@ $topbar_height: 56px;
   }
   #gameCard .scrollable {
     overflow: visible;
-    // Size to content rather than the card's height. A sticky header can only pin within its
-    // parent's content box, and with the list at 100% height that box is shorter than its
-    // overflowing content - the header would release as soon as the list's box scrolled past
-    // the top of #gameCard
     height: auto;
-  }
-  #gameCard #navfooter {
-    position: sticky;
-    bottom: 0;
   }
 }
 
@@ -1551,26 +1542,6 @@ $pane_header_height: 48px;
   border-bottom: $border_accent;
 }
 
-.facilities .paneHeader {
-  gap: 8px;
-
-  // Shared control size, with 4px of breathing room inside the pane header.
-  .button-buildFacility {
-    margin-left: auto;
-    height: var(--control-size);
-    min-height: var(--control-size);
-    padding: 4px 12px;
-
-    .MuiButton-startIcon {
-      margin-right: 8px;
-    }
-
-    .MuiButton-startIcon > svg {
-      font-size: 1em;
-    }
-  }
-}
-
 .transmissionPanel {
   display: flex;
   flex-direction: column;
@@ -1760,13 +1731,6 @@ $pane_header_height: 48px;
   flex-direction: column;
   gap: 8px;
   padding: 0 16px 8px;
-}
-
-// Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
-@media (pointer: coarse) {
-  .facilities .paneHeader .button-buildFacility {
-    height: 44px;
-  }
 }
 
 // A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --
@@ -2713,6 +2677,7 @@ $pane_header_height: 48px;
 
 // A lifted row is opaque, so its text never collides with the row it passes over.
 .facilityRow.dragging,
+.fleetAgreementRow.dragging,
 .transmissionLine.dragging {
   outline: 1px solid var(--interactive-blue);
   outline-offset: -1px;
@@ -3762,16 +3727,6 @@ $pane_header_height: 48px;
 
     & > div {
       flex: 0 1 auto;
-    }
-
-    // The app bar and bottom nav are fixed chrome, not scrollable content -- only .scrollable
-    // (the pane's own body) should give up height when a pane overflows the card. Without this,
-    // a tall pane (e.g. Finances' expandable table) lets the flexbox shrink algorithm eat into
-    // BottomNavigation's automatic minimum size instead, which undercuts its real 56px height
-    // and left the nav a different height depending which pane happened to overflow.
-    & > #appbar,
-    & > #navfooter {
-      flex-shrink: 0;
     }
   }
 
@@ -5988,6 +5943,9 @@ $homeSmokeCycle: 5.6s;
   font-weight: 400;
   color: var(--font-color-faded);
 }
+.facilities .fleetAgreementsHeading {
+  flex-wrap: wrap;
+}
 .facilityRowHeader {
   position: relative;
   display: flex;
@@ -6048,6 +6006,26 @@ $homeSmokeCycle: 5.6s;
 // The combined grip and icon target already spaces the row from the edge.
 .base_main .facilityDragHandle + .facilityDisclosure .facility {
   padding-left: 8px;
+}
+.base_main .facilityDisclosure.fleetAgreementDragHandle {
+  cursor: grab;
+  touch-action: pan-y;
+
+  .facility {
+    padding-left: 4px;
+  }
+  .fleetAgreementGrip {
+    flex-shrink: 0;
+    width: 16px;
+    height: 20px;
+    color: var(--font-color-faded);
+  }
+  .transmissionListIcon {
+    flex-shrink: 0;
+  }
+}
+.fleetAgreementRow.dragging .fleetAgreementDragHandle {
+  cursor: grabbing;
 }
 .facilityRowIcon.MuiListItemAvatar-root {
   min-width: 3rem;
@@ -6165,6 +6143,7 @@ $homeSmokeCycle: 5.6s;
   }
 }
 .base_main .facilityRow,
+.base_main .fleetAgreementRow,
 .base_main .transmissionLine {
   container: facility-row / inline-size;
 }
@@ -9298,4 +9277,66 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   text-align: center;
   color: var(--font-color-secondary);
   z-index: 2100;
+}
+
+.utilityLogoPicker {
+  width: 100%;
+  max-width: 16rem;
+  .MuiSelect-select {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+    box-sizing: content-box;
+  }
+}
+
+.scenarioStartControls .utilityLogoPicker {
+  justify-self: center;
+  max-width: 320px;
+}
+
+.utilityLogoChoice {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.utilityLogoIcon {
+  display: block;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+}
+
+.utilityLogoIcon.transmissionListIcon {
+  width: 40px;
+  height: 40px;
+}
+
+.utilityLogoPicker .utilityLogoIcon,
+.utilityLogoOption .utilityLogoIcon {
+  width: 40px;
+  height: 40px;
+}
+
+.utilityLogoTaken {
+  min-width: 0;
+  margin-inline-start: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tradeUtilityName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (pointer: coarse) {
+  .utilityLogoPicker .utilityLogoIcon,
+  .utilityLogoOption .utilityLogoIcon {
+    width: 44px;
+    height: 44px;
+  }
 }

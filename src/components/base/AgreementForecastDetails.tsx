@@ -29,7 +29,7 @@ export default function AgreementForecastDetails({
       ? "Shared supply depends on other companies"
       : forecast.blocked === "buying"
         ? "Turn on market buying to compare"
-        : "Compared with omitting this agreement";
+        : "Compared with omitting this trade";
   const { withAgreement, withoutAgreement } = forecast.result ?? {};
   const demandServed =
     withAgreement &&
@@ -78,14 +78,14 @@ export default function AgreementForecastDetails({
           demandServed ? (
             <span
               className="powerAgreementGridImpact"
-              title="Demand served without → with agreement"
+              title="Demand served without → with trade"
             >
               <span aria-hidden="true">
                 {demandServed.without.slice(0, -1)} → {demandServed.with}
               </span>
               <span className="srOnly">
-                Demand served: {demandServed.without} without agreement,{" "}
-                {demandServed.with} with agreement
+                Demand served: {demandServed.without} without trade,{" "}
+                {demandServed.with} with trade
               </span>
             </span>
           ) : (
@@ -122,7 +122,7 @@ export function RecordedAgreementHistory({
   );
   return (
     <>
-      <BuildDetails label="Recorded agreement history">
+      <BuildDetails label="Recorded trade history">
         <BuildDetailRow
           label={`Recorded since ${agreementDate(account.accountingStartMinute)}`}
           value={`${formatNumber(totals.usefulMWh, { maximumFractionDigits: 0 })} MWh used · ${formatMoneyConcise(totals.payment)} paid`}

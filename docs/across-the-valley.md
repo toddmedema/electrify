@@ -35,7 +35,7 @@ icon toggles repeated connections with visible prices along owned borders.
 connected and unconnected sites. Inspection spends nothing. The selected site
 shows connection and project costs, expected output and commissioning date; only
 explicit confirmation connects the site and starts construction.
-The map stays visible while Fleet, Agreements and the other dock icons open one
+The map stays visible while Fleet, Trade and the other dock icons open one
 inspection or tool panel; selecting the active icon closes that panel. There is no
 separate Map button. Acquiring land
 or connecting to a utility reveals up to three hexes farther into the fixed
@@ -223,8 +223,11 @@ Use **Acquire** from any competitor's tile to review price, customer transfer,
 sites, and expected supply margin. Municipal offers include the plant being
 removed and the cost of each site. Regional offers include financing, operating
 plants, and dated power contracts. Confirmation requires a shared border, an up-to-date
-quote, and enough cash. Agreements display forecasted cash impact against
+quote, and enough cash. Trade shows the forecasted cash impact against
 omitting the agreement rather than assuming unlimited substitute purchases.
+
+Drag a supply trade higher in **Fleet** to give it first access to shared capacity.
+That order applies across inherited and newly signed trades.
 
 Scenario's Supply plan shares the existing tariff-sensitive projection. It shows
 the next year's customer count and peak demand, the first projected month below

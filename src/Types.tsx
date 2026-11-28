@@ -179,11 +179,18 @@ export interface AcceptPowerAgreementAction {
   durationYears?: number;
 }
 
+export interface ReprioritizePowerAgreementAction {
+  id: string;
+  targetId: string;
+  place: "before" | "after";
+}
+
 export interface TransmissionStateType {
   buyingRule: BuyingRuleType;
   sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
   acceptedAgreements?: PowerAgreementReceipt[];
+  agreementDispatchOrder?: string[];
   inheritedAgreementTerms?: PowerAgreementTermsVersion;
   agreementAccounts?: PowerAgreementAccount[];
 }
@@ -448,6 +455,8 @@ export interface RawWeatherType {
 // All amounts are the average across the time window
 export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
+    /** Physical imports by contract, including when the current frame is reforecast. */
+    agreementImportedW?: Record<string, number>;
     /** Interval settlements, separate from physical imports. */
     agreementAvailableMWh?: Record<string, number>;
     agreementUsefulMWh?: Record<string, number>;
@@ -821,10 +830,14 @@ interface SharedShoppingType {
 }
 
 export type GameToolType =
-  "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
+  | Exclude<MapWorkspaceView, "FACILITIES">
+  | "BUILD_GENERATORS"
+  | "EVENTS"
+  | "PROGRAMS"
+  | "INSIGHTS"
+  | "SCENARIO";
 
-export type TutorialActionType =
-  GameToolType | Exclude<MapWorkspaceView, "FACILITIES">;
+export type TutorialActionType = GameToolType;
 
 export interface TutorialStepType {
   // Introduced here and retained through this and every later mission in authored order.
@@ -1556,6 +1569,8 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
+  /** Selected company mark. An absent selection is resolved from the game's seed. */
+  utilityLogo?: import("./data/UtilityLogos").UtilityLogoId;
   territoryWeather?: import("./helpers/TerritoryWildfire").TerritoryWeatherState;
   territoryNetwork?: {
     version: 3;
@@ -1591,6 +1606,8 @@ export interface GameType {
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    /** Resolved marks for the shared roster. Published for rendering. */
+    utilityLogos?: import("./data/UtilityLogos").UtilityLogoClaims;
     territorial?: import("./helpers/MultiplayerTerritory").TerritorialState;
     /** Shared finite land claim, projected by the host from all company receipts. */
     landOwner?: { seat: string; name: string };
@@ -1779,7 +1796,6 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
-export type WorkspaceType = "automatic" | "single";
 export type ScreenEdgePaddingType = 0 | 2 | 4;
 
 export interface SettingsType {
@@ -1794,8 +1810,6 @@ export interface SettingsType {
   theme: ThemeChoiceType;
   // Explicit device multiplier; absent in older fixtures means 100%.
   interfaceScale?: number;
-  // Device workspace preference; Automatic adapts to the space remaining at this scale.
-  workspace?: WorkspaceType;
   // Percent of the shorter screen edge, shared by the app frame and overlays.
   screenEdgePadding?: ScreenEdgePaddingType;
 }
@@ -1967,6 +1981,10 @@ export interface VictoryDebriefType {
 /** Choosing a co-op game together: who drives the selection screens, and who is Ready. */
 export interface CoopSelectionType {
   role: "host" | "guest";
+  selfId?: string;
+  utilityLogos?: import("./data/UtilityLogos").UtilityLogoClaims;
+  utilityLogoError?: string;
+  utilityLogoPending?: boolean;
   hostName: string;
   /** Everyone in the lobby, with Ready meaning ready for the selection on screen now. */
   players: {
@@ -1995,6 +2013,12 @@ export interface CoopSelectionType {
   /** Host only: this computer has multiplayer saves to load instead. */
   hasSaves?: boolean;
 }
+/** One request to center the map on a tile, its affected fleet, or the home grid. */
+export interface MapFocusTarget {
+  tileId?: TerritoryTileId;
+  facilityIds?: number[];
+}
+
 export interface UIType {
   feedback?: import("./Feedback").FeedbackContext;
   /** Set while this player chooses a co-op game together with their lobby. */
@@ -2007,6 +2031,7 @@ export interface UIType {
   // The Insights date range outlives the pane, which unmounts when a narrow layout switches cards.
   insightsViewport?: { viewport: [number, number]; month: number };
   evidenceRequest?: EvidenceRequestType;
+  mapFocus?: MapFocusTarget;
   evidenceSequence?: number;
   evidenceRunId?: number;
   manualHelpEntry?: string;

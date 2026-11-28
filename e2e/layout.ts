@@ -335,8 +335,8 @@ export async function setMapProjectCapacity(
 }
 
 /**
- * Open the Build tool from the dock, leaving it open when it already is: the dock button
- * toggles, so a second click would close it. Returns the Build region.
+ * Open the Build catalogue from the map rail or compact dock.
+ * Bring an already open floating catalogue to the front.
  */
 export async function openBuild(page: Page): Promise<Locator> {
   const build = page.getByRole("region", { name: "Build", exact: true });
@@ -344,23 +344,24 @@ export async function openBuild(page: Page): Promise<Locator> {
   // A purchase dialog temporarily hides the workspace from the accessibility tree.
   // Wait for it to return before deciding whether the dock would open or close Build.
   await waitForPaneOrNav(build, navButton);
-  if (!(await build.isVisible())) await navButton.click();
+  if (
+    !(await build.isVisible()) ||
+    (await build.getAttribute("data-map-window-front")) === "false"
+  )
+    await navButton.click();
   await expect(build).toBeVisible();
   return build;
 }
 
 /** Select Fleet when the game opens on its map, then bring the fleet into view. */
 export async function openFleet(page: Page): Promise<Locator> {
-  const fleet = page.locator("#facilitiesPane");
+  const fleet = page.locator("#facilitiesPane:not([inert] *)");
   const action = page.getByRole("button", { name: "Fleet", exact: true });
-  await expect(fleet.or(action).first()).toBeAttached();
-  if (!(await fleet.isVisible()) && (await action.isVisible())) {
+  await openPane(fleet, action);
+  if (
+    await page.locator('#tool-FLEET[data-map-window-front="false"]').isVisible()
+  )
     await action.click();
-    await expect(fleet).toBeAttached();
-  }
-  if (await page.locator('[data-persistent-map="true"]').count())
-    await expect(fleet).toBeVisible();
-  else await openPane(fleet, action);
   return fleet;
 }
 
@@ -372,29 +373,6 @@ export async function openPane(
   pane: Locator,
   navButton: Locator,
 ): Promise<boolean> {
-  // Fleet remains mounted for state/scroll memory, but Single tool hides it entirely.
-  if (
-    (await pane.count()) > 0 &&
-    (await pane
-      .first()
-      .evaluate((element) => element.classList.contains("facilities")))
-  ) {
-    const closes = pane
-      .page()
-      .locator(".gameToolHeader button[aria-label^='Close ']")
-      .filter({ visible: true });
-    const changed = (await closes.count()) > 0;
-    while ((await closes.count()) > 0) {
-      const front = closes.and(
-        pane
-          .page()
-          .locator('[data-map-window-front="true"] > .gameToolHeader button'),
-      );
-      await ((await front.count()) ? front : closes.first()).click();
-    }
-    await expect(pane.first()).toBeVisible();
-    return changed;
-  }
   await waitForPaneOrNav(pane, navButton);
   const visiblePane = pane.filter({ visible: true });
   if ((await visiblePane.count()) > 0) return false;
@@ -461,21 +439,48 @@ export async function sortBuildCatalog(
 
 /** Move the generator ahead of storage using the same grip and drag sensors as a player. */
 export async function dragCoalAbovePumpedHydro(page: Page) {
-  const handle = page.getByRole("button", {
-    name: "Reorder Coal",
-    exact: true,
-  });
-  const row = page.locator('.facilityRow[data-facility="Coal"]');
-  await handle.scrollIntoViewIfNeeded();
-  await handle.click({ trial: true });
+  await dragFleetRowAbove(
+    page,
+    page.locator('.facilityRow[data-facility="Coal"]'),
+    page.getByRole("button", { name: "Reorder Coal", exact: true }),
+    page
+      .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
+      .first(),
+  );
+}
+
+export async function dragFleetRowAbove(
+  page: Page,
+  row: Locator,
+  handle: Locator,
+  target: Locator,
+  dropOffsetY = 0,
+) {
+  // Centering the source in a short pane can scroll the target under its header.
+  await handle.evaluate((element) =>
+    element.scrollIntoView({ block: "nearest", behavior: "instant" }),
+  );
+  await expect(handle).toBeInViewport({ ratio: 0.6 });
+  await expect(target).toBeInViewport({ ratio: 0.6 });
+  // A purchase notification can cover a visible handle until it dismisses.
+  // Check the hit target without moving either drag endpoint.
+  await expect
+    .poll(
+      () =>
+        handle.evaluate((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return element.contains(
+            document.elementFromPoint(x + width / 2, y + height / 2),
+          );
+        }),
+      { timeout: 12_000 },
+    )
+    .toBe(true);
   const from = (await handle.boundingBox())!;
-  const to = (await page
-    .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
-    .first()
-    .boundingBox())!;
+  const to = (await target.boundingBox())!;
   const x = from.x + from.width / 2;
   const y = from.y + from.height / 2;
-  const destination = to.y + to.height / 2;
+  const destination = to.y + to.height / 2 + dropOffsetY;
   if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
     const session = await page.context().newCDPSession(page);
     await session.send("Input.dispatchTouchEvent", {

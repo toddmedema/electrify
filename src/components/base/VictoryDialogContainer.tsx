@@ -1,5 +1,5 @@
 import { connect } from "react-redux";
-import type { AppDispatch } from "../../Store";
+import { store, type AppDispatch } from "../../Store";
 import { delta, quit, start, startLegacyCampaign } from "../../reducers/Game";
 import { runSaveTransition } from "../../SaveSession";
 import { feedbackOpen, snackbarOpen, victoryClose } from "../../reducers/UI";
@@ -29,14 +29,20 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       });
     },
     onRetry: (victory: VictoryType) => {
+      const { utilityLogo } = store.getState().game;
       void runSaveTransition(() => {
         dispatch(victoryClose());
         if (isLegacyCampaignScenario(victory.scenarioId)) {
-          startLegacyCampaign(dispatch, victory.difficulty);
+          startLegacyCampaign(dispatch, victory.difficulty, utilityLogo);
           return;
         }
         dispatch(quit());
-        dispatch(delta({ difficulty: victory.difficulty }));
+        dispatch(
+          delta({
+            difficulty: victory.difficulty,
+            ...(utilityLogo && { utilityLogo }),
+          }),
+        );
         dispatch(start(victory.scenarioId));
       });
     },

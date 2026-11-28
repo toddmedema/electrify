@@ -66,6 +66,12 @@ import {
 } from "../helpers/TerritoryWildfire";
 import { publicRateCap } from "../helpers/Customers";
 import { storyHash } from "../data/WorldEvents";
+import {
+  isRetiredUtilityLogo,
+  validUtilityLogoRoster,
+  type UtilityLogoClaims,
+} from "../data/UtilityLogos";
+import { assignUtilityLogos } from "../helpers/UtilityLogoAssignment";
 import manifest from "../data/RunCompatibility.json";
 import publishedOnlineRules from "./PublishedOnlineRules.json";
 import { selectWeatherLocation } from "../data/Weather";
@@ -317,6 +323,9 @@ export function createWorld(
     new Set(seats.map((s) => s.id)).size !== seats.length
   )
     throw new Error("A shared game needs two to four players");
+  if (!validUtilityLogoRoster(seats))
+    throw new Error("Each company needs a different logo");
+  seats = seats.map((seat) => ({ ...seat }));
   // A running match owns its selection; later library edits cannot replace its snapshot.
   spec = cloneDeep(spec);
   const { scenario, location } = matchScenario(spec);
@@ -1076,14 +1085,19 @@ function companyResults(world: World): CompanyResultType[] {
   });
 }
 
-/** Share physical ownership only within a synchronous publication. */
+/** Share derivations only within a synchronous publication. */
 export function roomViewBuilder(world: World) {
   let ownership: ReturnType<typeof worldTerritoryOwnership> | undefined;
+  let utilityLogos: UtilityLogoClaims | undefined;
   return (seatId: string): RoomView =>
     buildRoomView(
       world,
       seatId,
       (ownership ??= worldTerritoryOwnership(world)),
+      (utilityLogos ??= assignUtilityLogos(
+        storyHash(world.matchId),
+        world.seats,
+      )),
     );
 }
 
@@ -1115,6 +1129,7 @@ function buildRoomView(
   world: World,
   seatId: string,
   ownership: ReturnType<typeof worldTerritoryOwnership>,
+  utilityLogos: UtilityLogoClaims,
 ): RoomView {
   const index = world.seats.findIndex((s) => s.id === seatId);
   if (index < 0) throw new Error("Player is not in this match");
@@ -1152,6 +1167,7 @@ function buildRoomView(
   }
   game.multiplayer = {
     ...game.multiplayer!,
+    utilityLogos,
     // Compute sight with complete host footprints, then publish only discovered cells.
     legacyTiles: game.multiplayer!.legacyTiles?.filter(({ tile }) =>
       visibleCells.has(`${tile.q},${tile.r}`),
@@ -1314,7 +1330,8 @@ function validRoster(world: World) {
     !world.seats.every(
       (s) => !!s && typeof s.id === "string" && typeof s.name === "string",
     ) ||
-    new Set(world.seats.map((s) => s.id)).size !== world.seats.length
+    new Set(world.seats.map((s) => s.id)).size !== world.seats.length ||
+    !validUtilityLogoRoster(world.seats)
   )
     return false;
   try {
@@ -1498,6 +1515,7 @@ function validGrid(
               sellingRule: g.transmission!.sellingRule,
               lines: nativeLines,
               acceptedAgreements: g.transmission!.acceptedAgreements,
+              agreementDispatchOrder: g.transmission!.agreementDispatchOrder,
               inheritedAgreementTerms: g.transmission!.inheritedAgreementTerms,
               agreementAccounts: g.transmission!.agreementAccounts,
             }
@@ -1670,7 +1688,10 @@ function reassignSeats(world: World, seats: Seat[]) {
   const id = (old: string) => ids.get(old) ?? old;
   const rekey = <T>(record: Record<string, T>) =>
     Object.fromEntries(Object.entries(record).map(([k, v]) => [id(k), v]));
-  world.seats = seats.map((seat) => ({ ...seat }));
+  world.seats = seats.map(({ id, name }, index) => {
+    const { utilityLogo } = world.seats[index];
+    return { id, name, ...(utilityLogo && { utilityLogo }) };
+  });
   world.outcomes = rekey(world.outcomes);
   world.selectedSpeeds = rekey(world.selectedSpeeds);
   world.activities = rekey(world.activities);
@@ -2157,6 +2178,12 @@ function upgradeTerritoryWorld(value: unknown): unknown {
   )
     return value;
   const result = cloneDeep(old) as World;
+  if (old.gameSchema === 30 && Array.isArray(result.seats)) {
+    for (const seat of result.seats) {
+      if (seat && isRetiredUtilityLogo(seat.utilityLogo))
+        delete seat.utilityLogo;
+    }
+  }
   const publishedValleyRules =
     old.rules === SCHEMA_22_MASTER_RULES || old.rules === SCHEMA_23_MAP_RULES
       ? "published-master"

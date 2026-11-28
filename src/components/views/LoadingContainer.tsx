@@ -156,7 +156,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         // price checks before opening the save or allowing the first elapsed tick.
         if (resumed && !validPowerAgreements(game))
           throw new Error(
-            "This save's power agreement history does not match its terms. Your saved progress has been preserved.",
+            "This save's trade history does not match its terms. Your saved progress has been preserved.",
           );
         if (resumed && !validTerritoryPurchasePrices(game))
           throw new Error(

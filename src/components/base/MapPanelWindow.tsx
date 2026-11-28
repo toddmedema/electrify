@@ -296,7 +296,6 @@ export default function MapPanelWindow({
       aria-label={project ? undefined : label}
       aria-labelledby={project ? titleId : undefined}
       data-game-tool={tool}
-      data-tool-side={floating ? undefined : "right"}
       data-map-window-front={project ? undefined : front}
       style={
         rect && {

@@ -711,7 +711,7 @@ export function ProgramsScreen({
   const bodyRef = useToolScroll<HTMLDivElement>(
     `programs.scroll.${selected ?? "list"}`,
   );
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     onBackChange?.(() => (selected ? () => setSelected(undefined) : undefined));
     return () => onBackChange?.(undefined);
   }, [onBackChange, selected, setSelected]);

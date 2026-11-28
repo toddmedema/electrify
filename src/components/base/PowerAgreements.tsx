@@ -31,6 +31,8 @@ import AgreementForecastDetails, {
 import { useAgreementForecast } from "./useAgreementForecast";
 import DecisionDialog from "./DecisionDialog";
 import ConceptIcon from "./ConceptIcon";
+import UtilityLogoIcon from "./UtilityLogoIcon";
+import { gameUtilityBranding } from "../../helpers/UtilityBranding";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
 
@@ -46,7 +48,7 @@ export function agreementSummary(game: GameType, corridorId: string) {
     (block) =>
       block.utilityId === utility && powerAgreementQuote(game, block.id),
   );
-  return `${formatWatts(coverage)} under agreement${replacement ? " · Replacement available" : ""}`;
+  return `${formatWatts(coverage)} committed${replacement ? " · Replacement available" : ""}`;
 }
 const monthlyEnergy = (value: number) =>
   `${formatNumber(value, { maximumFractionDigits: 0 })} MWh/month`;
@@ -93,7 +95,7 @@ function AgreementMetrics({
   children?: React.ReactNode;
 }) {
   return (
-    <BuildDetails label="Agreement summary">
+    <BuildDetails label="Trade summary">
       <BuildDetailRow label="Max supply" value={formatWatts(capacityW)} />
       <BuildDetailRow label="Price" value={price} />
       <BuildDetailRow label="Final month" value={finalMonth(endMinute)} />
@@ -166,6 +168,7 @@ export default function PowerAgreements({
   const [acceptanceError, setAcceptanceError] = React.useState<string>();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
+  const branding = gameUtilityBranding(game);
   const replacement =
     review &&
     sources.some(
@@ -227,7 +230,7 @@ export default function PowerAgreements({
       component="section"
       ref={portfolio}
       tabIndex={-1}
-      aria-label="Power purchase agreements"
+      aria-label="Supply trades"
       className="powerAgreements"
     >
       {sources.map((source) => {
@@ -257,7 +260,10 @@ export default function PowerAgreements({
             className="powerAgreement"
           >
             <header className="powerAgreementHeader">
-              <h4>{source.name}</h4>
+              <h4 className="tradeUtilityName">
+                <UtilityLogoIcon logo={branding.forTrade(source.id)} />
+                {source.name}
+              </h4>
               <span className="powerAgreementStatus">
                 {expired
                   ? `Expired ${agreementDate(source.endMinute)}`
@@ -325,7 +331,7 @@ export default function PowerAgreements({
                   aria-label={`${source.name} details`}
                 >
                   <summary>Details</summary>
-                  <BuildDetails label="Agreement details">
+                  <BuildDetails label="Trade details">
                     <BuildDetailRow
                       label="First month"
                       value={agreementDate(source.startMinute).replace(
@@ -362,7 +368,7 @@ export default function PowerAgreements({
                         );
                         return (
                           <BuildDetailRow
-                            label="Contract energy used"
+                            label="Energy used"
                             value={
                               <div className="powerAgreementUsage">
                                 <DetailValue
@@ -375,7 +381,7 @@ export default function PowerAgreements({
                                 />
                                 {available > 0 && (
                                   <meter
-                                    aria-label="Share of available contracted energy used"
+                                    aria-label="Share of available energy used"
                                     value={useful}
                                     max={available}
                                   />
@@ -420,7 +426,10 @@ export default function PowerAgreements({
               className="powerAgreement powerAgreementOffer"
             >
               <header className="powerAgreementHeader">
-                <h4>{quote.name}</h4>
+                <h4 className="tradeUtilityName">
+                  <UtilityLogoIcon logo={branding.forTrade(quote.id)} />
+                  {quote.name}
+                </h4>
                 <span className="powerAgreementStatus">Offer</span>
               </header>
               <AgreementMetrics
@@ -436,7 +445,7 @@ export default function PowerAgreements({
               <Button
                 variant="outlined"
                 startIcon={<ConceptIcon concept="buy" decorative />}
-                aria-label={`Review ${quote.name} agreement`}
+                aria-label={`Review ${quote.name} trade`}
                 onClick={(event) => {
                   restore.current = event.currentTarget;
                   setForecastCommitted(true);
@@ -458,8 +467,8 @@ export default function PowerAgreements({
         closeDisabled={accepting}
         title={
           review
-            ? `Review ${review.name} ${replacement ? "replacement" : "agreement"}`
-            : `${recordedAgreement?.name ?? "Agreement"} recorded history`
+            ? `Review ${review.name} ${replacement ? "replacement" : "trade"}`
+            : `${recordedAgreement?.name ?? "Trade"} recorded history`
         }
         onClose={close}
         disableRestoreFocus
@@ -484,7 +493,7 @@ export default function PowerAgreements({
                   if (fresh?.quoteKey !== review.quoteKey) {
                     if (fresh) setReview(fresh);
                     setAcceptanceError(
-                      "Agreement terms changed; review the updated terms.",
+                      "Trade terms changed. Review the updated offer.",
                     );
                     return;
                   }
@@ -517,7 +526,7 @@ export default function PowerAgreements({
                     );
                     if (!receipt)
                       throw new Error(
-                        "Agreement terms changed; review the updated terms.",
+                        "Trade terms changed. Review the updated offer.",
                       );
                     restore.current =
                       document.getElementById(
@@ -526,7 +535,7 @@ export default function PowerAgreements({
                     close();
                     dispatch(
                       snackbarOpen(
-                        `Agreement accepted; delivery starts ${agreementDate(receipt.startMinute)}`,
+                        `Trade accepted. Delivery starts ${agreementDate(receipt.startMinute)}`,
                       ),
                     );
                   } catch (error) {
@@ -542,14 +551,14 @@ export default function PowerAgreements({
                     setAcceptanceError(
                       error instanceof Error
                         ? error.message
-                        : "Agreement could not be accepted. Try again.",
+                        : "Could not accept the trade. Try again.",
                     );
                   } finally {
                     setAccepting(false);
                   }
                 }}
               >
-                Accept agreement
+                Accept trade
               </Button>
             )}
           </>
@@ -592,13 +601,11 @@ export default function PowerAgreements({
               <Box className="powerAgreementTerms">
                 <BuildDetails
                   label={
-                    replacement
-                      ? "Replacement agreement terms"
-                      : "Agreement terms"
+                    replacement ? "Replacement trade terms" : "Trade terms"
                   }
                 >
                   <BuildDetailRow
-                    label="Agreement price"
+                    label="Trade price"
                     value={
                       <DetailValue
                         value={rate(review.priceToday)}

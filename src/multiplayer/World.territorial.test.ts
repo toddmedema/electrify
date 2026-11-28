@@ -91,6 +91,7 @@ test("loads the published territorial board and routes rivers only for new match
     );
     // Exact match recorded on the deployed master d6745546.
     const old = save(v1);
+    old.gameSchema = 28;
     old.rules =
       "coop-2-2042c23bfc633ac2af2ed66e310f561043f220bd925052f9167d9ef9b7d9db0a";
     expect(old.grids[3].multiplayer?.territorial?.startingTileIds).toEqual([

@@ -1,11 +1,18 @@
 import type { AppStore } from "./Store";
-import type { GameEventImportanceType, GameEventType, GameType } from "./Types";
+import type {
+  GameEventImportanceType,
+  GameEventType,
+  GameType,
+  MapFocusTarget,
+} from "./Types";
+import { storyOutputMultiplier } from "./helpers/Story";
 import { navigate } from "./reducers/Card";
-import { snackbarClose, snackbarOpen } from "./reducers/UI";
+import { setMapFocus, snackbarClose, snackbarOpen } from "./reducers/UI";
 
 export interface EventToastType {
   message: string;
   paused: boolean;
+  mapFocus?: MapFocusTarget;
 }
 
 const IMPORTANCE_RANK: Record<GameEventImportanceType | "NONE", number> = {
@@ -17,6 +24,64 @@ const IMPORTANCE_RANK: Record<GameEventImportanceType | "NONE", number> = {
 
 function rank(event: GameEventType): number {
   return IMPORTANCE_RANK[event.importance || "NONE"];
+}
+
+const WEATHER_ARCS = new Set([
+  "delhi-summer",
+  "heatwave-drought",
+  "hurricane-2008",
+  "kariba-drought",
+  "texas-deep-freeze",
+  "wildfire-intertie",
+]);
+
+/** Reuse the simulation's resolved strikes, derates and fire origin. */
+function weatherMapFocus(
+  event: GameEventType,
+  previousMinute: number,
+  game: GameType,
+): MapFocusTarget | undefined {
+  if (event.kind !== "WORLD_EVENT") return undefined;
+  const key = event.storyPhaseKey;
+  if (!key) {
+    if (event.concept !== "severeWeather") return undefined;
+    const origin = game.territoryWeather?.fires.findLast(
+      ({ startsMinute }) =>
+        startsMinute > previousMinute && startsMinute <= game.date.minute,
+    )?.tiles[0];
+    return origin ? { tileId: origin.tileId } : {};
+  }
+
+  const occurrences = game.worldEvents.occurrences.filter(
+    (occurrence) =>
+      occurrence.key === key || occurrence.attributes.eventKey === key,
+  );
+  const weather =
+    event.concept === "severeWeather" ||
+    event.concept === "weather" ||
+    occurrences.some(({ attributes, definitionId, effects }) => {
+      const [arc, phase] = definitionId.split(":");
+      return (
+        attributes.hazard !== undefined ||
+        effects.temperatureOffsetC !== undefined ||
+        effects.hydroRunoffMultiplier !== undefined ||
+        WEATHER_ARCS.has(arc) ||
+        (arc === "shale-boom" && phase?.startsWith("freeze")) ||
+        (!!game.campaign && arc === "bootleg-fire")
+      );
+    });
+  if (!weather) return undefined;
+
+  const facilityIds = game.facilities
+    .filter((facility) =>
+      occurrences.some(
+        ({ startsMinute, effects }) =>
+          (facility.minuteCreated ?? 0) <= startsMinute &&
+          storyOutputMultiplier(facility, effects, startsMinute) !== 1,
+      ),
+    )
+    .map(({ id }) => id);
+  return facilityIds.length ? { facilityIds } : {};
 }
 
 // A stopped clock with nothing on screen to say why reads as the game freezing
@@ -60,9 +125,11 @@ export function eventToastForUpdate(
   const lead = [...candidates].sort((a, b) => rank(a) - rank(b))[0];
   const more = candidates.length - 1;
   const text = lead.title || lead.message;
+  const mapFocus = weatherMapFocus(lead, previous.date.minute, current);
   return {
     message: `${paused ? "Paused: " : ""}${text}${more > 0 ? ` (+${more} more)` : ""}`,
     paused,
+    ...(mapFocus && { mapFocus }),
   };
 }
 
@@ -86,7 +153,12 @@ export function startEventToasts(store: AppStore): () => void {
         actionLabel: "View",
         action: () => {
           store.dispatch(snackbarClose());
-          store.dispatch(navigate("EVENTS"));
+          if (!toast.mapFocus) {
+            store.dispatch(navigate("EVENTS"));
+            return;
+          }
+          store.dispatch(navigate("FACILITIES"));
+          store.dispatch(setMapFocus(toast.mapFocus));
         },
       }),
     );

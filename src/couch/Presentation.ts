@@ -6,7 +6,6 @@ export function seatPresentation(settings: SettingsType) {
     theme: settings.theme,
     interfaceScale: settings.interfaceScale,
     units: settings.units,
-    workspace: "single",
     screenEdgePadding: 0,
     audioEnabled: false,
   } as const;

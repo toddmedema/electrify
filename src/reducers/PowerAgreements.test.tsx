@@ -25,6 +25,7 @@ import {
   validPowerAgreements,
   agreementYearMinute,
   connectionAgreements,
+  dispatchOrderedAgreements,
   inheritedConnection,
   powerAgreementQuote,
   agreementDurationDiscount,
@@ -49,6 +50,7 @@ import reducer, {
   generateForecastTimeline,
   generateNewTimeline,
   forecastMonthClosingCashAtCustomerRate,
+  reprioritizePowerAgreement,
   tickState,
   togglePauseTransmissionLine,
 } from "./Game";
@@ -190,6 +192,142 @@ it("opens with inherited finite power commitments and no owned wire", () => {
   expect(game.transmission!.lines).toEqual([]);
   expect(currentTick(game)!.importedW).toBeGreaterThan(0);
   expect(intertieBuildQuote("vt-champlain-regional", 2005)).toBeUndefined();
+});
+
+it("reassigns live and forecast imports in the new order without resettling prior deliveries", () => {
+  const game = at(0);
+  request(game, 30e6);
+  tickState(game);
+  const from = "champlain-quebec";
+  const to = "champlain-nuclear";
+  expect(currentTick(game)!.agreementImportedW).toMatchObject({
+    [to]: 30e6,
+    [from]: 0,
+  });
+  const move = reprioritizePowerAgreement({
+    id: from,
+    targetId: to,
+    place: "before",
+  });
+  const reordered = copyOfficialGame(reducer(game, move));
+  expect(reordered.transmission!.agreementDispatchOrder).toEqual([from, to]);
+  expect(currentTick(reordered)!.agreementImportedW).toMatchObject({
+    [from]: 30e6,
+    [to]: 0,
+  });
+  expect(reordered.transmission!.agreementAccounts).toEqual(
+    game.transmission!.agreementAccounts,
+  );
+  expect(currentTick(reordered)!.cash).toBe(currentTick(game)!.cash);
+  for (const key of [facilitySignature, intertieForecastKey])
+    expect(key(reordered)).not.toBe(key(game));
+  request(reordered, 30e6);
+  tickState(reordered);
+  expect(currentTick(reordered)!.agreementUsefulMWh![from]).toBeGreaterThan(0);
+  expect(currentTick(reordered)!.agreementUsefulMWh![to]).toBe(0);
+});
+
+it("reserves scarce shared capacity in Fleet order across legacy and newer trades", () => {
+  const opening = at(180);
+  opening.transmission!.inheritedAgreementTerms = 1;
+  const game = sign(opening);
+  const newer = "champlain-nuclear:0";
+  const legacy = "champlain-quebec";
+  const limitW = 50e6;
+  const legacyLimits = Transmission.intertieOfferLimits;
+  const firmLimits = Transmission.firmIntertieOfferLimits;
+  jest
+    .spyOn(Transmission, "intertieOfferLimits")
+    .mockImplementation((...args) => ({
+      ...legacyLimits(...args),
+      marketImportLimitW: limitW,
+      accessImportLimitW: limitW,
+      importLimitW: limitW,
+    }));
+  jest
+    .spyOn(Transmission, "firmIntertieOfferLimits")
+    .mockImplementation((...args) => ({
+      ...firmLimits(...args),
+      marketImportLimitW: limitW,
+      accessImportLimitW: limitW,
+      importLimitW: limitW,
+    }));
+  const reordered = copyOfficialGame(
+    reducer(
+      copyOfficialGame(game),
+      reprioritizePowerAgreement({
+        id: legacy,
+        targetId: newer,
+        place: "before",
+      }),
+    ),
+  );
+  request(game, limitW);
+  request(reordered, limitW);
+  tickState(game);
+  tickState(reordered);
+  expect(currentTick(game)!.agreementImportedW).toMatchObject({
+    [newer]: limitW,
+    [legacy]: 0,
+  });
+  expect(currentTick(reordered)!.entitlementImportedW).toBe(limitW);
+  expect(currentTick(reordered)!.agreementImportedW).toMatchObject({
+    [legacy]: limitW,
+    [newer]: 0,
+  });
+});
+
+it("retains explicit order across save import and rejects unknown or duplicate positions", () => {
+  const game = createGame({
+    scenarioId: 112,
+    seed: 61,
+    difficulty: "Employee",
+  });
+  const [first, second] = dispatchOrderedAgreements(game);
+  const previous = cloneDeep(serializeSave(game));
+  previous.game.timeline.forEach((frame) => delete frame.agreementImportedW);
+  const upgraded = parseSave({ ...previous, schemaVersion: 28 });
+  expect(upgraded).not.toBeNull();
+  expect(upgraded!.game.transmission!.agreementDispatchOrder).toBeUndefined();
+  expect(
+    reducer(
+      game,
+      reprioritizePowerAgreement({
+        id: second.id,
+        targetId: "missing",
+        place: "before",
+      }),
+    ),
+  ).toBe(game);
+  const reordered = reducer(
+    game,
+    reprioritizePowerAgreement({
+      id: second.id,
+      targetId: first.id,
+      place: "before",
+    }),
+  );
+  const saved = serializeSave(reordered);
+  const imported = parseSave(saved);
+  expect(imported).not.toBeNull();
+  expect(imported!.game.transmission!.agreementDispatchOrder).toEqual([
+    second.id,
+    first.id,
+  ]);
+  const resumed = copyOfficialGame(
+    reducer(reducer(undefined, resume(imported!.game)), loaded()),
+  );
+  const original = copyOfficialGame(reordered);
+  tickState(resumed);
+  tickState(original);
+  expect(currentTick(resumed)?.agreementImportedW).toEqual(
+    currentTick(original)?.agreementImportedW,
+  );
+  for (const invalid of [[first.id, first.id], ["missing"]]) {
+    const malformed = cloneDeep(saved);
+    malformed.game.transmission!.agreementDispatchOrder = invalid;
+    expect(parseSave(malformed)).toBeNull();
+  }
 });
 it("rejects a forged public quote, accepts its valid neighbor once and invalidates both forecast caches", () => {
   const game = at();
