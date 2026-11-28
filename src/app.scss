@@ -2220,10 +2220,17 @@ $pane_header_height: 48px;
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
+    // A positive duration would animate properties that normally change immediately.
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  // The drag library commits a reorder on transform transitionend. Snap to the drop position.
+  [data-reorder-drop] {
+    transition: transform 1ms step-end !important;
   }
 
   // The blackout pulse carries its color *in* the animation, so stopping it would erase the
