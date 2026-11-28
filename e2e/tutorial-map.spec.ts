@@ -6,7 +6,7 @@ import {
   tutorialCoal,
   tutorialMap,
 } from "./tutorial-fixture";
-import { dragCoalAbovePumpedHydro } from "./layout";
+import { dragCoalAbovePumpedHydro, dragFleetRowAbove } from "./layout";
 
 const hud = (page: Page) => page.locator(".tutorialHud");
 const goal = (page: Page, text: string, timeout?: number) =>
@@ -366,10 +366,21 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
   await action(page, "Fleet");
   await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   await goal(page, "Run the clock until your grid imports power");
-  const externalPower = fleet.getByRole("group", {
-    name: "External power now",
+  const agreements = fleet.getByRole("region", {
+    name: "Agreements",
   });
-  await expect(externalPower).toBeInViewport();
+  const agreementHeading = agreements.locator(".fleetAgreementsHeading");
+  const dispatchOrder = agreements.getByRole("list", {
+    name: "Agreement dispatch order",
+  });
+  const rows = dispatchOrder.getByRole("listitem");
+  await expect(agreementHeading).toBeInViewport();
+  await expect(rows).toHaveCount(3);
+  await expect(
+    agreements.getByRole("button", {
+      name: /^Reorder Valley Electric supply,/,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -383,21 +394,43 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     scale: "css",
   });
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await goal(page, "Find your live import total");
+  await goal(page, "Read your agreement flows");
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   const chart = page.locator("#chartSupplyDemand");
   await expect(
-    chart
-      .locator(".chartLegendLabel")
-      .getByText("External power", { exact: true }),
+    chart.locator(".chartLegendLabel").getByText("Agreements", { exact: true }),
   ).toBeVisible();
-  await expect(externalPower).toBeInViewport();
-  await expect(externalPower).toHaveClass(/tutorialTarget/);
-  await expect(externalPower).toContainText(/Importing [1-9][\d.]*\s*[kMG]?W/);
-  await reviewScreenshot(fleet.locator(".facilitySupplyChart"), {
-    path: test.info().outputPath("fleet-external-power.png"),
+  await expect(dispatchOrder).toHaveClass(/tutorialTarget/);
+  await expect(agreementHeading).toContainText(
+    /Importing [1-9][\d.]*\s*[kMG]?W/,
+  );
+  const valley = agreements.getByRole("button", {
+    name: /^Reorder Valley Electric supply, Importing/,
+  });
+  await expect(valley).toBeVisible();
+  const lastId = (await rows.last().getAttribute("data-rfd-draggable-id"))!;
+  const last = rows.and(page.locator(`[data-rfd-draggable-id="${lastId}"]`));
+  await expect(last).toBeInViewport({ ratio: 0.9 });
+  await expect(rows.first()).toBeInViewport({ ratio: 0.6 });
+  await dragFleetRowAbove(
+    page,
+    last,
+    last.getByRole("button"),
+    rows.first().getByRole("button"),
+  );
+  await expect(rows.first()).toHaveAttribute("data-rfd-draggable-id", lastId);
+  await expect
+    .poll(() =>
+      rows
+        .first()
+        .locator(".outputProgressBar")
+        .evaluate((bar) => new DOMMatrix(getComputedStyle(bar).transform).a),
+    )
+    .toBeGreaterThan(0);
+  await reviewScreenshot(agreements, {
+    path: test.info().outputPath("fleet-agreement-dispatch.png"),
     animations: "disabled",
     scale: "css",
     style: ".snackbar, .tutorialTargetRing { visibility: hidden; }",
@@ -407,6 +440,13 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     animations: "disabled",
     style: ".snackbar { visibility: hidden; }",
   });
+  const firstHandle = rows.first().getByRole("button");
+  await firstHandle.focus();
+  await page.keyboard.press("Space");
+  await expect(rows.first()).toHaveClass(/dragging/);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Space");
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", lastId);
   await next(page, "Finish tutorial");
   await complete(page);
   await expect(

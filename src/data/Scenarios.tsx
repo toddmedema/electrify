@@ -744,7 +744,7 @@ export const SCENARIOS: ScenarioType[] = [
           tutorialViewedMapTool.match(action) && action.payload === "FLEET",
         action: "Open Fleet to see power flows",
         content: (
-          <TutorialPrompt text="Look below the Fleet chart for your grid’s current imports and exports. Check your contract’s start date in Agreements." />
+          <TutorialPrompt text="Fleet lists your agreements below its chart. Check when your new contract starts in the Agreements panel." />
         ),
       },
       {
@@ -763,11 +763,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FLEET",
-        target: ".fleetExternalPower",
+        target: '.fleetAgreements [role="list"]',
         nextLabel: "Finish tutorial",
-        action: "Find your live import total",
+        action: "Read your agreement flows",
         content: (
-          <TutorialPrompt text="External power now shows your total imports. The striped band shows imports over the day. Exports appear above the Demand line." />
+          <TutorialPrompt text="The Agreements section shows how much each contract is supplying. Drag a row higher to use that contract’s power first." />
         ),
       },
     ],

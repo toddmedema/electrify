@@ -195,6 +195,7 @@ export function intertieForecastKey(game: GameType): string {
     game.policies,
     game.tutorialIntertieStress?.active,
     game.transmission?.acceptedAgreements,
+    game.transmission?.agreementDispatchOrder,
     game.transmission?.buyingRule,
     game.transmission?.sellingRule,
     game.facilities.map((f) => [

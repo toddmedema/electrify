@@ -594,6 +594,7 @@ export function parseSave(
             !Number.isFinite(tick.expensesInterest) ||
             tick.expensesExpansionInterest > tick.expensesInterest)) ||
         [
+          tick.agreementImportedW,
           tick.agreementAvailableMWh,
           tick.agreementUsefulMWh,
           tick.agreementPayments,

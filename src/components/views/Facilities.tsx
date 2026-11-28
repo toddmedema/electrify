@@ -3,6 +3,7 @@ import TerritoryNetwork from "./TerritoryNetwork";
 import RegionalGridMap from "./RegionalGridMap";
 import MultiplayerTerritoryMap from "./MultiplayerTerritoryMap";
 import TerritorialAgreements from "./TerritorialAgreements";
+import FleetAgreements from "./FleetAgreements";
 import PowerAgreements from "../base/PowerAgreements";
 import {
   INHERITED_CONNECTIONS,
@@ -57,7 +58,6 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
   currentGenerationW,
-  currentTick,
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor } from "../../Theme";
 import {
@@ -65,6 +65,7 @@ import {
   FacilityOperatingType,
   isStorage,
   GameType,
+  ReprioritizePowerAgreementAction,
   RetrofitFacilityAction,
   EvidenceRequestType,
   MapWorkspaceView,
@@ -702,17 +703,7 @@ function FacilitySupplyChart({
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
   const height = useFleetChartHeight(anchor);
-  const exchangeLabel = hasTerritoryNetwork(game)
-    ? "External power"
-    : undefined;
-  const exchangeTick =
-    exchangeLabel && game.transmission ? currentTick(game) : null;
-  const externalPowerLabelId = React.useId();
-  const { importedW = 0, exportedW = 0 } = exchangeTick ?? {};
-  const externalPowerFlows = [
-    importedW > 0 ? `Importing ${formatWatts(importedW)}` : "",
-    exportedW > 0 ? `Exporting ${formatWatts(exportedW)}` : "",
-  ].filter(Boolean);
+  const exchangeLabel = hasTerritoryNetwork(game) ? "Agreements" : undefined;
   // A portrait tablet's sheet starts where this block ends.
   React.useLayoutEffect(() => {
     const element = anchor.current;
@@ -752,18 +743,6 @@ function FacilitySupplyChart({
         legend
         startingYear={game.startingYear}
       />
-      {exchangeTick && (
-        <div
-          className="fleetExternalPower"
-          role="group"
-          aria-labelledby={externalPowerLabelId}
-        >
-          <strong id={externalPowerLabelId}>External power now</strong>
-          <span>
-            {externalPowerFlows.join(" · ") || "No imports or exports"}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
@@ -846,6 +825,10 @@ export interface DispatchProps extends FacilityCapacityUpgradeActions {
     destinationIndex: number | null,
     resumeSpeed: GameType["speed"],
     intertie?: boolean,
+  ) => void;
+  onAgreementDragEnd: (
+    move: ReprioritizePowerAgreementAction | null,
+    resumeSpeed: GameType["speed"],
   ) => void;
   onSelect: (id: FacilityOperatingType["id"] | null) => void;
   onStorageBuild: () => void;
@@ -1231,6 +1214,8 @@ export default class Facilities extends React.Component<Props, SelectionState> {
     // unskipped frame, and at FAST that reads as a click that missed
     if (
       nextProps.game.speed !== this.props.game.speed ||
+      nextProps.game.transmission?.agreementDispatchOrder !==
+        this.props.game.transmission?.agreementDispatchOrder ||
       nextProps.evidenceRequest !== this.props.evidenceRequest ||
       nextProps.territoryView !== this.props.territoryView ||
       nextProps.agreementPeer !== this.props.agreementPeer ||
@@ -1321,10 +1306,14 @@ export default class Facilities extends React.Component<Props, SelectionState> {
         ? [...this.state.ids]
         : [];
     this.setState({ groupDragging: this.draggedIds.length > 1 });
+    this.startDispatchDrag();
+  }
+
+  private startDispatchDrag = () => {
     this.dragging = true;
     this.speedBeforeDrag = this.props.game.speed;
     this.props.onFacilityDragStart(this.speedBeforeDrag);
-  }
+  };
 
   public onDragEnd(result: DropResult) {
     this.dragging = false;
@@ -1361,6 +1350,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       this.speedBeforeDrag,
     );
   }
+
+  private finishAgreementDrag = (
+    move: ReprioritizePowerAgreementAction | null,
+  ) => {
+    this.dragging = false;
+    this.props.onAgreementDragEnd(move, this.speedBeforeDrag);
+  };
 
   public render() {
     const {
@@ -1518,8 +1514,7 @@ export default class Facilities extends React.Component<Props, SelectionState> {
           {showFleet && (
             <div className="scrollable facilitiesBody" ref={this.setScrollBody}>
               <FacilitySupplyChart game={game} anchor={this.evidenceAnchor} />
-              {/* The scroller holds section labels and the intertie fleet as well as rows, so the
-              lists are the drag-and-drop containers inside it rather than the scroller itself. */}
+              {/* Each dispatch list has its own drop targets inside the Fleet scroller. */}
               <List
                 dense
                 component="div"
@@ -1527,6 +1522,13 @@ export default class Facilities extends React.Component<Props, SelectionState> {
                 data-group-dragging={this.state.groupDragging || undefined}
                 onKeyDown={this.onSelectionKeyDown}
               >
+                {territoryNetwork && game.transmission && (
+                  <FleetAgreements
+                    game={game}
+                    onDragStart={this.startDispatchDrag}
+                    onDragEnd={this.finishAgreementDrag}
+                  />
+                )}
                 <Typography
                   component="div"
                   id="dispatch-order"

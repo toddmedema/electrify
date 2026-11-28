@@ -1498,6 +1498,7 @@ function validGrid(
               sellingRule: g.transmission!.sellingRule,
               lines: nativeLines,
               acceptedAgreements: g.transmission!.acceptedAgreements,
+              agreementDispatchOrder: g.transmission!.agreementDispatchOrder,
               inheritedAgreementTerms: g.transmission!.inheritedAgreementTerms,
               agreementAccounts: g.transmission!.agreementAccounts,
             }

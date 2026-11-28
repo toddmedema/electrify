@@ -23,7 +23,7 @@ import {
   agreementBasePrice,
   agreementPrice,
   agreementTermsAt,
-  compareAgreementDispatchPriority,
+  agreementDispatchComparator,
   agreementRate,
   utilityOwnedAt,
   inheritedConnection,
@@ -752,7 +752,7 @@ export function entitlementSources(
           },
         };
       });
-  }).sort(compareAgreementDispatchPriority);
+  }).sort(agreementDispatchComparator(game));
   if (!sources.length) return [];
   const allocated = allocateIntertieFlows(
     sources.map((source) => source.offer),

@@ -461,18 +461,44 @@ export async function sortBuildCatalog(
 
 /** Move the generator ahead of storage using the same grip and drag sensors as a player. */
 export async function dragCoalAbovePumpedHydro(page: Page) {
-  const handle = page.getByRole("button", {
-    name: "Reorder Coal",
-    exact: true,
-  });
-  const row = page.locator('.facilityRow[data-facility="Coal"]');
-  await handle.scrollIntoViewIfNeeded();
-  await handle.click({ trial: true });
+  await dragFleetRowAbove(
+    page,
+    page.locator('.facilityRow[data-facility="Coal"]'),
+    page.getByRole("button", { name: "Reorder Coal", exact: true }),
+    page
+      .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
+      .first(),
+  );
+}
+
+export async function dragFleetRowAbove(
+  page: Page,
+  row: Locator,
+  handle: Locator,
+  target: Locator,
+) {
+  // Centering the source in a short pane can scroll the target under its header.
+  await handle.evaluate((element) =>
+    element.scrollIntoView({ block: "nearest", behavior: "instant" }),
+  );
+  await expect(handle).toBeInViewport({ ratio: 0.6 });
+  await expect(target).toBeInViewport({ ratio: 0.6 });
+  // A purchase notification can cover a visible handle until it dismisses.
+  // Check the hit target without moving either drag endpoint.
+  await expect
+    .poll(
+      () =>
+        handle.evaluate((element) => {
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return element.contains(
+            document.elementFromPoint(x + width / 2, y + height / 2),
+          );
+        }),
+      { timeout: 12_000 },
+    )
+    .toBe(true);
   const from = (await handle.boundingBox())!;
-  const to = (await page
-    .getByRole("button", { name: "Reorder Pumped Hydro", exact: true })
-    .first()
-    .boundingBox())!;
+  const to = (await target.boundingBox())!;
   const x = from.x + from.width / 2;
   const y = from.y + from.height / 2;
   const destination = to.y + to.height / 2;

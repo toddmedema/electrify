@@ -84,7 +84,8 @@ import {
 } from "./GameActions";
 import {
   acceptAgreement,
-  compareAgreementDispatchPriority,
+  agreementDispatchComparator,
+  movedAgreementOrder,
   agreementIntervalMinutes,
   recordAgreementSettlements,
 } from "../helpers/PowerAgreements";
@@ -2328,6 +2329,17 @@ export const gameSlice = createSlice({
     ) => {
       applyReprioritizeTransmissionLine(state, action.payload);
     },
+    reprioritizePowerAgreement: (
+      state,
+      action: PayloadAction<
+        import("../Types").ReprioritizePowerAgreementAction
+      >,
+    ) => {
+      const order = movedAgreementOrder(state, action.payload);
+      if (!order || !state.transmission) return;
+      state.transmission.agreementDispatchOrder = order;
+      state.timeline = reforecastSupply(state);
+    },
     upgradeTransmissionLine: (
       state,
       action: PayloadAction<UpgradeTransmissionLineAction>,
@@ -2788,6 +2800,7 @@ export const {
   cancelTransmissionLine,
   togglePauseTransmissionLine,
   reprioritizeTransmissionLine,
+  reprioritizePowerAgreement,
   sellFacility,
   togglePauseFacility,
   reprioritizeFacility,
@@ -6225,14 +6238,14 @@ function* supplyFacilitiesFinancesPhases(
     excludedAgreementId,
     entitlementMinute,
   );
-  // Use fully paid blocks before adding monthly-minimum usage, then pay-as-used supply.
+  // Honor the player's order when set. Otherwise use fully paid blocks first.
   const entitlementOffers = [
     ...readyAgreements.map((source) => ({
       ...source,
       capacityW: source.paused ? 0 : source.capacityW,
     })),
     ...legacyAgreements,
-  ].sort(compareAgreementDispatchPriority);
+  ].sort(agreementDispatchComparator(state));
   const entitlementCapacityW = entitlementOffers.reduce(
     (sum, offer) => sum + offer.capacityW,
     0,
@@ -7076,6 +7089,12 @@ function* supplyFacilitiesFinancesPhases(
   if (state.utilityExpansion) {
     now.entitlementImportedW = entitlementDeliveredW;
     now.entitlementImportCapacityW = entitlementCapacityW;
+    now.agreementImportedW = Object.fromEntries(
+      entitlementOffers.map(({ id }, index) => [
+        id,
+        coveredReservations[index].watts,
+      ]),
+    );
   }
   now.importedW = importedW;
   now.exportedW = exportedW;

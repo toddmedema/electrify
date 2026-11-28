@@ -467,6 +467,43 @@ it("publishes signed terms and current minimum-payment history to each owning re
   expect(views["1"].game!.transmission!.acceptedAgreements).toBeUndefined();
 });
 
+it("applies agreement priority to the owning grid and restores it from a shared checkpoint", () => {
+  const world = ready(true);
+  const command = {
+    kind: "action",
+    name: "reprioritizePowerAgreement",
+    payload: {
+      id: "champlain-quebec",
+      targetId: "champlain-nuclear",
+      place: "before",
+    },
+  } as const;
+  const envelope = {
+    matchId: world.matchId,
+    epoch: world.epoch,
+    sequence: 2,
+  };
+  expect(
+    applyCommand(world, "0", {
+      ...envelope,
+      command: { ...command, payload: { ...command.payload, id: "missing" } },
+    }),
+  ).toMatch(/agreement/);
+  expect(
+    applyCommand(world, "0", { ...envelope, sequence: 3, command }),
+  ).toBeUndefined();
+  const order = ["champlain-quebec", "champlain-nuclear"];
+  expect(world.grids[0].transmission!.agreementDispatchOrder).toEqual(order);
+  expect(world.grids[1].transmission!.agreementDispatchOrder).toBeUndefined();
+  const restored = restoreWorld(
+    checkpointWorld(world),
+    "agreement-order-resume",
+  );
+  expect(restored?.grids[0].transmission!.agreementDispatchOrder).toEqual(
+    order,
+  );
+});
+
 it("reserves a later company's useful agreement delivery before an earlier company's spot demand", () => {
   const world = ready();
   setNextDemand(world, 100e6);

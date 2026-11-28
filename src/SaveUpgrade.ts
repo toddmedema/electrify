@@ -472,6 +472,8 @@ const migrations: readonly Migration[] = [
       return null;
     }
   },
+  // 28 -> 29: saves without a Fleet agreement order keep automatic dispatch.
+  (save) => save,
 ];
 
 /** Structure versions are independent of app releases and simulation compatibility. */

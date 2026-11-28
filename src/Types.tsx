@@ -179,11 +179,18 @@ export interface AcceptPowerAgreementAction {
   durationYears?: number;
 }
 
+export interface ReprioritizePowerAgreementAction {
+  id: string;
+  targetId: string;
+  place: "before" | "after";
+}
+
 export interface TransmissionStateType {
   buyingRule: BuyingRuleType;
   sellingRule: SellingRuleType;
   lines: TransmissionLineOperatingType[];
   acceptedAgreements?: PowerAgreementReceipt[];
+  agreementDispatchOrder?: string[];
   inheritedAgreementTerms?: PowerAgreementTermsVersion;
   agreementAccounts?: PowerAgreementAccount[];
 }
@@ -448,6 +455,8 @@ export interface RawWeatherType {
 // All amounts are the average across the time window
 export type TickPresentFutureType = Partial<FuelPricesType> &
   HistoryForecastShared & {
+    /** Physical imports by contract, including when the current frame is reforecast. */
+    agreementImportedW?: Record<string, number>;
     /** Interval settlements, separate from physical imports. */
     agreementAvailableMWh?: Record<string, number>;
     agreementUsefulMWh?: Record<string, number>;

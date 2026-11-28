@@ -221,6 +221,7 @@ function renderFacilities(
         onCancelExpansion={handlers.onCancelExpansion}
         onFacilityDragStart={() => undefined}
         onFacilityDragEnd={() => undefined}
+        onAgreementDragEnd={() => undefined}
         onSelect={(id) => {
           handlers.onSelect(id);
           setSelected(id);
@@ -533,6 +534,7 @@ describe("the fleet list", () => {
       onReprioritize: noop,
       onFacilityDragStart: noop,
       onFacilityDragEnd: noop,
+      onAgreementDragEnd: noop,
       onSelect: noop,
     };
     const store = configureStore({ reducer: { ui: uiReducer } });
@@ -617,6 +619,7 @@ describe("the fleet list", () => {
       onReprioritize: () => undefined,
       onFacilityDragStart,
       onFacilityDragEnd,
+      onAgreementDragEnd: () => undefined,
       onSelect: () => undefined,
     };
     render(
