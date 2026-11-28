@@ -16,11 +16,15 @@ import { buildOwnershipBorder, buildSelectionBorder } from "./BorderGeometry";
 import type { MapFrame } from "./Types";
 
 const factories = { terrain: getTerrainModel, structure: getStructureModel };
-const loadRenderer: RendererLoader = async () => {
-  if (typeof WebGL2RenderingContext === "undefined")
-    throw new Error("WebGL2 unavailable");
-  return (canvas, onState) => new MapRenderer(canvas, onState);
-};
+const rendererLoader =
+  (hasOcean: boolean): RendererLoader =>
+  async () => {
+    if (typeof WebGL2RenderingContext === "undefined")
+      throw new Error("WebGL2 unavailable");
+    return (canvas, onState) => new MapRenderer(canvas, hasOcean, onState);
+  };
+const loadInlandRenderer = rendererLoader(false);
+const loadCoastalRenderer = rendererLoader(true);
 
 export interface SceneCamera {
   subscribe: (listener: () => void) => () => void;
@@ -81,6 +85,11 @@ export default function TerritoryScene3D({
   } = React.useSyncExternalStore(camera.subscribe, camera.getSnapshot);
   const frame = { ...viewport, cameraX, cameraY, scale: baseScale * zoom };
   const builder = React.useMemo(() => new SceneBuilder(factories), []);
+  // Use the whole board so panning toward an offscreen coast keeps its shader.
+  const hasOcean = React.useMemo(
+    () => tiles.some((tile) => tile.terrain === "ocean"),
+    [tiles],
+  );
   const scene = React.useMemo(
     () => builder.build(views, tiles, wires, minute, runKey, cityGrowth),
     [builder, views, tiles, wires, minute, runKey, cityGrowth],
@@ -118,7 +127,7 @@ export default function TerritoryScene3D({
       instances={instances}
       frame={{ ...frame, lighting, lightingTransitionMs }}
       runKey={runKey}
-      loadRenderer={loadRenderer}
+      loadRenderer={hasOcean ? loadCoastalRenderer : loadInlandRenderer}
       onState={onState}
     />
   );

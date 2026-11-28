@@ -44,7 +44,7 @@ const FOG_SATURATION = [1, 0.8, 0.45, 0.15];
 const CITY_WINDOW_MATERIAL = 5;
 const RIVER_WATER_MATERIAL = 6;
 const NIGHT_BACKGROUND: Vec3 = [0.022, 0.032, 0.047];
-const VERTEX = `#version 300 es
+const vertex = (hasOcean: boolean) => `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aNormal;
@@ -62,8 +62,7 @@ out vec3 vColor;
 out vec4 vStyle;
 flat out vec4 vMaterial;
 out vec3 vSurfacePosition;
-out vec2 vLocal;
-void main() {
+${hasOcean ? "out vec2 vLocal;\n" : ""}void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
   if (aMaterial.z == 2.0 || aMaterial.z == ${RIVER_WATER_MATERIAL}.0) {
     world.y += mix(${WATERSHED_LEVEL_OFFSETS[0]}, ${WATERSHED_LEVEL_OFFSETS[1]}, uWeather.z);
@@ -71,9 +70,13 @@ void main() {
     if (aMaterial.z == ${RIVER_WATER_MATERIAL}.0) world.y -= aPosition.y * uWeather.z;
   }
   vSurfacePosition = world.xyz;
-  // Ocean shore masks are in world-axis ring order, around the instance origin.
+${
+  hasOcean
+    ? `  // Ocean shore masks are in world-axis ring order, around the instance origin.
   vLocal = world.xz - aTransform[3].xz;
-  if (uShadow) {
+`
+    : ""
+}  if (uShadow) {
     vec2 reach = -uLight.xz * max(0.0, world.y - 0.003) / max(0.25, uLight.y);
     float distance = length(reach);
     if (distance > 3.0) reach *= 3.0 / distance;
@@ -95,15 +98,14 @@ void main() {
     vMaterial.x = step(aColor.r, service);
   }
 }`;
-const fragment = (ocean: string) => `#version 300 es
+const fragment = (ocean = "") => `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
 in vec4 vStyle;
 flat in vec4 vMaterial;
 in vec3 vSurfacePosition;
-in vec2 vLocal;
-uniform vec3 uLight;
+${ocean ? "in vec2 vLocal;\n" : ""}uniform vec3 uLight;
 uniform vec3 uWaterHalfVector;
 uniform vec4 uWeather;
 uniform vec3 uLightColor;
@@ -143,16 +145,19 @@ void main() {
   float incidence = max(0.0, dot(normal, uLight));
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
   bool cityWindow = vMaterial.z == ${CITY_WINDOW_MATERIAL}.0;
-  bool ocean = vMaterial.z == ${OCEAN_WATER_MATERIAL}.0;
-  vec3 base = cityWindow
+${ocean ? `  bool ocean = vMaterial.z == ${OCEAN_WATER_MATERIAL}.0;\n` : ""}  vec3 base = cityWindow
     ? mix(vec3(0.22, 0.33, 0.37), vec3(0.39, 0.69, 0.66), vMaterial.x)
     : mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
   bool riverWater = vMaterial.z == ${RIVER_WATER_MATERIAL}.0;
   vec3 lit;
-  if (ocean) {
+${
+  ocean
+    ? `  if (ocean) {
     lit = oceanLit(band);
   } else {
-    if (vMaterial.z == 3.0) {
+`
+    : ""
+}    if (vMaterial.z == 3.0) {
       float snowLine = mix(0.75, 0.25, uWeather.w);
       float cap = smoothstep(snowLine, snowLine + 0.13, vSurfacePosition.y);
       // Snow clings more strongly to shoulders than to steep rock faces.
@@ -187,9 +192,13 @@ void main() {
       glint *= glint;
       lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
     }
-  }
+${
+  ocean
+    ? `  }
   // The ocean applies its own night response.
-  if (!ocean) lit *= mix(1.0, 0.40, uNight);
+  if (!ocean) `
+    : "  "
+}lit *= mix(1.0, 0.40, uNight);
   // Preserve a blue-green surface in low light, before applying distance fog.
   if (riverWater) {
     float current = surfaceNoise(vSurfacePosition.xz * 7.0);
@@ -333,6 +342,7 @@ export class MapRenderer {
 
   constructor(
     private canvas: MapCanvas,
+    private hasOcean: boolean,
     private onState?: (state: State) => void,
   ) {
     Object.defineProperty(canvas, "map3DDiagnostics", {
@@ -556,17 +566,7 @@ export class MapRenderer {
       const gl = this.gl;
       if (!gl || gl.getContextAttributes()?.stencil === false)
         throw new Error("Map requires WebGL2 with a stencil buffer");
-      let program: WebGLProgram;
-      try {
-        program = createMapProgram(gl, VERTEX, fragment(OCEAN_FRAGMENT));
-      } catch (_error) {
-        // Keep the map if one driver rejects the ocean shader: draw a flat sea instead.
-        program = createMapProgram(
-          gl,
-          VERTEX,
-          fragment(OCEAN_FALLBACK_FRAGMENT),
-        );
-      }
+      const program = this.createProgram(gl);
       this.program = program;
       this.uniforms = {
         projection: gl.getUniformLocation(program, "uProjection"),
@@ -590,6 +590,22 @@ export class MapRenderer {
     this.state = "ready";
     this.readyPending = true;
     this.schedule();
+  }
+
+  private createProgram(gl: WebGL2RenderingContext): WebGLProgram {
+    // Even an unused ocean branch slows land draws on software WebGL.
+    if (!this.hasOcean) return createMapProgram(gl, vertex(false), fragment());
+    const coastalVertex = vertex(true);
+    try {
+      return createMapProgram(gl, coastalVertex, fragment(OCEAN_FRAGMENT));
+    } catch (_error) {
+      // Keep the map if one driver rejects the ocean shader: draw a flat sea instead.
+      return createMapProgram(
+        gl,
+        coastalVertex,
+        fragment(OCEAN_FALLBACK_FRAGMENT),
+      );
+    }
   }
 
   private contextLost = (event: Event): void => {

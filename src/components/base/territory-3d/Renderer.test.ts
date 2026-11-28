@@ -161,13 +161,13 @@ function flush(timestamp: number) {
   callbacks.clear();
   for (const callback of pending) callback(timestamp);
 }
-function setup(gl = mockContext()) {
+function setup(gl = mockContext(), hasOcean = false) {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest
     .spyOn(canvas, "getContext")
     .mockReturnValue(gl as unknown as WebGL2RenderingContext);
   const state = jest.fn();
-  const renderer = new MapRenderer(canvas, state);
+  const renderer = new MapRenderer(canvas, hasOcean, state);
   return { canvas, gl, state, renderer };
 }
 beforeEach(() => {
@@ -712,7 +712,7 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest.spyOn(canvas, "getContext").mockReturnValue(null);
   const state = jest.fn(),
-    renderer = new MapRenderer(canvas, state);
+    renderer = new MapRenderer(canvas, false, state);
   renderer.update(scene(), frame);
   expect(state).toHaveBeenCalledWith("unavailable");
   expect(callbacks.size).toBe(0);
@@ -721,13 +721,12 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   gl.getShaderParameter.mockReturnValue(false);
   const broken = setup(gl);
   expect(broken.state).toHaveBeenCalledWith("unavailable");
-  // The full program and its flat-sea fallback each release their failed shader.
-  expect(gl.deleteShader).toHaveBeenCalledTimes(2);
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(2);
+  expect(gl.deleteShader).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
   broken.renderer.dispose();
 });
 
-it("falls back to a flat sea when a driver rejects the ocean shader", () => {
+it("draws inland geometry without compiling an ocean program", () => {
   const gl = mockContext();
   const sources = new Map<unknown, string>();
   (gl.shaderSource as jest.Mock).mockImplementation(
@@ -740,6 +739,25 @@ it("falls back to a flat sea when a driver rejects the ocean shader", () => {
   renderer.update(scene(), frame);
   flush(0);
   expect(state).toHaveBeenLastCalledWith("ready");
+  expect(renderer.diagnostics().triangles).toBeGreaterThan(0);
+  expect(gl.deleteProgram).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it("falls back to a flat sea when a driver rejects the ocean shader", () => {
+  const gl = mockContext();
+  const sources = new Map<unknown, string>();
+  (gl.shaderSource as jest.Mock).mockImplementation(
+    (shader: unknown, source: string) => sources.set(shader, source),
+  );
+  (gl.getShaderParameter as jest.Mock).mockImplementation(
+    (shader: unknown) => !sources.get(shader)?.includes("shoreDistance"),
+  );
+  const { renderer, state } = setup(gl, true);
+  renderer.update([{ ...scene()[0], model: getTerrainModel("ocean") }], frame);
+  flush(0);
+  expect(state).toHaveBeenLastCalledWith("ready");
+  expect(renderer.diagnostics().triangles).toBeGreaterThan(0);
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
   renderer.dispose();
 });

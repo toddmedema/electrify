@@ -338,6 +338,10 @@ for (const theme of ["light", "dark"]) {
     }, theme);
     await page.goto("/?scenario=107");
     await page.getByRole("button", { name: "Start game" }).click();
+    // The initial forecast adds the announced event to the mobile header and resizes the plot.
+    await expect(
+      page.getByRole("button", { name: /^Upcoming:/ }),
+    ).toBeVisible();
     await openFleet(page);
     const chart = page.locator("#chartSupplyDemand [role=img]");
     const plot = chart.locator(".u-over");
