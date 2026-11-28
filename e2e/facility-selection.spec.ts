@@ -23,6 +23,9 @@ for (const theme of ["light", "dark"]) {
         ...templates[i % templates.length],
         id: i + 1,
         paused: false,
+        // Even after two sales these dispatchable fixtures must meet demand. The narrow
+        // layout checks exercise the announced-event headline, which a shortage displaces.
+        spinMinutes: 1,
       }));
       save.game.speed = "PAUSED";
       return save.game.facilities.map((f) => f.id);
@@ -405,28 +408,36 @@ test("selling an open facility collapses its row before removing it", async ({
   await sold.locator(".facilityDisclosure").click();
   await sold.getByRole("button", { name: /^Sell / }).click();
   const confirm = page.getByRole("dialog", { name: /Sell .* facility/ });
-  const started = await sold.evaluate(
-    (element) => element.getBoundingClientRect().height,
-  );
-  // Sample frames in the page so a fast exit can't finish between Playwright commands.
-  const measurements = page.evaluate(
-    async ({ id, started }) => {
-      const selector = `.facilityRow[data-facility-id="${id}"]`;
-      const deadline = performance.now() + 4000;
-      let interimHeight = false;
-      while (performance.now() < deadline) {
-        await new Promise(requestAnimationFrame);
-        const row = document.querySelector(selector);
-        if (!row) return { interimHeight, removed: true };
-        const collapsed = row.closest<HTMLElement>(".MuiCollapse-root");
-        if (!collapsed?.hasAttribute("inert")) continue;
-        const { height } = collapsed.getBoundingClientRect();
-        interimHeight ||= height > 1 && height < started - 1;
-      }
-      return { interimHeight, removed: false };
-    },
-    { id, started },
-  );
+  const measurements = await sold.evaluateHandle((row) => {
+    const wrapper = row.closest<HTMLElement>(".MuiCollapse-root")!;
+    const sample = {
+      started: wrapper.getBoundingClientRect().height,
+      midpoint: 0,
+    };
+    // A slow compositor can skip every intermediate frame of this 200 ms exit.
+    // Sample the browser's actual height transition halfway through its timeline.
+    const observer = new MutationObserver(() => {
+      if (!wrapper.inert) return;
+      const exit = wrapper
+        .getAnimations()
+        .find(
+          (animation) =>
+            animation instanceof CSSTransition &&
+            animation.transitionProperty === "height",
+        );
+      if (!exit?.effect) return;
+      const duration = Number(exit.effect.getComputedTiming().activeDuration);
+      if (duration <= 0) return;
+      exit.currentTime = duration / 2;
+      sample.midpoint = wrapper.getBoundingClientRect().height;
+      observer.disconnect();
+    });
+    observer.observe(wrapper, { attributes: true });
+    return sample;
+  });
   await confirm.getByRole("button", { name: "Sell", exact: true }).click();
-  expect(await measurements).toEqual({ interimHeight: true, removed: true });
+  await expect(sold).toHaveCount(0);
+  const { started, midpoint } = await measurements.jsonValue();
+  expect(midpoint).toBeGreaterThan(1);
+  expect(midpoint).toBeLessThan(started - 1);
 });

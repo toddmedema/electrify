@@ -116,6 +116,7 @@ function setup(
           },
           0,
           2,
+          2,
         )
       : solo;
   const store = configureStore({

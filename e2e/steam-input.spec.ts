@@ -108,43 +108,45 @@ async function select(
     await expect(control, "reachable through the home menu loop").toBeFocused();
     return;
   }
-  const popupSurfaces = () =>
-    page
-      .locator('[role="dialog"],[role="menu"],[role="listbox"]')
-      .filter({ visible: true })
-      .evaluateAll((elements) =>
-        elements.map((element) => ({
-          role: element.getAttribute("role"),
-          id: element.id,
-          label: element.getAttribute("aria-label"),
-        })),
-      );
-  const expectedSurfaces = await popupSurfaces();
-  const visited = new Map<string, number>();
-  for (let attempt = 0; attempt < limit; attempt++) {
-    if (await control.evaluate((element) => element === document.activeElement))
-      return;
-    expect(
-      await popupSurfaces(),
-      "directional focus traversal must not open or dismiss a popup",
-    ).toEqual(expectedSurfaces);
-    expect(
-      await control.count(),
-      "the target must remain available during navigation",
-    ).toBe(1);
-    const movement = await control.evaluate((element) => {
-      const target = element.getBoundingClientRect();
+  // Resolve the target and inspect each real D-pad stop in one browser call. Re-running
+  // role queries across the map for every focus and geometry read dominates the journey on CI.
+  const navigation = () =>
+    control.evaluateAll((targets) => {
+      const surfaces = Array.from(
+        document.querySelectorAll(
+          '[role="dialog"],[role="menu"],[role="listbox"]',
+        ),
+      )
+        .filter((node) => {
+          const bounds = node.getBoundingClientRect();
+          return (
+            bounds.width > 0 &&
+            bounds.height > 0 &&
+            node.checkVisibility({ visibilityProperty: true })
+          );
+        })
+        .map((node) => [
+          node.getAttribute("role"),
+          node.id,
+          node.getAttribute("aria-label"),
+        ]);
+      const element = targets[0];
       const active = document.activeElement as HTMLElement | null;
-      if (!active || active === document.body)
-        return { direction: "down", key: "body" };
+      const state = {
+        count: targets.length,
+        surfaces,
+        focused: !!element && active === element,
+      };
+      if (!element || !active || active === document.body || state.focused)
+        return { ...state, direction: "down", key: "body" };
       if (
         active.matches(".worldMapMarker,.territoryTileTarget") &&
         !element.matches(".worldMapMarker,.territoryTileTarget")
       ) {
-        // Every arrow belongs to map geography. Back returns to its toolbar
-        // before the player can navigate to another form control.
-        return { direction: "back", key: "map" };
+        // Every arrow belongs to map geography. Back returns to its toolbar.
+        return { ...state, direction: "back", key: "map" };
       }
+      const target = element.getBoundingClientRect();
       const from = active.getBoundingClientRect();
       const sameRow =
         Math.min(from.bottom, target.bottom) >
@@ -156,6 +158,7 @@ async function select(
           'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
         );
       return {
+        ...state,
         direction: horizontal
           ? target.left > from.left
             ? "right"
@@ -166,6 +169,19 @@ async function select(
         key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
       };
     });
+  let movement = await navigation();
+  const expectedSurfaces = movement.surfaces;
+  const visited = new Map<string, number>();
+  for (let attempt = 0; attempt < limit; attempt++) {
+    expect(
+      movement.count,
+      "the target must remain available during navigation",
+    ).toBe(1);
+    expect(
+      movement.surfaces,
+      "directional focus traversal must not open or dismiss a popup",
+    ).toEqual(expectedSurfaces);
+    if (movement.focused) return;
     const count = visited.get(movement.key) ?? 0;
     visited.set(movement.key, count + 1);
     const direction =
@@ -175,6 +191,7 @@ async function select(
           : movement.direction
         : ["down", "right", "up", "left"][count % 4];
     await input(page, direction as InputAction);
+    movement = await navigation();
   }
   await expect(
     control,
