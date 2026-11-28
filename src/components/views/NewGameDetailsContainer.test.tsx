@@ -21,6 +21,9 @@ jest.mock("./NewGameDetails", () => ({
 jest.mock("./StartGame", () => ({
   startWithSaveGuard: (_dispatch: unknown, start: () => void) => start(),
 }));
+jest.mock("../../helpers/UtilityLogoAssignment", () => ({
+  randomUtilityLogo: () => "clipped-bolt",
+}));
 jest.mock("../../Store", () => ({ store: { getState: jest.fn() } }));
 jest.mock("../../reducers/Game", () => ({
   start: (scenarioId: number) => ({ type: "start", scenarioId }),
@@ -44,10 +47,10 @@ it("previews and launches the same unlocked level when a remembered choice is lo
   const controls = mapDispatchToProps(dispatch);
   controls.onDelta({ difficulty: "CEO" });
   expect(dispatch).not.toHaveBeenCalled();
-  controls.onStart(100);
+  controls.onStart(100, "sunburst");
   expect(dispatch).toHaveBeenCalledWith({
     type: "delta",
-    payload: { difficulty: "Intern" },
+    payload: { difficulty: "Intern", utilityLogo: "sunburst" },
   });
   expect(dispatch).toHaveBeenCalledWith({ type: "start", scenarioId: 100 });
 });
@@ -68,7 +71,7 @@ it("uses newly earned history for launch and accepts unlocked selections", () =>
   mapDispatchToProps(dispatch).onStart(100);
   expect(dispatch).toHaveBeenCalledWith({
     type: "delta",
-    payload: { difficulty: "Employee" },
+    payload: { difficulty: "Employee", utilityLogo: "clipped-bolt" },
   });
 });
 

@@ -158,6 +158,7 @@ describe("RANDOM_STREAM", () => {
       weatherHazards: 11,
       cityMix: 12,
       sellerGeneratorAge: 13,
+      utilityLogos: 14,
     });
   });
 });
