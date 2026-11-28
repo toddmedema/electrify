@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { revealControl } from "../components/base/RevealControl";
 import type { AppStore } from "../Store";
 import type {
@@ -377,7 +378,10 @@ export function startDesktopInput(
     )
       return;
     document.documentElement.dataset.controllerInput = "true";
-    present({ active: true });
+    // The first action after a pointer can replace the Build rail with a dock
+    // button. Resolve that action against the controller layout the player enters.
+    if (!getInputPresentation().active)
+      flushSync(() => present({ active: true }));
     // Prefer one-shot intent over a held direction repeating in the same sample.
     // One intent per sample also keeps simultaneous buttons out of a newly opened dialog.
     const action =

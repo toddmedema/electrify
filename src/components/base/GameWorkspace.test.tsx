@@ -10,6 +10,10 @@ import type { SettingsType } from "../../Types";
 import { createGame } from "../../testing/Simulator";
 import { createMultiplayerTerritory } from "../../helpers/MultiplayerTerritory";
 import { SIDE_TOOL_MIN_WIDTH } from "../../WorkspaceLayout";
+import {
+  updateInputPresentation,
+  resetInputPresentation,
+} from "../../desktop/InputPresentation";
 import MapWorkspace from "./MapWorkspace";
 
 jest.mock("./GameAppBar", () => () => <div>Game status</div>);
@@ -148,6 +152,7 @@ function setup(
 }
 
 afterEach(() => {
+  act(() => resetInputPresentation());
   resize(originalWidth);
   jest.restoreAllMocks();
 });
@@ -194,6 +199,26 @@ it("keeps Fleet open beside the territorial multiplayer desktop Build catalogue"
   expect(build).not.toBeInTheDocument();
   expect(fleet).toBeVisible();
   expect(screen.getByRole("button", { name: /^Build$/ })).toHaveFocus();
+});
+
+it("keeps Fleet in front when controller input replaces the territorial Build window", async () => {
+  const app = setup(1280, {}, "multiplayer");
+  await app.user.click(screen.getByRole("button", { name: /^Build$/ }));
+  await app.user.click(app.action("Fleet"));
+  const fleet = screen.getByRole("region", { name: "Fleet" });
+  await app.user.click(screen.getByRole("button", { name: /^Build$/ }));
+  expect(screen.getByRole("region", { name: "Build" })).toHaveAttribute(
+    "data-map-window-front",
+    "true",
+  );
+  expect(app.store.getState().card.name).toBe("FLEET");
+  act(() => updateInputPresentation({ active: true }));
+  expect(screen.queryByRole("region", { name: "Build" })).toBeNull();
+  expect(fleet).toBeVisible();
+  expect(app.action("Fleet")).toHaveAttribute("aria-expanded", "true");
+  await app.user.keyboard("{Escape}");
+  expect(screen.queryByRole("region", { name: "Fleet" })).toBeNull();
+  expect(app.store.getState().card.name).toBe("FACILITIES");
 });
 
 it.each([360, SIDE_TOOL_MIN_WIDTH - 1])(

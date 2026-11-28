@@ -73,6 +73,7 @@ for (const theme of ["light", "dark"] as const) {
       })
       .click();
 
+    await openFleet(page);
     await expect(facilities.locator(".transmissionLine")).toBeVisible();
     await expect(page.locator(".cardTransitions > main")).toHaveCount(1);
     for (const [width, height] of [

@@ -336,7 +336,7 @@ export async function setMapProjectCapacity(
 
 /**
  * Open the Build catalogue from the map rail or compact dock.
- * Leave it open when the player has already opened it.
+ * Bring an already open floating catalogue to the front.
  */
 export async function openBuild(page: Page): Promise<Locator> {
   const build = page.getByRole("region", { name: "Build", exact: true });
@@ -344,7 +344,11 @@ export async function openBuild(page: Page): Promise<Locator> {
   // A purchase dialog temporarily hides the workspace from the accessibility tree.
   // Wait for it to return before deciding whether the dock would open or close Build.
   await waitForPaneOrNav(build, navButton);
-  if (!(await build.isVisible())) await navButton.click();
+  if (
+    !(await build.isVisible()) ||
+    (await build.getAttribute("data-map-window-front")) === "false"
+  )
+    await navButton.click();
   await expect(build).toBeVisible();
   return build;
 }

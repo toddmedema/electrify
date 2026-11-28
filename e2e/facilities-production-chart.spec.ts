@@ -217,7 +217,11 @@ for (const theme of ["light", "dark"]) {
       }
       await openBuild(page);
       await page.locator("#insightsNav").click();
-      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(2);
+      await expect(page.locator(".gameToolPanel:visible")).toHaveCount(3);
+      for (const name of ["Fleet", "Build", "Insights"])
+        await expect(
+          page.getByRole("region", { name, exact: true }),
+        ).toBeVisible();
       await expect(aligned).toPass();
     }
   });

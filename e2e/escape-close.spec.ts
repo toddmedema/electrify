@@ -52,7 +52,7 @@ for (const theme of ["light", "dark"] as const) {
 
     for (const { category, from, open } of [
       { category: "Generators", from: "w", open: "g" },
-      { category: "Storage", from: "r", open: "s" },
+      { category: "Storage", from: "r", open: "Shift+s" },
       { category: "Interties", from: "q", open: "g" },
     ]) {
       for (const close of ["button", "Escape"]) {

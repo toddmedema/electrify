@@ -106,7 +106,11 @@ export default function MapWorkspace({
     windows: MapWindow[];
     raisedToClose?: boolean;
   }>(() => ({ card, destination, windows: destination ? [destination] : [] }));
-  const windows = floating ? stack.windows : stack.windows.slice(-1);
+  // Territorial project selection replaces the Build window when using the dock.
+  const eligible = usesMapProject
+    ? stack.windows.filter((item) => item !== "BUILD_GENERATORS")
+    : stack.windows;
+  const windows = floating ? eligible : eligible.slice(-1);
   const openPanels = windows.filter(isDockTool);
   const active = windows.at(-1);
   // Navigation remembers the last dock tool even when a tile covers it. Teach
@@ -131,6 +135,8 @@ export default function MapWorkspace({
             ]
           : windows.filter((item) => item === "TILE");
     setStack({ card, destination, windows: retained });
+  } else if (eligible.length !== stack.windows.length) {
+    setStack({ card, destination, windows: eligible });
   }
   React.useLayoutEffect(() => {
     if (!desktopMap) return;

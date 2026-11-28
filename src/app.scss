@@ -5851,6 +5851,10 @@ $homeSmokeCycle: 5.6s;
 }
 .facilitySupplyChart {
   flex: 0 0 auto;
+  // Reserve plot space before uPlot mounts, so focused fleet rows stay in view.
+  .accessibleChart > [role="img"]:empty {
+    height: var(--fleet-plot-height);
+  }
 }
 .dayNightRibbon {
   position: absolute;

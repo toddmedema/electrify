@@ -726,6 +726,7 @@ function FacilitySupplyChart({
       ref={anchor}
       tabIndex={-1}
       className="operatingEvidence facilitySupplyChart"
+      style={{ "--fleet-plot-height": `${height}px` } as React.CSSProperties}
       aria-label="Supply and demand"
     >
       <ChartSupplyDemand
@@ -1078,10 +1079,12 @@ export default class Facilities extends React.Component<Props, SelectionState> {
       (this.liveSelectionCount() > (multiOnly ? 1 : 0) ||
         this.selectionModeActive())
     ) {
-      const modal = this.modalOpen();
+      const ownsEscape = !!this.state.menu || !this.modalOpen();
       this.clearSelection();
-      // A modal also owns Escape: let it dismiss normally as the group clears behind it.
-      if (!modal) event.preventDefault();
+      // Clearing our actions menu dismisses it in capture. Its Escape must not
+      // fall through to the Fleet window once the menu leaves the DOM.
+      // An independent modal still handles its own dismissal.
+      if (ownsEscape) event.preventDefault();
     }
   };
 
