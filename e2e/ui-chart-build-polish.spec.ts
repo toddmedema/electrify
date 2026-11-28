@@ -639,7 +639,7 @@ for (const theme of ["light", "dark"] as const) {
     expect(colors[2]).toBe(colors[1]);
   });
 
-  test(`purchased storage and interties retain their Fleet silhouettes and row focus in ${theme}`, async ({
+  test(`purchased interties and storage keep their Fleet icons and focus in ${theme}`, async ({
     page,
   }, info) => {
     const build = await openConstructionCatalog(page, theme);

@@ -424,7 +424,7 @@ it("paces routine four-seat views across paints and delivers a pause immediately
     f.publish();
   };
   try {
-    expect(f.world().spec.territorialVersion).toBe(1);
+    expect(f.world().spec.territorialVersion).toBe(2);
     await Promise.all(
       f.clients.map((client) =>
         client.submit({ kind: "speed", speed: "ULTRA" }),

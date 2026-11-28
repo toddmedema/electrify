@@ -439,6 +439,68 @@ test("a save from a newer app offers a one-click update instead of calling it br
   expect(store.getState().saves.unavailable?.newer).toBeUndefined();
 });
 
+test("periodic renewal cannot reclaim a save during Save & Exit", async () => {
+  await quitSavedGame();
+  store.dispatch(dialogClose());
+  jest.useFakeTimers();
+  const repository = require("./SaveRepository").mockRepository;
+  const saved = record();
+  let owner: string | undefined;
+  repository.prepareResume.mockImplementation(
+    async (_id: string, token: string) => {
+      if (owner && owner !== token) {
+        throw new SaveRepositoryError(
+          "conflict",
+          "The previous writer still owns this save",
+        );
+      }
+      owner = token;
+      return {
+        record: saved,
+        lease: { saveId: "A", writerToken: token, revision: 1 },
+      };
+    },
+  );
+  repository.renew.mockImplementation(async (lease: SaveLease) => {
+    owner = lease.writerToken;
+  });
+  const cleanup = startSaveSessions(store);
+  const released = deferred<void>();
+  const finishRelease = deferred<void>();
+  try {
+    expect(await resumeSavedGame("A")).toBe(true);
+    expect(await completeSaveLoading(getLoadingGeneration())).toBe(true);
+    const outgoing = owner;
+    repository.renew.mockClear();
+    jest.advanceTimersByTime(10_000);
+    expect(repository.renew).toHaveBeenCalledWith(
+      expect.objectContaining({ writerToken: outgoing }),
+    );
+
+    repository.release.mockImplementationOnce(async () => {
+      owner = undefined;
+      released.resolve(undefined);
+      await finishRelease.promise;
+    });
+    const exit = quitSavedGame();
+    await released.promise;
+    jest.advanceTimersByTime(10_000);
+    finishRelease.resolve(undefined);
+    expect(await exit).toBe(true);
+
+    expect(await resumeSavedGame("A")).toBe(true);
+    expect(owner).not.toBe(outgoing);
+    expect(await completeSaveLoading(getLoadingGeneration())).toBe(true);
+    expect(store.getState().game.date).toEqual(saved.save.game.date);
+    await quitSavedGame();
+  } finally {
+    finishRelease.resolve(undefined);
+    cleanup();
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  }
+});
+
 test("a failed source lease release retains the live game and offers transition recovery", async () => {
   const repository = require("./SaveRepository").mockRepository;
   const target = record();

@@ -865,7 +865,7 @@ test("a host can leave the interruption only after a confirmed epoch replaces it
   expect(f.posts).toContainEqual(
     expect.objectContaining({
       kind: "create",
-      spec: { ...COOP_TEST_SPEC, territorialVersion: 1 },
+      spec: { ...COOP_TEST_SPEC, territorialVersion: 2 },
     }),
   );
   expect(f.session.getSnapshot().view?.epoch).toBe("epoch");

@@ -112,6 +112,7 @@ for (const theme of ["light", "dark"] as const) {
     page,
   }) => {
     test.setTimeout(120000);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.addInitScript((mode) => {
       localStorage.clear();
       localStorage.setItem("theme", mode);

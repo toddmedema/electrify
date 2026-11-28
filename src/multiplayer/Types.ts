@@ -1,3 +1,4 @@
+import type { TerritorialState } from "../helpers/MultiplayerTerritory";
 import type {
   CompanyOutcomeType,
   DifficultyType,
@@ -17,7 +18,7 @@ export interface MatchSpec {
   difficulty: DifficultyType;
   customScenario?: ScenarioType;
   /** New launches stamp the world rules. Old checkpoints keep their opening layout. */
-  territorialVersion?: 1;
+  territorialVersion?: TerritorialState["version"];
 }
 export interface BorderConnection {
   a: FrontierTerritoryId;

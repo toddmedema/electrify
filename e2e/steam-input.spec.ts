@@ -183,8 +183,15 @@ async function select(
 }
 
 async function openControllerFleet(page: Page) {
-  await select(page, page.getByRole("button", { name: "Fleet", exact: true }));
-  await input(page, "confirm");
+  const fleet = page.locator("#facilitiesPane");
+  if (!(await fleet.isVisible())) {
+    await select(
+      page,
+      page.getByRole("button", { name: "Fleet", exact: true }),
+    );
+    await input(page, "confirm");
+  }
+  await expect(fleet).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Map", exact: true }),
   ).toBeVisible();
@@ -806,10 +813,13 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await expect(
     page.getByRole("button", { name: "Fleet", exact: true }),
   ).toBeVisible();
-  await input(page, "nextChart");
-  const chart = page.locator(
-    '.accessibleChart > [role="img"][tabindex="0"]:focus',
+  const charts = page.locator(
+    '#facilitiesPane .accessibleChart > [role="img"][tabindex="0"]',
   );
+  await expect(charts.first()).toBeHidden();
+  await input(page, "nextChart");
+  await expect(charts.first()).toBeVisible();
+  const chart = charts.and(page.locator(":focus"));
   await expect(chart).toBeFocused();
   await input(page, "confirm");
   await expect(chart.locator("..").getByRole("status")).not.toBeEmpty();

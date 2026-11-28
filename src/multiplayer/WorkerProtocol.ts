@@ -18,7 +18,7 @@ export function newMatchSpec(spec: MatchSpec): MatchSpec {
   return spec.scenarioId === CUSTOM_SCENARIO_ID &&
     spec.customScenario &&
     !spec.customScenario.mod
-    ? { ...spec, territorialVersion: 1 }
+    ? { ...spec, territorialVersion: 2 }
     : spec;
 }
 

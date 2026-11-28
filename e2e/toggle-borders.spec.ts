@@ -150,44 +150,50 @@ async function expectGlyphContrast(
   }
 }
 
-async function startToolbarGame(page: Page, theme: string) {
-  await page.emulateMedia({ reducedMotion: "no-preference" });
+async function openDifficulty(page: Page, theme: "light" | "dark") {
   await page.addInitScript((mode) => {
     localStorage.clear();
     localStorage.setItem("theme", mode);
     localStorage.setItem("audioEnabled", "false");
   }, theme);
   await page.goto("/?scenario=111");
+  return page.getByRole("group", {
+    name: "Difficulty",
+    exact: true,
+  });
+}
+
+async function unlockDifficulty(page: Page) {
+  await page.evaluate(
+    ({ key, journal }) => {
+      localStorage.setItem(key, JSON.stringify(journal));
+      dispatchEvent(new StorageEvent("storage", { key }));
+    },
+    { key: DIFFICULTY_STORAGE_KEY, journal: unlockedJournal },
+  );
+}
+
+async function startToolbarGame(page: Page, theme: "light" | "dark") {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const difficulty = await openDifficulty(page, theme);
+  await expect(difficulty).toBeVisible();
+  await unlockDifficulty(page);
+  await difficulty.getByRole("button", { name: "Medium", exact: true }).click();
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   await expect(page.locator(".gameStage .facilities")).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
-for (const theme of ["light", "dark"]) {
+for (const theme of ["light", "dark"] as const) {
   test(`difficulty keeps continuous selected borders in ${theme}`, async ({
     page,
   }, info) => {
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-      localStorage.setItem("audioEnabled", "false");
-    }, theme);
-    await page.goto("/?scenario=111");
-    const difficulty = page.getByRole("group", {
-      name: "Difficulty",
-      exact: true,
-    });
+    const difficulty = await openDifficulty(page, theme);
     // The opaque locked neighbor must not hide the beginner selection's edge.
     await expectContinuousBorder(
       difficulty.getByRole("button", { name: "Beginner", exact: true }),
     );
-    await page.evaluate(
-      ({ key, journal }) => {
-        localStorage.setItem(key, JSON.stringify(journal));
-        dispatchEvent(new StorageEvent("storage", { key }));
-      },
-      { key: DIFFICULTY_STORAGE_KEY, journal: unlockedJournal },
-    );
+    await unlockDifficulty(page);
     for (const name of ["Beginner", "Easy", "Medium", "Hard", "Expert"]) {
       const button = difficulty.getByRole("button", { name, exact: true });
       await button.click();
