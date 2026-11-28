@@ -4,7 +4,7 @@ import { test } from "./advance-world";
 import { crossplayFixture } from "./crossplay-fixture";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { reviewScreenshot } from "./review-screenshot";
-import { openPane, selectTerritoryMapTile } from "./layout";
+import { openFleet, openPane, selectTerritoryMapTile } from "./layout";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { RoomView } from "../src/multiplayer/Types";
 import type { GameType } from "../src/Types";
@@ -493,15 +493,72 @@ for (const count of [2, 3, 4]) {
         /SolarSam \(you\) selected 24×/,
       );
       if (!info.project.use.isMobile && buyer.viewportSize()!.width >= 1024) {
+        const fleet = await openFleet(buyer);
         const rail = territorialMap(buyer).getByRole("complementary", {
           name: "Build facilities",
         });
-        await rail.getByRole("button", { name: "Build", exact: true }).click();
+        const trigger = rail.getByRole("button", {
+          name: "Build",
+          exact: true,
+        });
+        await expect(trigger).toHaveId("buildNav");
+        await trigger.click();
         const build = buyer.getByRole("region", { name: "Build", exact: true });
         await expect(build).toHaveAttribute("data-resizable", "true");
+        await expect(fleet).toBeVisible();
         await build
           .getByRole("button", { name: "Close Build", exact: true })
           .click();
+        await expect(build).toHaveCount(0);
+        await expect(fleet).toBeVisible();
+        await expect(trigger).toBeFocused();
+        await buyer
+          .getByRole("button", { name: "Close Fleet", exact: true })
+          .click();
+      } else if (count === 2) {
+        const dockBuild = buyer
+          .getByRole("navigation", { name: "Game actions" })
+          .getByRole("button", { name: "Build", exact: true });
+        const project = buyer.getByRole("dialog", {
+          name: "Build",
+          exact: true,
+        });
+        const storage = project.getByRole("tab", {
+          name: "Storage",
+          exact: true,
+        });
+        const battery = project
+          .getByRole("tabpanel", {
+            name: "Storage",
+            exact: true,
+          })
+          .getByRole("button", {
+            name: "Review purchase of Lithium Battery",
+            exact: true,
+          });
+        const generators = project.getByRole("tab", {
+          name: "Generators",
+          exact: true,
+        });
+        const close = project.getByRole("button", {
+          name: "Close project",
+          exact: true,
+        });
+        await dockBuild.click();
+        await storage.click();
+        await close.click();
+        await expect(project).toHaveCount(0);
+        await dockBuild.click();
+        await expect(storage).toHaveAttribute("aria-selected", "true");
+        await expect(battery).toBeVisible();
+        await generators.click();
+        await close.click();
+        await expect(project).toHaveCount(0);
+        await buyer.keyboard.press("Shift+s");
+        await expect(storage).toHaveAttribute("aria-selected", "true");
+        await expect(battery).toBeVisible();
+        await generators.click();
+        await close.click();
       }
       const buyerGame = (await projection(buyer))!.game!;
       const before = buyerGame.facilities.length;

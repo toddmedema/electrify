@@ -72,11 +72,13 @@ for (const mission of missions) {
       ["Build", "g"],
       ["Build", "Shift+s"],
     ]) {
-      if (!mission.actions.includes(name)) await page.keyboard.press(key);
+      if (mission.actions.includes(name)) continue;
+      await page.keyboard.press(key);
+      await expect(
+        page.locator(".gameToolPanel:visible, .tileWorkspaceBuilding:visible"),
+        `${key} should leave ${name} closed`,
+      ).toHaveCount(0);
     }
-    await expect(
-      page.locator(".gameToolPanel:visible, .tileWorkspaceBuilding:visible"),
-    ).toHaveCount(0);
     const target = page.locator(".tutorialTarget").first();
     await expect(target).toBeInViewport();
     await target.click({ trial: true });

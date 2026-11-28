@@ -375,6 +375,28 @@ test("Escape closes the game menu before an unsaved program decision", async ({
   ).toBeVisible();
 });
 
+test("opening Fleet focuses its heading and inspecting a facility keeps keyboard focus on the row", async ({
+  page,
+}) => {
+  await startGame(page, "dark");
+  const fleet = await openFleet(page);
+  const title = page.getByRole("heading", { name: "Fleet", exact: true });
+  await expect(title).toBeFocused();
+  if (await page.locator(".gameWorkspace").getAttribute("data-map-windows")) {
+    await openBuild(page);
+    await page.getByRole("button", { name: "Fleet", exact: true }).click();
+    await expect(title).toBeFocused();
+  }
+  const inspect = fleet.getByRole("button", {
+    name: "Inspect Coal",
+    exact: true,
+  });
+  await expect(inspect).toHaveAttribute("aria-expanded", "false");
+  await inspect.press("Enter");
+  await expect(inspect).toHaveAttribute("aria-expanded", "true");
+  await expect(inspect).toBeFocused();
+});
+
 test("Build and Programs restore selections and scrolling without reopening hidden tools", async ({
   page,
 }) => {

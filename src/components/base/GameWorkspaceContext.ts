@@ -42,6 +42,7 @@ export const MapWorkspacePanelContext = createContext<
       tileWindow?: MapTileWindow;
       projectRequested?: boolean;
       buildCategory?: CardNameType;
+      setBuildCategory?: (category: CardNameType) => void;
       buildCatalogue?: MapBuildCatalogue;
       showProject?: (close: () => void) => void;
       hideProject?: () => void;

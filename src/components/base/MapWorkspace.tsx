@@ -216,9 +216,12 @@ export default function MapWorkspace({
     [floating],
   );
   const focusHeading = React.useCallback((item: MapWindow) => {
-    workspace.current
-      ?.querySelector<HTMLElement>(`#tool-${item} .gameToolTitle`)
-      ?.focus({ preventScroll: true });
+    const panel = workspace.current?.querySelector(`#tool-${item}`);
+    // In-panel actions such as inspecting a Fleet row already have a focus target.
+    if (panel && !panel.contains(document.activeElement))
+      panel
+        .querySelector<HTMLElement>(".gameToolTitle")
+        ?.focus({ preventScroll: true });
   }, []);
   const toggleTool = React.useCallback(
     (tool: GameTool) => {
@@ -301,12 +304,7 @@ export default function MapWorkspace({
   }, [active, floating, focusHeading]);
   React.useEffect(() => {
     if (retainFocus.current) retainFocus.current = false;
-    else if (destination) {
-      // Evidence links and category tabs may already have focused a control in this panel.
-      const panel = workspace.current?.querySelector(`#tool-${destination}`);
-      if (panel && !panel.contains(document.activeElement))
-        focusHeading(destination);
-    }
+    else if (destination) focusHeading(destination);
   }, [card, destination, focusHeading]);
   React.useEffect(() => {
     const escape = (event: KeyboardEvent) => {
@@ -347,6 +345,7 @@ export default function MapWorkspace({
         : undefined,
       projectRequested: !projectBusy && requestedProject,
       buildCategory,
+      setBuildCategory,
       buildCatalogue: catalogueRail
         ? { open: openBuild, onOpen: openCatalogue, onChoose: chooseBuild }
         : undefined,

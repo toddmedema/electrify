@@ -37,6 +37,7 @@ const categories = [
 
 export default function BuildFacilities({
   category,
+  onCategoryChange,
   onPickSite,
   mapCatalogue = false,
   lockedTileId,
@@ -44,6 +45,7 @@ export default function BuildFacilities({
   onRailSelectionApplied,
 }: {
   category?: string;
+  onCategoryChange?: (category: (typeof categories)[number][0]) => void;
   onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
   mapCatalogue?: boolean;
   lockedTileId?: TerritoryTileId;
@@ -66,14 +68,10 @@ export default function BuildFacilities({
   const visibleCategories = categories.filter(
     ([name]) => intertiesAvailable || name !== "BUILD_INTERTIES",
   );
+  const localCategory = !!onPickSite || (mapCatalogue && !onCategoryChange);
   const [projectCategory, setProjectCategory] = useToolState<
     (typeof categories)[number][0]
-  >("project.category", "BUILD_GENERATORS");
-  const localCategory = !!onPickSite || mapCatalogue;
-  React.useLayoutEffect(() => {
-    const requested = categories.find(([name]) => name === category)?.[0];
-    if (mapCatalogue && requested) setProjectCategory(requested);
-  }, [category, mapCatalogue, setProjectCategory]);
+  >(localCategory ? "project.category" : undefined, "BUILD_GENERATORS");
   const active = introductoryChoices
     ? "BUILD_GENERATORS"
     : visibleCategories.find(
@@ -94,6 +92,10 @@ export default function BuildFacilities({
     null,
   );
   const changeCategory = (name: (typeof categories)[number][0]) => {
+    if (onCategoryChange) {
+      onCategoryChange(name);
+      return;
+    }
     if (localCategory) {
       setProjectCategory(name);
       return;

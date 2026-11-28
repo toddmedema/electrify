@@ -63,6 +63,7 @@ export default function MultiplayerTerritoryMap({
     projectRequested,
     buildCatalogue,
     buildCategory,
+    setBuildCategory,
   } = panel ?? {};
   const map = React.useRef<HTMLElement>(null);
   const focusOnMap = React.useRef<TerritoryMapTileKey>();
@@ -252,6 +253,7 @@ export default function MultiplayerTerritoryMap({
                 mapCatalogue
                 lockedTileId={project.site}
                 category={buildCategory}
+                onCategoryChange={setBuildCategory}
               />
             </MapProjectPanel>
           </GameBuildCompleteContext.Provider>
