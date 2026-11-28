@@ -7,9 +7,13 @@ import type {
 } from "../Types";
 import { UTILITY_AREAS } from "../data/UtilityExpansion";
 import { isLandTerritoryId } from "../data/Territories";
-import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
+import {
+  VALLEY_BOARD,
+  type TerritoryTileDefinition,
+} from "../data/TerritoryTiles";
 import {
   facilityTileId,
+  hasTerritoryNetwork,
   scenarioMapTiles,
   createTerritoryTileOwnership,
 } from "./TerritoryTiles";
@@ -60,6 +64,23 @@ export interface TerritoryTileView {
   visibilityDistance: 0 | 1 | 2 | 3;
   disaster?: TileDisaster;
 }
+
+const authoredValleyTiles = new Set(VALLEY_BOARD);
+
+/** Only an unmodified, built-in solo board can opt into the inland shader. */
+export function territoryMapBoard(game: GameType) {
+  const views = territoryTileViews(game);
+  const authoredInland: true | undefined =
+    !game.customScenario &&
+    !game.multiplayer &&
+    hasTerritoryNetwork(game) &&
+    views.length === VALLEY_BOARD.length &&
+    views.every(({ tile }) => authoredValleyTiles.has(tile))
+      ? true
+      : undefined;
+  return { views, authoredInland };
+}
+
 /** One truthful foreground per cell; peer structures are projected by the shared world. */
 export function territoryTileViews(game: GameType): TerritoryTileView[] {
   const readDisaster = readTerritoryDisasters(game);

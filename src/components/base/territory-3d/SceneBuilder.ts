@@ -25,6 +25,13 @@ import { hailModel } from "./Hailstones";
 import { getTowerConstructionModel } from "./StructureModels";
 import { MeshBuilder } from "./MeshBuilder";
 import { PALETTE } from "./Palette";
+import { coastEdges, oceanShoreMask } from "./Shoreline";
+import {
+  coastStyle,
+  coastTop,
+  getCoastModel,
+  scorchedCoast,
+} from "./CoastModels";
 import { tilePosition3D } from "./Projection";
 import { surfaceHeight } from "./SurfaceHeight";
 import type {
@@ -46,6 +53,10 @@ interface TileScene {
   size?: FacilitySize;
   growth?: readonly CityGrowthSector[];
   terrain: MapInstance;
+  /** Beach or cliff trim along a land tile's sea-facing edges. */
+  coast?: MapInstance;
+  /** A submerged cable comes ashore here. */
+  cabled: boolean;
   model?: MapModel;
   construction?: { stage: FacilityConstructionStage; model: MapModel };
   gridJunction?: MapInstance;
@@ -231,6 +242,7 @@ export class SceneBuilder {
   private wireKey?: string;
   private wires?: readonly HexWire[];
   private overheadWireTiles = new Set<string>();
+  private cableLandings = new Set<string>();
   private wireModels: MapInstance[] = [];
   private tiles?: readonly TerritoryTileDefinition[];
   private terrainAt = new Map<string, TerrainType>();
@@ -260,11 +272,15 @@ export class SceneBuilder {
     if (wires !== this.wires) {
       this.wires = wires;
       this.overheadWireTiles.clear();
-      for (const wire of wires)
-        if (wire.kind === "overhead") {
-          this.overheadWireTiles.add(wire.from);
-          this.overheadWireTiles.add(wire.to);
-        }
+      this.cableLandings.clear();
+      for (const wire of wires) {
+        const tiles =
+          wire.kind === "overhead"
+            ? this.overheadWireTiles
+            : this.cableLandings;
+        tiles.add(wire.from);
+        tiles.add(wire.to);
+      }
     }
     const byId = new Map<string, TerritoryTileView>(
       views.map((view) => [territoryMapTileKey(view.tile), view]),
@@ -285,6 +301,7 @@ export class SceneBuilder {
             ? "scorched"
             : view.disaster?.ground;
       const frost = view.disaster?.frost !== undefined;
+      const cabled = this.cableLandings.has(tileKey);
       let cell = this.cells.get(tileKey);
       if (
         !cell ||
@@ -294,6 +311,7 @@ export class SceneBuilder {
         cell.size !== size ||
         cell.growth !== growth ||
         cell.weather !== weather ||
+        cell.cabled !== cabled ||
         !!cell.terrain.wildfire !== burning ||
         cell.terrain.fog !== view.visibilityDistance
       ) {
@@ -301,19 +319,22 @@ export class SceneBuilder {
           ? this.factories.structure(kind, growth, size)
           : undefined;
         const position = tilePosition3D(tile);
+        const ports =
+          tile.terrain === "river" || tile.terrain === "lake"
+            ? waterPorts(tile, this.terrainAt, view.offMapRiverEdge)
+            : undefined;
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
           weather,
           variant:
             tile.terrain === "plains"
               ? farmLayout(tile.q, tile.r, this.farms)
-              : tile.terrain === "mountain" || tile.terrain === "river"
+              : tile.terrain === "mountain" ||
+                  tile.terrain === "river" ||
+                  tile.terrain === "lake"
                 ? terrainArtHash(tile.q, tile.r) >>> 30
                 : undefined,
-          ports:
-            tile.terrain === "river" || tile.terrain === "lake"
-              ? waterPorts(tile, this.terrainAt, view.offMapRiverEdge)
-              : undefined,
+          ports,
           ...(tile.terrain === "mountain" ||
           tile.terrain === "forest" ||
           tile.terrain === "lake"
@@ -329,10 +350,41 @@ export class SceneBuilder {
               }
             : {}),
         });
+        // A river mouth keeps its open channel to the sea, and a lake keeps its
+        // own shore ring. Mouths and the map's edge read as open water.
+        const mouths = (ports ?? []).reduce(
+          (bits, port) => bits | (1 << port),
+          0,
+        );
+        const shoreline =
+          tile.terrain === "ocean" || tile.terrain === "lake"
+            ? 0
+            : coastEdges(tile.q, tile.r, this.terrainAt) & ~mouths;
+        const open = HEX_NEIGHBORS.reduce(
+          (bits, [dq, dr], edge) =>
+            this.terrainAt.has(`${tile.q + dq},${tile.r + dr}`)
+              ? bits
+              : bits | (1 << edge),
+          mouths,
+        );
+        const coastModel = shoreline
+          ? getCoastModel(
+              coastStyle(
+                tile.terrain,
+                terrainArtHash(tile.q, tile.r),
+                model?.footprint ?? 0,
+                cabled,
+              ),
+              shoreline,
+              coastTop(tile.terrain),
+              open,
+            )
+          : undefined;
         cell = {
           tile,
           offMapRiverEdge: view.offMapRiverEdge,
           weather,
+          cabled,
           kind,
           size,
           growth,
@@ -344,6 +396,9 @@ export class SceneBuilder {
             active: false,
             frost,
             model: terrain,
+            ...(tile.terrain === "ocean" && {
+              shore: oceanShoreMask(tile.q, tile.r, this.terrainAt),
+            }),
             ...(burning && {
               wildfire: {
                 q: tile.q,
@@ -353,6 +408,19 @@ export class SceneBuilder {
               },
             }),
           },
+          coast: coastModel
+            ? {
+                id: `coast:${tileKey}`,
+                position,
+                fog: view.visibilityDistance,
+                active: false,
+                frost,
+                model:
+                  weather === "scorched"
+                    ? scorchedCoast(coastModel)
+                    : coastModel,
+              }
+            : undefined,
           structure: model
             ? {
                 id: `structure:${tileKey}`,
@@ -367,11 +435,14 @@ export class SceneBuilder {
       }
       if (cell.terrain.frost !== frost)
         cell.terrain = { ...cell.terrain, frost };
+      if (cell.coast && cell.coast.frost !== frost)
+        cell.coast = { ...cell.coast, frost };
       const position = cell.structure?.position ?? cell.terrain.position;
       const model = cell.model;
       const endpoint: WireEndpoint = { position };
       endpoints.set(tileKey, endpoint);
       instances.push(cell.terrain);
+      if (cell.coast) instances.push(cell.coast);
       if (!model) continue;
       const stage = size ? facilityConstructionStage(view.facility) : undefined;
       if (

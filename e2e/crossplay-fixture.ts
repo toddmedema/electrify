@@ -240,7 +240,7 @@ interface SimulationBridge {
   crossplayWire(
     source: number,
     destination: number,
-    bytes: number[],
+    frame: string,
   ): Promise<void>;
   receiveCrossplayFrames?(
     source: number,
@@ -277,7 +277,9 @@ async function installWebRtcSimulation(page: Page, address: string) {
           .crossplayWire(
             localPort,
             remotePort,
-            Array.from(new Uint8Array(payload)),
+            // A TURN frame is at most 16 KiB. Pass one string across DevTools
+            // instead of having Playwright serialize a separate value per byte.
+            btoa(String.fromCharCode(...new Uint8Array(payload))),
           )
           .catch(() => this.peer.close());
       }
@@ -1140,7 +1142,7 @@ export function crossplayFixture() {
       );
       await page.exposeBinding(
         "crossplayWire",
-        async (_, source: number, destination: number, data: number[]) => {
+        async (_, source: number, destination: number, payload: string) => {
           const recipient = ports.get(destination);
           if (
             ports.get(source) !== page ||
@@ -1150,7 +1152,6 @@ export function crossplayFixture() {
             offline.has(recipient)
           )
             return;
-          const payload = Buffer.from(data).toString("base64");
           const key = `${source}:${destination}`;
           const pending = wireQueues.get(key);
           if (pending) {

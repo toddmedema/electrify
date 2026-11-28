@@ -5,11 +5,12 @@ import { ordinaryTileConnectionPrice } from "./Territories";
 import { runMonths } from "../testing/SimulationTestHelpers";
 import { VALLEY_BOARD, isValleyBoardTile } from "../data/TerritoryTiles";
 import { municipalPlantAt } from "../data/MunicipalUtilities";
+import { getScenario } from "../data/Scenarios";
 import { createGame } from "../testing/Simulator";
 import { retiredValleyOpeningProgress } from "../testing/SaveTestHelpers";
 import { getMonthlyPayment, maxLoanAmount } from "./Financials";
 import { currentTick } from "./GameSelectors";
-import { territoryTileViews } from "./TerritoryMapState";
+import { territoryMapBoard, territoryTileViews } from "./TerritoryMapState";
 import { purchaseTile, tilePrice, tilePurchaseQuote } from "./Territories";
 import {
   getTerritoryTile,
@@ -38,6 +39,7 @@ it("maps the entire board from the first tick and fades distant terrain", () => 
     new Set(VALLEY_BOARD.map(({ id }) => id)),
   );
   expect(opening).toHaveLength(VALLEY_BOARD.length);
+  expect(territoryMapBoard(game).authoredInland).toBe(true);
   const edge = opening.find(({ tile }) => tile.id === "frontier:8:1");
   expect(edge?.visibilityDistance).toBe(3);
   expect(tilePurchaseQuote(game, edge!.tile.id)).toBeUndefined();
@@ -55,6 +57,42 @@ it("maps the entire board from the first tick and fades distant terrain", () => 
   expect(
     grown.find(({ tile }) => tile.id === adjacent.tileId)?.visibilityDistance,
   ).toBe(0);
+  expect(territoryMapBoard(game).authoredInland).toBe(true);
+});
+
+it("requires an authored scenario even when it projects the same inland tiles", () => {
+  const game = ready();
+  const opening = territoryMapBoard(game);
+  const custom = territoryMapBoard({
+    ...game,
+    customScenario: getScenario(116)!,
+  });
+  const unknown = territoryMapBoard({ ...game, scenarioId: 9999 });
+  for (const board of [custom, unknown]) {
+    expect(board.views.map(({ tile }) => tile)).toEqual(
+      opening.views.map(({ tile }) => tile),
+    );
+    expect(board.authoredInland).toBeUndefined();
+  }
+});
+
+it("uses the full shader when a retained inland footprint replaces an authored tile", () => {
+  const game = ready();
+  const retained = {
+    id: "champlain:legacy-100",
+    territoryId: "champlain",
+    q: 6,
+    r: -4,
+    terrain: "plains",
+    siteKind: "industrial",
+    maxPeakW: 1e8,
+  } as const;
+  game.territoryNetwork!.legacyTiles = [retained];
+  const { views, authoredInland } = territoryMapBoard(game);
+  expect(views).toHaveLength(VALLEY_BOARD.length);
+  expect(views.some(({ tile }) => tile === retained)).toBe(true);
+  expect(views.some(({ tile }) => tile.terrain === "ocean")).toBe(false);
+  expect(authoredInland).toBeUndefined();
 });
 
 it("keeps older off-board property visible and caps new connections at the scenario boundary", () => {

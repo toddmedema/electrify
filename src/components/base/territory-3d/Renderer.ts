@@ -7,6 +7,12 @@ import {
 } from "./Hailstones";
 import { interpolateMapLighting } from "./Lighting";
 import { createMapProgram } from "./MapProgram";
+import { COAST_TRIM_HEIGHT } from "./CoastModels";
+import {
+  OCEAN_FALLBACK_FRAGMENT,
+  OCEAN_FRAGMENT,
+  OCEAN_WATER_MATERIAL,
+} from "./OceanShader";
 import { FacilityMotionClock, MOTION_CYCLE } from "./MotionClock";
 import {
   CAMERA_COS,
@@ -38,7 +44,7 @@ const FOG_SATURATION = [1, 0.8, 0.45, 0.15];
 const CITY_WINDOW_MATERIAL = 5;
 const RIVER_WATER_MATERIAL = 6;
 const NIGHT_BACKGROUND: Vec3 = [0.022, 0.032, 0.047];
-const VERTEX = `#version 300 es
+const vertex = (hasOcean: boolean) => `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aNormal;
@@ -56,7 +62,7 @@ out vec3 vColor;
 out vec4 vStyle;
 flat out vec4 vMaterial;
 out vec3 vSurfacePosition;
-void main() {
+${hasOcean ? "out vec2 vLocal;\n" : ""}void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
   if (aMaterial.z == 2.0 || aMaterial.z == ${RIVER_WATER_MATERIAL}.0) {
     world.y += mix(${WATERSHED_LEVEL_OFFSETS[0]}, ${WATERSHED_LEVEL_OFFSETS[1]}, uWeather.z);
@@ -64,7 +70,13 @@ void main() {
     if (aMaterial.z == ${RIVER_WATER_MATERIAL}.0) world.y -= aPosition.y * uWeather.z;
   }
   vSurfacePosition = world.xyz;
-  if (uShadow) {
+${
+  hasOcean
+    ? `  // Ocean shore masks are in world-axis ring order, around the instance origin.
+  vLocal = world.xz - aTransform[3].xz;
+`
+    : ""
+}  if (uShadow) {
     vec2 reach = -uLight.xz * max(0.0, world.y - 0.003) / max(0.25, uLight.y);
     float distance = length(reach);
     if (distance > 3.0) reach *= 3.0 / distance;
@@ -72,6 +84,11 @@ void main() {
     world.y = 0.003;
   }
   gl_Position = uProjection * world;
+  if (aMaterial.z == 4.0 && !uShadow) {
+    // Keep territory and selection outlines over coastal cliffs: take the depth
+    // of a point raised above the tallest rim, without moving the outline.
+    gl_Position.z += uProjection[1][2] * ${(COAST_TRIM_HEIGHT + 0.01).toFixed(4)};
+  }
   vNormal = normalize(mat3(aTransform) * aNormal);
   vColor = aColor;
   vStyle = aStyle;
@@ -81,14 +98,14 @@ void main() {
     vMaterial.x = step(aColor.r, service);
   }
 }`;
-const FRAGMENT = `#version 300 es
+const fragment = (ocean = "") => `#version 300 es
 precision highp float;
 in vec3 vNormal;
 in vec3 vColor;
 in vec4 vStyle;
 flat in vec4 vMaterial;
 in vec3 vSurfacePosition;
-uniform vec3 uLight;
+${ocean ? "in vec2 vLocal;\n" : ""}uniform vec3 uLight;
 uniform vec3 uWaterHalfVector;
 uniform vec4 uWeather;
 uniform vec3 uLightColor;
@@ -113,6 +130,7 @@ float surfaceNoise(vec2 point) {
     edge.y
   );
 }
+${ocean}
 void main() {
   float fog = vStyle.x;
   if (uShadow) {
@@ -127,46 +145,60 @@ void main() {
   float incidence = max(0.0, dot(normal, uLight));
   float band = incidence < 0.25 ? 0.48 : (incidence < 0.7 ? 0.76 : 1.0);
   bool cityWindow = vMaterial.z == ${CITY_WINDOW_MATERIAL}.0;
-  vec3 base = cityWindow
+${ocean ? `  bool ocean = vMaterial.z == ${OCEAN_WATER_MATERIAL}.0;\n` : ""}  vec3 base = cityWindow
     ? mix(vec3(0.22, 0.33, 0.37), vec3(0.39, 0.69, 0.66), vMaterial.x)
     : mix(vColor, vec3(1.0, 0.71, 0.32), vMaterial.x);
-  if (vMaterial.z == 3.0) {
-    float snowLine = mix(0.75, 0.25, uWeather.w);
-    float cap = smoothstep(snowLine, snowLine + 0.13, vSurfacePosition.y);
-    // Snow clings more strongly to shoulders than to steep rock faces.
-    base = mix(base, vec3(0.88, 0.93, 0.98),
-      cap * smoothstep(0.0, 0.18, uWeather.w) * (0.52 + 0.48 * normal.y));
-  }
-  if (vMaterial.w > 0.0 && normal.y > 0.08) {
-    // Anchor the glaze to the landscape. Bare rock and shaded foliage show through.
-    vec2 surface = vSurfacePosition.xz + vSurfacePosition.y * vec2(0.22, -0.37);
-    float exposure = smoothstep(0.08, 0.76, normal.y);
-    float patches = surfaceNoise(surface * vec2(7.0, 10.0));
-    vec2 crystal = surface * vec2(28.0, 37.0);
-    float grain = surfaceGrain(floor(crystal));
-    vec2 facet = fract(crystal) - 0.5;
-    float facetEdge = abs(facet.x + facet.y * 0.7) + abs(facet.y) * 0.55;
-    float crystals = (1.0 - smoothstep(0.18, 0.39, facetEdge))
-      * smoothstep(0.55, 0.86, grain) * smoothstep(0.33, 0.58, patches);
-    float crust = smoothstep(0.42, 0.75, patches + (grain - 0.5) * 0.14);
-    float deposit = exposure * (0.12 + 0.61 * crust + 0.26 * crystals);
-    base = mix(base, vec3(0.88, 0.96, 0.99), deposit);
-  }
-  vec3 lit = base * (uAmbient + (1.0 - uAmbient) * band);
-  lit *= mix(vec3(1.0), uLightColor, 0.65);
   bool riverWater = vMaterial.z == ${RIVER_WATER_MATERIAL}.0;
-  if (vMaterial.z == 1.0 || vMaterial.z == 2.0 || riverWater) {
-    // A bounded sky tint and broad glint, with the normal shadow pass laid over both.
-    float cloud = uWeather.x;
-    vec3 sky = mix(uLightColor * uAmbient, uBackground, 0.35 + cloud * 0.35);
-    float ripple = sin(dot(vSurfacePosition.xz, vec2(17.0, 43.0)));
-    float gloss = clamp(dot(normal, uWaterHalfVector) + ripple * (0.03 + 0.06 * uWeather.y), 0.0, 1.0);
-    float glossSquared = gloss * gloss;
-    float glint = glossSquared * glossSquared;
-    glint *= glint;
-    lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
-  }
-  lit *= mix(1.0, 0.40, uNight);
+  vec3 lit;
+${
+  ocean
+    ? `  if (ocean) {
+    lit = oceanLit(band);
+  } else {
+`
+    : ""
+}    if (vMaterial.z == 3.0) {
+      float snowLine = mix(0.75, 0.25, uWeather.w);
+      float cap = smoothstep(snowLine, snowLine + 0.13, vSurfacePosition.y);
+      // Snow clings more strongly to shoulders than to steep rock faces.
+      base = mix(base, vec3(0.88, 0.93, 0.98),
+        cap * smoothstep(0.0, 0.18, uWeather.w) * (0.52 + 0.48 * normal.y));
+    }
+    if (vMaterial.w > 0.0 && normal.y > 0.08) {
+      // Anchor the glaze to the landscape. Bare rock and shaded foliage show through.
+      vec2 surface = vSurfacePosition.xz + vSurfacePosition.y * vec2(0.22, -0.37);
+      float exposure = smoothstep(0.08, 0.76, normal.y);
+      float patches = surfaceNoise(surface * vec2(7.0, 10.0));
+      vec2 crystal = surface * vec2(28.0, 37.0);
+      float grain = surfaceGrain(floor(crystal));
+      vec2 facet = fract(crystal) - 0.5;
+      float facetEdge = abs(facet.x + facet.y * 0.7) + abs(facet.y) * 0.55;
+      float crystals = (1.0 - smoothstep(0.18, 0.39, facetEdge))
+        * smoothstep(0.55, 0.86, grain) * smoothstep(0.33, 0.58, patches);
+      float crust = smoothstep(0.42, 0.75, patches + (grain - 0.5) * 0.14);
+      float deposit = exposure * (0.12 + 0.61 * crust + 0.26 * crystals);
+      base = mix(base, vec3(0.88, 0.96, 0.99), deposit);
+    }
+    lit = base * (uAmbient + (1.0 - uAmbient) * band);
+    lit *= mix(vec3(1.0), uLightColor, 0.65);
+    if (vMaterial.z == 1.0 || vMaterial.z == 2.0 || riverWater) {
+      // A bounded sky tint and broad glint, with the normal shadow pass laid over both.
+      float cloud = uWeather.x;
+      vec3 sky = mix(uLightColor * uAmbient, uBackground, 0.35 + cloud * 0.35);
+      float ripple = sin(dot(vSurfacePosition.xz, vec2(17.0, 43.0)));
+      float gloss = clamp(dot(normal, uWaterHalfVector) + ripple * (0.03 + 0.06 * uWeather.y), 0.0, 1.0);
+      float glossSquared = gloss * gloss;
+      float glint = glossSquared * glossSquared;
+      glint *= glint;
+      lit = mix(lit, sky, 0.15) + uLightColor * glint * mix(0.16, 0.028, cloud);
+    }
+${
+  ocean
+    ? `  }
+  // The ocean applies its own night response.
+  if (!ocean) `
+    : "  "
+}lit *= mix(1.0, 0.40, uNight);
   // Preserve a blue-green surface in low light, before applying distance fog.
   if (riverWater) {
     float current = surfaceNoise(vSurfacePosition.xz * 7.0);
@@ -311,6 +343,7 @@ export class MapRenderer {
   constructor(
     private canvas: MapCanvas,
     private onState?: (state: State) => void,
+    private readonly inlandOnly = false,
   ) {
     Object.defineProperty(canvas, "map3DDiagnostics", {
       value: this.sampleDiagnostics,
@@ -452,7 +485,11 @@ export class MapRenderer {
           ? waterLevelOffset(WATERSHED_LEVEL_OFFSETS, waterLevel)
           : 0;
         const offsetAt = (y: number) => surfaceOffset - y * riverRiseFade;
-        if (watershed || part.material === "water")
+        if (
+          watershed ||
+          part.material === "water" ||
+          part.material === "ocean-water"
+        )
           waterSurfaceY.push(pose[13] + vertices[1] + offsetAt(vertices[1]));
         for (let i = 0; i < vertices.length; i += 3)
           for (let axis = 0; axis < 3; axis++) {
@@ -529,7 +566,7 @@ export class MapRenderer {
       const gl = this.gl;
       if (!gl || gl.getContextAttributes()?.stencil === false)
         throw new Error("Map requires WebGL2 with a stencil buffer");
-      const program = createMapProgram(gl, VERTEX, FRAGMENT);
+      const program = this.createProgram(gl);
       this.program = program;
       this.uniforms = {
         projection: gl.getUniformLocation(program, "uProjection"),
@@ -553,6 +590,22 @@ export class MapRenderer {
     this.state = "ready";
     this.readyPending = true;
     this.schedule();
+  }
+
+  private createProgram(gl: WebGL2RenderingContext): WebGLProgram {
+    // Even an unused ocean branch slows land draws on software WebGL.
+    if (this.inlandOnly) return createMapProgram(gl, vertex(false), fragment());
+    const coastalVertex = vertex(true);
+    try {
+      return createMapProgram(gl, coastalVertex, fragment(OCEAN_FRAGMENT));
+    } catch (_error) {
+      // Keep the map if one driver rejects the ocean shader: draw a flat sea instead.
+      return createMapProgram(
+        gl,
+        coastalVertex,
+        fragment(OCEAN_FALLBACK_FRAGMENT),
+      );
+    }
   }
 
   private contextLost = (event: Event): void => {
@@ -753,6 +806,7 @@ export class MapRenderer {
         previous.producing !== next.producing ||
         previous.onPlayerGrid !== next.onPlayerGrid ||
         previous.motionKey !== next.motionKey ||
+        previous.shore !== next.shore ||
         previous.wildfire !== next.wildfire
       )
         return false;
@@ -979,14 +1033,19 @@ export class MapRenderer {
                 ? CITY_WINDOW_MATERIAL
                 : part.material === "river-water"
                   ? RIVER_WATER_MATERIAL
-                  : 0;
+                  : part.material === "ocean-water"
+                    ? OCEAN_WATER_MATERIAL
+                    : 0;
+    // Ocean water reads its shore mask here; other water never takes frost.
     pose[23] =
-      instance.frost &&
-      pose[22] !== 1 &&
-      pose[22] !== 2 &&
-      pose[22] !== RIVER_WATER_MATERIAL
-        ? 1
-        : 0;
+      pose[22] === OCEAN_WATER_MATERIAL
+        ? (instance.shore ?? 0)
+        : instance.frost &&
+            pose[22] !== 1 &&
+            pose[22] !== 2 &&
+            pose[22] !== RIVER_WATER_MATERIAL
+          ? 1
+          : 0;
   }
 
   private draw(moving: boolean, lighting: MapLighting): void {

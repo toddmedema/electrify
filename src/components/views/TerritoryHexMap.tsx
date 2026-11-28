@@ -144,6 +144,7 @@ export interface MapTileMenuTarget {
 interface Props {
   game: GameType;
   views: readonly TerritoryTileView[];
+  authoredInland?: true;
   regional?: boolean;
   selected?: TerritoryMapTileKey;
   inspected?: TerritoryMapTileKey;
@@ -162,6 +163,7 @@ interface Props {
 export default function TerritoryHexMap({
   game,
   views,
+  authoredInland,
   regional = false,
   selected,
   inspected,
@@ -1339,6 +1341,7 @@ export default function TerritoryHexMap({
               <TerritoryScene3D
                 views={renderedViews}
                 tiles={tiles}
+                authoredInland={authoredInland}
                 cityGrowth={cityGrowth}
                 ownership={topology}
                 ownerPalette={ownerPalette}

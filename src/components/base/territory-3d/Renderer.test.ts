@@ -2,6 +2,7 @@ import { hailModel, hailstoneRise } from "./Hailstones";
 import { TICK_MS } from "../../../Constants";
 import { MeshBuilder } from "./MeshBuilder";
 import { MapRenderer } from "./Renderer";
+import { OCEAN_WATER_MATERIAL } from "./OceanShader";
 import { projectPoint, tilePosition3D } from "./Projection";
 import { getStructureModel } from "./StructureModels";
 import { getTerrainModel } from "./TerrainModels";
@@ -160,13 +161,13 @@ function flush(timestamp: number) {
   callbacks.clear();
   for (const callback of pending) callback(timestamp);
 }
-function setup(gl = mockContext()) {
+function setup(gl = mockContext(), inlandOnly?: true) {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest
     .spyOn(canvas, "getContext")
     .mockReturnValue(gl as unknown as WebGL2RenderingContext);
   const state = jest.fn();
-  const renderer = new MapRenderer(canvas, state);
+  const renderer = new MapRenderer(canvas, state, inlandOnly);
   return { canvas, gl, state, renderer };
 }
 beforeEach(() => {
@@ -707,7 +708,7 @@ it("rebuilds lost GPU resources and notifies readiness only after restored drawi
   expect(renderer.diagnostics().phases["facility-0"]).toBe(phase);
   renderer.dispose();
 });
-it("fails gracefully without WebGL2 or when shader compilation fails", () => {
+it("fails gracefully without WebGL2", () => {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest.spyOn(canvas, "getContext").mockReturnValue(null);
   const state = jest.fn(),
@@ -716,13 +717,62 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   expect(state).toHaveBeenCalledWith("unavailable");
   expect(callbacks.size).toBe(0);
   renderer.dispose();
+});
+
+it.each([
+  { mode: "inland", inlandOnly: true as const, attempts: 1 },
+  {
+    mode: "default ocean and flat fallback",
+    inlandOnly: undefined,
+    attempts: 2,
+  },
+])(
+  "releases every failed $mode shader and program",
+  ({ inlandOnly, attempts }) => {
+    const gl = mockContext();
+    gl.getShaderParameter.mockReturnValue(false);
+    const { renderer, state } = setup(gl, inlandOnly);
+    expect(state).toHaveBeenCalledWith("unavailable");
+    expect(gl.deleteShader).toHaveBeenCalledTimes(attempts);
+    expect(gl.deleteProgram).toHaveBeenCalledTimes(attempts);
+    renderer.dispose();
+  },
+);
+
+it("draws inland geometry without compiling an ocean program", () => {
   const gl = mockContext();
-  gl.getShaderParameter.mockReturnValue(false);
-  const broken = setup(gl);
-  expect(broken.state).toHaveBeenCalledWith("unavailable");
-  expect(gl.deleteShader).toHaveBeenCalledTimes(1);
+  const sources = new Map<unknown, string>();
+  (gl.shaderSource as jest.Mock).mockImplementation(
+    (shader: unknown, source: string) => sources.set(shader, source),
+  );
+  (gl.getShaderParameter as jest.Mock).mockImplementation(
+    (shader: unknown) => !sources.get(shader)?.includes("shoreDistance"),
+  );
+  const { renderer, state } = setup(gl, true);
+  renderer.update(scene(), frame);
+  flush(0);
+  expect(state).toHaveBeenLastCalledWith("ready");
+  expect(renderer.diagnostics().triangles).toBeGreaterThan(0);
+  expect(gl.deleteProgram).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it("compiles the ocean shader by default and falls back to a flat sea if rejected", () => {
+  const gl = mockContext();
+  const sources = new Map<unknown, string>();
+  (gl.shaderSource as jest.Mock).mockImplementation(
+    (shader: unknown, source: string) => sources.set(shader, source),
+  );
+  (gl.getShaderParameter as jest.Mock).mockImplementation(
+    (shader: unknown) => !sources.get(shader)?.includes("shoreDistance"),
+  );
+  const { renderer, state } = setup(gl);
+  renderer.update([{ ...scene()[0], model: getTerrainModel("ocean") }], frame);
+  flush(0);
+  expect(state).toHaveBeenLastCalledWith("ready");
+  expect(renderer.diagnostics().triangles).toBeGreaterThan(0);
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
-  broken.renderer.dispose();
+  renderer.dispose();
 });
 
 it.each([
@@ -1131,6 +1181,24 @@ it("uploads the frost material when cold starts and ends while keeping surface w
     expect(pose[23]).toBe(frost ? 1 : 0);
     expect(pose[47]).toBe(0);
     expect(renderer.diagnostics().meshCount).toBe(1);
+  }
+  renderer.dispose();
+});
+
+it("hands each ocean tile its shore mask instead of frost", () => {
+  const { renderer, gl } = setup();
+  const mesh = model.parts[0].mesh;
+  const sea: MapModel = {
+    ...model,
+    parts: [{ mesh, material: "ocean-water" }],
+  };
+  for (const shore of [0b110, 0b10_0000_0000_0001]) {
+    renderer.update([{ ...scene()[0], model: sea, frost: true, shore }], frame);
+    gl.bufferSubData.mockClear();
+    flush(0);
+    const pose = gl.bufferSubData.mock.calls[0][2] as Float32Array;
+    expect(pose[22]).toBe(OCEAN_WATER_MATERIAL);
+    expect(pose[23]).toBe(shore);
   }
   renderer.dispose();
 });

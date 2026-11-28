@@ -81,6 +81,7 @@ function insidePad(triangle: readonly Vec3[], halfWidth: number) {
 function isWater({ material }: ModelPart) {
   return (
     material === "water" ||
+    material === "ocean-water" ||
     material === "watershed-water" ||
     material === "river-water"
   );
@@ -459,8 +460,12 @@ it.each(["river", "lake"] as const)(
 );
 
 it("gives neighboring lake tiles a shared basin and retains the narrower river mouth", () => {
-  const west = getTerrainModel("lake", { adjacentEdges: 1 << 1, ports: [4] });
-  const east = getTerrainModel("lake", { adjacentEdges: 1 << 4 });
+  const west = getTerrainModel("lake", {
+    adjacentEdges: 1 << 1,
+    ports: [4],
+    variant: 1,
+  });
+  const east = getTerrainModel("lake", { adjacentEdges: 1 << 4, variant: 2 });
   const westShore = edgeWater(west, 1)
     .map(([, y, z]) => [y, z])
     .sort();
@@ -474,6 +479,13 @@ it("gives neighboring lake tiles a shared basin and retains the narrower river m
   );
   const [[, , a], [, , b]] = edgeWater(west, 4);
   expect(Math.abs(a - b)).toBeCloseTo(0.29, 6);
+});
+
+it("gives isolated lakes distinct shore shapes for each art variant", () => {
+  const shapes = [0, 1, 2, 3].map((variant) =>
+    waterTriangles(getTerrainModel("lake", { variant })),
+  );
+  expect(new Set(shapes.map((shape) => JSON.stringify(shape))).size).toBe(4);
 });
 
 it.each([0, 1])(
