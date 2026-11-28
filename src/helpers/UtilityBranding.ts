@@ -31,8 +31,14 @@ export function utilityBranding(
     shuffled[0];
   const assigned = new Set([player, ...Object.values(players ?? {})]);
   const pool = shuffled.filter((id) => !assigned.has(id));
-  const npcs = new Map(NPC_UTILITIES.map((key, index) => [key, pool[index]]));
-  const frontierLogos = pool.slice(NPC_UTILITIES.length);
+  // With four players the remaining palette can repeat across NPCs.
+  const npcs = new Map(
+    NPC_UTILITIES.map((key, index) => [key, pool[index % pool.length]]),
+  );
+  const frontierLogos =
+    pool.length > NPC_UTILITIES.length
+      ? pool.slice(NPC_UTILITIES.length)
+      : pool;
   return {
     forOwner(owner?: string): UtilityLogoId | undefined {
       if (owner === "you") return player;
@@ -44,8 +50,8 @@ export function utilityBranding(
         );
         if (coordinates) {
           const { q, r } = coordinates;
-          // Older maps can retain an open-ended frontier. Its marks never use the player
-          // or established utility palettes, and discovery order cannot change a town's logo.
+          // Older maps can retain an open-ended frontier. Discovery order cannot
+          // change a town's logo, and the pool excludes every player mark.
           return frontierLogos[
             territoryCoordinateHash(q, r, `utility-logo:${seed}`) %
               frontierLogos.length

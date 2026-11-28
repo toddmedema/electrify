@@ -340,7 +340,7 @@ it("assigns finite supplier-ready commitments once independently from consumptio
   assertFeasible(consuming);
 });
 
-it("allocates scarce supplier readiness to paid v2 before cheaper v3 within each company", () => {
+it.each([2, 1] as const)("clears v%i before v3 in co-op", (termsVersion) => {
   const price = jest
     .spyOn(Transmission, "adjacentMarketPricePerMWh")
     .mockReturnValue(20);
@@ -353,6 +353,12 @@ it("allocates scarce supplier readiness to paid v2 before cheaper v3 within each
       const quote = powerAgreementQuote(grid, "champlain-nuclear", 3, 10)!;
       expect(quote).toBeDefined();
       grid.transmission!.acceptedAgreements = [quote.receipt];
+      grid.transmission!.inheritedAgreementTerms = termsVersion;
+      if (termsVersion === 1)
+        grid.transmission!.agreementDispatchOrder = [
+          "champlain-quebec",
+          "champlain-nuclear:0",
+        ];
       grid.transmission!.buyingRule = "NONE";
       const start = agreementYearMinute(2020);
       grid.date = getDateFromMinute(start + 16 * 60 + 45, grid.startingYear);
@@ -380,23 +386,23 @@ it("allocates scarce supplier readiness to paid v2 before cheaper v3 within each
       const now = currentTick(grid)!;
       expect(now.minute).toBe(agreementYearMinute(2020) + 17 * 60);
       const sources = connectionAgreements(grid, "champlain");
-      const v2 = sources.find(
-        (source) => source.termsVersion === 2 && source.active,
+      const first = sources.find(
+        (source) => source.termsVersion === termsVersion && source.active,
       )!;
       const v3 = sources.find(
         (source) => source.termsVersion === 3 && source.active,
       )!;
-      expect(v3.priceToday).toBeLessThan(v2.priceToday);
-      const paidW = Math.min(57e6, remainingW);
-      remainingW -= paidW;
+      expect(v3.priceToday).toBeLessThan(first.priceToday);
+      const firstW = Math.min(57e6, remainingW);
+      remainingW -= firstW;
       const minimumW = Math.min(95e6, remainingW);
       remainingW -= minimumW;
-      expect(now.agreementAvailableMWh?.[v2.id] ?? 0).toBeCloseTo(
-        paidW * energyPerW,
+      expect(now.agreementAvailableMWh?.[first.id] ?? 0).toBeCloseTo(
+        firstW * energyPerW,
         6,
       );
-      expect(now.agreementUsefulMWh?.[v2.id] ?? 0).toBeCloseTo(
-        paidW * energyPerW,
+      expect(now.agreementUsefulMWh?.[first.id] ?? 0).toBeCloseTo(
+        firstW * energyPerW,
         6,
       );
       expect(now.agreementAvailableMWh?.[v3.id] ?? 0).toBeCloseTo(

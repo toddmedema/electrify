@@ -40,6 +40,22 @@ describe("SaveGame", () => {
     expect(parseSave(serializeSave(game))?.game.utilityLogo).toBeUndefined();
   });
 
+  it("restores saved progress when an older company logo leaves the catalog", () => {
+    const save = serializeSave(game);
+    const old = {
+      ...save,
+      schemaVersion: 30,
+      game: { ...save.game, utilityLogo: "hookwater" },
+    };
+    const upgraded = parseSave(old);
+    expect(upgraded?.game).toEqual(parseSave(save)?.game);
+    expect(upgraded?.game.utilityLogo).toBeUndefined();
+    expect(old.game.utilityLogo).toBe("hookwater");
+    expect(
+      parseSave({ ...old, game: { ...old.game, utilityLogo: "unknown" } }),
+    ).toBeNull();
+  });
+
   it("accepts older absent fuel baselines and preserves a current baseline across repeated loads", () => {
     expect(game.fuelPriceBaseline).toBeUndefined();
     expect(parseSave(serializeSave(game))).not.toBeNull();

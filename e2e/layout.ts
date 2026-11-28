@@ -454,6 +454,7 @@ export async function dragFleetRowAbove(
   row: Locator,
   handle: Locator,
   target: Locator,
+  dropOffsetY = 0,
 ) {
   // Centering the source in a short pane can scroll the target under its header.
   await handle.evaluate((element) =>
@@ -479,7 +480,7 @@ export async function dragFleetRowAbove(
   const to = (await target.boundingBox())!;
   const x = from.x + from.width / 2;
   const y = from.y + from.height / 2;
-  const destination = to.y + to.height / 2;
+  const destination = to.y + to.height / 2 + dropOffsetY;
   if (await page.evaluate(() => matchMedia("(pointer: coarse)").matches)) {
     const session = await page.context().newCDPSession(page);
     await session.send("Input.dispatchTouchEvent", {

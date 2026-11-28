@@ -81,28 +81,28 @@
     pointer-events: auto;
     width: max-content;
     max-width: 160px;
-    overflow: hidden;
     white-space: nowrap;
-    text-overflow: ellipsis;
     text-align: center;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    .territoryCityLogo {
-      width: 20px;
-      height: 20px;
+
+    > span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .territoryCityLabelText {
-      min-width: 0;
-      > span {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-      > span + span {
-        font-size: 11px;
-        font-weight: 400;
-      }
+
+    &:has(> .territoryCityLogo) {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    // Keep the name centered on the map anchor. The badge overlaps only its left edge.
+    .territoryCityLogo {
+      position: absolute;
+      top: 50%;
+      right: calc(100% - 6px);
+      width: 36px;
+      height: 36px;
+      transform: translateY(-50%);
     }
   }
   &[data-municipal-city="true"] strong,

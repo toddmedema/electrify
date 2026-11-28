@@ -352,7 +352,7 @@ test("an open tile keeps Trade waiting until Fleet is revealed", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
-test("a chosen company logo appears at the left of the player's city label @minimum-phone", async ({
+test("a city name stays centered with its company logo overlapping the left edge @minimum-phone", async ({
   page,
 }) => {
   await page.goto("/?scenario=116");
@@ -360,33 +360,52 @@ test("a chosen company logo appears at the left of the player's city label @mini
   await expect(picker).toContainText("Random");
   await expect(picker.locator("svg.utilityLogoIcon")).toBeVisible();
   await picker.click();
-  await expect(page.getByRole("option")).toHaveCount(21);
+  await expect(page.getByRole("option")).toHaveCount(13);
   await page.getByRole("option", { name: "Sunburst", exact: true }).click();
   await page.getByRole("button", { name: "Start game", exact: true }).click();
 
   const map = tutorialMap(page);
   await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
-  const name = map
+  const label = map
     .locator('[data-owned="true"] > strong')
-    .filter({ hasText: "Burlington" });
-  const logo = name.locator('img[data-utility-logo="sunburst"]');
-  await expect(logo.first()).toBeVisible();
+    .filter({ hasText: "Burlington" })
+    .first();
+  const logo = label.locator('img[data-utility-logo="sunburst"]');
+  await expect(label).toHaveText("Burlington");
+  await expect(logo).toBeVisible();
   await expect
-    .poll(() =>
-      logo.first().evaluate((img: HTMLImageElement) => img.naturalWidth),
-    )
+    .poll(() => logo.evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
-  const leftEdges = await name
-    .first()
-    .evaluate((label) =>
-      [...label.children].map((child) => child.getBoundingClientRect().left),
-    );
-  expect(leftEdges[0]).toBeLessThan(leftEdges[1]);
+  const { cityX, textX, showTop, showBottom, overlap, hangsLeft, gap } =
+    await label.evaluate((element) => {
+      const rectangle = element.getBoundingClientRect();
+      const city = element.parentElement!.getBoundingClientRect();
+      const text = element.querySelector("span")!.getBoundingClientRect();
+      const badge = element.querySelector("img")!.getBoundingClientRect();
+      return {
+        cityX: city.x + city.width / 2,
+        textX: text.x + text.width / 2,
+        showTop: rectangle.top - badge.top,
+        showBottom: badge.bottom - rectangle.bottom,
+        overlap: badge.right - rectangle.left,
+        hangsLeft: rectangle.left - badge.left,
+        gap: text.left - badge.right,
+      };
+    });
+  expect(Math.abs(cityX - textX)).toBeLessThan(1);
+  expect(showTop).toBeGreaterThan(0);
+  expect(showBottom).toBeGreaterThan(0);
+  expect(overlap).toBeGreaterThan(0);
+  expect(hangsLeft).toBeGreaterThan(overlap);
+  expect(gap).toBeCloseTo(2, 0);
+  await expect(label).toHaveCSS("border-top-left-radius", "0px");
+  await expect(label).toHaveCSS("border-bottom-left-radius", "0px");
 });
 
 test("Mission 7 · sign a trade and find live imports in Fleet", async ({
   page,
 }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await startMission(page, 112);
   const floating = page.viewportSize()!.width >= 1024;
   const fleet = page.getByRole("region", { name: "Fleet", exact: true });
@@ -460,6 +479,7 @@ test("Mission 7 · sign a trade and find live imports in Fleet", async ({
     last,
     last.getByRole("button"),
     rows.first().getByRole("button"),
+    -8, // Leave a final position adjustment for the drop to complete.
   );
   await expect(rows.first()).toHaveAttribute("data-rfd-draggable-id", lastId);
   await expect
