@@ -143,7 +143,7 @@ async function select(
             node.getAttribute("role") === "listbox" &&
             !!node.id &&
             controlledIds?.includes(node.id) &&
-            document.getElementById(node.id) === node,
+            document.querySelectorAll(`#${CSS.escape(node.id)}`).length === 1,
         ),
         focused,
       };
