@@ -26,6 +26,8 @@ export function regionalHexes(radius: number): HexCoordinate[] {
 }
 
 type Ridge = readonly [q: number, r: number, width: number];
+export type RegionalMapVersion = 1 | 2;
+
 interface ResearchedRegion {
   city: string;
   utility: readonly (readonly [since: number, name: string])[];
@@ -33,6 +35,8 @@ interface ResearchedRegion {
   treeCover?: "sparse" | "wooded";
   /** Small waterways identifiable from local maps but below the global layer's resolution. */
   river?: readonly (readonly [q: number, r: number])[];
+  /** Later samples omitted when reconstructing a published version 1 board. */
+  riverAddedInVersion2?: readonly (readonly [q: number, r: number])[];
 }
 
 /** Local source notes and historical utility attribution are in docs/regional-maps.md. */
@@ -109,17 +113,19 @@ const RESEARCHED_REGIONS: Readonly<Partial<Record<string, ResearchedRegion>>> =
         [-3, -1, 2],
       ],
       treeCover: "sparse",
+      riverAddedInVersion2: [
+        [-2, 1],
+        [2, 2],
+      ],
       river: [
         [-5, 1],
         [-4, 0],
         [-3, 0],
         [-2, 0],
-        [-2, 1],
         [-1, 1],
         [0, 1],
         [1, 1],
         [2, 1],
-        [2, 2],
         [3, 2],
       ],
     },
@@ -572,6 +578,7 @@ export function getRegionalGeography(
   startingYear: number,
   scenarioId: number,
   sources?: DataCenterCustomerSources,
+  version: RegionalMapVersion = 2,
 ): RegionalGeography {
   const entry = Object.hasOwn(waterEntries, location.id)
     ? waterEntries[location.id]
@@ -618,9 +625,10 @@ export function getRegionalGeography(
     });
     // A vetted offshore reference preserves sampled tidal water where the atlas
     // is too coarse to show a narrow strait. Explicit lake samples stay lakes.
-    if (!mappedCoast) classifyInlandWater(water);
+    if (version === 2 && !mappedCoast) classifyInlandWater(water);
   }
-  for (const [q, r] of region?.river ?? []) {
+  const additions = version === 2 ? region?.riverAddedInVersion2 : undefined;
+  for (const [q, r] of [...(region?.river ?? []), ...(additions ?? [])]) {
     const key = `${q}:${r}`;
     if (!water.has(key)) water.set(key, "river");
   }
@@ -645,8 +653,9 @@ export function getRegionalGeography(
       if (!water.has(key) && [q, r, q + r][axis] === 1) water.set(key, "river");
     }
   }
-  routeRivers(water);
-  const exits = riverExits(water);
+  // Version 1 match saves replay the published board from the original samples.
+  if (version === 2) routeRivers(water);
+  const exits = version === 2 ? riverExits(water) : [];
   // Texture between landmarks is schematic and fixed to the location, across starts and saves.
   const treeChance =
     region?.treeCover === "wooded"

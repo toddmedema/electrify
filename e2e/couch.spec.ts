@@ -912,7 +912,7 @@ test("TV couch intertie construction requires approval from both company owners"
   await expect.poll(() => couch.seats.size).toBe(0);
   const complete = couch.checkpoint()!;
   const edge = complete.edges[0];
-  expect(complete.spec.territorialVersion).toBe(1);
+  expect(complete.spec.territorialVersion).toBe(2);
   expect(edge).toMatchObject({ ratingW: 0, flowW: 0 });
   const lines = complete.grids.map(({ transmission }) =>
     transmission!.lines.find(

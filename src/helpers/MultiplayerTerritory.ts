@@ -23,6 +23,7 @@ import {
   REGIONAL_MAP_RADIUS,
   REGIONAL_MAP_TILE_KM,
   type HexCoordinate,
+  type RegionalMapVersion,
 } from "../data/RegionalGeography";
 import { territoryCoordinateHash } from "../data/Territories";
 import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
@@ -39,7 +40,7 @@ import type { TerritoryTileView } from "./TerritoryMapState";
 type OpeningSite = "land" | "hydro" | "offshore" | "geothermal";
 
 export interface TerritorialState {
-  version: 1;
+  version: RegionalMapVersion;
   seatIndex: number;
   seatCount: number;
   /** Compact opening plant requirements. The running fleet does not alter the common board. */
@@ -93,12 +94,16 @@ const cachedBoards = new WeakMap<
   BoardGame["location"],
   { key: string; board: Board }
 >();
-const boardsByOpening = new WeakMap<OpeningSite[], Board>();
+const boardsByOpening = new WeakMap<
+  OpeningSite[],
+  { version: RegionalMapVersion; map: Board }
+>();
 
 function boardFor(
   game: BoardGame,
   seatCount: number,
   openingSites: readonly OpeningSite[],
+  version: RegionalMapVersion,
 ): Board {
   const key = JSON.stringify([
     game.scenarioId,
@@ -106,6 +111,7 @@ function boardFor(
     game.seed,
     seatCount,
     openingSites,
+    version,
   ]);
   const cached = cachedBoards.get(game.location);
   if (cached?.key === key) return cached.board;
@@ -113,6 +119,8 @@ function boardFor(
     game.location,
     game.startingYear,
     game.scenarioId,
+    undefined,
+    version,
   );
   const salt = `multiplayer-territory-v1:${game.location.id}:${game.seed}`;
   const rank = ({ q, r }: HexCoordinate) => territoryCoordinateHash(q, r, salt);
@@ -321,6 +329,7 @@ export function createMultiplayerTerritory(
   game: GameType,
   seatIndex: number,
   seatCount: number,
+  version: RegionalMapVersion,
 ): GameType {
   if (
     !game.multiplayer ||
@@ -335,7 +344,7 @@ export function createMultiplayerTerritory(
   }
   const openingFleet = [...game.facilities].sort((a, b) => a.id - b.id);
   const openingSites = openingFleet.map(openingSite);
-  const board = boardFor(game, seatCount, openingSites);
+  const board = boardFor(game, seatCount, openingSites, version);
   const startingTileIds = [...board.starts[seatIndex]];
   const tileForFacility = new Map(
     openingFleet.map(({ id }, slot) => [id, startingTileIds[slot + 1]]),
@@ -349,7 +358,7 @@ export function createMultiplayerTerritory(
     multiplayer: {
       ...game.multiplayer,
       territorial: {
-        version: 1,
+        version,
         seatIndex,
         seatCount,
         openingSites,
@@ -365,11 +374,14 @@ function territories(game: GameType) {
   const state = game.multiplayer?.territorial;
   if (!state) return undefined;
   let board = boardsByOpening.get(state.openingSites);
-  if (!board) {
-    board = boardFor(game, state.seatCount, state.openingSites);
+  if (!board || board.version !== state.version) {
+    board = {
+      version: state.version,
+      map: boardFor(game, state.seatCount, state.openingSites, state.version),
+    };
     boardsByOpening.set(state.openingSites, board);
   }
-  return board;
+  return board.map;
 }
 
 export function multiplayerTerritoryTile(game: GameType, id: unknown) {

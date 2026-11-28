@@ -40,7 +40,7 @@ test.each([2, 3, 4])(
   "the shared %i-company board gives every company independent connected property",
   (seatCount) => {
     const grids = Array.from({ length: seatCount }, (_, seatIndex) =>
-      createMultiplayerTerritory(initial, seatIndex, seatCount),
+      createMultiplayerTerritory(initial, seatIndex, seatCount, 2),
     );
     const allOwned = grids.flatMap(multiplayerOwnedTileIds);
     expect(new Set(allOwned).size).toBe(allOwned.length);
@@ -49,7 +49,9 @@ test.each([2, 3, 4])(
       expect(multiplayerTerritoryTiles(grid)).toEqual(
         multiplayerTerritoryTiles(grids[0]),
       );
-      expect(grid).toEqual(createMultiplayerTerritory(initial, i, seatCount));
+      expect(grid).toEqual(
+        createMultiplayerTerritory(initial, i, seatCount, 2),
+      );
       const reachable = new Set([homeTileId]);
       for (const id of reachable) {
         adjacent(id)
@@ -75,7 +77,7 @@ test("a full opening fleet retains a disjoint board and two normal construction 
   for (const location of Object.values(LOCATIONS)) {
     const game = { ...initial, location, facilities: fleet };
     const grids = Array.from({ length: 4 }, (_, i) =>
-      createMultiplayerTerritory(game, i, 4),
+      createMultiplayerTerritory(game, i, 4, 2),
     );
     const claims = grids.flatMap(multiplayerOwnedTileIds);
     expect(new Set(claims).size).toBe(4 * 43);
@@ -138,7 +140,7 @@ test.each([2, 3, 4])(
 );
 
 test("the reducer debits verified adjacent claims and enforces occupancy for real construction", () => {
-  const game = createMultiplayerTerritory(initial, 0, 2);
+  const game = createMultiplayerTerritory(initial, 0, 2, 2);
   const allTiles = multiplayerTerritoryTiles(game);
   const project = { name: "Solar", fuel: "Sun", peakW: 1e6 } as const;
   const eligible = allTiles
