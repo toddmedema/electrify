@@ -450,11 +450,14 @@ for (const theme of ["light", "dark"]) {
       await chart.tap({ position: { x: 1, y: 14 } });
       await expect(group).toContainText("Now · Jan 2023");
       await expect(page.locator(".manual-popover")).toHaveCount(0);
-    } else {
-      await group.focus();
-      await group.press("Home");
-      await expect(group).toContainText("Now · Jan 2023");
     }
+    await group.focus();
+    await expect(group).toHaveCSS("outline-style", "none");
+    await group.press("Home");
+    await expect(group).toContainText("Now · Jan 2023");
+    await expect(group).toHaveCSS("outline-style", "solid");
+    await group.press("End");
+    await expect(group).toContainText("month end");
     expect(
       await row.evaluate(
         (element) => element.scrollWidth - element.clientWidth,

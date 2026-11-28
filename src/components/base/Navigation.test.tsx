@@ -42,6 +42,8 @@ afterAll(() => {
 });
 afterEach(() => {
   delete window.electrifyCouch;
+  delete document.documentElement.dataset.keyboardNavigation;
+  delete document.documentElement.dataset.controllerInput;
   resetInputPresentation();
   document.elementFromPoint = originalElementFromPoint;
   jest.useRealTimers();
@@ -333,6 +335,12 @@ describe("Navigation", () => {
     fireEvent.pointerLeave(build, { pointerType: "mouse" });
     const programs = screen.getByRole("button", { name: "Programs" });
     await act(async () => programs.focus());
+    expect(
+      screen.queryByRole("tooltip", { name: "Programs (W)" }),
+    ).not.toBeInTheDocument();
+    await act(async () => programs.blur());
+    document.documentElement.dataset.keyboardNavigation = "true";
+    await act(async () => programs.focus());
     expect(screen.getByRole("tooltip", { name: "Programs (W)" })).toBeVisible();
     expect(onToggle).not.toHaveBeenCalled();
   });
@@ -340,9 +348,11 @@ describe("Navigation", () => {
   it("keeps dock help free of keyboard prompts while the controller is active", async () => {
     renderNavigation();
     const build = screen.getByRole("button", { name: "Build" });
+    document.documentElement.dataset.controllerInput = "true";
     act(() => updateInputPresentation({ active: true, connected: true }));
     await act(async () => build.focus());
     expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build$/);
+    delete document.documentElement.dataset.controllerInput;
     act(() => updateInputPresentation({ active: false }));
     expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q, B\)$/);
   });

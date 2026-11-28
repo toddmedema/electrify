@@ -1,3 +1,5 @@
+@use "../../focus-visibility" as focus;
+
 .desktopBuildRail {
   position: absolute;
   inset: 0 auto 0 0;
@@ -96,12 +98,12 @@
     height: 38px;
   }
   &:hover:not([aria-disabled="true"])::before,
-  &:focus-visible::before,
+  &#{focus.$visible}::before,
   &[aria-pressed="true"]::before {
     border-color: var(--interactive-blue);
     background: var(--bg-sunken);
   }
-  &:focus-visible {
+  &#{focus.$visible} {
     outline: none;
     &::before {
       outline: 2px solid var(--interactive-blue);
@@ -141,7 +143,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  &:focus-visible {
+  &#{focus.$visible} {
     outline: 2px solid var(--interactive-blue);
     outline-offset: -2px;
   }

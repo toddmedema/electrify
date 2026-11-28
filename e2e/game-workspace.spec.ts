@@ -421,6 +421,12 @@ for (const theme of ["light", "dark"] as const) {
     // A physical keyboard on the same touch device still receives visible focus when closing.
     await page.keyboard.press("e");
     await expect(insightsPane).toBeVisible();
+    const title = insightsPane.getByRole("heading", {
+      name: "Insights",
+      exact: true,
+    });
+    await expect(title).toBeFocused();
+    await expect(title).toHaveCSS("outline-style", "none");
     await page.keyboard.press("Escape");
     await expect(insights).toBeFocused();
     await expect(insights).toHaveCSS("outline-style", "solid");

@@ -1,3 +1,5 @@
+@use "../../focus-visibility" as focus;
+
 .territoryTileTarget {
   pointer-events: none;
   position: absolute;
@@ -45,7 +47,7 @@
     );
   }
   &[data-model-hovered="true"] .territoryTileHitArea,
-  &:focus-visible .territoryTileHitArea {
+  &#{focus.$visible} .territoryTileHitArea {
     background: radial-gradient(
       ellipse closest-side,
       color-mix(in srgb, var(--territory-hover-color) 8%, transparent) 42%,
@@ -102,7 +104,7 @@
     background: var(--bg-raised);
     border-color: var(--territory-owner-color);
   }
-  &:focus-visible strong {
+  &#{focus.$visible} strong {
     outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }
@@ -222,7 +224,7 @@
     }
   }
   &:hover .territoryTilePrice,
-  &:focus-visible .territoryTilePrice {
+  &#{focus.$visible} .territoryTilePrice {
     background: var(--bg-raised);
   }
   &[data-unaffordable="true"] .territoryTilePrice {
@@ -263,7 +265,7 @@
     color: var(--bg-primary);
     border-color: var(--interactive-blue);
   }
-  &:focus-visible {
+  &#{focus.$visible} {
     outline: 3px solid var(--focus-ring);
     outline-offset: 2px;
   }

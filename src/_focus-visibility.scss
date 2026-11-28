@@ -1,0 +1,4 @@
+// Scope gameplay focus cues to explicit navigation while preserving native focus elsewhere.
+$workspace-without-navigation: 'html:not([data-keyboard-navigation="true"], [data-controller-input="true"]) .gameWorkspace';
+$without-navigation: "#{$workspace-without-navigation} :not([data-keyboard-restored-focus])";
+$visible: ":focus-visible:where(:not(#{$without-navigation}))";
