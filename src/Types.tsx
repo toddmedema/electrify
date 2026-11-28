@@ -830,10 +830,14 @@ interface SharedShoppingType {
 }
 
 export type GameToolType =
-  "BUILD_GENERATORS" | "PROGRAMS" | "INSIGHTS" | "EVENTS" | "SCENARIO";
+  | Exclude<MapWorkspaceView, "FACILITIES">
+  | "BUILD_GENERATORS"
+  | "EVENTS"
+  | "PROGRAMS"
+  | "INSIGHTS"
+  | "SCENARIO";
 
-export type TutorialActionType =
-  GameToolType | Exclude<MapWorkspaceView, "FACILITIES">;
+export type TutorialActionType = GameToolType;
 
 export interface TutorialStepType {
   // Introduced here and retained through this and every later mission in authored order.
@@ -1788,7 +1792,6 @@ export type ThemeModeType = "light" | "dark";
 // follow the OS rather than a palette of its own, and it can change while the game is open
 export type ThemeChoiceType = ThemeModeType | "system";
 
-export type WorkspaceType = "automatic" | "single";
 export type ScreenEdgePaddingType = 0 | 2 | 4;
 
 export interface SettingsType {
@@ -1803,8 +1806,6 @@ export interface SettingsType {
   theme: ThemeChoiceType;
   // Explicit device multiplier; absent in older fixtures means 100%.
   interfaceScale?: number;
-  // Device workspace preference; Automatic adapts to the space remaining at this scale.
-  workspace?: WorkspaceType;
   // Percent of the shorter screen edge, shared by the app frame and overlays.
   screenEdgePadding?: ScreenEdgePaddingType;
 }
@@ -2004,6 +2005,12 @@ export interface CoopSelectionType {
   /** Host only: this computer has multiplayer saves to load instead. */
   hasSaves?: boolean;
 }
+/** One request to center the map on a tile, its affected fleet, or the home grid. */
+export interface MapFocusTarget {
+  tileId?: TerritoryTileId;
+  facilityIds?: number[];
+}
+
 export interface UIType {
   feedback?: import("./Feedback").FeedbackContext;
   /** Set while this player chooses a co-op game together with their lobby. */
@@ -2016,6 +2023,7 @@ export interface UIType {
   // The Insights date range outlives the pane, which unmounts when a narrow layout switches cards.
   insightsViewport?: { viewport: [number, number]; month: number };
   evidenceRequest?: EvidenceRequestType;
+  mapFocus?: MapFocusTarget;
   evidenceSequence?: number;
   evidenceRunId?: number;
   manualHelpEntry?: string;

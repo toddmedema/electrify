@@ -50,7 +50,6 @@ function renderSettings(overrides: Partial<Props> = {}) {
     onUnitsChange: () => undefined,
     onThemeChange: () => undefined,
     onInterfaceScaleChange: () => undefined,
-    onWorkspaceChange: () => undefined,
     onScreenEdgePaddingChange: () => undefined,
     onBack: () => undefined,
     ...overrides,
@@ -263,27 +262,12 @@ describe("Settings", () => {
     expect(onInterfaceScaleChange.mock.calls).toEqual([[1.5], [2]]);
   });
 
-  it("offers Automatic and Single tool workspaces outside the desktop app", async () => {
-    const onWorkspaceChange = jest.fn();
-    renderSettings({ onWorkspaceChange });
-    const workspace = within(screen.getByLabelText("Workspace"));
-    expect(
-      workspace.getByRole("button", { name: "Automatic" }),
-    ).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(
-      workspace.getByRole("button", { name: "Single tool" }),
-    );
-    expect(onWorkspaceChange).toHaveBeenCalledWith("single");
-  });
-
   it("offers independent screen-edge padding in advanced Display settings outside the desktop app", async () => {
     const onScreenEdgePaddingChange = jest.fn();
     const onInterfaceScaleChange = jest.fn();
-    const onWorkspaceChange = jest.fn();
     renderSettings({
       onScreenEdgePaddingChange,
       onInterfaceScaleChange,
-      onWorkspaceChange,
     });
     const region = screen.getByLabelText("Display", { selector: "section" });
     expect(region).toHaveRole("region");
@@ -293,7 +277,6 @@ describe("Settings", () => {
     // Here, exercise the callbacks and the settings that must remain independent.
     const padding = display.getByLabelText("Screen-edge padding");
     const scale = screen.getByLabelText("Interface scale");
-    const automatic = display.getByText("Automatic", { selector: "button" });
     expect(advanced).toHaveAttribute("aria-expanded", "false");
     await userEvent.click(advanced);
     expect(advanced).toHaveAttribute("aria-expanded", "true");
@@ -310,12 +293,10 @@ describe("Settings", () => {
     }
     expect(onScreenEdgePaddingChange.mock.calls).toEqual([[2], [4]]);
     expect(onInterfaceScaleChange).not.toHaveBeenCalled();
-    expect(onWorkspaceChange).not.toHaveBeenCalled();
     expect(scale).toHaveRole("combobox");
     expect(scale).toHaveAccessibleName("Interface scale");
     expect(scale).toHaveValue("1");
-    expect(automatic).toHaveAccessibleName("Automatic");
-    expect(automatic).toHaveAttribute("aria-pressed", "true");
+    expect(display.queryByLabelText("Workspace")).not.toBeInTheDocument();
   });
 
   it("displays an exact stored intermediate scale", () => {

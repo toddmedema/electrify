@@ -6,6 +6,7 @@ import {
   VictoryType,
   EvidenceTargetType,
   EvidenceRequestType,
+  MapFocusTarget,
 } from "../Types";
 import { launchRun, quit, start, resume, loaded } from "./GameActions";
 import {
@@ -77,6 +78,10 @@ export const uiSlice = createSlice({
       ) {
         delete state.evidenceRequest;
       }
+    },
+    setMapFocus: (state, action: PayloadAction<MapFocusTarget | undefined>) => {
+      if (action.payload) state.mapFocus = action.payload;
+      else delete state.mapFocus;
     },
     delta: (state, action: PayloadAction<Partial<UIType>>) => {
       return { ...state, ...action.payload };
@@ -153,6 +158,7 @@ export const uiSlice = createSlice({
       state.selectedFacilityId = null;
       state.facilityDragActive = false;
       delete state.evidenceRequest;
+      delete state.mapFocus;
       delete state.insightsViewport;
       state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
     });
@@ -175,6 +181,7 @@ export const uiSlice = createSlice({
       (state) => {
         delete state.arrivingFacilityId;
         delete state.evidenceRequest;
+        delete state.mapFocus;
         delete state.insightsViewport;
         state.evidenceRunId = (state.evidenceRunId ?? 0) + 1;
       },
@@ -184,6 +191,7 @@ export const uiSlice = createSlice({
         action.type === navigate.type || action.type === navigateBack.type,
       (state) => {
         delete state.evidenceRequest;
+        delete state.mapFocus;
       },
     );
   },
@@ -205,6 +213,7 @@ export const {
   acknowledgeFacilityArrival,
   requestEvidence,
   acknowledgeEvidence,
+  setMapFocus,
   delta,
   snackbarClose,
   selectFacility,

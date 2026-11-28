@@ -180,7 +180,7 @@ async function startToolbarGame(page: Page, theme: "light" | "dark") {
   await unlockDifficulty(page);
   await difficulty.getByRole("button", { name: "Medium", exact: true }).click();
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect(page.locator(".gameStage .facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   await page.mouse.move(0, 0);
 }
 
@@ -275,9 +275,7 @@ for (const theme of ["light", "dark"] as const) {
     const supportsHover = await page.evaluate(
       () => matchMedia("(hover: hover) and (pointer: fine)").matches,
     );
-    const build = page
-      .getByRole("navigation", { name: "Game actions" })
-      .getByRole("button", { name: "Build", exact: true });
+    const build = page.getByRole("button", { name: "Build", exact: true });
     await expect(build).toHaveAttribute("aria-expanded", "false");
     await expectGlyphContrast(build, supportsHover, blue);
     await expect(
@@ -524,9 +522,7 @@ for (const app of ["light", "dark"] as const) {
         await expect(selected).toBeFocused();
         await expectSpeedPaint(selected, palette, "selected");
       }
-      const build = page
-        .getByRole("navigation", { name: "Game actions" })
-        .getByRole("button", { name: "Build", exact: true });
+      const build = page.getByRole("button", { name: "Build", exact: true });
       await expect(build).toHaveAttribute("aria-expanded", "false");
       await expectGlyphContrast(build, palette.hover);
       await build.click();

@@ -1,20 +1,23 @@
 import * as React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { Provider } from "react-redux";
 import { store } from "../../Store";
 import { delta, markEventsRead } from "../../reducers/Game";
 import { ActiveWorldEventType } from "../../Types";
 import Navigation, { MapEventStatus } from "./Navigation";
-import { createGame } from "../../testing/Simulator";
 import {
   resetInputPresentation,
   updateInputPresentation,
 } from "../../desktop/InputPresentation";
 
-function renderNavigation(onToggle = jest.fn()) {
+function renderNavigation(onToggle = jest.fn(), showMapBuild = true) {
   return render(
     <Provider store={store}>
-      <Navigation onToggle={onToggle} />
+      <Navigation
+        openTools={[]}
+        showMapBuild={showMapBuild}
+        onToggle={onToggle}
+      />
     </Provider>,
   );
 }
@@ -53,9 +56,9 @@ describe("Navigation", () => {
       <Provider store={store}>
         <Navigation
           openTools={["BUILD_GENERATORS"]}
-          destination={(tool) =>
-            tool === "BUILD_GENERATORS" ? "BUILD_STORAGE" : tool
-          }
+          buildDestination="BUILD_STORAGE"
+          showMapBuild
+          onToggle={jest.fn()}
         />
       </Provider>,
     );
@@ -96,31 +99,16 @@ describe("Navigation", () => {
     );
   });
 
-  it("keeps Build out of map games and restores it for other scenarios", () => {
-    store.dispatch(
-      delta({
-        scenarioId: 116,
-        territoryNetwork: createGame({ scenarioId: 116, seed: 188 })
-          .territoryNetwork,
-      }),
-    );
-    const view = renderNavigation();
+  it("keeps Build out of the dock when the map provides it separately", () => {
+    renderNavigation(jest.fn(), false);
     expect(
       screen.queryByRole("button", { name: "Build" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Programs" })).toBeEnabled();
+    for (const name of ["Fleet", "Trade", "Programs"])
+      expect(screen.getByRole("button", { name })).toBeEnabled();
     expect(
       screen.queryByRole("button", { name: "Map" }),
     ).not.toBeInTheDocument();
-    for (const name of ["Fleet", "Trade"])
-      expect(screen.getByRole("button", { name })).toBeEnabled();
-    act(() => {
-      store.dispatch(delta({ scenarioId: 103 }));
-    });
-    expect(screen.getByRole("button", { name: "Build" })).toBeEnabled();
-    for (const name of ["Map", "Fleet", "Trade"])
-      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
-    view.unmount();
   });
 
   it("keeps an emergency alert after reading events and resuming until the last emergency ends", () => {
@@ -206,7 +194,12 @@ describe("Navigation", () => {
     render(
       <Provider store={store}>
         <MapEventStatus open={false} onToggle={onToggle} />
-        <Navigation showEventStatus={false} onToggle={onToggle} />
+        <Navigation
+          openTools={[]}
+          showMapBuild
+          showEventStatus={false}
+          onToggle={onToggle}
+        />
       </Provider>,
     );
     const status = screen.getByRole("button", {
@@ -264,17 +257,24 @@ describe("Navigation", () => {
       ).toHaveAccessibleDescription("Unread events");
     },
   );
-  it("groups the four game tools in a labeled action dock", () => {
+  it("lists the map tools in shortcut order and leaves Build at the end", () => {
     renderNavigation();
 
+    const dock = screen.getByRole("navigation", { name: "Game actions" });
+    expect(dock).toBeVisible();
     expect(
-      screen.getByRole("navigation", { name: "Game actions" }),
-    ).toBeVisible();
-    for (const name of ["Build", "Programs", "Insights", "Events"]) {
-      const button = screen.getByRole("button", { name });
-      expect(button).toBeVisible();
-      expect(button).not.toHaveTextContent(name);
-    }
+      within(dock)
+        .getAllByRole("button")
+        .map((button) => button.getAttribute("aria-label")),
+    ).toEqual([
+      "Fleet",
+      "Trade",
+      "Events",
+      "Programs",
+      "Insights",
+      "Scenario",
+      "Build",
+    ]);
     expect(screen.queryByRole("button", { name: "Facilities" })).toBeNull();
   });
 
@@ -283,7 +283,7 @@ describe("Navigation", () => {
     store.dispatch(delta({ scenarioId: 103 }));
     renderNavigation(onToggle);
     const scenario = screen.getByRole("button", { name: "Scenario" });
-    expect(scenario).toHaveAttribute("aria-keyshortcuts", "T");
+    expect(scenario).toHaveAttribute("aria-keyshortcuts", "Y S");
     fireEvent.click(scenario);
     expect(onToggle).toHaveBeenCalledWith("SCENARIO");
   });
@@ -302,8 +302,8 @@ describe("Navigation", () => {
     [4, 3, ["Fleet", "Programs", "Insights"]],
     [3, 0, ["Fleet", "Programs", "Insights"]],
     [5, 0, ["Fleet", "Programs", "Insights"]],
-    [112, 0, ["Fleet", "Trade", "Programs", "Insights", "Events"]],
-    [112, 4, ["Fleet", "Trade", "Programs", "Insights", "Events"]],
+    [112, 0, ["Fleet", "Trade", "Events", "Programs", "Insights"]],
+    [112, 4, ["Fleet", "Trade", "Events", "Programs", "Insights"]],
   ])(
     "shows only taught actions in tutorial %s step %s",
     (scenarioId, tutorialStep, actions) => {
@@ -313,7 +313,7 @@ describe("Navigation", () => {
           tutorialStep,
         }),
       );
-      renderNavigation();
+      renderNavigation(jest.fn(), false);
       expect(
         screen
           .getAllByRole("button")
@@ -327,13 +327,15 @@ describe("Navigation", () => {
     const onToggle = jest.fn();
     renderNavigation(onToggle);
     const build = screen.getByRole("button", { name: "Build" });
-    expect(build).toHaveAttribute("aria-keyshortcuts", "Q B");
+    expect(build).toHaveAttribute("aria-keyshortcuts", "B");
     fireEvent.pointerEnter(build, { pointerType: "mouse" });
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q, B\)$/);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(B\)$/);
     fireEvent.pointerLeave(build, { pointerType: "mouse" });
     const programs = screen.getByRole("button", { name: "Programs" });
     await act(async () => programs.focus());
-    expect(screen.getByRole("tooltip", { name: "Programs (W)" })).toBeVisible();
+    expect(
+      screen.getByRole("tooltip", { name: "Programs (R, P)" }),
+    ).toBeVisible();
     expect(onToggle).not.toHaveBeenCalled();
   });
 
@@ -344,7 +346,7 @@ describe("Navigation", () => {
     await act(async () => build.focus());
     expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build$/);
     act(() => updateInputPresentation({ active: false }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(Q, B\)$/);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/^Build \(B\)$/);
   });
 
   it("previews labels after holding the dock padding and scrubbing, without activating on release", () => {
@@ -401,7 +403,7 @@ describe("Navigation", () => {
     const onToggle = jest.fn();
     render(
       <Provider store={store}>
-        <Navigation openTools={["INSIGHTS"]} onToggle={onToggle} />
+        <Navigation openTools={["INSIGHTS"]} showMapBuild onToggle={onToggle} />
       </Provider>,
     );
     const insights = screen.getByRole("button", { name: "Insights" });

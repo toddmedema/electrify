@@ -122,10 +122,8 @@ test("manual entry titles keep their height when toggled", async ({ page }) => {
   await expect.poll(measureTitle).toEqual(collapsed);
 });
 
-// The manual's list is the scroller, except on short windows (<=768x600) where #gameCard
-// takes over and the list stops scrolling (app.scss). These measurements find whichever one
-// actually is, so the assertions hold in both layouts. Playwright can't pass functions as
-// evaluate arguments, hence the string body.
+// Resolve the scroller before measuring how its headings stack.
+// Playwright can't pass functions as evaluate arguments, hence the string body.
 const GEOMETRY_JS = `(() => {
   const list = document.querySelector("#manual");
   let scroller = null;

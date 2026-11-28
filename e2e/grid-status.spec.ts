@@ -141,6 +141,8 @@ for (const theme of ["light", "dark"] as const) {
         name: "Buying",
         exact: true,
       });
+      await expect(page.locator(".facilitySupplyChart .uplot")).toBeVisible();
+      await expect(buying).toBeInViewport();
       await buying.click();
       await page.getByRole("option", { name: choice, exact: true }).click();
       await expect(buying).toContainText(choice);

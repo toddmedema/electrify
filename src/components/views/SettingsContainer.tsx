@@ -49,9 +49,6 @@ const mapDispatchToProps = (
     onInterfaceScaleChange: (interfaceScale: number) => {
       dispatch(changeSettings({ interfaceScale }));
     },
-    onWorkspaceChange: (workspace) => {
-      dispatch(changeSettings({ workspace }));
-    },
     onScreenEdgePaddingChange: (screenEdgePadding) => {
       dispatch(changeSettings({ screenEdgePadding }));
     },

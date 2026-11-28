@@ -86,8 +86,7 @@ export function clearManualMemory() {
   lastScrollTop = 0;
 }
 
-// The list is the scroller, except on short windows where #gameCard takes over and the list
-// stops scrolling (see app.scss). Scroll adjustments have to target whichever one actually is
+// On short screens the page scrolls around the list. Adjust the active scroller.
 function scrollContainerOf(el: HTMLElement): HTMLElement {
   let node: HTMLElement | null = el;
   while (node && node !== document.body) {

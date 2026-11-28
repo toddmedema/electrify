@@ -15,7 +15,7 @@ export default function useBuildRowReveal(
     if (row) revealControl(row, "start");
     pending.current = undefined;
   });
-  return (name: string) => {
+  return React.useCallback((name: string) => {
     pending.current = name;
-  };
+  }, []);
 }

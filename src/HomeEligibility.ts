@@ -23,12 +23,7 @@ export async function canStartLightweightHome(): Promise<boolean> {
     // Unavailable inventory APIs use the normal app rather than guessing whether saves exist.
     if (!indexedDB.databases || localStorage.getItem("audioEnabled") === "true")
       return false;
-    for (const key of [
-      "plays",
-      "interfaceScale",
-      "screenEdgePadding",
-      "workspace",
-    ]) {
+    for (const key of ["plays", "interfaceScale", "screenEdgePadding"]) {
       if (localStorage.getItem(key) !== null) return false;
     }
     const databases = await indexedDB.databases();

@@ -335,8 +335,8 @@ export async function setMapProjectCapacity(
 }
 
 /**
- * Open the Build tool from the dock, leaving it open when it already is: the dock button
- * toggles, so a second click would close it. Returns the Build region.
+ * Open the Build catalogue from the map rail or compact dock.
+ * Bring an already open floating catalogue to the front.
  */
 export async function openBuild(page: Page): Promise<Locator> {
   const build = page.getByRole("region", { name: "Build", exact: true });
@@ -344,23 +344,24 @@ export async function openBuild(page: Page): Promise<Locator> {
   // A purchase dialog temporarily hides the workspace from the accessibility tree.
   // Wait for it to return before deciding whether the dock would open or close Build.
   await waitForPaneOrNav(build, navButton);
-  if (!(await build.isVisible())) await navButton.click();
+  if (
+    !(await build.isVisible()) ||
+    (await build.getAttribute("data-map-window-front")) === "false"
+  )
+    await navButton.click();
   await expect(build).toBeVisible();
   return build;
 }
 
 /** Select Fleet when the game opens on its map, then bring the fleet into view. */
 export async function openFleet(page: Page): Promise<Locator> {
-  const fleet = page.locator("#facilitiesPane");
+  const fleet = page.locator("#facilitiesPane:not([inert] *)");
   const action = page.getByRole("button", { name: "Fleet", exact: true });
-  await expect(fleet.or(action).first()).toBeAttached();
-  if (!(await fleet.isVisible()) && (await action.isVisible())) {
+  await openPane(fleet, action);
+  if (
+    await page.locator('#tool-FLEET[data-map-window-front="false"]').isVisible()
+  )
     await action.click();
-    await expect(fleet).toBeAttached();
-  }
-  if (await page.locator('[data-persistent-map="true"]').count())
-    await expect(fleet).toBeVisible();
-  else await openPane(fleet, action);
   return fleet;
 }
 
@@ -372,29 +373,6 @@ export async function openPane(
   pane: Locator,
   navButton: Locator,
 ): Promise<boolean> {
-  // Fleet remains mounted for state/scroll memory, but Single tool hides it entirely.
-  if (
-    (await pane.count()) > 0 &&
-    (await pane
-      .first()
-      .evaluate((element) => element.classList.contains("facilities")))
-  ) {
-    const closes = pane
-      .page()
-      .locator(".gameToolHeader button[aria-label^='Close ']")
-      .filter({ visible: true });
-    const changed = (await closes.count()) > 0;
-    while ((await closes.count()) > 0) {
-      const front = closes.and(
-        pane
-          .page()
-          .locator('[data-map-window-front="true"] > .gameToolHeader button'),
-      );
-      await ((await front.count()) ? front : closes.first()).click();
-    }
-    await expect(pane.first()).toBeVisible();
-    return changed;
-  }
   await waitForPaneOrNav(pane, navButton);
   const visiblePane = pane.filter({ visible: true });
   if ((await visiblePane.count()) > 0) return false;

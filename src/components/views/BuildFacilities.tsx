@@ -16,10 +16,11 @@ import { corridorsForLocation } from "../../data/AdjacentMarkets";
 import { getTutorialStep } from "../../data/Scenarios";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { intertieBuildQuote } from "../../helpers/Transmission";
-import { getTimeFromTimeline } from "../../helpers/DateTime";
-import type { TerritoryTileId } from "../../Types";
-import ConceptIcon from "../base/ConceptIcon";
-import CatalogTitleBar from "../base/CatalogTitleBar";
+import {
+  isStorage,
+  type FacilityShoppingType,
+  type TerritoryTileId,
+} from "../../Types";
 import BuildGeneratorsContainer from "./BuildGeneratorsContainer";
 import BuildStorageContainer from "./BuildStorageContainer";
 import TransmissionPanel from "./TransmissionPanel";
@@ -35,17 +36,21 @@ const categories = [
 ] as const;
 
 export default function BuildFacilities({
-  embedded = false,
   category,
+  onCategoryChange,
   onPickSite,
   mapCatalogue = false,
   lockedTileId,
+  railSelection,
+  onRailSelectionApplied,
 }: {
-  embedded?: boolean;
   category?: string;
+  onCategoryChange?: (category: (typeof categories)[number][0]) => void;
   onPickSite?: (facility: import("../../Types").FacilityShoppingType) => void;
   mapCatalogue?: boolean;
   lockedTileId?: TerritoryTileId;
+  railSelection?: FacilityShoppingType;
+  onRailSelectionApplied?: (selection: FacilityShoppingType) => void;
 }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const closeTool = React.useContext(GameToolCloseContext);
@@ -63,23 +68,34 @@ export default function BuildFacilities({
   const visibleCategories = categories.filter(
     ([name]) => intertiesAvailable || name !== "BUILD_INTERTIES",
   );
+  const localCategory = !!onPickSite || (mapCatalogue && !onCategoryChange);
   const [projectCategory, setProjectCategory] = useToolState<
     (typeof categories)[number][0]
-  >("project.category", "BUILD_GENERATORS");
-  const localCategory = !!onPickSite || mapCatalogue;
+  >(localCategory ? "project.category" : undefined, "BUILD_GENERATORS");
   const active = introductoryChoices
     ? "BUILD_GENERATORS"
     : visibleCategories.find(
         ([name]) =>
           name === (localCategory ? projectCategory : (category ?? card)),
       )?.[0] || "BUILD_GENERATORS";
-  const cash = getTimeFromTimeline(game.date.minute, game.timeline)?.cash || 0;
+  React.useEffect(() => {
+    if (!railSelection) return;
+    const category = isStorage(railSelection)
+      ? "BUILD_STORAGE"
+      : "BUILD_GENERATORS";
+    if (active === category || introductoryChoices)
+      onRailSelectionApplied?.(railSelection);
+  }, [active, introductoryChoices, onRailSelectionApplied, railSelection]);
   const intertiesRef = useToolScroll<HTMLDivElement>(`build.${active}.scroll`);
   const close = closeTool ?? (() => dispatch(navigate("FACILITIES")));
   const gesture = React.useRef<{ id: number; x: number; y: number } | null>(
     null,
   );
   const changeCategory = (name: (typeof categories)[number][0]) => {
+    if (onCategoryChange) {
+      onCategoryChange(name);
+      return;
+    }
     if (localCategory) {
       setProjectCategory(name);
       return;
@@ -95,22 +111,8 @@ export default function BuildFacilities({
   };
 
   return (
-    <div
-      id={embedded ? undefined : "topbar"}
-      className="flexContainer screenCatalog buildFacilities"
-    >
+    <div className="flexContainer screenCatalog buildFacilities">
       <header className="constructionHeader">
-        {!embedded && (
-          <CatalogTitleBar
-            icon={<ConceptIcon concept="build" fontSize="small" />}
-            title="Build"
-            cash={cash}
-            onClose={close}
-            closeButtonId="close-button"
-            // The build screen stands in for the game bar, so tutorials find its speeds here
-            speedControlId="speedChangeButtons"
-          />
-        )}
         {!introductoryChoices && (
           <Tabs
             className="constructionTabs"
@@ -192,12 +194,22 @@ export default function BuildFacilities({
           <BuildGeneratorsContainer
             onPickSite={onPickSite}
             lockedTileId={lockedTileId}
+            railSelection={
+              railSelection && !isStorage(railSelection)
+                ? railSelection
+                : undefined
+            }
           />
         )}
         {active === "BUILD_STORAGE" && (
           <BuildStorageContainer
             onPickSite={onPickSite}
             lockedTileId={lockedTileId}
+            railSelection={
+              railSelection && isStorage(railSelection)
+                ? railSelection
+                : undefined
+            }
           />
         )}
         {active === "BUILD_INTERTIES" && (

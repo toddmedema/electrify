@@ -31,7 +31,7 @@ const RESTORE_FRAMES = 120;
 
 /**
  * Keeps an element's scroll position in the workspace memory, so a tool closed and reopened (or
- * moved between a sheet and a side column) comes back where the player left it. A pane that
+ * moved between a sheet and a floating window) comes back where the player left it. A pane that
  * mounts before its sheet is laid out, or first renders a placeholder, restores once it is tall
  * enough to hold the position, unless the player starts scrolling first.
  */
@@ -143,7 +143,6 @@ export function useToolFocusMemory(
   ref: React.RefObject<HTMLElement | null>,
   memory: Map<string, unknown>,
   active: string,
-  layout?: string,
 ) {
   React.useEffect(() => {
     const root = ref.current;
@@ -155,9 +154,11 @@ export function useToolFocusMemory(
         element.matches("h1,h2,h3,h4,h5,h6")
       )
         return;
-      const pane = element.closest<HTMLElement>("[data-game-tool],.gameFleet");
+      const pane = element.closest<HTMLElement>(
+        "[data-game-tool],.gameMapStage",
+      );
       if (!pane) return;
-      const key = pane.dataset.gameTool ?? "fleet";
+      const key = pane.dataset.gameTool ?? "map";
       memory.set(`focus.${key}`, {
         element,
         id: element.id,
@@ -178,7 +179,7 @@ export function useToolFocusMemory(
     )
       return;
     const saved = memory.get(`focus.${active}`) as FocusMemory | undefined;
-    if (!saved && active !== "fleet") return;
+    if (!saved && active !== "map") return;
     let frame: number | undefined;
     let cancelled = false;
     const cancel = () => {
@@ -198,7 +199,7 @@ export function useToolFocusMemory(
       )
         return;
       const root = ref.current?.querySelector<HTMLElement>(
-        active === "fleet" ? ".gameFleet" : `[data-game-tool="${active}"]`,
+        active === "map" ? ".gameMapStage" : `[data-game-tool="${active}"]`,
       );
       const target =
         root && !root.hidden
@@ -240,5 +241,5 @@ export function useToolFocusMemory(
       document.removeEventListener("keydown", cancel, true);
       document.removeEventListener("pointerdown", cancel, true);
     };
-  }, [active, layout, memory, ref]);
+  }, [active, memory, ref]);
 }

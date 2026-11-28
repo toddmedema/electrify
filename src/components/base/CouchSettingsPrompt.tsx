@@ -11,6 +11,8 @@ import {
   subscribeInputPresentation,
 } from "../../desktop/InputPresentation";
 
+const COUCH_SCALE = 1.5;
+
 function hasReceipt(): boolean {
   return getLocalStorage().getItem("couchPromptShown") === "true";
 }
@@ -25,6 +27,9 @@ export default function CouchSettingsPrompt() {
   const onTitleScreen = useAppSelector(
     (state) => state.card.name === "MAIN_MENU",
   );
+  const interfaceScale = useAppSelector(
+    (state) => state.settings.interfaceScale ?? 1,
+  );
   const dispatch = useAppDispatch();
   const received = useRef(hasReceipt());
   const [open, setOpen] = useState(false);
@@ -34,9 +39,9 @@ export default function CouchSettingsPrompt() {
     signals?.bigPicture === true ||
     signals?.remotePlayTv === true;
   useEffect(() => {
-    if (!onTitleScreen) setOpen(false);
+    if (!onTitleScreen || interfaceScale >= COUCH_SCALE) setOpen(false);
     else if (!received.current && qualifies) setOpen(true);
-  }, [onTitleScreen, qualifies]);
+  }, [interfaceScale, onTitleScreen, qualifies]);
   useEffect(() => {
     if (!open || !onTitleScreen) return;
     // Persist after this notice has committed, while keeping this launch's notice open.
@@ -95,13 +100,14 @@ export default function CouchSettingsPrompt() {
         }
       }}
     >
-      <p>Playing from the couch? Try larger controls and a focused layout.</p>
+      <p>Playing from the couch? Try larger controls.</p>
       <div className="couchSettingsPromptActions">
         <Button
           variant="text"
           disableRipple
           onClick={() => {
-            dispatch(change({ interfaceScale: 1.5, workspace: "single" }));
+            if (interfaceScale < COUCH_SCALE)
+              dispatch(change({ interfaceScale: COUCH_SCALE }));
             close();
           }}
         >

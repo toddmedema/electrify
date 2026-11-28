@@ -31,7 +31,7 @@ async function observeExit(screen: Locator): Promise<void> {
 
 async function expectBuildClosed(page: Page): Promise<void> {
   await expect(page.locator(".buildFacilities")).toHaveCount(0);
-  await expect(page.locator(".facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   await expect(page.locator("main.base_main")).toHaveCount(1);
 }
 
@@ -46,13 +46,13 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(page.locator(".facilities")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await expect(page.locator("main.base_main")).toHaveCount(1);
     await page.keyboard.press("0");
 
     for (const { category, from, open } of [
       { category: "Generators", from: "w", open: "g" },
-      { category: "Storage", from: "r", open: "s" },
+      { category: "Storage", from: "r", open: "Shift+s" },
       { category: "Interties", from: "q", open: "g" },
     ]) {
       for (const close of ["button", "Escape"]) {
@@ -118,7 +118,7 @@ test("Escape dismisses nested build dialogs before closing the sheet", async ({
   });
   await page.goto("/?scenario=111");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect(page.locator(".facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   await expect(page.locator("main.base_main")).toHaveCount(1);
   await page.keyboard.press("g");
   const catalog = page.locator(".buildFacilities");
@@ -164,13 +164,13 @@ test("Escape matches Back for Manual, Settings, and Saved games", async ({
   });
   await page.goto("/?scenario=111");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
-  await expect(page.locator(".facilities")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   await expect(page.locator("main.base_main")).toHaveCount(1);
   await page.keyboard.press("0");
 
   for (const title of ["Manual", "Settings", "Saved games"]) {
     for (const close of ["Back", "Escape"]) {
-      await page.keyboard.press("r");
+      await page.keyboard.press("e");
       await expect(page.locator("main.base_main")).toHaveCount(1);
       await page.locator(".gameMenuButton").click();
       await page.getByRole("menuitem", { name: title, exact: true }).click();

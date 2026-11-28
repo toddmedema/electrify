@@ -1281,8 +1281,7 @@ $topbar_height: 56px;
   }
 }
 
-// Short windows and large text must scroll the operating header with the body instead of
-// squeezing the charts and controls beneath a growing fixed status stack.
+// Short Settings and Manual pages scroll the entire column.
 @media (max-width: $tablet_width) and (max-height: 600px) {
   #gameCard {
     overflow-y: auto;
@@ -1290,15 +1289,7 @@ $topbar_height: 56px;
   }
   #gameCard .scrollable {
     overflow: visible;
-    // Size to content rather than the card's height. A sticky header can only pin within its
-    // parent's content box, and with the list at 100% height that box is shorter than its
-    // overflowing content - the header would release as soon as the list's box scrolled past
-    // the top of #gameCard
     height: auto;
-  }
-  #gameCard #navfooter {
-    position: sticky;
-    bottom: 0;
   }
 }
 
@@ -1551,26 +1542,6 @@ $pane_header_height: 48px;
   border-bottom: $border_accent;
 }
 
-.facilities .paneHeader {
-  gap: 8px;
-
-  // Shared control size, with 4px of breathing room inside the pane header.
-  .button-buildFacility {
-    margin-left: auto;
-    height: var(--control-size);
-    min-height: var(--control-size);
-    padding: 4px 12px;
-
-    .MuiButton-startIcon {
-      margin-right: 8px;
-    }
-
-    .MuiButton-startIcon > svg {
-      font-size: 1em;
-    }
-  }
-}
-
 .transmissionPanel {
   display: flex;
   flex-direction: column;
@@ -1760,13 +1731,6 @@ $pane_header_height: 48px;
   flex-direction: column;
   gap: 8px;
   padding: 0 16px 8px;
-}
-
-// Touch keeps the full 44px Build target, which the 52px touch header holds with 4px either side
-@media (pointer: coarse) {
-  .facilities .paneHeader .button-buildFacility {
-    height: 44px;
-  }
 }
 
 // A control living in a paneHeader alongside the title, pushed to the toolbar's trailing edge --
@@ -3763,16 +3727,6 @@ $pane_header_height: 48px;
 
     & > div {
       flex: 0 1 auto;
-    }
-
-    // The app bar and bottom nav are fixed chrome, not scrollable content -- only .scrollable
-    // (the pane's own body) should give up height when a pane overflows the card. Without this,
-    // a tall pane (e.g. Finances' expandable table) lets the flexbox shrink algorithm eat into
-    // BottomNavigation's automatic minimum size instead, which undercuts its real 56px height
-    // and left the nav a different height depending which pane happened to overflow.
-    & > #appbar,
-    & > #navfooter {
-      flex-shrink: 0;
     }
   }
 

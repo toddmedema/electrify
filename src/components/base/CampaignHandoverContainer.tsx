@@ -2,6 +2,7 @@ import { createSelector } from "@reduxjs/toolkit";
 import { RootState, useAppDispatch, useAppSelector } from "../../Store";
 import gameReducer, { continueLegacyCampaign } from "../../reducers/Game";
 import { quitSavedGame } from "../../SaveSession";
+import { navigate } from "../../reducers/Card";
 import { NAV_CARDS } from "../../Constants";
 import { getScenario } from "../../data/Scenarios";
 import { scenarioObjectiveDefinitions } from "../../helpers/ObjectiveRules";
@@ -38,7 +39,16 @@ export default function CampaignHandoverContainer(): React.JSX.Element | null {
     <CampaignHandover
       term={term}
       nextObjectives={nextObjectives}
-      onContinue={() => dispatch(continueLegacyCampaign())}
+      onContinue={() => {
+        dispatch(
+          navigate({
+            name: "FACILITIES",
+            replaceCurrentCard: true,
+            skipBrowserHistory: true,
+          }),
+        );
+        dispatch(continueLegacyCampaign());
+      }}
       onExit={() => {
         void quitSavedGame();
       }}

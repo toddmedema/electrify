@@ -1,10 +1,8 @@
 import { createContext, useContext, type RefObject } from "react";
+import type { CardNameType, FacilityShoppingType } from "../../Types";
 import type { WorkspaceLayout } from "../../WorkspaceLayout";
 
-/** Prevent embedded game views from creating their own app bar and navigation. */
-export const GameWorkspaceContext = createContext(false);
-
-/** Close an embedded tool without clearing the other desktop rail. */
+/** Close a tool while leaving the other map windows open. */
 export const GameToolCloseContext = createContext<(() => void) | undefined>(
   undefined,
 );
@@ -28,6 +26,12 @@ export type MapTileWindow = {
   raise: () => void;
 };
 
+export type MapBuildCatalogue = {
+  open: boolean;
+  onOpen: () => void;
+  onChoose: (selection: FacilityShoppingType) => void;
+};
+
 /** Share tile activation and exclusive project navigation with the map workspace. */
 export const MapWorkspacePanelContext = createContext<
   | {
@@ -37,6 +41,9 @@ export const MapWorkspacePanelContext = createContext<
       hideTile?: () => void;
       tileWindow?: MapTileWindow;
       projectRequested?: boolean;
+      buildCategory?: CardNameType;
+      setBuildCategory?: (category: CardNameType) => void;
+      buildCatalogue?: MapBuildCatalogue;
       showProject?: (close: () => void) => void;
       hideProject?: () => void;
       onProjectBusyChange?: (busy: boolean) => void;

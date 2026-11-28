@@ -1,5 +1,5 @@
 // Production timing evidence: E2E_CPU_RATE=4 npm run test:e2e:production --
-// side-panel-performance.spec.ts --project=desktop-1440px --workers=1
+// map-window-performance.spec.ts --project=desktop-1440px --workers=1
 // Timings are reports, never machine-dependent assertions.
 import { expect, test } from "./fixtures";
 import { openBuild, waitForSettled } from "./layout";
@@ -43,9 +43,9 @@ for (const panel of panels) {
         await openBuild(page);
         if (panel !== "Generators")
           await page.getByRole("tab", { name: panel, exact: true }).click();
-      } else if (panel !== "Fleet") {
+      } else {
         if (panel === "Multiple") {
-          // Enough space for three simultaneously visible tools plus the fleet.
+          // Three independently floating tools over the map.
           await page.setViewportSize({ width: 1920, height: 1080 });
           await openBuild(page);
           await page
@@ -106,7 +106,7 @@ for (const panel of panels) {
       expect(end).not.toBe(start);
       if (panel === "Multiple" && speed === "normal")
         await reviewScreenshot(page, {
-          path: info.outputPath("desktop-side-panels.png"),
+          path: info.outputPath("desktop-map-windows.png"),
           animations: "disabled",
         });
       const sorted = [...samples.gaps].sort((a, b) => a - b);

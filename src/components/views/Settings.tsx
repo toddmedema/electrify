@@ -21,14 +21,12 @@ import {
   ScreenEdgePaddingType,
   ThemeChoiceType,
   UnitSystemType,
-  WorkspaceType,
 } from "../../Types";
 import {
   INTERFACE_SCALES,
   interfaceScaleLabel,
   normalizeInterfaceScale,
 } from "../../InterfaceScale";
-import { normalizeWorkspace } from "../../WorkspaceLayout";
 import {
   SCREEN_EDGE_PADDINGS,
   normalizeScreenEdgePadding,
@@ -73,7 +71,6 @@ export interface DispatchProps {
   onUnitsChange: (change: UnitSystemType) => void;
   onThemeChange: (change: ThemeChoiceType) => void;
   onInterfaceScaleChange: (change: number) => void;
-  onWorkspaceChange: (change: WorkspaceType) => void;
   onScreenEdgePaddingChange: (change: ScreenEdgePaddingType) => void;
   onBack: () => void;
 }
@@ -341,28 +338,6 @@ export default function Settings(props: Props): React.JSX.Element {
           </SettingsGroup>
 
           <SettingsGroup id="display-settings" title="Display">
-            <SettingRow
-              label="Workspace"
-              description="Automatic fits tools beside Fleet when there is room. Single tool gives the active tool the main area."
-              stackOnMobile
-            >
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={normalizeWorkspace(props.settings.workspace)}
-                aria-label="Workspace"
-                onChange={(_event, value: WorkspaceType | null) =>
-                  value && props.onWorkspaceChange(value)
-                }
-                sx={{
-                  width: { xs: "100%", sm: "auto" },
-                  "& .MuiToggleButton-root": { flex: 1, textTransform: "none" },
-                }}
-              >
-                <ToggleButton value="automatic">Automatic</ToggleButton>
-                <ToggleButton value="single">Single tool</ToggleButton>
-              </ToggleButtonGroup>
-            </SettingRow>
             <Accordion
               disableGutters
               elevation={0}

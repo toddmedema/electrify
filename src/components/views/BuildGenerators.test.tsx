@@ -1186,7 +1186,7 @@ it("keeps comparison with the scrolling catalog when Fleet is hidden or space is
   const workspace = (fleetVisible: boolean, constrained = false) => (
     <GameWorkspaceLayoutContext.Provider
       value={{
-        ...workspaceLayout(1920, 1, "automatic"),
+        ...workspaceLayout(1920, 1),
         fleetVisible,
         constrained,
       }}

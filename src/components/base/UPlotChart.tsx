@@ -432,6 +432,24 @@ export default function UPlotChart<S>(
   heightRef.current = height;
   const exactHeightRef = React.useRef(props.exactHeight);
   exactHeightRef.current = props.exactHeight;
+  const plotSize = React.useCallback((width: number) => {
+    const root = rootRef.current!;
+    const requested =
+      (heightRef.current || 300) *
+      (exactHeightRef.current ? 1 : chartScale(width));
+    const height = Math.max(
+      1,
+      Math.round(
+        presentationRef.current?.height ??
+          containerChartHeight(root, requested),
+      ),
+    );
+    // uPlot appends an unsized wrapper before initializing its canvas. Keep the
+    // host's allocated height even while replacing or resizing that wrapper.
+    if (exactHeightRef.current)
+      root.style.setProperty("--measured-plot-height", `${height}px`);
+    return { width, height };
+  }, []);
   const number = React.useMemo(
     () =>
       new Intl.NumberFormat(undefined, {
@@ -592,36 +610,14 @@ export default function UPlotChart<S>(
       if (!plot || nextWidth <= 0) {
         return;
       }
-      plot.setSize({
-        width: nextWidth,
-        height: Math.max(
-          1,
-          Math.round(
-            presentationRef.current?.height ??
-              containerChartHeight(
-                root,
-                exactHeightRef.current
-                  ? heightRef.current || 300
-                  : (heightRef.current || 300) * chartScale(nextWidth),
-              ),
-          ),
-        ),
-      });
+      plot.setSize(plotSize(nextWidth));
     };
 
     const measure = () => {
       // Floor fractional flex widths so uPlot's explicit canvas width can never
       // round a pixel wider than the pane that owns it.
       nextWidth = Math.floor(root.getBoundingClientRect().width);
-      const nextHeight = Math.round(
-        presentationRef.current?.height ??
-          containerChartHeight(
-            root,
-            exactHeightRef.current
-              ? heightRef.current || 300
-              : (heightRef.current || 300) * chartScale(nextWidth),
-          ),
-      );
+      const nextHeight = plotSize(nextWidth).height;
       if (
         nextWidth <= 0 ||
         (nextWidth === measuredWidthRef.current &&
@@ -664,7 +660,7 @@ export default function UPlotChart<S>(
         clearTimeout(settleTimer);
       }
     };
-  }, []);
+  }, [plotSize]);
 
   const plotLayout = React.useMemo(
     () => ({
@@ -736,17 +732,7 @@ export default function UPlotChart<S>(
     const plot = new uPlot(
       {
         ...built,
-        width,
-        height: Math.max(
-          1,
-          Math.round(
-            presentation?.height ??
-              containerChartHeight(
-                rootRef.current,
-                (height || 300) * (props.exactHeight ? 1 : scale),
-              ),
-          ),
-        ),
+        ...plotSize(width),
         // Only x is synced: these charts plot watts against watt-hours against dollars, so
         // matching their y scales would line up numbers that have nothing to do with each other
         cursor: {
@@ -1239,6 +1225,9 @@ export default function UPlotChart<S>(
         data-viewport-max={viewport?.range[1]}
         style={{
           width: "100%",
+          height: props.exactHeight
+            ? `var(--measured-plot-height, ${height || 300}px)`
+            : undefined,
           minWidth: 0,
           maxWidth: "100%",
           // Expanded keyboard details live outside uPlot's positioned plot surface.

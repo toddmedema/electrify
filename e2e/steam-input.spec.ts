@@ -72,13 +72,118 @@ async function select(
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
-  const group = control.locator("..");
-  const roving =
-    (await control.getAttribute("tabindex")) === "-1" &&
-    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "");
+  // Resolve the target and inspect each real D-pad stop in one browser call. Re-running
+  // role queries across the map for every focus and geometry read dominates the journey on CI.
+  const navigation = () =>
+    control.evaluateAll((targets) => {
+      const visibleSurfaces = Array.from(
+        document.querySelectorAll(
+          '[role="dialog"],[role="menu"],[role="listbox"]',
+        ),
+      ).filter((node) => {
+        const bounds = node.getBoundingClientRect();
+        return (
+          bounds.width > 0 &&
+          bounds.height > 0 &&
+          node.checkVisibility({ visibilityProperty: true })
+        );
+      });
+      const element = targets[0];
+      const active = document.activeElement as HTMLElement | null;
+      const focused = !!element && active === element;
+      const controlledIds =
+        focused && element.matches('[role="combobox"][aria-expanded="true"]')
+          ? element.getAttribute("aria-controls")?.split(/\s+/)
+          : undefined;
+      const state = {
+        count: targets.length,
+        homeLoop:
+          !!element?.closest("#menuCard") &&
+          !document.querySelector(".couchSettingsPrompt"),
+        roving:
+          element?.getAttribute("tabindex") === "-1" &&
+          !!element.parentElement?.matches('[role="group"],[role="tablist"]'),
+        surfaces: visibleSurfaces.map((node) => [
+          node.getAttribute("role"),
+          node.id,
+          node.getAttribute("aria-label"),
+        ]),
+        ownedListbox: visibleSurfaces.findIndex(
+          (node) =>
+            node.getAttribute("role") === "listbox" &&
+            !!node.id &&
+            controlledIds?.includes(node.id) &&
+            document.querySelectorAll(`#${CSS.escape(node.id)}`).length === 1,
+        ),
+        focused,
+      };
+      if (!element || !active || active === document.body || state.focused)
+        return { ...state, directions: ["down"], key: "body" };
+      if (
+        active.matches(".worldMapMarker,.territoryTileTarget") &&
+        !element.matches(".worldMapMarker,.territoryTileTarget")
+      ) {
+        // Every arrow belongs to map geography. Back returns to its toolbar.
+        return { ...state, directions: ["back"], key: "map" };
+      }
+      const target = element.getBoundingClientRect();
+      const from = active.getBoundingClientRect();
+      const sameRow =
+        Math.min(from.bottom, target.bottom) >
+        Math.max(from.top, target.top) +
+          Math.min(from.height, target.height) / 2;
+      const horizontalDirection = target.left > from.left ? "right" : "left";
+      const verticalDirection = target.top > from.top ? "down" : "up";
+      const horizontal =
+        sameRow &&
+        !active.matches(
+          'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
+        );
+      // If the nearest row leads back here, try the other axis toward the
+      // destination before exploring directions that take us farther away.
+      const directions = horizontal
+        ? [horizontalDirection, verticalDirection]
+        : [verticalDirection, horizontalDirection];
+      // Roving groups consume arrows on their own axis. To leave one, try
+      // the perpendicular directions before exploring the other routes.
+      const group = active.parentElement;
+      if (
+        active.matches("button[tabindex]") &&
+        group?.matches('[role="group"],[role="tablist"]') &&
+        !group.contains(element) &&
+        group.querySelector(':scope > button[tabindex="-1"]')
+      ) {
+        const orientation =
+          group.getAttribute("aria-orientation") ??
+          (group.matches(".MuiToggleButtonGroup-vertical")
+            ? "vertical"
+            : group.matches('.MuiToggleButtonGroup-horizontal,[role="tablist"]')
+              ? "horizontal"
+              : undefined);
+        if (orientation === "vertical")
+          directions.unshift(
+            horizontalDirection,
+            horizontalDirection === "left" ? "right" : "left",
+          );
+        if (orientation === "horizontal")
+          directions.unshift(
+            verticalDirection,
+            verticalDirection === "up" ? "down" : "up",
+          );
+      }
+      return {
+        ...state,
+        directions,
+        key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
+      };
+    });
+  let movement = await navigation();
+  expect(movement.count, "unique control at the start of navigation").toBe(1);
+  const roving = movement.roving;
   if (roving) {
     // Roving groups expose one vertical tab stop. Enter it before moving within
     // the group, just as a player does with the D-pad.
+    const group = control.locator("..");
     const entry = group.locator('button[tabindex="0"]');
     await expect(entry).toHaveCount(1);
     await select(page, entry, "down", limit);
@@ -92,12 +197,10 @@ async function select(
     const vertical =
       (await group.getAttribute("aria-orientation")) === "vertical";
     action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
+    movement = await navigation();
   }
 
-  if (
-    (await control.evaluate((element) => !!element.closest("#menuCard"))) &&
-    !(await page.locator(".couchSettingsPrompt").count())
-  ) {
+  if (movement.homeLoop) {
     for (let attempt = 0; attempt < limit; attempt++) {
       if (
         await control.evaluate((element) => element === document.activeElement)
@@ -108,93 +211,77 @@ async function select(
     await expect(control, "reachable through the home menu loop").toBeFocused();
     return;
   }
-  const popupSurfaces = () =>
-    page
-      .locator('[role="dialog"],[role="menu"],[role="listbox"]')
-      .filter({ visible: true })
-      .evaluateAll((elements) =>
-        elements.map((element) => ({
-          role: element.getAttribute("role"),
-          id: element.id,
-          label: element.getAttribute("aria-label"),
-        })),
-      );
-  const expectedSurfaces = await popupSurfaces();
+  const expectedSurfaces = movement.surfaces;
   const visited = new Map<string, number>();
-  for (let attempt = 0; attempt < limit; attempt++) {
-    if (await control.evaluate((element) => element === document.activeElement))
-      return;
+  for (let attempt = 0; attempt <= limit; attempt++) {
     expect(
-      await popupSurfaces(),
-      "directional focus traversal must not open or dismiss a popup",
-    ).toEqual(expectedSurfaces);
-    expect(
-      await control.count(),
+      movement.count,
       "the target must remain available during navigation",
     ).toBe(1);
-    const movement = await control.evaluate((element) => {
-      const target = element.getBoundingClientRect();
-      const active = document.activeElement as HTMLElement | null;
-      if (!active || active === document.body)
-        return { direction: "down", key: "body" };
-      if (
-        active.matches(".worldMapMarker,.territoryTileTarget") &&
-        !element.matches(".worldMapMarker,.territoryTileTarget")
-      ) {
-        // Every arrow belongs to map geography. Back returns to its toolbar
-        // before the player can navigate to another form control.
-        return { direction: "back", key: "map" };
-      }
-      const from = active.getBoundingClientRect();
-      const sameRow =
-        Math.min(from.bottom, target.bottom) >
-        Math.max(from.top, target.top) +
-          Math.min(from.height, target.height) / 2;
-      const horizontal =
-        sameRow &&
-        !active.matches(
-          'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
-        );
-      return {
-        direction: horizontal
-          ? target.left > from.left
-            ? "right"
-            : "left"
-          : target.top > from.top
-            ? "down"
-            : "up",
-        key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
-      };
-    });
+    // A combobox may open its own listbox on focus. Every other popup, including
+    // ones already open before traversal, must still match the starting state.
+    const surfaces =
+      movement.surfaces.length === expectedSurfaces.length + 1
+        ? movement.surfaces.filter(
+            (_, index) => index !== movement.ownedListbox,
+          )
+        : movement.surfaces;
+    expect(
+      surfaces,
+      "directional focus traversal must not open or dismiss a popup",
+    ).toEqual(expectedSurfaces);
+    if (movement.focused || attempt === limit) break;
     const count = visited.get(movement.key) ?? 0;
     visited.set(movement.key, count + 1);
-    const direction =
-      count < 2
-        ? roving
-          ? action
-          : movement.direction
-        : ["down", "right", "up", "left"][count % 4];
-    await input(page, direction as InputAction);
+    // Reaching the same stop again means the preceding choice led back here.
+    // Try a different direction before repeating that route.
+    const directions = [
+      ...new Set([
+        ...(roving ? [action] : []),
+        ...movement.directions,
+        "down",
+        "right",
+        "up",
+        "left",
+      ]),
+    ];
+    await input(page, directions[count % directions.length] as InputAction);
+    movement = await navigation();
   }
-  await expect(
-    control,
+  expect(
+    movement.focused,
     "reachable through the rendered control positions",
-  ).toBeFocused();
+  ).toBe(true);
 }
 
-async function openControllerFleet(page: Page) {
-  const fleet = page.locator("#facilitiesPane");
-  if (!(await fleet.isVisible())) {
-    await select(
-      page,
-      page.getByRole("button", { name: "Fleet", exact: true }),
-    );
-    await input(page, "confirm");
-  }
-  await expect(fleet).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Map", exact: true }),
-  ).toBeVisible();
+async function reorderFirstFleetRow(page: Page) {
+  const rows = page.locator(".facilities:visible .facilityRow");
+  const firstId = (await rows.first().getAttribute("data-rfd-draggable-id"))!;
+  const grip = rows.first().getByRole("button", { name: /^Reorder / });
+  await select(page, grip);
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
+  await input(page, "down");
+  await input(page, "confirm");
+  await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
+  return { rows, firstId };
+}
+
+async function reopenReorderedFleetChart(
+  page: Page,
+  rows: Locator,
+  firstId: string,
+) {
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const charts = fleet.locator('.accessibleChart > [role="img"][tabindex="0"]');
+  await expect(charts.first()).toBeHidden();
+  await input(page, "nextChart");
+  await expect(charts.first()).toBeVisible();
+  const chart = charts.and(page.locator(":focus"));
+  await expect(chart).toBeFocused();
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
+  return chart;
 }
 
 /** Enter the roving map stop, then let D-pad movement reveal virtualized cells. */
@@ -529,7 +616,6 @@ test("TV home controller navigation includes every footer icon and wraps", async
 }) => {
   await page.addInitScript(() => {
     localStorage.setItem("interfaceScale", "1.5");
-    localStorage.setItem("workspace", "single");
   });
   await page.goto("/");
   await waitForDesktopInput(page);
@@ -728,9 +814,7 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   );
   await input(page, "confirm");
   await expect(purchase).toHaveCount(0);
-  if (
-    (await page.locator(".gameStage").getAttribute("data-layout")) === "side"
-  ) {
+  if (await page.locator(".gameWorkspace").getAttribute("data-map-windows")) {
     await expect(build).toBeVisible();
     await select(
       page,
@@ -740,27 +824,22 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   }
   await expect(build).toHaveCount(0);
 
-  // Confirm lifts a reorder handle; directions must move the row rather than leave it.
-  await openControllerFleet(page);
-  const rows = page.locator(".facilities:visible .facilityRow");
-  const firstId = await rows.first().getAttribute("data-rfd-draggable-id");
-  const grip = rows.first().getByRole("button", { name: /^Reorder / });
-  await select(page, grip);
-  await input(page, "confirm");
-  await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
-  await input(page, "down");
-  await input(page, "confirm");
-  await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
-  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  // Fleet is the first pane after the map. Confirm lifts a reorder handle.
+  await input(page, "nextPane");
+  await expect(
+    page.getByRole("region", { name: "Fleet", exact: true }),
+  ).toBeVisible();
+  const { rows, firstId } = await reorderFirstFleetRow(page);
   await input(page, "confirm");
   await expect(page.locator(".facilityRow.dragging")).toHaveCount(1);
   await input(page, "up");
   await input(page, "back");
   await expect(page.locator(".facilityRow.dragging")).toHaveCount(0);
-  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
+  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
 
-  // From the fleet the pane ring reaches Build, then Programs at every viewport width.
-  await input(page, "nextPane");
+  // Use the Build action from Fleet and verify category memory through the pane ring.
+  await input(page, "build");
+  await expect(build).toBeVisible();
   for (const category of ["Storage", "Interties"]) {
     await page.getByRole("tab", { name: category, exact: true }).click();
     await input(page, "nextPane");
@@ -769,9 +848,14 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
       page.getByRole("tab", { name: category, exact: true }),
     ).toHaveAttribute("aria-selected", "true");
   }
-  await input(page, "nextPane");
   const programs = page.getByRole("region", { name: "Programs", exact: true });
-  await expect(programs).toBeVisible();
+  await input(page, "nextPane");
+  for (const destination of ["Fleet", "Trade", "Events", "Programs"]) {
+    await input(page, "nextPane");
+    await expect(
+      page.getByRole("region", { name: destination, exact: true }),
+    ).toBeVisible();
+  }
   const rate = programs.getByRole("slider", {
     name: "The rate you charge for electricity generation",
     exact: true,
@@ -803,24 +887,11 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
       animations: "disabled",
     });
   }
-  // Programs → Insights → Events → Scenario → Fleet closes every retained side pane.
+  // Programs → Insights → Scenario → Build → Map closes the active panel.
   for (let index = 0; index < 4; index++) await input(page, "nextPane");
   await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   await expect(programs).toHaveCount(0);
-  await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId!);
-  await select(page, page.getByRole("button", { name: "Map", exact: true }));
-  await input(page, "confirm");
-  await expect(
-    page.getByRole("button", { name: "Fleet", exact: true }),
-  ).toBeVisible();
-  const charts = page.locator(
-    '#facilitiesPane .accessibleChart > [role="img"][tabindex="0"]',
-  );
-  await expect(charts.first()).toBeHidden();
-  await input(page, "nextChart");
-  await expect(charts.first()).toBeVisible();
-  const chart = charts.and(page.locator(":focus"));
-  await expect(chart).toBeFocused();
+  const chart = await reopenReorderedFleetChart(page, rows, firstId);
   await input(page, "confirm");
   await expect(chart.locator("..").getByRole("status")).not.toBeEmpty();
   await input(page, "right");
@@ -840,6 +911,10 @@ test("semantic actions play, build, adjust pricing, inspect charts and save at 1
   await input(page);
   await expect(paused).toHaveAttribute("aria-pressed", "true");
 
+  await input(page, "back");
+  await expect(
+    page.getByRole("region", { name: "Fleet", exact: true }),
+  ).toBeHidden();
   await input(page, "back");
   const quit = page.getByRole("menuitem", { name: "Save & Quit", exact: true });
   await select(page, quit);
@@ -1261,7 +1336,50 @@ test("controller reviews, cancels and confirms a utility acquisition", async ({
   ).toBe(true);
 });
 
-test("controller cycles six right-hand panels around the persistent map", async ({
+test("first controller Confirm opens the keyboard-focused Build rail @docked-controller", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=111");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  const paused = page.locator('.speedToggles button[value="PAUSED"]');
+  await paused.click();
+  await expect(paused).toHaveAttribute("aria-pressed", "true");
+  const rail = page.locator(".desktopBuildRail #buildNav");
+  await expect(rail).toBeEnabled();
+  await rail.focus();
+  await expect(rail).toBeFocused();
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-mock-input-context",
+    "Gameplay",
+  );
+  await expect(page.locator("html")).not.toHaveAttribute(
+    "data-controller-input",
+    "true",
+  );
+  const activations = await page.evaluateHandle(() => {
+    const count = { build: 0 };
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest("#buildNav")
+        )
+          count.build++;
+      },
+      true,
+    );
+    return count;
+  });
+  await input(page, "confirm");
+  expect(await activations.evaluate((count) => count.build)).toBe(1);
+  await expect(
+    page.getByRole("region", { name: "Build", exact: true }),
+  ).toBeVisible();
+});
+
+test("controller cycles six tools around the persistent map", async ({
   page,
 }) => {
   await page.goto("/?scenario=116");
@@ -1280,19 +1398,23 @@ test("controller cycles six right-hand panels around the persistent map", async 
   ).toHaveCount(0);
   const viewport = map.locator(".territoryMapViewport");
   const original = await viewport.elementHandle();
+  await input(page, "nextPane");
+  const { rows, firstId } = await reorderFirstFleetRow(page);
+  await input(page, "previousPane");
+  await expect(page.locator(".gameToolPanel:visible")).toHaveCount(0);
   for (const name of [
     "Fleet",
     "Trade",
+    "Events",
     "Programs",
     "Insights",
-    "Events",
     "Scenario",
   ]) {
     await input(page, "nextPane");
     const panel = page.getByRole("region", { name, exact: true });
     await expect(panel).toBeVisible();
     await expect(page.locator(".gameToolPanel:visible")).toHaveCount(1);
-    await expect(panel).toHaveAttribute("data-tool-side", "right");
+    await expect(panel).not.toHaveAttribute("data-resizable", "true");
     await expect(map).toBeVisible();
     expect(
       await original!.evaluate(
@@ -1312,6 +1434,10 @@ test("controller cycles six right-hand panels around the persistent map", async 
   await expect(
     page.getByRole("button", { name: "Rapid connection mode", exact: true }),
   ).toBeFocused();
+  await reopenReorderedFleetChart(page, rows, firstId);
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  await expect(fleet).toBeVisible();
+  await expect(fleet.locator('#chartSupplyDemand [role="img"]')).toBeFocused();
 });
 
 async function startControllerMapAtToolbar(page: Page) {
@@ -1448,11 +1574,6 @@ async function setupTv(page: Page, maximum: boolean, theme: "light" | "dark") {
   await page
     .getByRole("combobox", { name: "Interface scale", exact: true })
     .selectOption(maximum ? "2" : "1.5");
-  await select(
-    page,
-    page.getByRole("button", { name: "Single tool", exact: true }),
-  );
-  await input(page, "confirm");
   if (maximum) {
     await select(
       page,
@@ -1522,7 +1643,6 @@ test("TV saved display preferences style direct scenario links before play", asy
   await page.addInitScript(() => {
     const savedPrefs = () => {
       localStorage.setItem("interfaceScale", "2");
-      localStorage.setItem("workspace", "single");
       localStorage.setItem("screenEdgePadding", "4");
     };
     // The shared bridge fixture clears preferences. Preserve these explicit display
@@ -1864,7 +1984,7 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await expect(page.locator("#appbar:visible")).toBeVisible();
     await expect(page.locator(".gameStage")).toHaveAttribute(
       "data-layout",
-      "single",
+      "map",
     );
     const capture = async (view: string) => {
       await expect(page.locator(".base_main")).toHaveCount(1);
@@ -1945,19 +2065,18 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
         });
       }
     };
-    await select(
-      page,
-      page.getByRole("button", { name: "Build", exact: true }),
-    );
+    const fleet = page.getByRole("button", { name: "Fleet", exact: true });
+    await select(page, fleet);
     await input(page, "right");
     await expect(
-      page.getByRole("button", { name: "Programs", exact: true }),
+      page.getByRole("button", { name: "Trade", exact: true }),
     ).toBeFocused();
     await input(page, "left");
+    await expect(fleet).toBeFocused();
+    await input(page, "confirm");
     await expect(
-      page.getByRole("button", { name: "Build", exact: true }),
-    ).toBeFocused();
-    await openControllerFleet(page);
+      page.getByRole("region", { name: "Fleet", exact: true }),
+    ).toBeVisible();
     await capture("fleet");
     const inspect = page.getByRole("button", {
       name: "Inspect Coal",
@@ -1969,7 +2088,8 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await capture("fleet-expanded");
     await input(page, "build");
     const build = page.getByRole("region", { name: "Build", exact: true });
-    await expect(page.locator(".gameFleet")).toBeHidden();
+    await expect(page.locator(".gameMapStage")).toBeVisible();
+    await expect(page.locator("#facilitiesPane")).toBeHidden();
     await expect(build.locator("summary")).toHaveCount(0);
     const compareSolar = build.getByRole("button", {
       name: "Compare Solar",
@@ -2001,9 +2121,8 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
       .locator(".gameToolBody,ul.cardList")
       .evaluateAll((elements) => elements.map((element) => element.scrollTop));
     await input(page, "nextPane");
-    await expect(
-      page.getByRole("region", { name: "Programs", exact: true }),
-    ).toBeVisible();
+    await expect(build).toHaveCount(0);
+    await expect(page.locator(".gameMapStage")).toBeVisible();
     await input(page, "previousPane");
     await expect(reviewSolar).toBeFocused();
     await expect
@@ -2320,12 +2439,14 @@ async function tvJourney(page: Page, testInfo: TestInfo, maximum: boolean) {
     await input(page, "confirm");
     await expect(sound).not.toBeChecked();
     await input(page, "back");
-    await select(page, page.getByRole("button", { name: "menu", exact: true }));
-    await input(page, "confirm");
-    await select(
-      page,
-      page.getByRole("menuitem", { name: "Manual", exact: true }),
-    );
+    // The exiting Settings screen owns input until the transition is finished.
+    await expect(page.locator("#gameCard")).toHaveCount(0);
+    const manual = page.getByRole("menuitem", { name: "Manual", exact: true });
+    // Back leaves map geography before opening the game menu.
+    for (let step = 0; step < 2 && !(await manual.isVisible()); step++) {
+      await input(page, "back");
+    }
+    await select(page, manual);
     await input(page, "confirm");
     const search = page.getByRole("textbox", { name: "Search the manual" });
     await select(page, search);
@@ -2529,9 +2650,6 @@ for (const source of [
       accept ? "1.5" : "1",
     );
     // Acceptance persists the applied choices; dismissal keeps defaults without writing them.
-    expect(await page.evaluate(() => localStorage.getItem("workspace"))).toBe(
-      accept ? "single" : null,
-    );
     expect(
       await page.evaluate(() => localStorage.getItem("screenEdgePadding")),
     ).toBeNull();

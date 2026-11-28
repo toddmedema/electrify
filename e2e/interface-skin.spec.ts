@@ -110,7 +110,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=106");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await expect(page.locator(".facilities")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await page.keyboard.press("0");
     const insights = page.getByRole("region", {
       name: "Insights",

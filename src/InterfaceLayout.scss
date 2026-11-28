@@ -78,9 +78,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
       font-size: 1.125rem;
     }
   }
-  .gameFleet {
-    max-width: 75rem;
-  }
   .facilityDisclosure .MuiListItemText-secondary {
     font-size: 0.875rem;
   }
@@ -457,8 +454,6 @@ html[data-interface-scale]:not([data-interface-scale="1"]) {
   }
 }
 
-// Single-tool and enlarged layouts share the same wrapping status contract.
-.gameWorkspace[data-workspace-layout="single"],
 html[data-interface-scale]:not([data-interface-scale="1"]) {
   .gameStatusBar {
     display: flex;

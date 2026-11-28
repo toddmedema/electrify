@@ -1,5 +1,6 @@
 import * as React from "react";
-import { Button } from "@mui/material";
+import { Button, Tooltip } from "@mui/material";
+import { getLegacyBuildBounds } from "../../data/LegacyEra";
 import { DOWNPAYMENT_PERCENT } from "../../Constants";
 import { GENERATORS, STORAGE } from "../../data/Facilities";
 import { getHydroAvailability } from "../../data/HydroSites";
@@ -9,9 +10,15 @@ import {
   type GameType,
   type TerritoryTileId,
 } from "../../Types";
-import { sliderTickToW } from "../../helpers/BuildSizing";
+import { sliderTickToW, wToSliderTick } from "../../helpers/BuildSizing";
 import { formatWatts, formatWattHours } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
+import { getBuildAvailability } from "./BuildAvailability";
+import {
+  multiplayerBuildAvailability,
+  multiplayerHydroAvailability,
+} from "../../helpers/MultiplayerTerritory";
+import { purchaseTerms } from "../../helpers/Financials";
 import { hasVisibleEscapeOverlay } from "./VisibleEscapeOverlay";
 import { expectedMonthlyOutputShape } from "../../helpers/ExpectedOutput";
 import {
@@ -27,7 +34,10 @@ import {
   tileFitsFacility,
   tileSupportsFacilityTechnology,
 } from "../../helpers/TerritoryTiles";
-import { resilienceBuildOptions } from "../../helpers/Hazards";
+import {
+  resilienceBuildOptions,
+  withResilienceOptions,
+} from "../../helpers/Hazards";
 import {
   projectCatalogue,
   projectSiteQuote,
@@ -44,6 +54,8 @@ import {
   typicalCapacityFactor,
 } from "./BuildPreviewComparison";
 import { useToolState } from "./GameToolMemory";
+import ConceptIcon from "./ConceptIcon";
+import type { MapBuildCatalogue } from "./GameWorkspaceContext";
 import "./DesktopBuildRail.scss";
 
 const technologyOrder = [
@@ -66,10 +78,55 @@ const technologyOrder = [
   "Pumped Hydro",
 ];
 
-const sizeBounds = {
-  generator: { min: 0, max: 34 },
-  storage: { min: 4, max: 37 },
-};
+const storageBounds = { min: 4, max: 37 };
+
+function catalogueSites(
+  game: GameType,
+  options: FacilityShoppingType[],
+  siteId?: TerritoryTileId,
+) {
+  const multiplayer = !!game.multiplayer?.territorial;
+  return new Map(
+    options.map((facility) => {
+      const storage = isStorage(facility);
+      const availability = multiplayer
+        ? multiplayerBuildAvailability(game, facility, siteId)
+        : undefined;
+      const hydroAvailability =
+        facility.name === "Hydro"
+          ? multiplayer
+            ? multiplayerHydroAvailability(game, facility.peakW, siteId)
+            : getHydroAvailability(game, facility.peakW)
+          : undefined;
+      const buildable =
+        getBuildAvailability({
+          name: facility.name,
+          description: facility.description,
+          available: facility.available,
+          sizeBuildable: storage
+            ? facility.peakWh <= facility.maxPeakWh
+            : facility.peakW <= facility.maxPeakW,
+          maxSizeLabel: undefined,
+          location: game.location,
+          viableLocationsRemaining: facility.viableLocationsRemaining,
+          siteInventory: availability,
+          hydroAvailability,
+        }).buildable &&
+        (availability?.buildable ?? true);
+      const cost = storage
+        ? facility.buildCost
+        : withResilienceOptions(facility, game, {}).buildCost;
+      return [
+        facility.name,
+        {
+          minimumDue: buildable
+            ? purchaseTerms(cost, true, game.interestRate).downpayment
+            : Infinity,
+        },
+      ] as const;
+    }),
+  );
+}
 
 function railSites(game: GameType, options: FacilityShoppingType[]) {
   const tiles = getTerritoryTiles(game);
@@ -117,13 +174,15 @@ export default function DesktopBuildRail({
   focusRequest,
   onProject,
   onProjectDrag,
+  catalogue,
 }: {
   game: GameType;
   project?: ProjectSelection;
   siteId?: TerritoryTileId;
   busy: boolean;
   focusRequest: number;
-  onProject: (project: ProjectSelection | undefined) => void;
+  onProject?: (project: ProjectSelection | undefined) => void;
+  catalogue?: MapBuildCatalogue;
   onProjectDrag?: (project: ProjectSelection | undefined) => void;
 }) {
   const rail = React.useRef<HTMLElement>(null);
@@ -142,16 +201,24 @@ export default function DesktopBuildRail({
     pinned: boolean;
   }>();
   const [sizingTop, setSizingTop] = React.useState(0);
-  const [generatorSize, setGeneratorSize] = useToolState(
+  const catalogueMode = !!catalogue;
+  const legacyBounds = catalogueMode ? getLegacyBuildBounds(game) : undefined;
+  const generatorMin = legacyBounds ? wToSliderTick(legacyBounds.minW) : 0;
+  const generatorMax = legacyBounds ? wToSliderTick(legacyBounds.maxW) : 34;
+  const [generatorTick, setGeneratorSize] = useToolState(
     "project.generatorSize",
-    10,
+    legacyBounds ? wToSliderTick(legacyBounds.defaultW) : 10,
+  );
+  const generatorSize = Math.min(
+    generatorMax,
+    Math.max(generatorMin, generatorTick),
   );
   const [storageSize, setStorageSize] = useToolState("project.storageSize", 18);
   const forecast = useBuildForecast(game);
   const previewId = React.useId();
   const previewHintId = React.useId();
   const sizingId = React.useId();
-  const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}`;
+  const pricingKey = `${signature(game)}|${game.interestRate}|${JSON.stringify(game.multiplayer?.tileOwners)}|${JSON.stringify(game.multiplayer?.landOwners)}|${game.multiplayer?.territorial?.claims.length ?? 0}`;
   const options = React.useMemo<FacilityShoppingType[]>(
     () =>
       withTerritoryCatalogueLimits(game, [
@@ -162,21 +229,30 @@ export default function DesktopBuildRail({
           forecast?.solarIrradiances ?? [],
           forecast?.offshoreWindSpeeds ?? [],
           forecast?.airborneWindSpeeds ?? [],
+          undefined,
+          catalogueMode ? siteId : undefined,
         ),
-        ...STORAGE(game, sliderTickToW(storageSize)),
+        ...STORAGE(
+          game,
+          sliderTickToW(storageSize),
+          catalogueMode ? siteId : undefined,
+        ),
         // Planning inputs, rather than clock ticks or map focus, own catalogue pricing.
       ]).sort(
         (a, b) =>
           technologyOrder.indexOf(a.name) - technologyOrder.indexOf(b.name),
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pricingKey, generatorSize, storageSize, forecast],
+    [pricingKey, generatorSize, storageSize, forecast, catalogueMode, siteId],
   );
   const sites = React.useMemo(
-    () => railSites(game, options),
+    () =>
+      catalogueMode
+        ? catalogueSites(game, options, siteId)
+        : railSites(game, options),
     // Cash changes every tick. Site eligibility and prices use the planning inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pricingKey, options],
+    [pricingKey, options, catalogueMode, siteId],
   );
   const cash = currentTick(game)?.cash ?? 0;
   const canChoose = (facility: FacilityShoppingType) =>
@@ -230,7 +306,9 @@ export default function DesktopBuildRail({
       event.preventDefault();
       event.stopPropagation();
       const isStorageSize = event.currentTarget === storage;
-      const { min, max } = sizeBounds[isStorageSize ? "storage" : "generator"];
+      const { min, max } = isStorageSize
+        ? storageBounds
+        : { min: generatorMin, max: generatorMax };
       const setSize = isStorageSize ? setStorageSize : setGeneratorSize;
       const step = Math.sign(delta);
       setSize((tick) => Math.max(min, Math.min(max, tick + step)));
@@ -242,7 +320,7 @@ export default function DesktopBuildRail({
       generator?.removeEventListener("wheel", adjustSize);
       storage?.removeEventListener("wheel", adjustSize);
     };
-  }, [busy, setGeneratorSize, setStorageSize]);
+  }, [busy, generatorMin, generatorMax, setGeneratorSize, setStorageSize]);
   React.useLayoutEffect(() => {
     if (previewEntry) previewPanel.current?.focus({ preventScroll: true });
   }, [previewEntry]);
@@ -320,23 +398,30 @@ export default function DesktopBuildRail({
     const selected =
       size === requested
         ? option
-        : projectCatalogue(game, size, isStorage(option)).find(
-            ({ name }) => name === option.name,
-          );
+        : (catalogue
+            ? isStorage(option)
+              ? STORAGE(game, size, siteId)
+              : GENERATORS(game, size, [], [], [], [], undefined, siteId)
+            : projectCatalogue(game, size, isStorage(option))
+          ).find(({ name }) => name === option.name);
     if (!selected) return;
     const due =
       size === requested
         ? sites.get(selected.name)?.minimumDue
-        : railSites(game, [selected]).get(selected.name)?.minimumDue;
+        : (catalogue
+            ? catalogueSites(game, [selected], siteId)
+            : railSites(game, [selected])
+          ).get(selected.name)?.minimumDue;
     if ((due ?? Infinity) <= cash) {
       dismiss();
-      onProject(selectProject(selected));
+      if (catalogue) catalogue.onChoose(selected);
+      else onProject?.(selectProject(selected));
     }
   };
   const option = options.find((item) => item.name === previewName);
   const hasPreview = !!option;
   const siteQuotes = React.useMemo(() => {
-    if (!hasPreview || !siteId) return undefined;
+    if (catalogueMode || !hasPreview || !siteId) return undefined;
     const connections = tilePurchaseQuotes(game);
     return new Map(
       options.map((item) => [
@@ -346,7 +431,7 @@ export default function DesktopBuildRail({
     );
     // The same planning inputs own the inspected-site quotes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pricingKey, options, hasPreview, siteId]);
+  }, [pricingKey, options, hasPreview, siteId, catalogueMode]);
   const quote = option && siteQuotes?.get(option.name);
   const inspectedTile = siteId ? getTerritoryTile(siteId, game) : undefined;
   const ownedSite =
@@ -370,7 +455,8 @@ export default function DesktopBuildRail({
     ? undefined
     : (unavailableSiteReason ?? quote?.reason);
   const previewComparison = React.useMemo(() => {
-    if (!facility || (siteId && !quote?.facility)) return undefined;
+    if (!facility || (!catalogueMode && siteId && !quote?.facility))
+      return undefined;
     const sameTypeAndSize = (item: FacilityShoppingType) =>
       isStorage(facility)
         ? isStorage(item) && item.peakWh === facility.peakWh
@@ -423,6 +509,7 @@ export default function DesktopBuildRail({
     sites,
     forecast,
     quote,
+    catalogueMode,
   ]);
   const sizeControl = (storage: boolean) => {
     const category = storage ? "storage" : "generator";
@@ -475,6 +562,23 @@ export default function DesktopBuildRail({
           dismiss();
       }}
     >
+      {catalogue && (
+        <Tooltip title="Build (B)" placement="right">
+          <Button
+            id="buildNav"
+            className="desktopBuildOpen button-buildFacility"
+            aria-label="Build"
+            aria-keyshortcuts="B"
+            aria-expanded={catalogue.open}
+            aria-controls={catalogue.open ? "tool-BUILD_GENERATORS" : undefined}
+            disabled={busy}
+            onClick={catalogue.onOpen}
+            startIcon={<ConceptIcon concept="build" />}
+          >
+            Build
+          </Button>
+        </Tooltip>
+      )}
       <div className="desktopBuildSizing">
         <h3>Generators</h3>
         {sizeControl(false)}
@@ -561,10 +665,14 @@ export default function DesktopBuildRail({
                       busy || canChoose(item)
                         ? item.name
                         : sites.get(item.name)?.minimumDue === Infinity
-                          ? `${item.name} · No available sites at this size`
+                          ? `${item.name} · ${catalogue ? "Unavailable at this size" : "No available sites at this size"}`
                           : `${item.name} · Insufficient cash to start construction`
                     }
-                    aria-label={`Choose sites for ${item.name}`}
+                    aria-label={
+                      catalogue
+                        ? `Choose ${item.name === "Battery" ? "Lithium Battery" : item.name}`
+                        : `Choose sites for ${item.name}`
+                    }
                     aria-pressed={project?.name === item.name}
                     aria-keyshortcuts="ArrowRight"
                     aria-describedby={`${previewHintId}${previewName === item.name ? ` ${previewId}` : ""}`}
@@ -579,7 +687,7 @@ export default function DesktopBuildRail({
                       if (busy) return;
                       if (project?.name === item.name) {
                         dismiss();
-                        onProject(undefined);
+                        onProject?.(undefined);
                       } else {
                         choose(item);
                       }
@@ -623,8 +731,12 @@ export default function DesktopBuildRail({
                 ? formatWattHours(sliderTickToW(storageSize))
                 : formatWatts(sliderTickToW(generatorSize))
             }
-            min={sizeBounds[sizing.category].min}
-            max={sizeBounds[sizing.category].max}
+            min={
+              sizing.category === "storage" ? storageBounds.min : generatorMin
+            }
+            max={
+              sizing.category === "storage" ? storageBounds.max : generatorMax
+            }
             step={1}
             value={sizing.category === "storage" ? storageSize : generatorSize}
             disabled={busy}
@@ -684,19 +796,28 @@ export default function DesktopBuildRail({
                   hydroAvailability={
                     facility.name === "Hydro" &&
                     (!quote?.facility || quote.owned)
-                      ? getHydroAvailability(
-                          game,
-                          facility.peakW,
-                          ownedSite?.territoryId,
-                          ownedSite?.id,
-                        )
+                      ? game.multiplayer?.territorial
+                        ? multiplayerHydroAvailability(
+                            game,
+                            facility.peakW,
+                            siteId,
+                          )
+                        : getHydroAvailability(
+                            game,
+                            facility.peakW,
+                            ownedSite?.territoryId,
+                            ownedSite?.id,
+                          )
                       : undefined
                   }
                   forecastPending={!forecast}
                   outputShape={expectedMonthlyOutputShape(
                     facility,
                     forecast?.timeline ?? [],
-                    { game, tileId: quote?.facility ? siteId : undefined },
+                    {
+                      game,
+                      tileId: quote?.facility || catalogue ? siteId : undefined,
+                    },
                   )}
                   territoryAvailability={siteAvailability}
                   territoryId={ownedSite?.territoryId}

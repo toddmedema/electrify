@@ -2,7 +2,7 @@ import { DIFFICULTY_STORAGE_KEY, unlockedJournal } from "./difficulty-fixture";
 import path from "path";
 import "../src/Store";
 import { test, expect, type Page } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openPane, readTerritoryMapCamera } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { installLeaderboardFixture } from "./leaderboard-fixture";
 import { editSavedGame, readSavedGame } from "./save-fixture";
@@ -53,7 +53,7 @@ async function configureCampaign(page: Page, theme: "light" | "dark") {
   );
 }
 
-async function startMediumCampaign(page: Page) {
+async function startCampaignMap(page: Page) {
   await page.goto("/?campaign=legacy");
   await page
     .getByRole("group", { name: "Difficulty", exact: true })
@@ -62,11 +62,17 @@ async function startMediumCampaign(page: Page) {
   await page
     .getByRole("button", { name: "Start campaign", exact: true })
     .click();
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  const map = page.getByRole("region", { name: "Regional map workspace" });
+  const viewport = map.locator(".territoryMapViewport");
+  const cameraScale = async () =>
+    (await readTerritoryMapCamera(viewport)).scale;
+  await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+  const openingScale = await cameraScale();
   await page
     .getByRole("button", { name: "pause", exact: true })
     .first()
     .click();
+  return { map, cameraScale, openingScale };
 }
 
 for (const theme of ["light", "dark"] as const) {
@@ -199,7 +205,9 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Regional map workspace" }),
+    ).toBeVisible();
     const opened = await readSavedGame(page);
     expect(opened?.scenarioId).toBe(117);
     expect(opened?.difficulty).toBe("Manager");
@@ -211,7 +219,7 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
     await configureCampaign(page, theme);
-    await startMediumCampaign(page);
+    const { map, cameraScale, openingScale } = await startCampaignMap(page);
     const build = await openBuild(page);
     const size = build.getByRole("slider");
     await expect(size).toHaveAttribute("min", "-14");
@@ -404,6 +412,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(successor?.customerRate).toBe(closed?.customerRate);
     expect(successor?.dollarsPerkWh).toBe(closed?.dollarsPerkWh);
     expect(successor?.timeline[0].cash).toBe(closed?.timeline[0].cash);
+    await expect.poll(cameraScale).toBeLessThan(openingScale * 0.97);
+    await expect(
+      map.getByRole("button", {
+        name: "Inspect San Francisco on map",
+        exact: true,
+      }),
+    ).toBeInViewport();
   });
 
   test(`the saved eighth-term handover previews the final goals in ${theme}`, async ({
@@ -411,7 +426,8 @@ for (const theme of ["light", "dark"] as const) {
   }, info) => {
     test.skip(!REVIEW_PROJECTS.includes(info.project.name));
     await configureCampaign(page, theme);
-    await startMediumCampaign(page);
+    const { map, cameraScale, openingScale } = await startCampaignMap(page);
+
     // A protocol fixture reaches the longest incoming term. Full campaign balance has separate
     // real-action simulation coverage; this checks goal wrapping, scrolling, and saved previews.
     await editSavedGame(page, (save) => {
@@ -496,6 +512,12 @@ for (const theme of ["light", "dark"] as const) {
     const finalCompany = await readSavedGame(page);
     expect(finalCompany?.campaign?.generationIndex).toBe(8);
     expect(finalCompany?.objectiveProgress?.completedMonths).toBe(0);
+    await expect.poll(cameraScale).toBeCloseTo(openingScale * 0.64, 5);
+    const finalScale = await cameraScale();
+    await page.reload();
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+    await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+    expect(await cameraScale()).toBeCloseTo(finalScale, 5);
   });
 }
 
@@ -520,7 +542,7 @@ for (const theme of ["light", "dark"] as const) {
     await page
       .getByRole("button", { name: "Start campaign", exact: true })
       .click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await page
       .getByRole("button", { name: "pause", exact: true })
       .first()
@@ -542,7 +564,7 @@ for (const theme of ["light", "dark"] as const) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await expect(page.locator(".facilities:visible")).toBeVisible();
+    await expect(page.locator("#mapPane")).toBeVisible();
     await page
       .getByRole("button", { name: "normal speed", exact: true })
       .first()
@@ -640,7 +662,7 @@ for (const theme of ["light", "dark"] as const) {
       await page
         .getByRole("button", { name: "Start campaign", exact: true })
         .click();
-      await expect(page.locator(".facilities:visible")).toBeVisible();
+      await expect(page.locator("#mapPane")).toBeVisible();
       await page
         .getByRole("button", { name: "pause", exact: true })
         .first()
@@ -703,7 +725,7 @@ test("a later-generation URL opens campaign setup instead of a fresh successor c
   await page
     .getByRole("button", { name: "Start campaign", exact: true })
     .click();
-  await expect(page.locator(".facilities:visible")).toBeVisible();
+  await expect(page.locator("#mapPane")).toBeVisible();
   const game = await readSavedGame(page);
   expect(game?.scenarioId).toBe(117);
   expect(game?.startingYear).toBe(1882);

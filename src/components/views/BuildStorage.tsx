@@ -473,6 +473,7 @@ export interface DispatchProps {
 export type Props = StateProps &
   DispatchProps & {
     lockedTileId?: TerritoryTileId;
+    railSelection?: StorageShoppingType;
     onPickSite?: (facility: StorageShoppingType) => void;
   };
 
@@ -513,6 +514,14 @@ function StorageBuildDialog(props: Props): React.JSX.Element {
     `${memoryKey}.exactSizes`,
     {},
   );
+  const railSelection = props.railSelection;
+  React.useLayoutEffect(() => {
+    if (!railSelection) return;
+    const { name, peakWh } = railSelection;
+    setSliderTick(wToSliderTick(peakWh));
+    setExactSizes((sizes) => ({ ...sizes, [name]: peakWh }));
+    revealResizedRow(name === "Battery" ? "Lithium Battery" : name);
+  }, [railSelection, revealResizedRow, setExactSizes, setSliderTick]);
   const [sort, setSort] = useToolState<StorageSortKey>(
     `${memoryKey}.sort`,
     "buildCost",

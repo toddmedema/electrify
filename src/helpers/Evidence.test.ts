@@ -44,10 +44,10 @@ it("keeps the intertie focus request while opening Fleet from the regional map",
   expect(store.getState().ui.evidenceRequest?.target).toBe("interties");
 });
 
-it("uses the lesson's existing Facilities destination for evidence", () => {
+it("opens the tutorial Fleet for supply and demand evidence", () => {
   const { store, dispatch } = fixture(0, 0);
   dispatch(openEvidence("supply-demand"));
-  expect(store.getState().card.name).toBe("FACILITIES");
+  expect(store.getState().card.name).toBe("FLEET");
 });
 
 it("defers during drag, claims focus once, and ignores obsolete requests", () => {

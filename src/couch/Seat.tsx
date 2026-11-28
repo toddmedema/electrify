@@ -46,7 +46,6 @@ export default function CouchSeat() {
     document.documentElement.dataset.couchSeat = bridge.seatId;
     store.dispatch(
       applyPresentation({
-        workspace: "single",
         screenEdgePadding: 0,
         audioEnabled: false,
         controllerVibrationEnabled: false,

@@ -25,12 +25,11 @@ import {
 } from "../Types";
 import AudioContainer from "./base/AudioContainer";
 import { rememberToolInput } from "./base/GameToolMemory";
-import { GAME_TOOLS, GameTool } from "./base/Navigation";
+import { GAME_TOOLS, type GameTool } from "./base/GameNavigation";
 import { restoreMenuFocus } from "./base/useMenuKeys";
 import DeferredSnackbar from "./base/DeferredSnackbar";
 import { focusInitialDialogAction } from "./base/dialogFocus";
 import { isBlackoutToast } from "../helpers/BlackoutToast";
-import { TOOL_SHORTCUTS } from "./base/KeyboardShortcuts";
 import { listenForDropdownKeys } from "./base/DropdownKeys";
 import { listenForShortcuts } from "./base/GlobalShortcuts";
 import DisplayNameDialogContainer from "./base/DisplayNameDialogContainer";
@@ -74,7 +73,8 @@ import { store } from "../Store";
 import LazyViewBoundary, { lazyView } from "./base/LazyViewBoundary";
 import { loadSavedGames } from "./views/SavedGamesLoader";
 import SavedGamesShell from "./views/SavedGamesShell";
-const GameWorkspace = lazyView(() => import("./base/GameWorkspace"));
+import { WorkspaceMapRendering } from "./base/WorkspaceMapRendering";
+const MapWorkspace = lazyView(() => import("./base/MapWorkspace"));
 const DataCenterSetupContainer = lazyView(
   () => import("./views/DataCenterSetupContainer"),
 );
@@ -134,11 +134,11 @@ export const keyMap = {
   ...Object.fromEntries(
     GAME_TOOLS.map((tool) => [
       `TOOL_${tool.id}`,
-      TOOL_SHORTCUTS[tool.id].map((key) => key.toLowerCase()),
+      tool.keys.map((key) => key.toLowerCase()),
     ]),
   ),
   BUILD_GENERATOR: "g",
-  BUILD_STORAGE: "s",
+  BUILD_STORAGE: "shift+s",
   PRIORITIZE_EARLIER: "[",
   PRIORITIZE_LATER: "]",
   MANUAL: ["?", "shift+/"],
@@ -208,15 +208,16 @@ function reprioritizeSelected(delta: number) {
 
 // A tool key does exactly what its action bar button does -- open the tool, or close it when it
 // is already showing -- so it presses that button. A tool hidden by a tutorial has no key either.
-function toggleTool(tool: GameTool) {
+function toggleTool(tool: GameTool, triggerId: string) {
   const { card, game } = store.getState();
   if (!game.inGame || !isGameCard(card.name)) {
     return;
   }
-  const trigger = GAME_TOOLS.find((item) => item.id === tool)!.triggerId;
-  const button = document.getElementById(trigger);
+  const button = document.getElementById(triggerId);
   if (button && button.getClientRects().length > 0) {
     button.click();
+  } else if (tool === "BUILD_GENERATORS" && canBuild()) {
+    store.dispatch(navigate({ name: "BUILD_GENERATORS", dontRemember: true }));
   }
 }
 
@@ -271,7 +272,7 @@ const shortcutHandlers = {
       `TOOL_${tool.id}`,
       () => {
         if (!uiHidden(tool.id === "BUILD_GENERATORS" ? "build" : "nav")) {
-          toggleTool(tool.id);
+          toggleTool(tool.id, tool.triggerId);
         }
       },
     ]),
@@ -357,7 +358,10 @@ function WorkspaceTutorialHud({
   workspace: React.RefObject<HTMLElement>;
   settings: SettingsType;
 }) {
-  const { effectiveWidth } = useWorkspaceLayout(workspace, settings);
+  const { effectiveWidth } = useWorkspaceLayout(
+    workspace,
+    settings.interfaceScale,
+  );
   return (
     <TutorialHud {...props} desktop={effectiveWidth >= SIDE_TOOL_MIN_WIDTH} />
   );
@@ -562,7 +566,11 @@ export default class Compositor extends React.Component<Props, {}> {
     if (this.workspaceMemory.run !== run)
       this.workspaceMemory = { run, values: new Map() };
     if (isGameCard(this.props.card.name))
-      return <GameWorkspace key={run} memory={this.workspaceMemory.values} />;
+      return (
+        <WorkspaceMapRendering key={run}>
+          <MapWorkspace memory={this.workspaceMemory.values} />
+        </WorkspaceMapRendering>
+      );
     switch (this.props.card.name) {
       case "SETTINGS":
         return <SettingsContainer />;
