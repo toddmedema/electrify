@@ -719,7 +719,7 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   renderer.dispose();
   const gl = mockContext();
   gl.getShaderParameter.mockReturnValue(false);
-  const broken = setup(gl);
+  const broken = setup(gl, true);
   expect(broken.state).toHaveBeenCalledWith("unavailable");
   expect(gl.deleteShader).toHaveBeenCalledTimes(1);
   expect(gl.deleteProgram).toHaveBeenCalledTimes(1);

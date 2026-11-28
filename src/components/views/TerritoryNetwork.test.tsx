@@ -799,8 +799,8 @@ it("only reviews a dragged project at the position resolved by its quote", async
     view.tile === peer ? { ...view, connectable: true } : view,
   );
   const stub = jest
-    .spyOn(territoryMapState, "territoryTileViews")
-    .mockReturnValueOnce(views);
+    .spyOn(territoryMapState, "territoryMapBoard")
+    .mockReturnValueOnce({ views, authoredInland: undefined });
   const { store } = show(game, 1280);
   stub.mockRestore();
   const wind = screen.getByRole("button", { name: "Choose sites for Wind" });
