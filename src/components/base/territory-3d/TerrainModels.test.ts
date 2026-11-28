@@ -378,6 +378,56 @@ it.each(["river", "lake"] as const)(
   },
 );
 
+it.each([
+  { ports: [1, 2], shape: "tight bend" },
+  { ports: [1, 3], shape: "wide bend" },
+  { ports: [0, 2, 4], shape: "junction" },
+])("keeps the interior banks smooth at a $shape", ({ ports }) => {
+  const faces = waterTriangles(getTerrainModel("river", { ports }));
+  const edges = new Map<string, { a: Vec3; b: Vec3; count: number }>();
+  for (const face of faces) {
+    face.forEach((a, i) => {
+      const b = face[(i + 1) % face.length];
+      const key = [a.join(","), b.join(",")].sort().join("|");
+      const edge = edges.get(key);
+      if (edge) edge.count++;
+      else edges.set(key, { a, b, count: 1 });
+    });
+  }
+  const banks = new Map<string, { point: Vec3; neighbors: Vec3[] }>();
+  for (const { a, b, count } of edges.values()) {
+    if (count !== 1) continue;
+    for (const [point, neighbor] of [
+      [a, b],
+      [b, a],
+    ]) {
+      const [x, , z] = point;
+      // Port lips are joined to their neighbors and are not interior bank points.
+      if (
+        Math.abs(x) >= 0.5 - EPSILON ||
+        Math.abs(z) + Math.abs(x) / Math.sqrt(3) >= GROUND_RADIUS - EPSILON
+      )
+        continue;
+      const key = point.join(",");
+      const bank = banks.get(key) ?? { point, neighbors: [] };
+      bank.neighbors.push(neighbor);
+      banks.set(key, bank);
+    }
+  }
+  expect(banks.size).toBeGreaterThan(0);
+  for (const {
+    point: [x, , z],
+    neighbors,
+  } of banks.values()) {
+    expect(neighbors).toHaveLength(2);
+    const [[ax, , az], [bx, , bz]] = neighbors;
+    const cosine =
+      ((x - ax) * (bx - x) + (z - az) * (bz - z)) /
+      (Math.hypot(x - ax, z - az) * Math.hypot(bx - x, bz - z));
+    expect(cosine).toBeGreaterThan(Math.SQRT1_2);
+  }
+});
+
 it.each(["river", "lake"] as const)(
   "joins a river to a %s at identical world-space water cross-sections",
   (terrain) => {

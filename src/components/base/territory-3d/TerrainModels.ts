@@ -511,21 +511,133 @@ function river(
     headwaters(floor, water, Math.log2(ports), variant);
     return;
   }
-  const exits = HEX.flatMap((a, edge) =>
-    ports & (1 << edge) ? [lerp(a, HEX[(edge + 1) % 6], 0.5)] : [],
+  if (ports) {
+    curvedRiver(floor, water, ports, variant);
+    return;
+  }
+  riverBasin(
+    floor,
+    water,
+    0,
+    HEX.map((corner) => scaled(corner, 0.2)),
+    [0, 0],
   );
+}
 
-  // Move the join toward the exits of a bend. Junctions keep a compact shared basin.
-  const center =
-    exits.length === 2
-      ? scaled(lerp(exits[0], exits[1], 0.5), 0.42)
-      : ([0, 0] as const);
-  const radius = exits.length ? 0.35 : 0.2;
-  const inner = HEX.map(([x, z]): GroundPoint => [
-    x * radius + center[0],
-    z * radius + center[1],
-  ]);
-  riverBasin(floor, water, ports, inner, center);
+const turn = (a: GroundPoint, b: GroundPoint, c: GroundPoint) =>
+  (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+/** A shoreline and its piece of dry land can both be concave. Cut off convex
+ * triangles whose diagonals lie inside the outline. */
+function shorelineSurface(
+  builder: MeshBuilder,
+  outline: readonly GroundPoint[],
+  color: RGB,
+) {
+  const corners = [...outline];
+  const tolerance = 1e-12;
+  while (corners.length > 3) {
+    const ear = corners.findIndex((b, i) => {
+      const a = corners.at(i - 1)!;
+      const c = corners[(i + 1) % corners.length];
+      return (
+        turn(a, b, c) > tolerance &&
+        corners.every(
+          (p) =>
+            p === a ||
+            p === b ||
+            p === c ||
+            turn(a, b, p) < -tolerance ||
+            turn(b, c, p) < -tolerance ||
+            turn(c, a, p) < -tolerance,
+        )
+      );
+    });
+    if (ear < 0) throw new Error("River shoreline must form a simple polygon");
+    const [a, b, c] = [
+      corners.at(ear - 1)!,
+      corners[ear],
+      corners[(ear + 1) % corners.length],
+    ];
+    builder.triangle(point(a), point(c), point(b), color);
+    corners.splice(ear, 1);
+  }
+  surface(
+    builder,
+    corners.map((p) => point(p)),
+    color,
+  );
+}
+
+const BANK_REACH = [0, 0.14, 0.27, 0.4, 0.52, 0.64] as const;
+const BANK_SKEW = [-0.06, 0.1, -0.14, 0.18] as const;
+
+/** Both bank tangents meet the tile edge at right angles to preserve the
+ * same water and submerged shelf cross-sections on every neighboring tile. */
+function curvedBank(first: number, last: number, skew: number) {
+  const a = HEX[first];
+  const b = HEX[(first + 1) % 6];
+  const c = HEX[last];
+  const d = HEX[(last + 1) % 6];
+  const [start, end] = [riverPort(a, b)[1], riverPort(c, d)[0]];
+  const span = BANK_REACH[(last + 6 - first) % 6];
+  const reach = (
+    port: GroundPoint,
+    v: GroundPoint,
+    w: GroundPoint,
+    depth: number,
+  ): GroundPoint => [
+    port[0] - (v[0] + w[0]) * depth,
+    port[1] - (v[1] + w[1]) * depth,
+  ];
+  const from = reach(start, a, b, span * (1 + skew));
+  const to = reach(end, c, d, span * (1 - skew));
+  const inset = 2 * RIVER_PORT_HALF_WIDTH * RIVER_BANK_INSET;
+  return Array.from({ length: 13 }, (_, step) => {
+    const t = step / 12;
+    const middle = lerp(from, to, t);
+    const left = lerp(lerp(start, from, t), middle, t);
+    const right = lerp(middle, lerp(to, end, t), t);
+    const rim = lerp(left, right, t);
+    const dx = right[0] - left[0];
+    const dz = right[1] - left[1];
+    const depth = inset / Math.hypot(dx, dz);
+    const bed: GroundPoint = [rim[0] - dz * depth, rim[1] + dx * depth];
+    return { rim, bed };
+  });
+}
+
+function curvedRiver(
+  floor: MeshBuilder,
+  water: MeshBuilder,
+  ports: number,
+  variant: number,
+) {
+  const edges = HEX.flatMap((_, edge) => (ports & (1 << edge) ? [edge] : []));
+  const outline: GroundPoint[] = [];
+  for (const [index, first] of edges.entries()) {
+    const last = edges[(index + 1) % edges.length];
+    const bank = curvedBank(first, last, BANK_SKEW[variant]);
+    const shore = bank.map(({ rim }) => rim);
+    outline.push(...shore);
+
+    // Each dry patch follows the hex's edge around the outside and the bank
+    // curve back around the water. Adjacent patches meet only at river mouths.
+    const land = [shore[0]];
+    for (let edge = (first + 1) % 6; ; edge = (edge + 1) % 6) {
+      land.push(HEX[edge]);
+      if (edge === last) break;
+    }
+    land.push(...shore.slice(1).reverse());
+    shorelineSurface(floor, land, PALETTE.grass);
+
+    for (let i = 1; i < bank.length; i++) {
+      const a = bank[i - 1];
+      const b = bank[i];
+      riverShelf(floor, a.rim, b.rim, a.bed, b.bed);
+    }
+  }
+  shorelineSurface(water, outline, PALETTE.riverWater);
 }
 
 function riverBasin(
@@ -786,13 +898,18 @@ export function getTerrainModel(
   if ((terrain === "river" || terrain === "lake") && options?.ports)
     for (const port of options.ports)
       if (Number.isInteger(port) && port >= 0 && port < 6) ports |= 1 << port;
-  const bend =
-    terrain === "river" && OPPOSITE_RIVER_PORTS.includes(ports)
-      ? variant
-      : terrain === "river" && isHeadwater(ports)
+  const riverVariant =
+    terrain === "river" && ports
+      ? isHeadwater(ports)
         ? variant & 1
-        : 0;
-  const index = (bend * CLEAR_WIDTHS.length + bucket) * 64 + ports;
-  const model = (cache[terrain][index] ??= build(terrain, bucket, ports, bend));
+        : variant
+      : 0;
+  const index = (riverVariant * CLEAR_WIDTHS.length + bucket) * 64 + ports;
+  const model = (cache[terrain][index] ??= build(
+    terrain,
+    bucket,
+    ports,
+    riverVariant,
+  ));
   return terrain === "hills" && scorched ? scorchedRelief(model) : model;
 }
