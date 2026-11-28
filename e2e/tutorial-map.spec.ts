@@ -366,6 +366,10 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
   await action(page, "Fleet");
   await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   await goal(page, "Run the clock until your grid imports power");
+  const externalPower = fleet.getByRole("group", {
+    name: "External power now",
+  });
+  await expect(externalPower).toBeInViewport();
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -379,7 +383,7 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
     scale: "css",
   });
   await page.getByRole("button", { name: "fast speed", exact: true }).click();
-  await goal(page, "Find External power on the chart");
+  await goal(page, "Find your live import total");
   await expect(
     page.getByRole("button", { name: "pause", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -389,6 +393,15 @@ test("Mission 7 · sign an agreement and find live imports in Fleet", async ({
       .locator(".chartLegendLabel")
       .getByText("External power", { exact: true }),
   ).toBeVisible();
+  await expect(externalPower).toBeInViewport();
+  await expect(externalPower).toHaveClass(/tutorialTarget/);
+  await expect(externalPower).toContainText(/Importing [1-9][\d.]*\s*[kMG]?W/);
+  await reviewScreenshot(fleet.locator(".facilitySupplyChart"), {
+    path: test.info().outputPath("fleet-external-power.png"),
+    animations: "disabled",
+    scale: "css",
+    style: ".snackbar, .tutorialTargetRing { visibility: hidden; }",
+  });
   await reviewScreenshot(page, {
     path: test.info().outputPath("tutorial-agreements-fleet.png"),
     animations: "disabled",

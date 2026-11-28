@@ -5898,6 +5898,23 @@ $homeSmokeCycle: 5.6s;
 .facilitySupplyChart {
   flex: 0 0 auto;
 }
+.fleetExternalPower {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin-inline: 16px;
+  padding-block: 8px;
+  color: var(--font-color-faded);
+  font-size: var(--font-size-body2);
+  font-variant-numeric: tabular-nums;
+
+  strong {
+    color: var(--font-color-primary);
+    font-weight: 600;
+  }
+}
 .dayNightRibbon {
   position: absolute;
   display: flex;

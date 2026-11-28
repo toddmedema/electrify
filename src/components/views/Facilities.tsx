@@ -57,6 +57,7 @@ import { TickThrottle } from "../../helpers/RenderThrottle";
 import {
   activeScenario,
   currentGenerationW,
+  currentTick,
 } from "../../helpers/GameSelectors";
 import { chartPalette, facilityColor } from "../../Theme";
 import {
@@ -701,6 +702,17 @@ function FacilitySupplyChart({
 }) {
   const fuelOrder = getDispatchOrderedFuels(game.facilities);
   const height = useFleetChartHeight(anchor);
+  const exchangeLabel = hasTerritoryNetwork(game)
+    ? "External power"
+    : undefined;
+  const exchangeTick =
+    exchangeLabel && game.transmission ? currentTick(game) : null;
+  const externalPowerLabelId = React.useId();
+  const { importedW = 0, exportedW = 0 } = exchangeTick ?? {};
+  const externalPowerFlows = [
+    importedW > 0 ? `Importing ${formatWatts(importedW)}` : "",
+    exportedW > 0 ? `Exporting ${formatWatts(exportedW)}` : "",
+  ].filter(Boolean);
   // A portrait tablet's sheet starts where this block ends.
   React.useLayoutEffect(() => {
     const element = anchor.current;
@@ -732,7 +744,7 @@ function FacilitySupplyChart({
         height={height}
         exactHeight
         timeline={game.timeline}
-        exchangeLabel={hasTerritoryNetwork(game) ? "External power" : undefined}
+        exchangeLabel={exchangeLabel}
         fuelOrder={fuelOrder}
         currentMinute={game.date.minute}
         speed={game.speed}
@@ -740,6 +752,18 @@ function FacilitySupplyChart({
         legend
         startingYear={game.startingYear}
       />
+      {exchangeTick && (
+        <div
+          className="fleetExternalPower"
+          role="group"
+          aria-labelledby={externalPowerLabelId}
+        >
+          <strong id={externalPowerLabelId}>External power now</strong>
+          <span>
+            {externalPowerFlows.join(" · ") || "No imports or exports"}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -744,7 +744,7 @@ export const SCENARIOS: ScenarioType[] = [
           tutorialViewedMapTool.match(action) && action.payload === "FLEET",
         action: "Open Fleet to see power flows",
         content: (
-          <TutorialPrompt text="The chart in Fleet shows live imports and exports." />
+          <TutorialPrompt text="Look below the Fleet chart for your grid’s current imports and exports. Check your contract’s start date in Agreements." />
         ),
       },
       {
@@ -752,7 +752,7 @@ export const SCENARIOS: ScenarioType[] = [
         target: "#speedChangeButtons",
         action: "Run the clock until your grid imports power",
         content: (
-          <TutorialPrompt text="Your agreement can cover demand when your own plants fall short." />
+          <TutorialPrompt text="After it starts, the agreement can cover demand your plants can’t meet." />
         ),
         capstone: {
           preserveProgress: true,
@@ -763,11 +763,11 @@ export const SCENARIOS: ScenarioType[] = [
       },
       {
         card: "FLEET",
-        target: "#chartSupplyDemand",
+        target: ".fleetExternalPower",
         nextLabel: "Finish tutorial",
-        action: "Find External power on the chart",
+        action: "Find your live import total",
         content: (
-          <TutorialPrompt text="The patterned External power band shows imports in the supply stack. When you sell power, exports appear above the Demand line." />
+          <TutorialPrompt text="External power now shows your total imports. The striped band shows imports over the day. Exports appear above the Demand line." />
         ),
       },
     ],
