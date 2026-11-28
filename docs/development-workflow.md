@@ -80,11 +80,56 @@ lands on `master`, keep the monitor's existing metadata query. Do not execute a
 feature branch's copy as the shared monitor. Treat an API or helper error as a
 failed survey, preserve the ledger, and report the error.
 
-For repair pushes, have the monitor and its workers follow the
-[local verification policy in AGENTS.md](../AGENTS.md#start-here). Reproduce the
-failure where practical and check the fix and affected callers before pushing.
-Use the full local profile when the scope or failure warrants it. Hosted CI runs
-the full suite on the repair push.
+### Checks before a repair push
+
+Start with `npm run ci:failures -- <PR>` and the failing job's trace. Reproduce the failing
+assertion on the failing revision when practical. If it only reproduces on the hosted runner,
+record the comparison that was possible, the remaining uncertainty and the hosted check that
+would resolve it. Preserve the original assertion and deadline, and make sure the journey reaches
+any affected downstream assertions. Use the same build, browser, viewport and motion settings
+for timing comparisons.
+
+Commit the candidate, refresh the PR's actual target ref, and run `npm run check:repair`
+with that ref. Select the owning tests, failed gates and affected callers:
+
+```sh
+npm run check:repair -- --base origin/master \
+  --suite src/desktop/Input.test.tsx \
+  --case 'controller:deck-800-light:e2e/steam-input.spec.ts:semantic actions play, build, adjust pricing, inspect charts and save at 125% interface scale'
+```
+
+Each run verifies a clean candidate and the resolved base, runs `check:prepush`, then the
+selected check gates. Types, lint, and formatting always run, followed by any `--gate` and the
+renderer builds the selected cases need. Selected Jest files, `--simulation`, and browser cases
+run after those gates. `--resume` can reuse verified gate evidence; every browser case still
+runs. Repeat `--suite`, `--gate`, or `--case` to cover affected callers. For a red covered Jest
+gate, include `--gate tests` to retain coverage and suite interactions. For prose-only changes,
+use the Markdown checks in [AGENTS.md](../AGENTS.md#start-here).
+
+- **Web UI, setup or fixtures.** Select the failed file, project and exact Playwright title with
+  the `web` runner to use the PR matrix, including its reduced motion. Use `web-all` for a case
+  outside the matrix against the production web build; that run does not force reduced motion.
+  Include desktop and 390 px for changed UI flows or layouts, plus 360 px when minimum-width
+  behavior can change.
+- **Map, motion, focus or controller.** Add the `controller` runner for affected Deck and TV
+  journeys on the production desktop renderer. A workspace change can affect Map-to-Fleet chart
+  focus and menu Escape. Shared motion changes can also affect pointer reorder and the TV
+  couch forecast in both seats. Cover reduced motion and full motion where both behaviors
+  matter.
+- **Save, co-op or simulation.** Add affected `multiplayer`, `crossplay` and `crossplay-web`
+  cases. Cover save and resume and an older compatible checkpoint when compatibility changes.
+  For reducer changes, select the owning regression and add `--simulation` to run
+  `npm run sim -- --all`.
+- **Repairs spanning shared runtime boundaries.** Add `--full` for the complete local
+  `check:ci` profile, such as a repair touching both map startup and multiplayer persistence.
+  Keep any affected cases outside that profile, including cross-play. Use `--resume` to reuse
+  only check-gate evidence that the existing check runner verifies. Packaged Electron window
+  tests stay in hosted CI.
+
+For each explicit browser case, the command verifies the selection before launching it and
+requires an actual first-attempt pass. It retains the selection, results and failure artifacts
+in the printed `.tmp/repair-*` directory. Record the candidate, base, commands and outcome in
+the PR, including any hosted-only checks. Hosted CI runs the full suite after the repair push.
 
 ### Validation evidence
 
