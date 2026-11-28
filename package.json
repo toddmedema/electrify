@@ -76,6 +76,7 @@
     "check": "node scripts/dev/run.js check",
     "check:ci": "node scripts/dev/run.js check --ci",
     "check:prepush": "node scripts/site/check-changed.js",
+    "check:repair": "node scripts/ci/repair-check.js",
     "task": "node scripts/dev/task.js",
     "shot": "node scripts/dev/shot.js",
     "ci:failures": "node scripts/ci/failures.js",
