@@ -1,3 +1,4 @@
+import { CUSTOM_SCENARIO_ID } from "../data/Scenarios";
 import type { ReplicaBaseline, ReplicaRecord } from "./Replication";
 import type { AuthorityWindow } from "./SessionTransport";
 import type { HostReplicationRequest } from "./ReplicaProtocol";
@@ -8,6 +9,19 @@ import type {
   Seat,
   World,
 } from "./Types";
+
+/**
+ * New custom launches use territorial rules. Authored scenarios and mods keep their own maps,
+ * which also lets a resumed authored campaign restart. Checkpoint restores supply their saved spec.
+ */
+export function newMatchSpec(spec: MatchSpec): MatchSpec {
+  return spec.scenarioId === CUSTOM_SCENARIO_ID &&
+    spec.customScenario &&
+    !spec.customScenario.mod
+    ? { ...spec, territorialVersion: 1 }
+    : spec;
+}
+
 /** Couch play projects every seat locally; online play projects only the host's company. */
 type WorkerMode =
   | { local: true; hostSeat?: never }

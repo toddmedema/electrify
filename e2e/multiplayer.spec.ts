@@ -4,11 +4,13 @@ import { test } from "./advance-world";
 import { crossplayFixture } from "./crossplay-fixture";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import { reviewScreenshot } from "./review-screenshot";
-import { openPane } from "./layout";
+import { openPane, selectTerritoryMapTile } from "./layout";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
 import type { RoomView } from "../src/multiplayer/Types";
 import type { GameType } from "../src/Types";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
+import { multiplayerTerritoryTiles } from "../src/helpers/MultiplayerTerritory";
+import { claimToPeerBorder, territorialMap } from "./territorial-multiplayer";
 
 const companies = ["SolarSam", "WindyWren", "HydroHal", "VoltVera"];
 const lobby = (page: Page) =>
@@ -298,13 +300,14 @@ async function startCustom(
   count: number,
   compact: boolean,
   touchGuest = false,
+  compactWidth = 390,
 ) {
   const campaign = new V2Campaign(newIsolatedContext);
-  const host = await campaign.addPlayer(compact ? 390 : 1280);
+  const host = await campaign.addPlayer(compact ? compactWidth : 1280);
   const invite = await campaign.create(host);
   for (let index = 1; index < count; index++) {
     const guest = await campaign.addPlayer(
-      compact || touchGuest || index === 3 ? 390 : 1280,
+      compact || touchGuest || index === 3 ? compactWidth : 1280,
     );
     await campaign.requestJoin(guest, invite);
     await campaign.waitForGuest(host, guest);
@@ -349,46 +352,6 @@ async function openCampaignSaves(page: Page) {
 
 async function selectSpeed(page: Page, label: string) {
   await clock(page).getByRole("button", { name: label, exact: true }).click();
-}
-
-async function approveIntertieUpgrade(host: Page, guest: Page) {
-  const upgradeCapacity =
-    (await projection(host))!.game!.transmission!.lines[0].capacityW * 1.5;
-  const hostLine = host.getByRole("button", {
-    name: /^Inspect WindyWren,/,
-  });
-  const guestLine = guest.getByRole("button", {
-    name: /^Inspect SolarSam,/,
-  });
-  await hostLine.click();
-  await host
-    .getByRole("button", {
-      name: "Review upgrade of WindyWren",
-      exact: true,
-    })
-    .click();
-  await host.getByRole("button", { name: "Pay cash", exact: true }).click();
-  await guestLine.click();
-  await expect(
-    guest.getByText(/SolarSam requested this upgrade/),
-  ).toBeVisible();
-  await guest
-    .getByRole("button", {
-      name: "Review upgrade of SolarSam",
-      exact: true,
-    })
-    .click();
-  await guest.getByRole("button", { name: "Pay cash", exact: true }).click();
-  for (const page of [host, guest])
-    await expect
-      .poll(
-        async () =>
-          (await projection(page))?.game?.transmission?.lines[0].upgrade
-            ?.targetCapacityW,
-      )
-      .toBe(upgradeCapacity);
-  await hostLine.click();
-  await guestLine.click();
 }
 
 test("desktop menu keyboard journey includes Play with friends in both directions", async ({
@@ -485,26 +448,42 @@ test("focus skips a guest who is still exiting after a quick second kick", async
   expect(campaign.errors).toEqual([]);
 });
 
-for (const count of [2, 4]) {
+for (const count of [2, 3, 4]) {
   test(
-    `V2 ${count} players share time and interties while building on their own grids`,
-    { tag: "@mobile" },
+    `V2 ${count} players share a territorial map and build on their own land`,
+    { tag: ["@mobile", "@territorial"] },
     async ({ newIsolatedContext }, info) => {
       const campaign = await startCustom(
         newIsolatedContext,
         count,
         !!info.project.use.isMobile,
+        false,
+        info.project.use.viewport?.width,
       );
       const [host, ...guests] = campaign.players;
       const buyer = guests.at(-1)!;
+      const owned = new Set<string>();
       for (const page of campaign.players) {
-        await expect(page.locator(".transmissionLine")).toHaveCount(count - 1);
-        const view = await projection(page);
+        await expect(territorialMap(page)).toBeVisible();
+        const game = (await projection(page))!.game!;
+        expect(game.multiplayer?.territorial?.seatCount).toBe(count);
+        const territory = game.multiplayer!.territorial!;
+        expect(territory.startingTileIds).toContain(territory.homeTileId);
+        for (const tile of territory.startingTileIds) {
+          expect(owned.has(tile)).toBe(false);
+          owned.add(tile);
+        }
+        expect(game.facilities.length).toBeGreaterThan(0);
+        for (const facility of game.facilities)
+          expect(territory.startingTileIds).toContain(facility.tileId);
         expect(
-          view!.game!.transmission!.lines.every((line) =>
-            line.corridorId.startsWith("peer:"),
+          game.multiplayer?.peers?.map(({ connected }) => !!connected),
+        ).toEqual(Array(count - 1).fill(false));
+        expect(
+          game.transmission?.lines.filter(({ corridorId }) =>
+            corridorId.startsWith("peer:"),
           ),
-        ).toBe(true);
+        ).toEqual([]);
         await selectSpeed(page, "slow speed");
       }
       await selectSpeed(host, "ultra speed");
@@ -513,8 +492,20 @@ for (const count of [2, 4]) {
       await expect(clock(host)).toHaveAccessibleDescription(
         /SolarSam \(you\) selected 24×/,
       );
-      const before = (await captureState(buyer)).facilities!;
-      await buyer.locator(".button-buildFacility").click();
+      const buyerGame = (await projection(buyer))!.game!;
+      const before = buyerGame.facilities.length;
+      const site = multiplayerTerritoryTiles(buyerGame).find(
+        (tile) =>
+          buyerGame.multiplayer!.territorial!.startingTileIds.includes(
+            tile.id,
+          ) &&
+          !tile.city &&
+          !buyerGame.facilities.some(({ tileId }) => tileId === tile.id),
+      )!;
+      await selectTerritoryMapTile(buyer, site, territorialMap(buyer));
+      await buyer
+        .getByRole("button", { name: "Build here", exact: true })
+        .click();
       await buyer
         .getByRole("button", { name: "Review purchase of Wind", exact: true })
         .click();
@@ -524,12 +515,13 @@ for (const count of [2, 4]) {
       await expect
         .poll(async () => (await captureState(buyer)).facilities)
         .toBe(before + 1);
+      expect(
+        (await projection(buyer))!.game!.facilities.find(
+          ({ tileId }) => tileId === site.id,
+        )?.name,
+      ).toBe("Wind");
       for (const page of campaign.players)
         await expect(clock(page)).toHaveAttribute("data-active-speed", "SLOW");
-      if (buyer.viewportSize()!.width >= 1024)
-        await buyer
-          .getByRole("button", { name: "Close Build", exact: true })
-          .click();
       await selectSpeed(host, "pause");
       await selectSpeed(buyer, "normal speed");
       for (const page of campaign.players)
@@ -542,7 +534,6 @@ for (const count of [2, 4]) {
         "data-active-speed",
         count === 2 ? "NORMAL" : "SLOW",
       );
-      if (count === 2) await approveIntertieUpgrade(host, buyer);
       await saveAndQuit(buyer);
       await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
       await expect
@@ -556,6 +547,125 @@ for (const count of [2, 4]) {
     },
   );
 }
+
+test(
+  "V2 companies claim a border and both approve its construction",
+  { tag: ["@mobile", "@territorial"] },
+  async ({ newIsolatedContext }, info) => {
+    const compact = !!info.project.use.isMobile;
+    const width = info.project.use.viewport?.width;
+    const campaign = await startCustom(
+      newIsolatedContext,
+      2,
+      compact,
+      false,
+      width,
+    );
+    const [host, guest] = campaign.players;
+    const hostId = (await projection(host))!.game!.multiplayer!.seat;
+    const guestId = (await projection(guest))!.game!.multiplayer!.seat;
+    const hostGame = () => projection(host).then((view) => view!.game!);
+    await expect(
+      territorialMap(host).locator("canvas.territory3DCanvas"),
+    ).toHaveAttribute("data-renderer", "ready");
+    await host.mouse.move(1, 1);
+    if (!compact && process.env.REVIEW_SCREENSHOT_DIR) {
+      const viewport = territorialMap(host).locator(".territoryMapViewport");
+      const openingScale = Number(
+        await viewport.getAttribute("data-camera-scale"),
+      );
+      const bounds = (await viewport.boundingBox())!;
+      await host.mouse.move(
+        bounds.x + bounds.width / 2,
+        bounds.y + bounds.height / 2,
+      );
+      await host.mouse.wheel(0, 340);
+      await expect
+        .poll(async () =>
+          Number(await viewport.getAttribute("data-camera-scale")),
+        )
+        .toBeLessThan(openingScale);
+      await host.mouse.move(1, 1);
+      await reviewScreenshot(host, {
+        path: info.outputPath("territorial-desktop.png"),
+        animations: "disabled",
+      });
+    }
+    await claimToPeerBorder(
+      host,
+      guestId,
+      hostGame,
+      compact && width === 390
+        ? () =>
+            reviewScreenshot(host, {
+              path: info.outputPath("territorial-phone.png"),
+              animations: "disabled",
+            })
+        : undefined,
+    );
+    await expect
+      .poll(async () => (await hostGame()).multiplayer!.peers![0].border)
+      .toBeTruthy();
+    await expect
+      .poll(
+        async () =>
+          (await projection(guest))!.game!.multiplayer!.peers![0].border,
+      )
+      .toBeTruthy();
+
+    for (const page of [host, guest])
+      await page
+        .getByRole("button", { name: "Agreements", exact: true })
+        .click();
+    await host
+      .getByRole("button", {
+        name: "Review connection with WindyWren",
+        exact: true,
+      })
+      .click();
+    await host
+      .getByRole("button", { name: "Propose connection", exact: true })
+      .click();
+    await expect
+      .poll(
+        async () =>
+          (await projection(guest))!.game!.multiplayer!.peers![0]
+            .connectionRequestedBy,
+      )
+      .toBeTruthy();
+    expect((await hostGame()).transmission!.lines).toEqual([]);
+    await guest
+      .getByRole("button", {
+        name: "Review connection from SolarSam",
+        exact: true,
+      })
+      .click();
+    await guest
+      .getByRole("button", { name: "Accept connection", exact: true })
+      .click();
+    for (const page of [host, guest]) {
+      await expect
+        .poll(
+          async () =>
+            (await projection(page))!.game!.transmission!.lines[0]
+              ?.yearsToBuildLeft,
+        )
+        .toBeGreaterThan(0);
+      const peer = (await projection(page))!.game!.multiplayer!.peers![0];
+      expect(peer.endpoints).toBeDefined();
+      expect(peer.connected).toBeFalsy();
+    }
+    await saveAndQuit(guest);
+    const saved = await campaign.fixture.checkpoint();
+    expect(saved?.spec.territorialVersion).toBe(1);
+    expect(
+      saved?.grids.find((grid) => grid.multiplayer?.seat === hostId)
+        ?.multiplayer?.territorial?.claims.length,
+    ).toBeGreaterThan(0);
+    expect(saved?.edges[0]).toMatchObject({ ratingW: 0, flowW: 0 });
+    expect(campaign.errors).toEqual([]);
+  },
+);
 
 test(
   "V2 restores the confirmed save under a new host and keeps both company seats",

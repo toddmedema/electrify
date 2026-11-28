@@ -6,6 +6,7 @@ import type {
   TerritoryTileId,
 } from "../Types";
 import { getOffshoreWindOutputFactor, getWindOutputFactor } from "./Energy";
+import { multiplayerTerritoryTile } from "./MultiplayerTerritory";
 import {
   getTerritoryTile,
   hasTerritoryNetwork,
@@ -20,9 +21,11 @@ export function getTerrainModifiers(
   fuel: FuelNameType | undefined,
   tileId?: TerritoryTileId,
 ): { onshoreWindSpeed: number; buildCost: number; buildTime: number } {
-  const terrain = hasTerritoryNetwork(game)
-    ? getTerritoryTile(tileId, game)?.terrain
-    : undefined;
+  const terrain = game.multiplayer?.territorial
+    ? multiplayerTerritoryTile(game, tileId)?.terrain
+    : hasTerritoryNetwork(game)
+      ? getTerritoryTile(tileId, game)?.terrain
+      : undefined;
   return terrainModifiers(terrain, fuel);
 }
 
@@ -58,10 +61,10 @@ export function isOceanWindTile(
   game: GameType,
   tileId?: TerritoryTileId,
 ): boolean {
-  return (
-    hasTerritoryNetwork(game) &&
-    getTerritoryTile(tileId, game)?.terrain === "ocean"
-  );
+  return game.multiplayer?.territorial
+    ? multiplayerTerritoryTile(game, tileId)?.terrain === "ocean"
+    : hasTerritoryNetwork(game) &&
+        getTerritoryTile(tileId, game)?.terrain === "ocean";
 }
 
 /** Apply local speed before the turbine curve, never to generated watts. */

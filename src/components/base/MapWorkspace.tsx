@@ -51,6 +51,10 @@ export default function MapWorkspace({
   const card = useAppSelector((state) => state.card);
   const settings = useAppSelector((state) => state.settings);
   const tutorialStep = useAppSelector((state) => state.game.tutorialStep);
+  const territorial = useAppSelector(
+    (state) => !!state.game.multiplayer?.territorial,
+  );
+  const [agreementPeer, setAgreementPeer] = React.useState<string>();
   const candidate = gameToolForCard(card.name);
   const [projectBusy, setProjectBusy] = React.useState(false);
   const requestedPanel: MapTool | undefined =
@@ -348,10 +352,15 @@ export default function MapWorkspace({
                     <Facilities
                       paneId="mapPane"
                       territoryView="FACILITIES"
-                      onTerritoryView={(view) => {
-                        if (view !== "FACILITIES" && openPanels.includes(view))
+                      onTerritoryView={(view, peer) => {
+                        if (view === "AGREEMENTS") setAgreementPeer(peer);
+                        if (
+                          view !== "FACILITIES" &&
+                          openPanels.includes(view)
+                        ) {
                           raise(view);
-                        else dispatch(navigate(view));
+                          focusHeading(view);
+                        } else dispatch(navigate(view));
                       }}
                     />
                   </div>
@@ -389,6 +398,7 @@ export default function MapWorkspace({
                                 {isMapView(tool.id) && (
                                   <Facilities
                                     territoryView={tool.id}
+                                    agreementPeer={agreementPeer}
                                     paneId={
                                       tool.id === "AGREEMENTS"
                                         ? "agreementsPane"
@@ -414,7 +424,7 @@ export default function MapWorkspace({
                   </div>
                 </div>
                 <Navigation
-                  showMapBuild={!desktopMap}
+                  showMapBuild={territorial || !desktopMap}
                   showEventStatus={!desktopMap}
                   openMapViews={openPanels.filter(isMapView)}
                   onToggleMapView={toggleTool}

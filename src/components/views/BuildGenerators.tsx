@@ -62,6 +62,11 @@ import {
 } from "../../Constants";
 import { getHydroAvailability } from "../../data/HydroSites";
 import { withTerritoryCatalogueLimits } from "../../helpers/ProjectBuild";
+import {
+  multiplayerBuildAvailability,
+  multiplayerHydroAvailability,
+  multiplayerTerritoryTile,
+} from "../../helpers/MultiplayerTerritory";
 import { GENERATORS } from "../../data/Facilities";
 import {
   DateType,
@@ -353,9 +358,9 @@ export function GeneratorBuildItem(
     : props.territoryAvailability && !props.territoryAvailability.buildable
       ? props.territoryAvailability.reason
       : generalAvailability.secondaryText;
-  const tile = props.tileId
-    ? getTerritoryTile(props.tileId, props.game)
-    : undefined;
+  const tile = props.game?.multiplayer?.territorial
+    ? multiplayerTerritoryTile(props.game, props.tileId)
+    : getTerritoryTile(props.tileId, props.game);
   const offerMaxSize =
     (!tile || tileSupportsFacilityTechnology(tile, generator)) &&
     ((pickingSite && !sizeBuildable && maxSizeW > 0) ||
@@ -1197,7 +1202,9 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const [rememberedTerritoryId, setTerritoryId] =
     useTerritoryBuildDestination();
   const [rememberedTileId, setTileId] = useTerritoryBuildTile();
-  const tileId = props.lockedTileId ?? rememberedTileId;
+  const territorial = !!game.multiplayer?.territorial;
+  const tileId =
+    props.lockedTileId ?? (territorial ? undefined : rememberedTileId);
   const territoryId =
     (props.lockedTileId
       ? getTerritoryTile(props.lockedTileId, game)?.territoryId
@@ -1286,12 +1293,15 @@ function BuildGenerators(props: Props): React.JSX.Element {
     airborneWindSpeeds,
     solarIrradiances,
   } = forecast ?? EMPTY_FORECAST;
-  const hydroAvailability = getHydroAvailability(
-    game,
-    shownExactSizes.Hydro ?? sliderTickToW(shownSliderTick),
-    territoryNetwork ? territoryId : undefined,
-    territoryNetwork ? tileId : undefined,
-  );
+  const hydroSize = shownExactSizes.Hydro ?? sliderTickToW(shownSliderTick);
+  const hydroAvailability = territorial
+    ? multiplayerHydroAvailability(game, hydroSize, tileId)
+    : getHydroAvailability(
+        game,
+        hydroSize,
+        territoryNetwork ? territoryId : undefined,
+        territoryNetwork ? tileId : undefined,
+      );
   const hydroSiteMaximum =
     hydroAvailability.selected ?? hydroAvailability.largest;
   const canUseSiteMaximum =
@@ -1307,7 +1317,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
       offshoreWindSpeeds,
       airborneWindSpeeds,
       territoryNetwork ? territoryId : undefined,
-      territoryNetwork ? tileId : undefined,
+      territoryNetwork || territorial ? tileId : undefined,
     );
   const minimumGenerators = quoteGenerators(sliderTickToW(minTick));
   const sizedGenerators = quoteGenerators(sliderTickToW(shownSliderTick))
@@ -1336,9 +1346,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const territoryAvailabilityByName = new Map(
     shownGenerators.map((generator) => [
       generator.name,
-      territoryNetwork
-        ? territoryBuildAvailability(game, generator, territoryId, tileId)
-        : undefined,
+      territorial
+        ? multiplayerBuildAvailability(game, generator, tileId)
+        : territoryNetwork
+          ? territoryBuildAvailability(game, generator, territoryId, tileId)
+          : undefined,
     ]),
   );
   const affordability = useBuildAffordabilityKey(
@@ -1397,7 +1409,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
       expectedMonthlyOutputShape(
         generator,
         forecastedTimeline,
-        territoryNetwork
+        territoryNetwork || territorial
           ? {
               game,
               tileId:
@@ -1424,9 +1436,11 @@ function BuildGenerators(props: Props): React.JSX.Element {
   const lowestEnergyCost = Math.min(
     ...buildableGenerators.map((generator) => generator.lcWh),
   );
-  const selectedTile = territoryNetwork
-    ? getTerritoryTile(tileId, game)
-    : undefined;
+  const selectedTile = territorial
+    ? multiplayerTerritoryTile(game, tileId)
+    : territoryNetwork
+      ? getTerritoryTile(tileId, game)
+      : undefined;
   const comparableGenerators = selectedTile
     ? generators.filter((generator) =>
         tileSupportsFacilityTechnology(selectedTile, generator),
@@ -1632,7 +1646,7 @@ function BuildGenerators(props: Props): React.JSX.Element {
                 interestRate={game.interestRate}
                 generator={g}
                 territoryId={territoryNetwork ? territoryId : undefined}
-                tileId={territoryNetwork ? tileId : undefined}
+                tileId={territoryNetwork || territorial ? tileId : undefined}
                 territoryAvailability={territoryAvailabilityByName.get(g.name)}
                 minimumBuildCost={
                   withResilienceOptions(
@@ -1664,6 +1678,13 @@ function BuildGenerators(props: Props): React.JSX.Element {
                       selected,
                       financed,
                       territoryId,
+                      tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
+                    );
+                  if (territorial)
+                    return props.onBuildGenerator(
+                      selected,
+                      financed,
+                      undefined,
                       tileId ?? territoryAvailabilityByName.get(g.name)?.tileId,
                     );
                   return props.onBuildGenerator(selected, financed);

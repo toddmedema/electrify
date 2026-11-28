@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openFleet } from "./layout";
 import { wToSliderTick } from "../src/helpers/BuildSizing";
 
 for (const theme of ["light", "dark"]) {
@@ -42,10 +42,7 @@ for (const theme of ["light", "dark"]) {
       await expect(dialog).toBeHidden();
     }
     const fleet = page.locator(".facilities");
-    await openPane(
-      fleet,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const row = fleet.locator('.facilityRow[data-fuel="Natural Gas"]').first();
     await row.locator(".facilityDisclosure").click();
     await row

@@ -1,4 +1,5 @@
 import { currencyForLocation } from "../../helpers/Currency";
+import { COOP_CUSTOM_FACILITY_LIMIT } from "../../Constants";
 import { useMoney } from "../base/CurrencyContext";
 import {
   getHydroAvailability,
@@ -66,6 +67,7 @@ import {
 } from "../../helpers/CustomGameForecast";
 import { getDateFromMinute } from "../../helpers/DateTime";
 import { getScenarioLocation } from "../../helpers/Locations";
+import { withRegionalStartingFleet } from "../../helpers/RegionalStartingFleet";
 import {
   formatWattHours,
   formatWatts,
@@ -249,14 +251,21 @@ function demandServedLabel(outlook: YearOneOutlook): string {
   return `${formatForecastNumber(percent)}%`;
 }
 
-/**
- * The one-peaker fleet a custom setup opens with before it has been sized to its grid. A fleet
- * the player has since built up by hand is never replaced just by opening the screen.
- */
-function isStarterFleet(facilities: readonly ScenarioFacilityType[]): boolean {
-  return (
-    facilities.length === 1 &&
-    facilityName(facilities[0]) === "Natural Gas Peaker"
+function facilitiesForStartingCustomers(
+  scenario: ScenarioType,
+  startingCustomers: number,
+): ScenarioFacilityType[] {
+  const previousCustomers =
+    scenario.startingCustomers ||
+    getStartingCustomers(getScenarioLocation(scenario));
+  if (previousCustomers <= 0 || previousCustomers === startingCustomers) {
+    return scenario.facilities;
+  }
+  const scale = startingCustomers / previousCustomers;
+  return scenario.facilities.map((facility: ScenarioFacilityType) =>
+    facility.peakW && !facility.peakWh
+      ? { ...facility, peakW: Math.round(facility.peakW * scale) }
+      : facility,
   );
 }
 
@@ -290,21 +299,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
   const previewSeed = React.useRef(scenario.seed ?? newSeed());
   const guest = props.coop?.role === "guest";
+  const host = props.coop?.role === "host";
+  const atCoopFacilityLimit =
+    host && scenario.facilities.length >= COOP_CUSTOM_FACILITY_LIMIT;
+  const overCoopFacilityLimit =
+    host && scenario.facilities.length > COOP_CUSTOM_FACILITY_LIMIT;
+  const coopFacilityLimitNoticeId = React.useId();
   // The starting fleet is the local grid's blend, sized to the customers it serves. It is made
   // again whenever the location, era or customers change, until the player builds their own.
   const [fleetStale, setFleetStale] = React.useState(
-    () => !guest && isStarterFleet(scenario.facilities),
+    () => !guest && scenario.startingFleetSource === "regional",
   );
-  const { onScenarioChange } = props;
-  React.useEffect(() => {
-    if (guest) return;
-    // A fleet the worker is about to replace cannot be offered to guests for review.
-    onScenarioChange?.(
-      fleetStale
-        ? undefined
-        : { ...scenario, seed: scenario.seed ?? previewSeed.current },
-    );
-  }, [fleetStale, guest, scenario, onScenarioChange]);
   // A guest's setup is whatever the host is showing, seed included, so forecasts match too.
   React.useEffect(() => {
     if (!guest) return;
@@ -428,16 +433,17 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const isLocationUnavailable = useOfflineWeather(selectableLocations, current);
   const weatherUnavailable = !!current && !!isLocationUnavailable?.(current);
 
-  // Rolling the year back past a technology's invention would otherwise leave a facility in the
-  // list that quietly disappears once the game loads
+  // Retained plants use the selected year's technology limits and their actual capacities.
+  // Conventional Hydro is checked against individual sites above.
   const claimedSites: Array<{ name: string }> = [];
   const unavailable = scenario.facilities.filter(
     (f: Partial<FacilityShoppingType>) => {
       const name = facilityName(f);
-      if (!technologies.some((t) => t.name === name)) {
-        return true;
-      }
+      const technology = technologies.find((t) => t.name === name);
+      if (!technology) return true;
       if (name === "Hydro") return false;
+      const capacity = (technology.storage ? f.peakWh : f.peakW) ?? 0;
+      if (capacity > technology.maxSize) return true;
       const sitesRemaining = getViableLocationsRemaining(
         location,
         claimedSites,
@@ -454,6 +460,26 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // nothing worth forecasting or starting yet.
   const fleetSizing =
     fleetStale && !guest && !!forecastLocation && !weatherUnavailable;
+  const startDisabled =
+    fleetSizing ||
+    forecastInvalid ||
+    weatherUnavailable ||
+    overCoopFacilityLimit;
+  const startGame = () => {
+    if (guest || startDisabled) return;
+    onStart({ ...scenario, seed: scenario.seed ?? previewSeed.current });
+  };
+  const addBlocked =
+    guest || fleetSizing || atCoopFacilityLimit || !adding || !selectedSize;
+  const { onScenarioChange } = props;
+  React.useEffect(() => {
+    if (!guest)
+      onScenarioChange?.(
+        startDisabled || fleetStale
+          ? undefined
+          : { ...scenario, seed: scenario.seed ?? previewSeed.current },
+      );
+  }, [fleetStale, guest, startDisabled, scenario, onScenarioChange]);
   const fleet = useWorkerRequest(
     fleetSizing && forecastLocation
       ? {
@@ -525,7 +551,15 @@ export default function CustomGame(props: Props): React.JSX.Element {
   // A guest's setup only ever changes when the host's does.
   const change = (delta: Partial<ScenarioType>) => {
     if (guest) return;
-    setScenario(prepareCustomSetup({ ...scenario, ...delta }));
+    const next = { ...scenario, ...delta };
+    setScenario(
+      prepareCustomSetup(
+        next.startingFleetSource === "regional" &&
+          delta.startingYear !== undefined
+          ? withRegionalStartingFleet(next)
+          : next,
+      ),
+    );
   };
 
   const changeStartingCustomers = (
@@ -533,10 +567,21 @@ export default function CustomGame(props: Props): React.JSX.Element {
     delta: Partial<ScenarioType> = {},
   ) => {
     if (guest) return;
-    setFleetStale(true);
-    setScenario((currentScenario: ScenarioType) =>
-      prepareCustomSetup({ ...currentScenario, ...delta, startingCustomers }),
-    );
+    if (scenario.startingFleetSource === "regional") setFleetStale(true);
+    setScenario((currentScenario: ScenarioType) => {
+      const next = { ...currentScenario, ...delta, startingCustomers };
+      return prepareCustomSetup(
+        next.startingFleetSource === "regional"
+          ? withRegionalStartingFleet(next)
+          : {
+              ...next,
+              facilities: facilitiesForStartingCustomers(
+                currentScenario,
+                startingCustomers,
+              ),
+            },
+      );
+    });
   };
 
   /**
@@ -549,7 +594,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
   const changeStartingYear = (startingYear: number) => {
     const cash = nearestIndex(cashOptions, scenario.cash);
     const fee = nearestIndex(feeOptions, scenario.feePerKgCO2e * 1000);
-    setFleetStale(true);
+    if (scenario.startingFleetSource === "regional") setFleetStale(true);
     change({
       startingYear,
       cash: inEraMoney(STARTING_CASH[cash], startingYear),
@@ -559,14 +604,15 @@ export default function CustomGame(props: Props): React.JSX.Element {
   };
 
   const addFacility = () => {
-    if (!adding || !selectedSize) {
-      return;
-    }
+    if (addBlocked) return;
     const facility = adding.storage
       ? { name: adding.name, peakWh: selectedSize }
       : { name: adding.name, peakW: selectedSize };
     setFleetStale(false);
-    change({ facilities: [...scenario.facilities, facility] });
+    change({
+      startingFleetSource: "manual",
+      facilities: [...scenario.facilities, facility],
+    });
   };
 
   const removeFacility = (index: number, trigger: HTMLButtonElement) => {
@@ -586,6 +632,7 @@ export default function CustomGame(props: Props): React.JSX.Element {
       : document.getElementById("addFacilityName");
     next?.focus();
     change({
+      startingFleetSource: "manual",
       facilities: scenario.facilities.filter(
         (_f: Partial<FacilityShoppingType>, i: number) => i !== index,
       ),
@@ -882,6 +929,25 @@ export default function CustomGame(props: Props): React.JSX.Element {
               >
                 Facilities
               </Typography>
+              {scenario.startingFleetSource === "regional" ? (
+                <Typography variant="caption" color="textSecondary">
+                  Starting facilities follow the regional capacity mix until you
+                  edit the fleet. Where available fuels cannot fill the grid,
+                  the model may substitute gas backup.
+                </Typography>
+              ) : (
+                <Button
+                  disabled={guest}
+                  onClick={() => {
+                    setFleetStale(true);
+                    setScenario(
+                      prepareCustomSetup(withRegionalStartingFleet(scenario)),
+                    );
+                  }}
+                >
+                  Use regional fleet
+                </Button>
+              )}
               {!fleetSizing && hydroSetup.error && (
                 <Typography color="error" role="alert">
                   {hydroSetup.error}
@@ -893,6 +959,20 @@ export default function CustomGame(props: Props): React.JSX.Element {
                   this location and year, or exceeds the number of suitable
                   build sites. Remove {unavailable.length === 1 ? "it" : "them"}{" "}
                   or change the setup.
+                </Typography>
+              )}
+              {atCoopFacilityLimit && (
+                <Typography
+                  id={coopFacilityLimitNoticeId}
+                  variant="body2"
+                  color={overCoopFacilityLimit ? "error" : "textSecondary"}
+                  role={overCoopFacilityLimit ? "alert" : undefined}
+                >
+                  Co-op games support up to {COOP_CUSTOM_FACILITY_LIMIT}{" "}
+                  starting facilities.{" "}
+                  {overCoopFacilityLimit
+                    ? "Remove facilities to start."
+                    : "Remove a facility to add another."}
                 </Typography>
               )}
 
@@ -1085,8 +1165,11 @@ export default function CustomGame(props: Props): React.JSX.Element {
                 <IconButton
                   onClick={addFacility}
                   aria-label="Add facility"
+                  aria-describedby={
+                    atCoopFacilityLimit ? coopFacilityLimitNoticeId : undefined
+                  }
                   color="primary"
-                  disabled={fleetSizing || !adding || sizes.length === 0}
+                  disabled={addBlocked}
                   size="large"
                 >
                   <AddIcon />
@@ -1099,13 +1182,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
           {props.coop ? (
             <CoopStartButton
               coop={props.coop}
-              disabled={forecastInvalid || weatherUnavailable || fleetSizing}
-              onStart={() =>
-                onStart({
-                  ...scenario,
-                  seed: scenario.seed ?? previewSeed.current,
-                })
-              }
+              disabled={startDisabled}
+              onStart={startGame}
             />
           ) : (
             <Button
@@ -1114,13 +1192,8 @@ export default function CustomGame(props: Props): React.JSX.Element {
               variant="contained"
               color="primary"
               startIcon={<PlayCircleIcon />}
-              disabled={forecastInvalid || weatherUnavailable || fleetSizing}
-              onClick={() =>
-                onStart({
-                  ...scenario,
-                  seed: scenario.seed ?? previewSeed.current,
-                })
-              }
+              disabled={startDisabled}
+              onClick={startGame}
             >
               Start game
             </Button>

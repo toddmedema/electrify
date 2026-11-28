@@ -18,6 +18,7 @@ export function findTileControl(map: HTMLElement | null, tile: string) {
 type SurfaceProps = {
   id?: string;
   closeLabel?: string;
+  showClose?: boolean;
   title: string;
   titleIconSrc?: string;
   /** Inline glyph (for example a MUI icon) shown before the title instead of `titleIconSrc`. */
@@ -54,6 +55,7 @@ export function TileInspectionSurface({
 export default function TileWorkspaceSurface({
   id,
   closeLabel = "Close tile",
+  showClose = false,
   title,
   titleIconSrc,
   titleIcon,
@@ -167,7 +169,7 @@ export default function TileWorkspaceSurface({
             </Typography>
           )}
         </div>
-        {!inspector && (
+        {(!inspector || showClose) && (
           <IconButton aria-label={closeLabel} onClick={onClose}>
             <CloseIcon />
           </IconButton>

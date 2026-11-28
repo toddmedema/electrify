@@ -1,6 +1,6 @@
 import path from "node:path";
 import { expect, Page, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 import { pauseBrowserClock } from "./browser-clock";
 
 declare global {
@@ -44,10 +44,7 @@ async function start(page: Page, theme: string, interfaceScale = 1) {
   await page.goto("/?scenario=103");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const pane = page.locator(".facilities:visible");
-  await openPane(
-    pane,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await page.locator("#chartSupplyDemand .u-wrap > canvas").waitFor();
   await page.evaluate(() => document.fonts.ready);
   // Scenario 103's first forecast replaces its pending mission headline with an announced

@@ -1,6 +1,6 @@
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 import { readSavedGame } from "./save-fixture";
 
 for (const theme of ["light", "dark"] as const) {
@@ -29,8 +29,9 @@ for (const theme of ["light", "dark"] as const) {
     await expect
       .poll(async () => (await readSavedGame(page))?.seed)
       .toBe(0.25 * 2 ** 32);
+    const fleet = await openFleet(page);
     await expect(
-      page.getByRole("button", { name: /Inspect Northern intertie/ }),
+      fleet.getByRole("button", { name: /Inspect Northern intertie/ }),
     ).toBeVisible();
     const events = page.locator(".eventLog");
     await openPane(
@@ -78,10 +79,7 @@ for (const theme of ["light", "dark"] as const) {
         fullPage: true,
       });
     }
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const line = page.locator(".transmissionLine").filter({
       has: page.getByRole("button", { name: /Inspect Northern intertie/ }),
     });

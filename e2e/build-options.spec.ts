@@ -5,13 +5,14 @@ import { expectContinuousDialogSurface } from "./dialog-surface";
 import { expect, test } from "./fixtures";
 import {
   openBuild,
-  openPane,
   returnToTerritoryMap,
   setMapProjectCapacity,
   sortBuildCatalog,
+  openFleet,
 } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { purchaseTerms } from "../src/helpers/Financials";
+import { wToSliderTick } from "../src/helpers/BuildSizing";
 import { TERRAIN_LABELS } from "../src/data/TerrainLabels";
 import { getAuthoredTerritoryTile } from "../src/data/TerritoryTiles";
 import {
@@ -531,10 +532,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=103");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     for (const kind of ["Generator", "Storage"]) {
       await page.locator(".button-buildFacility").click();
       await page.locator(`.button-build${kind}`).click();
@@ -1025,10 +1023,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await page.locator(".button-buildFacility").click();
     await page.locator(".button-buildStorage").click();
     const battery = page.locator(".buildOption").filter({
@@ -1140,16 +1135,10 @@ for (const theme of ["light", "dark"] as const) {
     await expect(page.locator("#appbar:visible").first()).toBeVisible();
     const build = await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
-    // Where the capacity slider opens depends on the grid's size, so step up from its smallest
-    // size to the 1 GWh / 10 MW project.
+    // The starting size follows the generated fleet. Select a 1 GWh / 10 MW project.
+    const storageWh = 1_000_000_000;
     const size = build.getByRole("slider");
-    await size.press("Home");
-    for (
-      let steps = 0;
-      steps < 60 && (await size.getAttribute("aria-valuetext")) !== "1GWh";
-      steps++
-    )
-      await size.press("ArrowRight");
+    await size.fill(String(wToSliderTick(storageWh)));
     await expect(size).toHaveAccessibleName("Capacity 1GWh");
     const ironAir = page.locator(".buildOption").filter({
       has: page.getByRole("button", {
@@ -1205,7 +1194,7 @@ for (const theme of ["light", "dark"] as const) {
         (await readSavedGame(page))?.facilities.some(
           (facility) =>
             facility.name === "Iron-Air Battery" &&
-            facility.peakWh === 1000000000,
+            facility.peakWh === storageWh,
         ),
       )
       .toBe(true);

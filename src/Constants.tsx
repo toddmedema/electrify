@@ -75,6 +75,9 @@ export function difficultyLabel(difficulty: string): string {
   );
 }
 
+/** Maximum starting facilities in a custom setup shared with a co-op lobby. */
+export const COOP_CUSTOM_FACILITY_LIMIT = 40;
+
 export const LOCATIONS = {
   PIT: {
     id: "PIT",

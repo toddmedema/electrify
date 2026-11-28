@@ -1,7 +1,7 @@
 import path from "path";
 import type { Locator } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { openBuild, openPane } from "./layout";
+import { openBuild, openPane, openFleet } from "./layout";
 import { selectManualText } from "./manual-selection";
 import { reviewScreenshot } from "./review-screenshot";
 
@@ -32,10 +32,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await facilities.locator(".facilityDisclosure").first().click();
     const details = facilities.locator(".facilityDetails").first();
     const manual = page.getByRole("dialog", { name: "Manual help" });
@@ -209,11 +206,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     await expect(page.getByRole("group", { name: "game speed" })).toBeVisible();
-    const facilities = page.locator(".facilities");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const build = await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
     const capacity = page.getByRole("slider", { name: /^Capacity/ });

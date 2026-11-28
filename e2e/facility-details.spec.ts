@@ -1,6 +1,6 @@
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 import path from "node:path";
 import { editSavedGame } from "./save-fixture";
 import { getHydroAvailability, validHydroClaims } from "../src/data/HydroSites";
@@ -22,10 +22,7 @@ for (const colorScheme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       const facilities = page.locator(".facilities:visible");
-      await openPane(
-        facilities,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
 
       // Hydro exercises long captions; gas adds upkeep/start costs; storage has charge/cycles.
       for (const name of ["Hydro", "Natural Gas CC", "Battery"]) {
@@ -354,10 +351,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await openBuild(page);
     await page.locator(".button-buildGenerator").click();
     await page
@@ -437,10 +431,7 @@ for (const theme of ["light", "dark"]) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
-    await openPane(
-      facilities,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const row = facilities.locator('.facilityRow[data-fuel="Hydro"]').first();
     await row.locator(".facilityDisclosure").click();
     const group = row.getByRole("group", {

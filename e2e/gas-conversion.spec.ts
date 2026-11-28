@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 
 for (const theme of ["light", "dark"]) {
@@ -14,10 +14,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=104");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const fleet = page.locator(".facilities:visible");
-    await openPane(
-      fleet,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const row = fleet.locator(".facilityRow").filter({
       has: page.locator(".facilityName", { hasText: /^Natural Gas Peaker$/ }),
     });

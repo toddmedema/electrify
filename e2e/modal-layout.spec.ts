@@ -1,6 +1,6 @@
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 import { expectDialogToFit } from "./dialog-layout";
 import { SAVE_NAME_LIMIT } from "../src/SaveModel";
 import { readSavedGame, readSaveRecords } from "./save-fixture";
@@ -170,10 +170,7 @@ for (const theme of ["light", "dark"]) {
         .getByRole("button", { name: "Start game", exact: true })
         .click();
       const fleet = page.locator(".facilities:visible");
-      await openPane(
-        fleet,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
       const row = fleet
         .locator('.facilityRow[data-fuel="Natural Gas"]')
         .first();

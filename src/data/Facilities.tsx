@@ -5,6 +5,7 @@ import {
 } from "./FacilityCapacity";
 import { availableTerritorySpecialSites } from "./Territories";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import { multiplayerHydroAvailability } from "../helpers/MultiplayerTerritory";
 import { FACILITY_FUELS } from "./FacilityFuels";
 import { gasHeatRate } from "./GasPlantVintages";
 import {
@@ -378,12 +379,9 @@ export function GENERATORS(
     return fee;
   };
 
-  let hydroAvailability = getHydroAvailability(
-    state,
-    peakW,
-    territoryId,
-    tileId,
-  );
+  let hydroAvailability = state.multiplayer?.territorial
+    ? multiplayerHydroAvailability(state, peakW, tileId)
+    : getHydroAvailability(state, peakW, territoryId, tileId);
   // Only standing-capacity expansion passes its already-owned site. Fresh builds retain the
   // inventory rules above; this does not release or change any real site reservation.
   if (pinnedHydroSiteId) {

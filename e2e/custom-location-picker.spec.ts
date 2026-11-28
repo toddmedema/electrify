@@ -1,22 +1,5 @@
 import { expect, Locator, Page, test } from "./fixtures";
-
-async function openCustomSetup(page: Page) {
-  await page.addInitScript(() => {
-    window.localStorage.clear();
-    window.localStorage.setItem(
-      "plays",
-      JSON.stringify({
-        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
-      }),
-    );
-  });
-  await page.goto("/");
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await page.getByRole("button", { name: "View Custom Game details" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Custom setup" }),
-  ).toBeVisible();
-}
+import { openCustomSetup } from "./layout";
 
 async function activateFocusedNeighbor(
   page: Page,
@@ -292,10 +275,17 @@ test("Year 1 outlook recalculates from the selected facilities", async ({
     timeout: 20000,
   });
 
-  // The grid opens with the local blend of plants, sized to serve its first year.
   await expect(outlook).toContainText("Demand covered");
-  const remove = page.getByRole("button", { name: /^Remove / });
-  while ((await remove.count()) > 0) await remove.first().click();
+  const startingPlants = page
+    .getByRole("region", { name: "Facilities", exact: true })
+    .locator(".startingFacility:not([inert])")
+    .getByRole("button", { name: /^Remove / });
+  const startingCount = await startingPlants.count();
+  expect(startingCount).toBeGreaterThan(1);
+  for (let count = startingCount; count > 0; count--) {
+    await startingPlants.first().click();
+    await expect(startingPlants).toHaveCount(count - 1);
+  }
   await expect(outlook).toContainText("Calculating Year 1 outlook…");
   await expect(outlook).toContainText("0%", { timeout: 20000 });
   await expect(outlook).toContainText("Deficit forecast");
@@ -541,11 +531,48 @@ test("moving to another place sizes a starting fleet that is viable there", asyn
   await search.fill("Paris");
   await page.getByRole("option", { name: "Paris, France" }).click();
   await expect(play).toBeDisabled();
+
   await expect(play).toBeEnabled({ timeout: 30000 });
   await expect(geothermal).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: /^Remove / }).first(),
   ).toBeVisible();
+});
+
+test("location constraints keep Play valid only where the starting fleet is viable", async ({
+  page,
+}) => {
+  await openCustomSetup(page);
+
+  const play = page
+    .locator(".customSetupActions")
+    .getByRole("button", { name: "Start game", exact: true });
+  await expect(play).toBeEnabled({ timeout: 30000 });
+  await page.getByRole("combobox", { name: "Facility type" }).click();
+  await page.getByRole("option", { name: "Geothermal" }).click();
+  await page.getByRole("button", { name: "Add facility" }).click();
+  await expect(play).toBeEnabled();
+
+  const search = page.getByRole("combobox", { name: "Search playable cities" });
+  await search.fill("Paris");
+  await page.getByRole("option", { name: "Paris, France" }).click();
+  await expect(play).toBeDisabled();
+
+  await search.fill("San Francisco");
+  await page.getByRole("option", { name: "San Francisco, CA" }).click();
+  await expect(play).toBeEnabled();
+
+  await search.fill("Paris");
+  await page.getByRole("option", { name: "Paris, France" }).click();
+  await expect(play).toBeDisabled();
+  await page.getByRole("button", { name: "Use regional fleet" }).click();
+  await expect(play).toBeEnabled({ timeout: 30000 });
+  await expect(
+    page.getByRole("button", { name: "Remove Nuclear" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Remove Geothermal" }),
+  ).toHaveCount(0);
 });
 
 test("dark theme and reduced motion keep the map legible and still", async ({

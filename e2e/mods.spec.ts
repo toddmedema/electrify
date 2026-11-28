@@ -8,7 +8,7 @@ import type { GameType, SaveGameType } from "../src/Types";
 import { decodeSave, encodeSave } from "../src/SaveEncoding";
 import { SAVE_DATABASE_NAME } from "../src/SaveRepository";
 import type { InstalledMod, ModLibrary, ModRequest } from "../src/mods/Types";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 import { verifyMenuKeyboard } from "./menu-keyboard";
 import {
   copySavedGame,
@@ -359,10 +359,7 @@ for (const [theme, winning] of [
     await expect(rate).toHaveAttribute("aria-valuenow", "0.12");
     await page.keyboard.press("Escape");
     if (winning) {
-      await openPane(
-        page.locator(".facilities"),
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
       await page.locator(".button-buildFacility").click();
       await page.locator(".button-buildGenerator").click();
       const capacity = page.getByRole("slider", { name: /^Capacity/ });
@@ -1487,10 +1484,7 @@ test("desktop mod management, Workshop publishing and a modded run", async ({
 
   await playAndCheckRun(page, "Community Grid");
   // The mod's run-local facility modifier reaches the Build catalog.
-  await openPane(
-    page.locator(".facilities"),
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await page.locator(".button-buildFacility").click();
   await page.locator(".button-buildGenerator").click();
   const solar = page.locator(".buildOption").filter({ hasText: /^Solar/ });

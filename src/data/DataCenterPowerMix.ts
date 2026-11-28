@@ -1,4 +1,8 @@
-import { FuelNameType, LocationType } from "../Types";
+import type {
+  FuelNameType,
+  LocationType,
+  ScenarioFacilityType,
+} from "../Types";
 import snapshot from "./DataCenterPowerCapacity.json";
 
 export interface DataCenterPowerMix {
@@ -39,14 +43,18 @@ export function getDataCenterPowerMix(
   location: LocationType,
   startingYear = new Date().getFullYear(),
 ): DataCenterPowerMix {
+  const admin = location.admin || "";
   const state =
-    location.country === "United States"
-      ? states[location.admin || ""]
+    location.country === "United States" && Object.hasOwn(states, admin)
+      ? states[admin]
       : undefined;
   const country =
     location.admin === "Puerto Rico" ? "Puerto Rico" : location.country || "";
-  const scope = state ? "state" : countries[country] ? "country" : "world";
-  const years = state?.years || countries[country] || countries.World;
+  const countryYears = Object.hasOwn(countries, country)
+    ? countries[country]
+    : undefined;
+  const scope = state ? "state" : countryYears ? "country" : "world";
+  const years = state?.years || countryYears || countries.World;
   const available = Object.keys(years)
     .map(Number)
     .filter((year) => years[year].some((value) => value > 0))
@@ -87,4 +95,28 @@ export function getDataCenterPowerMix(
     shares,
     unsupportedShare: unsupportedCapacity / total,
   };
+}
+
+/** Keep a scenario's wind and solar capacity budget while sizing its assets from the opening-year mix. */
+export function regionalizeVariableStartingCapacity(
+  location: LocationType,
+  startingYear: number,
+  facilities: ScenarioFacilityType[],
+): ScenarioFacilityType[] {
+  const wind = facilities.find((facility) => facility.fuel === "Wind");
+  const solar = facilities.find((facility) => facility.fuel === "Sun");
+  if (!wind?.peakW || !solar?.peakW) return facilities;
+  const blend = getDataCenterPowerMix(location, startingYear);
+  const windShare = blend.shares.Wind;
+  const solarShare = blend.shares.Sun;
+  if (blend.year > startingYear || !windShare || !solarShare) return facilities;
+  const totalW = wind.peakW + solar.peakW;
+  const solarW = Math.round((totalW * solarShare) / (windShare + solarShare));
+  return facilities.map((facility) =>
+    facility === solar
+      ? { ...solar, peakW: solarW }
+      : facility === wind
+        ? { ...wind, peakW: totalW - solarW }
+        : facility,
+  );
 }

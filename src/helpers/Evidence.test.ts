@@ -9,8 +9,8 @@ import cardReducer, { navigate } from "../reducers/Card";
 import { loaded, quit, resume, start } from "../reducers/GameActions";
 import { createGame } from "../testing/Simulator";
 
-function fixture() {
-  const game = createGame({ scenarioId: 101, seed: 357 });
+function fixture(scenarioId = 101, tutorialStep = -1) {
+  const game = { ...createGame({ scenarioId, seed: 357 }), tutorialStep };
   const store = configureStore({
     reducer: {
       ui: uiReducer,
@@ -25,7 +25,7 @@ it("maps semantic destinations and repeats same-card requests without changing s
   const { store, dispatch, game } = fixture();
   dispatch(openEvidence("supply-demand"));
   const first = store.getState().ui.evidenceRequest!;
-  expect(store.getState().card.name).toBe("FACILITIES");
+  expect(store.getState().card.name).toBe("FLEET");
   dispatch(openEvidence("supply-demand"));
   expect(store.getState().ui.evidenceRequest!.id).toBe(first.id + 1);
   expect(store.getState().game).toBe(game);
@@ -34,6 +34,20 @@ it("maps semantic destinations and repeats same-card requests without changing s
   expect(evidenceCard({ card: "FACILITIES", view: "BUILD_GENERATORS" })).toBe(
     "BUILD_GENERATORS",
   );
+});
+
+it("keeps the intertie focus request while opening Fleet from the regional map", () => {
+  const { store, dispatch } = fixture(111);
+  dispatch(navigate("FACILITIES"));
+  dispatch(openEvidence("interties"));
+  expect(store.getState().card.name).toBe("FLEET");
+  expect(store.getState().ui.evidenceRequest?.target).toBe("interties");
+});
+
+it("uses the lesson's existing Facilities destination for evidence", () => {
+  const { store, dispatch } = fixture(0, 0);
+  dispatch(openEvidence("supply-demand"));
+  expect(store.getState().card.name).toBe("FACILITIES");
 });
 
 it("defers during drag, claims focus once, and ignores obsolete requests", () => {

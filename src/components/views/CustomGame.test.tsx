@@ -9,12 +9,13 @@ import {
 import { DEFAULT_CUSTOM_SCENARIO, SCENARIOS } from "../../data/Scenarios";
 import { getFuelEscalation } from "../../data/FuelPrices";
 import { inEraRate } from "../../data/RetailRates";
-import { LOCATIONS } from "../../Constants";
+import { COOP_CUSTOM_FACILITY_LIMIT, LOCATIONS } from "../../Constants";
 import { prefetchLocationWeather } from "../../OfflineWeatherData";
 import { createCustomGameForecastWorker } from "../../helpers/CustomGameForecastClient";
 import { createCustomGameFleetWorker } from "../../helpers/CustomGameFleetClient";
 import type { ScenarioFacilityType, ScenarioType } from "../../Types";
 import { createGame } from "../../testing/Simulator";
+import type { CoopSelectionType } from "../../Types";
 import CustomGame from "./CustomGame";
 
 jest.mock("../../OfflineWeatherData", () => ({
@@ -197,6 +198,39 @@ it("keeps Play available when the optional outlook fails", () => {
   expect(screen.getByRole("button", { name: "Start game" })).toBeEnabled();
 });
 
+it("starts a managed fleet with biomass below the manual picker minimum", () => {
+  jest.useFakeTimers();
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, startingFleetSource: "regional" }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  answerFleet([{ name: "Biomass", fuel: "Biomass", peakW: 1_000_000 }]);
+  expect(screen.getByRole("button", { name: "Remove Biomass" })).toBeVisible();
+  fireEvent.mouseDown(setupCombobox("Facility type"));
+  expect(
+    screen.queryByRole("option", { name: "Biomass" }),
+  ).not.toBeInTheDocument();
+  fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+
+  const start = screen.getByRole("button", { name: "Start game" });
+  expect(start).toBeEnabled();
+  fireEvent.click(start);
+  expect(onStart).toHaveBeenCalledWith(
+    expect.objectContaining({
+      facilities: expect.arrayContaining([
+        expect.objectContaining({ name: "Biomass" }),
+      ]),
+    }),
+  );
+});
+
 it.each(["startup", "postMessage"])(
   "recovers from a synchronous forecast %s failure without blocking Play",
   (failure) => {
@@ -242,7 +276,6 @@ it.each(["startup", "postMessage"])(
         target: { value: 2_000_000 },
       },
     );
-    answerFleet();
     act(() => jest.advanceTimersByTime(250));
     const request = (recoveredWorker.postMessage as jest.Mock).mock.calls[0][0];
     act(() => {
@@ -289,7 +322,6 @@ it.each<[number, string]>([
         target: { value: 2_000_000 },
       },
     );
-    answerFleet();
     act(() => jest.advanceTimersByTime(250));
     const secondRequest = (worker.postMessage as jest.Mock).mock.calls[1][0];
     act(() => {
@@ -337,13 +369,123 @@ it("does not forecast a facility that is unavailable in the selected year", () =
   expect(mockCreateForecastWorker).not.toHaveBeenCalled();
 });
 
+it("blocks a retained facility when its capacity exceeds the selected year's limit", () => {
+  const onStart = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: [{ name: "Battery", peakWh: 100_000_000 }],
+      }}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+    />,
+  );
+
+  const start = screen.getByRole("button", { name: "Start game" });
+  expect(start).toBeEnabled();
+  fireEvent.mouseDown(setupCombobox("Starting year"));
+  fireEvent.click(screen.getByRole("option", { name: "2010" }));
+  expect(start).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Remove Battery" })).toBeVisible();
+  fireEvent.click(start);
+  expect(onStart).not.toHaveBeenCalled();
+
+  fireEvent.mouseDown(setupCombobox("Starting year"));
+  fireEvent.click(screen.getByRole("option", { name: "2020" }));
+  expect(start).toBeEnabled();
+});
+
+const readyCoopHost: CoopSelectionType = {
+  role: "host",
+  hostName: "Alice",
+  players: [
+    { id: "a", name: "Alice", host: true, connected: true, ready: false },
+    { id: "b", name: "Bob", host: false, connected: true, ready: true },
+  ],
+  ready: false,
+  starting: false,
+};
+
+it("allows a co-op host to reach the facility limit and prevents another addition", () => {
+  const onScenarioChange = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: Array.from(
+          { length: COOP_CUSTOM_FACILITY_LIMIT - 1 },
+          () => ({ name: "Coal", peakW: 100_000_000 }),
+        ),
+      }}
+      coop={readyCoopHost}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={jest.fn()}
+      onScenarioChange={onScenarioChange}
+    />,
+  );
+
+  fireEvent.mouseDown(setupCombobox("Facility type"));
+  fireEvent.click(screen.getByRole("option", { name: "Coal" }));
+  const add = screen.getByRole("button", { name: "Add facility" });
+  expect(add).toBeEnabled();
+  fireEvent.click(add);
+  expect(onScenarioChange.mock.lastCall?.[0].facilities).toHaveLength(
+    COOP_CUSTOM_FACILITY_LIMIT,
+  );
+  expect(add).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Start for everyone" }),
+  ).toBeEnabled();
+  expect(screen.getByText(/co-op games support up to/i)).toBeVisible();
+});
+
+it("lets a host repair an oversized recalled fleet before sharing or starting it", () => {
+  const onStart = jest.fn();
+  const onScenarioChange = jest.fn();
+  render(
+    <CustomGame
+      game={createGame({ scenarioId: 100 })}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        facilities: Array.from(
+          { length: COOP_CUSTOM_FACILITY_LIMIT + 1 },
+          () => ({ name: "Coal", peakW: 100_000_000 }),
+        ),
+      }}
+      coop={readyCoopHost}
+      onBack={jest.fn()}
+      onDelta={jest.fn()}
+      onStart={onStart}
+      onScenarioChange={onScenarioChange}
+    />,
+  );
+
+  const start = screen.getByRole("button", { name: "Start for everyone" });
+  expect(start).toBeDisabled();
+  expect(onScenarioChange.mock.calls).toEqual([[undefined]]);
+  fireEvent.click(screen.getAllByRole("button", { name: "Remove Coal" })[0]);
+  expect(onScenarioChange.mock.lastCall?.[0].facilities).toHaveLength(
+    COOP_CUSTOM_FACILITY_LIMIT,
+  );
+  expect(start).toBeEnabled();
+  fireEvent.click(start);
+  expect(onStart.mock.lastCall?.[0].facilities).toHaveLength(
+    COOP_CUSTOM_FACILITY_LIMIT,
+  );
+});
+
 it("re-quotes starting cash when the starting year changes", () => {
   jest.useFakeTimers();
   const onStart = jest.fn();
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...SIZED, cash: 500000000 }}
+      scenario={{ ...SIZED, startingFleetSource: "regional", cash: 500000000 }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -368,7 +510,11 @@ it("quotes electricity rates at the prices of a historical starting year", () =>
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...SIZED, dollarsPerkWh: 0.05 }}
+      scenario={{
+        ...SIZED,
+        startingFleetSource: "regional",
+        dollarsPerkWh: 0.05,
+      }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -412,7 +558,11 @@ it("sizes a starting grid for the setup it opens with", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: 4242 }}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        startingFleetSource: "regional",
+        seed: 4242,
+      }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -479,7 +629,11 @@ it("only shares a custom setup once the starting grid has settled", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, seed: 4242 }}
+      scenario={{
+        ...DEFAULT_CUSTOM_SCENARIO,
+        startingFleetSource: "regional",
+        seed: 4242,
+      }}
       coop={{
         role: "host",
         hostName: "Ada",
@@ -522,13 +676,14 @@ it("sizes the grid again when its customers, era or place change", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...SIZED }}
+      scenario={{ ...SIZED, startingFleetSource: "regional" }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={jest.fn()}
     />,
   );
   expect(fleetWorker.postMessage).not.toHaveBeenCalled();
+  answerFleet();
 
   fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
     target: { value: 2000000 },
@@ -564,7 +719,39 @@ it("sizes the grid again when its customers, era or place change", () => {
   ).toBeInTheDocument();
 });
 
-it("leaves a fleet the player built alone, until the grid it serves changes", () => {
+it.each([
+  { peakW: 25_000_000, valid: true },
+  { peakW: 10_000_000_000_000, valid: false },
+])(
+  "recalls a manual single peaker with its saved $peakW W capacity",
+  ({ peakW, valid }) => {
+    jest.useFakeTimers();
+    const onStart = jest.fn();
+    const facility = { name: "Natural Gas Peaker", peakW, initialAgeYears: 7 };
+    render(
+      <CustomGame
+        game={createGame({ scenarioId: 100 })}
+        scenario={{ ...DEFAULT_CUSTOM_SCENARIO, facilities: [facility] }}
+        onBack={jest.fn()}
+        onDelta={jest.fn()}
+        onStart={onStart}
+      />,
+    );
+    act(() => jest.advanceTimersByTime(300));
+    expect(mockCreateFleetWorker).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Remove Natural Gas Peaker" }),
+    ).toBeVisible();
+    const play = screen.getByRole("button", { name: "Start game" });
+    expect(play).toHaveProperty("disabled", !valid);
+    fireEvent.click(play);
+    expect(onStart.mock.calls.map(([scenario]) => scenario.facilities)).toEqual(
+      valid ? [[facility]] : [],
+    );
+  },
+);
+
+it("preserves a manually edited fleet until the player requests the regional blend", () => {
   jest.useFakeTimers();
   render(
     <CustomGame
@@ -590,10 +777,16 @@ it("leaves a fleet the player built alone, until the grid it serves changes", ()
     screen.getByRole("button", { name: "Remove Natural Gas CC" }),
   ).toBeInTheDocument();
 
-  // A different grid needs a different fleet, so the hand-built one gives way.
+  // A manual fleet remains editable as the grid grows.
   fireEvent.change(screen.getByRole("slider", { name: "Starting customers" }), {
     target: { value: 1500000 },
   });
+  act(() => jest.advanceTimersByTime(1000));
+  expect(fleetWorker.postMessage).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "Remove Natural Gas CC" }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Use regional fleet" }));
   expect(
     screen.getByRole("combobox", { name: "Facility type" }),
   ).toHaveAttribute("aria-disabled", "true");
@@ -613,7 +806,7 @@ it("keeps the fleet and Play available when sizing fails", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...DEFAULT_CUSTOM_SCENARIO }}
+      scenario={{ ...DEFAULT_CUSTOM_SCENARIO, startingFleetSource: "regional" }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}
@@ -654,7 +847,7 @@ it("commits the complete location object when a map marker is selected", () => {
   render(
     <CustomGame
       game={createGame({ scenarioId: 100 })}
-      scenario={{ ...SIZED }}
+      scenario={{ ...SIZED, startingFleetSource: "regional" }}
       onBack={jest.fn()}
       onDelta={jest.fn()}
       onStart={onStart}

@@ -13,6 +13,9 @@ const clock = (page: Page) =>
   page.locator(".multiplayerSpeedToggles:visible").last();
 
 async function enter(page: Page) {
+  // Both 3D maps stay live while the test drives the clocks, saves and relay.
+  // Reduced motion keeps decorative animation from competing with those operations.
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await mainEntry(page).click();
   await expect(lobby(page)).toBeVisible();

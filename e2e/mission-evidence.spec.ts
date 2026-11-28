@@ -1,7 +1,7 @@
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import path from "path";
 import { expect, test, type Page } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openPane, openBuild, openFleet } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 
 const reviewProjects = new Set([
@@ -315,6 +315,7 @@ for (const theme of ["light", "dark"]) {
     await expect(
       page.getByRole("button", { name: "Scenario", exact: true }),
     ).toBeFocused();
+    await openFleet(page);
     await page
       .getByRole("button", { name: "Inspect Coal", exact: true })
       .click();
@@ -333,13 +334,9 @@ for (const theme of ["light", "dark"]) {
       await expect(page.locator("#chartSupplyDemand")).toBeVisible();
     }
     if (info.project.name.startsWith("mobile")) {
-      // Facilities is the base layer: closing the open tool returns to it.
-      for (const nav of ["Insights", "Events", "Facilities"]) {
-        if (nav === "Facilities")
-          await openPane(
-            page.locator(".facilities"),
-            page.locator("#faciltiesNav"),
-          );
+      // Closing the open tool returns to the selected Fleet view.
+      for (const nav of ["Insights", "Events", "Fleet"]) {
+        if (nav === "Fleet") await openFleet(page);
         else await page.getByRole("button", { name: nav, exact: true }).click();
         await settle(page);
         await expect(page.locator(".missionSummary:visible")).toContainText(
@@ -508,13 +505,16 @@ test("projected sample evidence and a deliberate purchase retain the bounded inv
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.locator(".missionSummary:visible")).toBeVisible();
-  await page.getByRole("button", { name: "Inspect Coal", exact: true }).click();
-  await page.getByRole("button", { name: "Pause Coal", exact: true }).click();
+  const fleet = await openFleet(page);
+  await fleet
+    .getByRole("button", { name: "Inspect Coal", exact: true })
+    .click();
+  await fleet.getByRole("button", { name: "Pause Coal", exact: true }).click();
   // The pause confirmation can cover Resume on phones, and MUI keeps it open on hover.
   // Release the pointer and wait for it to clear before acting on the row beneath it.
   await page.mouse.move(0, 0);
   await expect(page.locator(".snackbarContent")).toBeHidden();
-  await page.getByRole("button", { name: "Resume Coal", exact: true }).click();
+  await fleet.getByRole("button", { name: "Resume Coal", exact: true }).click();
   // A future shortfall stays explicit without replacing the current reserve.
   const grid = page.locator(".gridHealth:visible");
   await expect(grid).not.toHaveClass(/gridHealth-blackout/);

@@ -7,6 +7,14 @@ six-character code so friends can join directly. The host can remove a player
 before the game starts. Each player keeps their company for the campaign.
 After hosting, existing campaigns can be resumed with **Load multiplayer save**.
 
+New campaigns put all companies on the same 3D regional map. Each company
+starts at its own headquarters with land for its opening fleet. Claim neutral
+land next to your existing property to open more build sites. You can inspect
+other companies' property and plants on the map. Once two companies share a
+border, both must approve and fund an intertie. After construction, the link
+carries trades according to each company's buying and selling policies and
+its available capacity.
+
 Any player can host. The host's device runs the simulation and each guest's
 device replays the records to produce its own views. Backgrounding or losing a
 required device pauses play. If the host lease expires, an original player can

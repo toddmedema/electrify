@@ -1,3 +1,5 @@
+import { generatorMaxPeakW } from "../data/FacilityCapacity";
+import { COOP_CUSTOM_FACILITY_LIMIT } from "../Constants";
 import { DEFAULT_CUSTOM_SCENARIO } from "../data/Scenarios";
 import { getSimLocation, loadSimData } from "../testing/SimData";
 import { forecastCustomGameYearOne } from "./CustomGameForecast";
@@ -95,5 +97,11 @@ it.each([
     // initGame silently drops a starting plant its catalog cannot match, which would leave the
     // setup screen listing a plant the player never receives.
     expect(game.facilities).toHaveLength(facilities.length);
+    expect(facilities.length).toBeLessThanOrEqual(COOP_CUSTOM_FACILITY_LIMIT);
+    for (const facility of facilities.filter((plant) => !plant.hydroSiteId)) {
+      expect(facility.peakW).toBeLessThanOrEqual(
+        generatorMaxPeakW(game, facility.name!),
+      );
+    }
   },
 );

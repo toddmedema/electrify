@@ -2,7 +2,7 @@ import { reviewScreenshot } from "./review-screenshot";
 import path from "path";
 import { expect, Page, test } from "./fixtures";
 import { TICK_MS } from "../src/Constants";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { getDateFromMinute } from "../src/helpers/DateTime";
 
@@ -65,10 +65,7 @@ for (const theme of ["light", "dark"]) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const chart = pane.locator("#chartSupplyDemand");
     await expect(chart.getByRole("img")).toHaveAccessibleName(
       /Unfilled gaps .* unused surplus/,
@@ -157,10 +154,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const chart = pane.locator("#chartSupplyDemand");
     const ribbon = chart.locator(".dayNightRibbon");
     await expect(ribbon).toBeVisible();
@@ -218,10 +212,7 @@ for (const theme of ["light", "dark"]) {
     if (info.project.name === "desktop-chromium") {
       for (const width of [1299, 1330, 1500]) {
         await page.setViewportSize({ width, height: 800 });
-        await openPane(
-          pane,
-          page.getByRole("button", { name: "Facilities", exact: true }),
-        );
+        await openFleet(page);
         await expect(aligned).toPass();
       }
       await openBuild(page);
@@ -247,11 +238,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    const navigation = page.getByRole("button", {
-      name: "Facilities",
-      exact: true,
-    });
-    await openPane(pane, navigation);
+    await openFleet(page);
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();
     await page
@@ -270,7 +257,7 @@ for (const theme of ["light", "dark"]) {
     });
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    await openPane(pane, navigation);
+    await openFleet(page);
     await pane
       .getByRole("button", { name: "Inspect Natural Gas CC", exact: true })
       .click();
@@ -516,10 +503,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const chart = pane.locator("#chartSupplyDemand");
     await expect(chart.locator("canvas")).toBeVisible();
     await expect(
@@ -602,15 +586,11 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const pane = page.locator(".facilities:visible");
-  const navigation = page.getByRole("button", {
-    name: "Facilities",
-    exact: true,
-  });
   const speed = page.locator("#appbar:visible");
   await expect(
     speed.getByRole("button", { name: "pause", exact: true }).first(),
   ).toHaveAttribute("aria-pressed", "true");
-  await openPane(pane, navigation);
+  await openFleet(page);
   await openBuild(page);
   await page.getByRole("tab", { name: "Interties", exact: true }).click();
   await page
@@ -633,7 +613,7 @@ test("blackout periods remain visible when imports supplement fuel production", 
   await expect(
     speed.getByRole("button", { name: "pause", exact: true }).first(),
   ).toHaveAttribute("aria-pressed", "true");
-  await openPane(pane, navigation);
+  await openFleet(page);
   for (const name of ["Natural Gas CC", "Nuclear"]) {
     await pane
       .getByRole("button", { name: `Inspect ${name}`, exact: true })
@@ -732,10 +712,7 @@ test("a full fuel mix and concurrent flows retain readable source keys on narrow
   await page.reload();
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   const pane = page.locator(".facilities:visible");
-  await openPane(
-    pane,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   const chart = pane.locator("#chartSupplyDemand");
   await expect(chart.locator(".chartLegendItem")).toHaveCount(5);
   const legendBounds = (await chart.locator(".chartLegend").boundingBox())!;
@@ -796,10 +773,7 @@ for (const theme of ["light", "dark"]) {
     await page.reload();
     await page.getByRole("button", { name: "Continue", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const chart = pane.locator("#chartSupplyDemand");
     const over = chart.locator(".u-over");
     await expect(over).toBeVisible();

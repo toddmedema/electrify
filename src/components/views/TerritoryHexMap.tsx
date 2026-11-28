@@ -37,6 +37,7 @@ import {
   needsSubmergedCable,
 } from "../base/FacilityMapStatus";
 import useFacilityMapMotion from "../base/useFacilityMapMotion";
+import { useMapCovered } from "../base/WorkspaceMapRendering";
 import FacilityMapStatusArtwork from "../base/FacilityMapStatusArtwork";
 import MapStatusLayers from "../base/MapStatusLayers";
 import { useToolState } from "../base/GameToolMemory";
@@ -51,6 +52,7 @@ import {
   hexFacePath,
   hexWires,
   foregroundOrigin,
+  type HexWire,
 } from "../base/TerritoryHexGeometry";
 import {
   TERRITORY_OWNER_PALETTE,
@@ -118,7 +120,7 @@ function sameTile(a: TerritoryTileView["tile"], b: TerritoryTileView["tile"]) {
       a.r === b.r &&
       a.terrain === b.terrain &&
       (a.city
-        ? a.city.size === b.city?.size
+        ? a.city.size === b.city?.size && a.city.name === b.city.name
         : !b.city &&
           a.siteKind === b.siteKind &&
           a.maxPeakW === b.maxPeakW &&
@@ -142,6 +144,7 @@ export interface MapTileMenuTarget {
 interface Props {
   game: GameType;
   views: readonly TerritoryTileView[];
+  regional?: boolean;
   selected?: TerritoryMapTileKey;
   inspected?: TerritoryMapTileKey;
   onSelect: (id: TerritoryMapTileKey, inspect?: boolean) => void;
@@ -159,6 +162,7 @@ interface Props {
 export default function TerritoryHexMap({
   game,
   views,
+  regional = false,
   selected,
   inspected,
   onSelect,
@@ -173,6 +177,7 @@ export default function TerritoryHexMap({
   onProjectDrop,
   projectWindOutput,
 }: Props) {
+  const territorial = game.multiplayer?.territorial;
   const showingProjectSites = projectPlanning || !!onProjectDrop;
   const mapId = React.useId();
   const workspace = useGameWorkspaceLayout();
@@ -182,7 +187,8 @@ export default function TerritoryHexMap({
     RendererState | "failed"
   >(webGLAvailable ? "loading" : "unavailable");
   const threeDReady = rendererState === "ready";
-  const motion = useFacilityMapMotion(game.speed);
+  const covered = useMapCovered();
+  const motion = useFacilityMapMotion(game.speed, covered);
   const weather = React.useMemo(() => readMapWeather(game), [game]);
   const now = currentTick(game);
   const cityService =
@@ -195,7 +201,7 @@ export default function TerritoryHexMap({
   const runId = useAppSelector((state) => state.ui?.evidenceRunId);
   const { formatPurchasePrice: money } = useMoney();
   const { pendingIds, availableCash, message, purchase } =
-    useTerritoryTilePurchases();
+    useTerritoryTilePurchases(!regional);
   const [buyMode, setBuyMode] = React.useState(false);
   const [showStatusLayer, setShowStatusLayer] = useToolState(
     "network.showStatusLayer",
@@ -227,6 +233,7 @@ export default function TerritoryHexMap({
   } = game;
   const cityGrowth = React.useMemo(() => {
     const growth = new Map<TerritoryId, readonly CityGrowthSector[]>();
+    if (regional) return growth;
     for (const tile of tiles) {
       if (!tile.city) continue;
       const sectors = cityGrowthAt(
@@ -237,7 +244,7 @@ export default function TerritoryHexMap({
       if (sectors.length) growth.set(tile.territoryId, sectors);
     }
     return growth;
-  }, [tiles, seed, startingYear, location, year]);
+  }, [tiles, seed, startingYear, location, year, regional]);
   const byKey = React.useMemo(
     () => new Map(views.map((view) => [territoryMapTileKey(view.tile), view])),
     [views],
@@ -717,8 +724,34 @@ export default function TerritoryHexMap({
   );
   const color = (id: string) => territoryOwnerColor(id, peerColors);
   const ownColor = couchPlayerColor(game.multiplayer?.seat, mode);
+  const seatIndex = territorial?.seatIndex;
+  // Replicas keep peers in seat order. Use that order so company colors agree across views.
+  const orderedPeers = useStableArray(
+    game.multiplayer?.peers?.map(({ id }) => id) ?? [],
+    (a, b) => a === b,
+  );
   const ownerPalette = React.useMemo(() => {
     const palette = TERRITORY_OWNER_PALETTE[mode];
+    if (seatIndex !== undefined) {
+      const colors = [
+        palette["--territory-owner-you"],
+        palette["--territory-owner-peer-0"],
+        palette["--territory-owner-peer-1"],
+        palette["--territory-owner-peer-2"],
+      ];
+      const sharedPalette: Record<string, string> = {
+        ...palette,
+        "--territory-owner-you": ownColor ?? colors[seatIndex],
+      };
+      orderedPeers.forEach((id, index) => {
+        const variable = peerColors[id];
+        if (!variable) return;
+        sharedPalette[variable.slice(4, -1)] =
+          couchPlayerColor(id, mode) ??
+          colors[index >= seatIndex ? index + 1 : index];
+      });
+      return sharedPalette;
+    }
     if (!ownColor) return palette;
     // Both the SVG overlay and the 3D borders resolve these same palette variables.
     const couchPalette: Record<string, string> = {
@@ -730,7 +763,7 @@ export default function TerritoryHexMap({
       if (peerColor) couchPalette[variable.slice(4, -1)] = peerColor;
     }
     return couchPalette;
-  }, [mode, ownColor, peerColors]);
+  }, [mode, orderedPeers, ownColor, peerColors, seatIndex]);
   const tileHover = (view: TerritoryTileView) => {
     const { tile } = view;
     const unavailable = (reason: string) => ({
@@ -741,6 +774,13 @@ export default function TerritoryHexMap({
       color: "var(--interactive-blue)",
       reason,
     });
+    if (regional && !territorial) return available("");
+    if (territorial) {
+      return {
+        color: view.ownerKey ? color(view.ownerKey) : "var(--interactive-blue)",
+        reason: "",
+      };
+    }
     if (buyMode && !showingProjectSites && view.connectable)
       return available("");
     if (showingProjectSites && projectSites?.has(territoryMapTileKey(tile)))
@@ -759,21 +799,42 @@ export default function TerritoryHexMap({
       return unavailable("No compatible technology");
     return !view.owned && !view.connectable ? unavailable("") : available("");
   };
+  const activeInterties = useStableArray(
+    territorial
+      ? (game.multiplayer?.peers ?? []).flatMap<HexWire<TerritoryMapTileKey>>(
+          ({ connected, corridor, endpoints }) =>
+            connected && endpoints
+              ? [
+                  {
+                    id: corridor.id,
+                    from: endpoints.here,
+                    to: endpoints.there,
+                    kind: "overhead",
+                  },
+                ]
+              : [],
+        )
+      : [],
+    (a, b) => a.id === b.id && a.from === b.from && a.to === b.to,
+  );
   const allWires = React.useMemo(() => {
     const index = new Map(
       topology.map((view) => [territoryMapTileKey(view.tile), view]),
     );
-    return hexWires(
-      tiles.map((tile) => ({
-        q: tile.q,
-        r: tile.r,
-        id: territoryMapTileKey(tile),
-      })),
-      (tile) => !!index.get(tile.id)?.developed,
-      (a, b) => index.get(a.id)?.ownerKey === index.get(b.id)?.ownerKey,
-      (tile) => !!index.get(tile.id)?.submerged,
-    );
-  }, [tiles, topology]);
+    return [
+      ...hexWires(
+        tiles.map((tile) => ({
+          q: tile.q,
+          r: tile.r,
+          id: territoryMapTileKey(tile),
+        })),
+        (tile) => !!index.get(tile.id)?.developed,
+        (a, b) => index.get(a.id)?.ownerKey === index.get(b.id)?.ownerKey,
+        (tile) => !!index.get(tile.id)?.submerged,
+      ),
+      ...activeInterties,
+    ];
+  }, [activeInterties, tiles, topology]);
   const selectedTile = React.useMemo(
     () => tiles.find((tile) => territoryMapTileKey(tile) === activeSelected),
     [tiles, activeSelected],
@@ -998,7 +1059,12 @@ export default function TerritoryHexMap({
       className="territoryMap"
       data-buy-mode={buyMode}
       data-renderer={rendererState}
-      aria-label="Terrain, structures and utility ownership"
+      data-live-peer-links={territorial ? activeInterties.length : undefined}
+      aria-label={
+        regional
+          ? "Terrain and grid facilities"
+          : "Terrain, structures and utility ownership"
+      }
       style={ownerPalette as MapStyle}
     >
       <MapStatusLayers
@@ -1007,62 +1073,66 @@ export default function TerritoryHexMap({
         showNames={showNames}
         onNamesChange={setShowNames}
       />
-      <Tooltip
-        title={
-          buyMode
-            ? "Rapid connection mode is on · Select again to exit."
-            : "Rapid connection mode · Show connection prices."
-        }
-        placement="top"
-        arrow
-      >
-        <button
-          type="button"
-          className="territoryMapControl territoryMapBuyToggle"
-          ref={buyingControl}
-          aria-label="Rapid connection mode"
-          aria-pressed={buyMode}
-          aria-disabled={projectPending || undefined}
-          aria-describedby={`${mapId}-buy-status`}
-          onClick={() => {
-            if (projectPending) return;
-            if (projectPlanning) onDeselect?.();
-            setBuyMode((value) => !value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== "ArrowUp") return;
-            const entry = stage.current?.querySelector<HTMLButtonElement>(
-              "[data-map-target][tabindex='0']",
-            );
-            if (!entry) return;
-            event.preventDefault();
-            entry.focus({ preventScroll: true });
-          }}
-        >
-          <RapidConnectionIcon aria-hidden="true" />
-        </button>
-      </Tooltip>
-      <span
-        className="srOnly"
-        id={`${mapId}-buy-status`}
-        role="status"
-        aria-label="Rapid connection instructions"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {buyMode
-          ? "Rapid connection mode is on. Select a priced site to pay the displayed connection cost."
-          : ""}
-      </span>
-      <span
-        className="srOnly"
-        role="status"
-        aria-label="Connection result"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {message}
-      </span>
+      {!regional && (
+        <>
+          <Tooltip
+            title={
+              buyMode
+                ? "Rapid connection mode is on · Select again to exit."
+                : "Rapid connection mode · Show connection prices."
+            }
+            placement="top"
+            arrow
+          >
+            <button
+              type="button"
+              className="territoryMapControl territoryMapBuyToggle"
+              ref={buyingControl}
+              aria-label="Rapid connection mode"
+              aria-pressed={buyMode}
+              aria-disabled={projectPending || undefined}
+              aria-describedby={`${mapId}-buy-status`}
+              onClick={() => {
+                if (projectPending) return;
+                if (projectPlanning) onDeselect?.();
+                setBuyMode((value) => !value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowUp") return;
+                const entry = stage.current?.querySelector<HTMLButtonElement>(
+                  "[data-map-target][tabindex='0']",
+                );
+                if (!entry) return;
+                event.preventDefault();
+                entry.focus({ preventScroll: true });
+              }}
+            >
+              <RapidConnectionIcon aria-hidden="true" />
+            </button>
+          </Tooltip>
+          <span
+            className="srOnly"
+            id={`${mapId}-buy-status`}
+            role="status"
+            aria-label="Rapid connection instructions"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {buyMode
+              ? "Rapid connection mode is on. Select a priced site to pay the displayed connection cost."
+              : ""}
+          </span>
+          <span
+            className="srOnly"
+            role="status"
+            aria-label="Connection result"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            {message}
+          </span>
+        </>
+      )}
       {rendererState !== "ready" && (
         <div className="territoryRendererMessage">
           <span role="status" aria-label="3D map">
@@ -1078,7 +1148,13 @@ export default function TerritoryHexMap({
       <div
         className="territoryMapViewport"
         role="region"
-        aria-label="Territory map"
+        aria-label={
+          territorial
+            ? "Territorial map"
+            : regional
+              ? "Regional map"
+              : "Territory map"
+        }
         data-camera-scale={scale}
         ref={viewport}
         onDragOver={(event) => {
@@ -1283,7 +1359,7 @@ export default function TerritoryHexMap({
                   dpr: window.devicePixelRatio || 1,
                   background: dark ? [0.035, 0.055, 0.07] : [0.86, 0.9, 0.9],
                   cityService,
-                  visible: size.width > 0 && size.height > 0,
+                  visible: !covered && size.width > 0 && size.height > 0,
                   motionAllowed: motion.allowed,
                   playbackRate: motion.rate,
                   weather,
@@ -1295,6 +1371,31 @@ export default function TerritoryHexMap({
         )}
         <WeatherAtmosphere weather={weather} motion={motion} dark={dark} />
         <div className="territoryMapStage" ref={stage}>
+          {!threeDReady && activeInterties.length > 0 && (
+            <svg className="territoryFacilityStatusLayer" aria-hidden="true">
+              <g transform={`scale(${scale})`}>
+                {activeInterties.map(({ id, from, to }) => {
+                  const start = byKey.get(from)?.tile;
+                  const end = byKey.get(to)?.tile;
+                  if (!start || !end) return null;
+                  const a = hexCenter(start);
+                  const b = hexCenter(end);
+                  return (
+                    <line
+                      key={id}
+                      x1={a.x}
+                      y1={a.y}
+                      x2={b.x}
+                      y2={b.y}
+                      stroke="var(--font-color-primary)"
+                      strokeWidth={4}
+                      strokeDasharray="6 3"
+                    />
+                  );
+                })}
+              </g>
+            </svg>
+          )}
           {showStatusLayer && (
             <svg className="territoryFacilityStatusLayer" aria-hidden="true">
               <g transform={`scale(${scale})`}>
@@ -1354,9 +1455,13 @@ export default function TerritoryHexMap({
             const hover = tileHover(view);
             const pending = pendingIds.has(tile.id);
             const unaffordable = !!quote && quote.price > availableCash;
-            const label = utility
-              ? `Inspect ${view.owned ? "You" : view.ownerName} territory${cityLabel ? ` · ${cityLabel}` : ""}`
-              : `Inspect ${territoryTileLabel(tile)}`;
+            const label = territorial
+              ? `Inspect ${facility?.name ?? cityLabel ?? TERRAIN_LABELS[tile.terrain]} · ${view.ownerKey ? view.ownerName : "Unclaimed territory"}`
+              : regional
+                ? `Inspect ${facility?.name ?? cityLabel ?? TERRAIN_LABELS[tile.terrain]} on map`
+                : utility
+                  ? `Inspect ${view.owned ? "You" : view.ownerName} territory${cityLabel ? ` · ${cityLabel}` : ""}`
+                  : `Inspect ${territoryTileLabel(tile)}`;
             const outputFactor = projectWindOutput?.[tile.terrain] ?? 1;
             const outputModifier =
               Math.abs(outputFactor - 1) >= 0.005
@@ -1371,6 +1476,7 @@ export default function TerritoryHexMap({
               growth &&
                 `New buildings: ${growth.map((sector) => CITY_GROWTH_LABEL[sector]).join(", ")}`,
               facility?.name,
+              view.buildSite ? "Connected site" : undefined,
               status?.kind === "unknown" ? undefined : status?.label,
               view.connection &&
                 tileConnectionLabel(view.connection, game.date.minute),
@@ -1383,7 +1489,9 @@ export default function TerritoryHexMap({
               .filter(Boolean)
               .join(" · ");
             const unconnected =
-              !view.owned && !view.ownerKey ? "Unconnected" : undefined;
+              !regional && !view.owned && !view.ownerKey
+                ? "Unconnected"
+                : undefined;
             const tileDescription = [
               terrainAndStatus,
               unconnected,
@@ -1417,7 +1525,7 @@ export default function TerritoryHexMap({
                 data-terrain={tile.terrain}
                 data-ground-condition={disaster?.ground}
                 data-municipal-city={
-                  tile.city && isLandTerritoryId(tile.territoryId)
+                  !regional && tile.city && isLandTerritoryId(tile.territoryId)
                 }
                 data-project-site={
                   projectSite
@@ -1426,7 +1534,16 @@ export default function TerritoryHexMap({
                       : "connection"
                     : undefined
                 }
-                data-purchasable={!!quote}
+                data-purchasable={territorial ? !!view.connectable : !!quote}
+                data-build-site={
+                  view.buildSite ||
+                  (territorial &&
+                    view.owned &&
+                    !facility &&
+                    !view.reserved &&
+                    tileHasConstructionTechnology(tile)) ||
+                  undefined
+                }
                 data-unaffordable={unaffordable}
                 data-tooltip={tileTooltip}
                 aria-busy={pending || undefined}
@@ -1535,7 +1652,7 @@ export default function TerritoryHexMap({
                                 : undefined
                           }
                         >
-                          {view.owned ? "You" : view.ownerName}
+                          {view.owned && !regional ? "You" : view.ownerName}
                         </CouchPlayerText>
                       </span>
                     )}

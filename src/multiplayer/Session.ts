@@ -24,6 +24,7 @@ import type {
   ReplicaResponse,
 } from "./ReplicaProtocol";
 import type { WorkerRequest, WorkerResponse } from "./WorkerProtocol";
+import { newMatchSpec } from "./WorkerProtocol";
 import {
   selectionKey,
   validBrowseState,
@@ -1668,7 +1669,7 @@ export class MultiplayerSession {
             }
           : {
               kind: "create",
-              spec: (choice as { spec: MatchSpec }).spec,
+              spec: newMatchSpec((choice as { spec: MatchSpec }).spec),
               seats,
               matchId: crypto.randomUUID(),
               epoch,

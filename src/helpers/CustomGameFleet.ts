@@ -2,10 +2,11 @@ import { getDateFromMinute } from "./DateTime";
 import { getStartingCustomers } from "../data/LocationProfiles";
 import { getStartingFacilityAge } from "../data/StartingFacilityAges";
 import { forecastCustomGameTimeline } from "./CustomGameForecast";
+import { DATA_CENTER_DIFFICULTY } from "./DataCenterScenario";
 import {
-  DATA_CENTER_DIFFICULTY,
-  regionalStartingFleet,
-} from "./DataCenterScenario";
+  allocateCalibratedFleet,
+  withRegionalStartingFleet,
+} from "./RegionalStartingFleet";
 import { getScenarioLocation } from "./Locations";
 import { roundToSignificantDigits } from "./Math";
 import { startingFacilityQuote } from "./StartingFacilities";
@@ -68,14 +69,12 @@ export function sizeCustomGameFleet(
     customScenario: scenario,
     location,
   } as unknown as GameType;
-  const available = regionalStartingFleet(
-    location,
-    startingYear,
-    customers * (scenario.startingDemandScale || 1),
-  ).flatMap((facility): ScenarioFacilityType[] => {
-    const quote = startingFacilityQuote(state, facility);
-    return quote ? [{ ...facility, name: quote.name }] : [];
-  });
+  const available = withRegionalStartingFleet(scenario).facilities.flatMap(
+    (facility): ScenarioFacilityType[] => {
+      const quote = startingFacilityQuote(state, facility);
+      return quote ? [{ ...facility, name: quote.name }] : [];
+    },
+  );
   const reserveName = RESERVE_PLANTS.find((name) =>
     startingFacilityQuote(state, { name, peakW: 1000000 }),
   );
@@ -105,6 +104,7 @@ export function sizeCustomGameFleet(
     (candidate) =>
       forecastCustomGameTimeline(candidate, FLEET_DIFFICULTY, seed),
     reserve,
+    (facilities) => allocateCalibratedFleet(facilities, location, startingYear),
   ).map((facility) => ({
     ...facility,
     // A plant is built to two significant digits, so show the size it will have.

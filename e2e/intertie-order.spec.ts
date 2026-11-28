@@ -1,6 +1,6 @@
 import { reviewScreenshot } from "./review-screenshot";
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`interties support keyboard and pointer trading reordering in ${theme}`, async ({
@@ -13,10 +13,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const speed = page.getByRole("group", { name: "game speed" });
     await speed.getByRole("button", { name: "pause", exact: true }).click();
 
@@ -32,10 +29,7 @@ for (const theme of ["light", "dark"] as const) {
         .getByRole("dialog")
         .getByRole("button", { name: "Take loan", exact: true })
         .click();
-      await openPane(
-        pane,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
     }
     // The approval toast can cover a row on phones. Keep the pointer away so it dismisses.
     await page.mouse.move(0, 0);

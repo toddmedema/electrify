@@ -1,7 +1,13 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, Page, test } from "./fixtures";
-import { openBuild, openMapProjectCatalogue, openPane } from "./layout";
+import {
+  openBuild,
+  openFleet,
+  openMapProjectCatalogue,
+  openPane,
+  returnToTerritoryMap,
+} from "./layout";
 import { readShotRequest, ShotRequest } from "./shot-request";
 
 // Runner for `npm run shot`; see scripts/dev/shot.js. It starts the game and opens panes with
@@ -16,14 +22,23 @@ const TOOL_LABELS = {
 } as const;
 
 async function openView(page: Page, view: ShotRequest["view"]) {
-  if (view === "facilities")
-    await openPane(
-      page.locator(".facilities:visible"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
-  else if (view === "build") {
-    if (await page.locator(".gameWorkspace[data-persistent-map]").count())
-      await openMapProjectCatalogue(page);
+  const territoryWorkspace = page.locator(
+    '.gameWorkspace[data-persistent-map="true"]',
+  );
+  if (view === "facilities") {
+    await expect(page.locator(".gameWorkspace")).toBeVisible();
+    if (await territoryWorkspace.count()) await returnToTerritoryMap(page);
+    else await openFleet(page);
+  } else if (view === "map") {
+    const map = page.getByRole("region", {
+      name: /^(Regional|Territory) map workspace$/,
+    });
+    const selectMap = page.getByRole("button", { name: "Map", exact: true });
+    await expect(map.or(selectMap).first()).toBeVisible();
+    if (!(await map.isVisible())) await selectMap.click();
+    await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+  } else if (view === "build") {
+    if (await territoryWorkspace.count()) await openMapProjectCatalogue(page);
     else await openBuild(page);
   } else {
     const label = TOOL_LABELS[view];

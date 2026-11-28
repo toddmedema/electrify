@@ -306,13 +306,7 @@ export default function GridStatus({
             {(openFleet || externalPowerAction) && (
               <div className="gridStatusSecondaryActions">
                 {openFleet && (
-                  <Button
-                    onClick={() =>
-                      navigate(() =>
-                        openFleet(territoryNetwork ? "FLEET" : "FACILITIES"),
-                      )
-                    }
-                  >
+                  <Button onClick={() => navigate(() => openFleet("FLEET"))}>
                     Manage fleet
                   </Button>
                 )}

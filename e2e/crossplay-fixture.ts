@@ -242,10 +242,10 @@ interface SimulationBridge {
     destination: number,
     bytes: number[],
   ): Promise<void>;
-  receiveCrossplayFrame?(
+  receiveCrossplayFrames?(
     source: number,
     destination: number,
-    bytes: ArrayBuffer,
+    frames: string[],
   ): void;
   closeCrossplayPeer?(remotePorts: number[]): void;
 }
@@ -427,10 +427,24 @@ async function installWebRtcSimulation(page: Page, address: string) {
       if (peer?.remotePort === remote) peer.open();
     };
 
-    bridge.receiveCrossplayFrame = (source, destination, data) => {
-      const peer = connections.get(destination);
-      if (peer?.remotePort === source && peer.channel?.readyState !== "closed")
-        peer.channel?.onmessage?.({ data });
+    bridge.receiveCrossplayFrames = (source, destination, frames) => {
+      for (const frame of frames) {
+        const peer = connections.get(destination);
+        if (
+          peer?.remotePort !== source ||
+          peer.channel?.readyState === "closed"
+        )
+          continue;
+        try {
+          const data = Uint8Array.from(atob(frame), (char) =>
+            char.charCodeAt(0),
+          ).buffer;
+          peer.channel?.onmessage?.({ data });
+        } catch (error) {
+          // A thrown message handler must not discard the rest of the batch.
+          window.reportError(error);
+        }
+      }
     };
 
     bridge.closeCrossplayPeer = (remotePorts) => {
@@ -613,7 +627,7 @@ export function crossplayFixture() {
     Page,
     Awaited<ReturnType<ReturnType<Page["context"]>["newCDPSession"]>>
   >();
-  const wireQueue = new Map<number, Promise<unknown>>();
+  const wireQueues = new Map<string, string[]>();
   const offline = new Set<Page>();
   const lostAuthority = new Set<Page>();
   const bucket = storageFixture();
@@ -1137,16 +1151,26 @@ export function crossplayFixture() {
           )
             return;
           const payload = Buffer.from(data).toString("base64");
-          const send = (wireQueue.get(source) ?? Promise.resolve()).then(() =>
-            bridges.get(recipient)?.send("Runtime.evaluate", {
-              expression: `window.receiveCrossplayFrame?.(${source}, ${destination}, Uint8Array.from(atob(${JSON.stringify(payload)}), char => char.charCodeAt(0)).buffer)`,
-            }),
-          );
-          wireQueue.set(
-            source,
-            send.catch(() => {}),
-          );
-          await send;
+          const key = `${source}:${destination}`;
+          const pending = wireQueues.get(key);
+          if (pending) {
+            pending.push(payload);
+            return;
+          }
+          const queue = [payload];
+          wireQueues.set(key, queue);
+          try {
+            // Keep the channel ordered while a slow renderer is evaluating a
+            // delivery. Send all waiting frames in the next CDP round trip.
+            while (queue.length) {
+              const frames = queue.splice(0);
+              await bridges.get(recipient)?.send("Runtime.evaluate", {
+                expression: `window.receiveCrossplayFrames?.(${source}, ${destination}, ${JSON.stringify(frames)})`,
+              });
+            }
+          } finally {
+            wireQueues.delete(key);
+          }
         },
       );
       await installWebRtcSimulation(page, relayAddress);

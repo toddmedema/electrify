@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`unified facilities stay compact and disclose controls in ${theme}`, async ({
@@ -17,10 +17,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const rows = pane.locator(".facilityRow");
     const chart = pane.locator("#chartSupplyDemand");
     const phone = testInfo.project.name.startsWith("mobile-");

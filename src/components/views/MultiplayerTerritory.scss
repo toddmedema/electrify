@@ -1,0 +1,48 @@
+.multiplayerTileDetails {
+  display: grid;
+  gap: 8px;
+
+  > .MuiButton-root {
+    justify-self: start;
+    min-height: 40px;
+    max-width: 100%;
+    text-align: start;
+  }
+}
+
+.multiplayerAgreements {
+  display: grid;
+  gap: 16px;
+
+  > section {
+    min-width: 0;
+  }
+}
+
+.multiplayerPeerAgreement {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 12px;
+
+  > h3 {
+    overflow-wrap: anywhere;
+  }
+
+  > .MuiButton-root {
+    justify-self: start;
+    min-height: 40px;
+    max-width: 100%;
+    margin-top: 4px;
+    text-align: start;
+  }
+}
+
+@media (pointer: coarse) {
+  .multiplayerTileDetails,
+  .multiplayerPeerAgreement {
+    > .MuiButton-root {
+      min-height: 44px;
+    }
+  }
+}

@@ -22,24 +22,29 @@ export function sizeStartingFleet(
   forecast: (scenario: ScenarioType) => readonly TickPresentFutureType[],
   /** The firm plant that makes up a shortfall nothing in the blend can cover. */
   reservePlant: (shortfallW: number) => ScenarioFacilityType,
+  prepareFleet: (
+    facilities: ScenarioFacilityType[],
+  ) => ScenarioFacilityType[] = (facilities) => facilities,
 ): ScenarioFacilityType[] {
   const baseFacilities = [...scenario.facilities];
   const sized = (factor: number): ScenarioType => ({
     ...scenario,
     startingDemandScale:
       (scenario.startingDemandScale || 1) * (1 + SUPPLY_MARGIN),
-    facilities: baseFacilities.map((facility) => ({
-      ...facility,
-      peakW: Math.max(
-        1,
-        Math.min(
-          Math.ceil((facility.peakW || 0) * factor),
-          facility.hydroSiteId
-            ? HYDRO_SITES[facility.hydroSiteId].maxPeakW
-            : Infinity,
+    facilities: prepareFleet(
+      baseFacilities.map((facility) => ({
+        ...facility,
+        peakW: Math.max(
+          1,
+          Math.min(
+            Math.ceil((facility.peakW || 0) * factor),
+            facility.hydroSiteId
+              ? HYDRO_SITES[facility.hydroSiteId].maxPeakW
+              : Infinity,
+          ),
         ),
-      ),
-    })),
+      })),
+    ),
   });
   const shortfall = (candidate: ScenarioType) =>
     summarizeYearOneOutlook(forecast(candidate)).worstShortfallW;

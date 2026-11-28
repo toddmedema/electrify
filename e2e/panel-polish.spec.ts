@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 
 test("facility actions stay reachable while navigating game panels", async ({
   page,
@@ -11,10 +11,7 @@ test("facility actions stay reachable while navigating game panels", async ({
   await page.goto("/?scenario=108");
   await page.getByRole("button", { name: "Start game", exact: true }).click();
   const facilities = page.locator(".facilities:visible");
-  await openPane(
-    facilities,
-    page.getByRole("button", { name: "Facilities", exact: true }),
-  );
+  await openFleet(page);
   await facilities.locator(".facilityDisclosure").first().click();
   const actions = facilities.locator(".facilityActions").first();
   await expect(actions).toBeVisible();

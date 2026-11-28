@@ -94,10 +94,35 @@ capacity-weighted approximations of Austin Energy's assets and contracted supply
 The primary sources are Austin Energy's [plant inventory](https://austinenergy.com/about/company-profile/electric-system/power-plants),
 the City's [Electric Utility System Revenue Bonds official statement](https://services.austintexas.gov/edims/document.cfm?id=427822)
 and the utility's [renewable resource contracts](https://austinenergy.com/about/company-profile/environment/renewable-power-generation).
-These rows intentionally remain aggregate game assets; their ages do not turn
-them into claims about one physical plant. The default Custom Game peaker now
-starts at 17 years, the California peaker estimate for its default 2020 opening.
-Players' supplied facility ages, including zero, are unchanged.
+These rows represent aggregate game assets. Players' supplied facility ages,
+including zero, are preserved.
+
+## Regional starting fleets
+
+New custom setups and Data Center mode use the same installed-capacity data and
+regional facility ages. The custom setup starts with a budget of 900 nameplate
+watts per customer, multiplied by any scenario demand scale. This gave the
+San Francisco default a comparable opening reserve after introducing intermittent
+plants. The Year 1 outlook reports any shortfall from the selected weather,
+load and fleet. Before the first observation, custom setup uses the earliest
+observation as an illustrative mix and filters unavailable technologies by start
+year. Custom setup takes the largest eligible named hydro sites first and leaves
+room for the other fuels within the 40-facility co-op setup limit. Capacity the
+game cannot represent is distributed among available non-hydro fuels in their
+observed proportions. Large shares split into plants within the build catalogue's
+size and site limits. If those limits leave capacity unassigned, available plants
+take the remainder where possible, with modeled gas peakers available as backup.
+Editing the fleet keeps the player's selections until they select **Use regional
+fleet**. Data Center mode sizes its portfolio against the opening load in the
+simulation.
+
+Heatwave + Drought, Sudden Nuclear Shutdown, Wildfire Emergency, Load Shedding
+and Delhi Summer apply their opening-year wind and solar proportions to a fixed
+renewables budget. Their plant identities, dispatch order, storage and other
+starting capacity are preserved. Other official starts retain the fleets required
+by their historical sources, utility calibrations and tutorial or story goals.
+The shared mix uses [EIA state capacity](https://www.eia.gov/electricity/state/)
+and [Ember country capacity](https://ember-energy.org/data/yearly-electricity-data/).
 
 ## US state observations
 

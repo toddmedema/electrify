@@ -18,9 +18,11 @@ import {
 } from "../helpers/TerritoryValidation";
 import { landPurchaseQuote } from "../helpers/Territories";
 import { isLandTerritoryId } from "../data/Territories";
+import type { TerritoryTileDefinition } from "../data/TerritoryTiles";
 import { currencyForLocation } from "../helpers/Currency";
 import { formatMoneyFull } from "../helpers/Format";
 import { isUtilityExpansionGame } from "../helpers/ExpansionContext";
+import { validCoopCustomScenario } from "./Browse";
 import {
   MULTIPLAYER_LINK_BUDGET_FRACTION,
   MULTIPLAYER_LINK_BUILD_COST_PER_W,
@@ -68,8 +70,15 @@ import manifest from "../data/RunCompatibility.json";
 import publishedOnlineRules from "./PublishedOnlineRules.json";
 import { selectWeatherLocation } from "../data/Weather";
 import { currentTick } from "../helpers/GameSelectors";
+import { purchaseTerms } from "../helpers/Financials";
+import {
+  multiplayerBorderConnection,
+  multiplayerOwnedTileIds,
+  multiplayerTerritoryTiles,
+} from "../helpers/MultiplayerTerritory";
 import reducer, {
   basePeerTradePrice,
+  buildTransmissionLine,
   delta,
   gameSlice,
   initGame,
@@ -80,16 +89,28 @@ import reducer, {
 } from "../reducers/Game";
 import * as gameActions from "../reducers/GameActions";
 import { clearPeerMarket } from "./Market";
+import {
+  validTerritorialOwnership,
+  validTerritorialCrossing,
+} from "./WorldTerritorial";
 import { allocateIntertieFlows } from "../helpers/Transmission";
 import type {
+  BorderConnection,
+  Edge,
   CommandEnvelope,
+  ConnectionOrder,
+  IntertieOrder,
   MatchSpec,
   RoomView,
   Seat,
+  UpgradeDecision,
+  UpgradeOrder,
   World,
 } from "./Types";
 import type {
   CompanyResultType,
+  FacilityOperatingType,
+  TerritoryTileId,
   GameType,
   LocationType,
   PeerPlan,
@@ -273,6 +294,9 @@ export function matchScenario(spec: MatchSpec): {
       (!validScenarioMod(scenario.mod, scenario) ||
         scenario.mod.parameters.difficulty !== spec.difficulty)) ||
     (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined) ||
+    (spec.territorialVersion !== undefined &&
+      (spec.territorialVersion !== 1 ||
+        !validCoopCustomScenario(spec.customScenario))) ||
     (spec.scenarioId === CUSTOM_SCENARIO_ID) !== !!spec.customScenario ||
     !DIFFICULTY_IDS.includes(spec.difficulty) ||
     !isValidLocation(location)
@@ -296,10 +320,11 @@ export function createWorld(
   // A running match owns its selection; later library edits cannot replace its snapshot.
   spec = cloneDeep(spec);
   const { scenario, location } = matchScenario(spec);
+  const territorial = spec.territorialVersion === 1;
   // Every company plays the scenario as authored, on one seed, so weather and stories match.
   const seed = scenario.seed ?? storyHash(matchId) >>> 0;
   selectWeatherLocation(location.id);
-  const grids = seats.map((seat) => {
+  const grids = seats.map((seat, index) => {
     let game = reducer(undefined, start(scenario.id));
     game = reducer(
       game,
@@ -317,6 +342,9 @@ export function createWorld(
         customers: scenario.startingCustomers || getStartingCustomers(location),
         location,
         seed,
+        territorialStart: territorial
+          ? { seatIndex: index, seatCount: seats.length }
+          : undefined,
       }),
     );
     const result = cloneGrid(game);
@@ -344,12 +372,14 @@ export function createWorld(
   const edges: World["edges"] = [];
   seats.forEach((a, i) =>
     seats.slice(i + 1).forEach((b, offset) => {
-      const capacityW =
+      const capacityW = Math.max(
+        territorial ? 1000 : 0,
         Math.round(
           Math.min(budgets[i], budgets[i + 1 + offset]) /
             (seats.length - 1) /
             1000,
-        ) * 1000;
+        ) * 1000,
+      );
       edges.push({
         id: `${i}-${i + 1 + offset}`,
         a: a.id,
@@ -358,8 +388,9 @@ export function createWorld(
         annualOperatingCost: isUtilityExpansionGame(grids[i])
           ? 0
           : capacityW * MULTIPLAYER_LINK_OPERATING_COST_PER_W,
-        ratingW: capacityW,
+        ratingW: territorial ? 0 : capacityW,
         flowW: 0,
+        ...(territorial ? { disabled: true } : {}),
       });
     }),
   );
@@ -386,25 +417,26 @@ export function createWorld(
           yearsToBuild: 0.5,
           ...PEER_CORRIDOR_DERATE,
         };
-        game.transmission!.lines.push({
-          id:
-            game.transmission!.lines.reduce(
-              (largest, line) => Math.max(largest, line.id),
-              0,
-            ) + 1,
-          corridorId: corridor.id,
-          name: seat.name,
-          capacityW: corridor.capacityW,
-          buildCost: corridor.buildCost,
-          annualOperatingCost: corridor.annualOperatingCost,
-          yearsToBuildLeft: 0,
-          minuteCreated: 0,
-          financed: false,
-          loanAmountLeft: 0,
-          loanMonthlyPayment: 0,
-          interestRate: 0,
-          currentFlowW: 0,
-        });
+        if (!territorial)
+          game.transmission!.lines.push({
+            id:
+              game.transmission!.lines.reduce(
+                (largest, line) => Math.max(largest, line.id),
+                0,
+              ) + 1,
+            corridorId: corridor.id,
+            name: seat.name,
+            capacityW: corridor.capacityW,
+            buildCost: corridor.buildCost,
+            annualOperatingCost: corridor.annualOperatingCost,
+            yearsToBuildLeft: 0,
+            minuteCreated: 0,
+            financed: false,
+            loanAmountLeft: 0,
+            loanMonthlyPayment: 0,
+            interestRate: 0,
+            currentFlowW: 0,
+          });
         return {
           id: seat.id,
           name: seat.name,
@@ -532,6 +564,8 @@ function applyCommandOnce(
       name = "acquireTile";
       validation.payload = { tileId: quote.tileId, quoteKey: quote.quoteKey };
     }
+    if (name === "buildTransmissionLine" && world.spec.territorialVersion === 1)
+      return coSignBuild(world, sender, validation.payload as ConnectionOrder);
     if (
       name === "upgradeTransmissionLine" &&
       isPeerCorridorId(
@@ -541,7 +575,7 @@ function applyCommandOnce(
       return coSignUpgrade(
         world,
         sender,
-        validation.payload as { corridorId: string; financed: boolean },
+        validation.payload as IntertieOrder | UpgradeOrder,
       );
     const before = game.facilities.length;
     const reduced = reducer(
@@ -553,7 +587,15 @@ function applyCommandOnce(
     const updated = commandResult(game, reduced);
     // Projection data is for the quote/reducer pass, never another persisted source of claims.
     world.grids[index] = buying
-      ? { ...updated, multiplayer: game.multiplayer }
+      ? {
+          ...updated,
+          multiplayer: game.multiplayer?.territorial
+            ? {
+                ...game.multiplayer,
+                territorial: updated.multiplayer!.territorial,
+              }
+            : game.multiplayer,
+        }
       : updated;
     if (
       name === "buildFacility" &&
@@ -563,7 +605,9 @@ function applyCommandOnce(
     if (
       name === "acquireTile" &&
       world.grids[index].territoryNetwork?.tilePurchases?.length ===
-        game.territoryNetwork?.tilePurchases?.length
+        game.territoryNetwork?.tilePurchases?.length &&
+      world.grids[index].multiplayer?.territorial?.claims.length ===
+        game.multiplayer?.territorial?.claims.length
     )
       return "This land tile is no longer available";
     return;
@@ -592,11 +636,116 @@ function applyCommandOnce(
   return "Unknown command";
 }
 
+const changedProposal =
+  "This connection proposal changed. Review the current connection.";
+
+function staleProposal(
+  decision: UpgradeDecision,
+  revision: number | undefined,
+) {
+  return decision.intent === "propose"
+    ? revision !== undefined
+    : revision !== decision.proposalRevision;
+}
+
+/** Both owners sign the same crossing. Neither half is booked until both can pay. */
+function coSignBuild(
+  world: World,
+  sender: string,
+  target: ConnectionOrder,
+): string | undefined {
+  const edge = world.edges.find(
+    (e) => peerCorridorId(e.id) === target.corridorId,
+  );
+  if (!edge || (sender !== edge.a && sender !== edge.b))
+    return "Choose your company's intertie";
+  if (edge.crossing && !edge.proposal)
+    return "This connection has already been ordered";
+  const partner = world.seats.find(
+    (seat) => seat.id === (sender === edge.a ? edge.b : edge.a),
+  )!;
+  if (!isActive(world, partner.id))
+    return `${partner.name}'s company has retired`;
+  const proposal = edge.proposal;
+  if (staleProposal(target, proposal?.revision)) return changedProposal;
+  if (target.intent === "withdraw") {
+    if (proposal?.seat !== sender) return "Only the proposer can withdraw";
+    delete edge.proposal;
+    delete edge.crossing;
+    return;
+  }
+  const owners = [edge.a, edge.b].map((seat) =>
+    world.seats.findIndex((entry) => entry.id === seat),
+  );
+  const [a, b] = owners.map((index) => world.grids[index]);
+  if (target.intent === "propose") {
+    const crossing = multiplayerBorderConnection(a, b);
+    if (!crossing) return "Expand until your territories share a border";
+    const border = crossingForSeat(crossing, edge, sender);
+    if (
+      target.border.here !== border.here ||
+      target.border.there !== border.there
+    )
+      return "This border crossing changed. Review the current connection.";
+    const own = sender === edge.a ? a : b;
+    const peer = own.multiplayer!.peers!.find(
+      (entry) => entry.id === partner.id,
+    )!;
+    const { amountDue } = purchaseTerms(
+      peer.corridor.buildCost,
+      target.financed,
+      own.interestRate,
+    );
+    if ((currentTick(own)?.cash ?? -1) < amountDue)
+      return "Not enough cash for your half of the connection";
+    edge.crossing = crossing;
+    edge.proposal = {
+      seat: sender,
+      financed: target.financed,
+      minute: own.date.minute,
+      revision: world.revision,
+    };
+    return;
+  }
+  if (!proposal || proposal.seat === sender)
+    return "Only the other company can accept this proposal";
+  const built = owners.map((index) => {
+    const grid = world.grids[index];
+    selectWeatherLocation(grid.location.id);
+    return commandResult(
+      grid,
+      reducer(
+        cloneGrid(grid),
+        buildTransmissionLine({
+          corridorId: target.corridorId,
+          financed:
+            world.seats[index].id === sender
+              ? target.financed
+              : proposal.financed,
+        }),
+      ),
+    );
+  });
+  if (
+    built.some(
+      (grid) =>
+        !grid.transmission?.lines.some(
+          (line) => line.corridorId === target.corridorId,
+        ),
+    )
+  )
+    return "Both companies need enough cash for their half";
+  owners.forEach((owner, index) => {
+    world.grids[owner] = built[index];
+  });
+  delete edge.proposal;
+}
+
 /** A shared link upgrades only once both owners agree; each pays for their own half. */
 function coSignUpgrade(
   world: World,
   sender: string,
-  target: { corridorId: string; financed: boolean },
+  target: IntertieOrder | UpgradeOrder,
 ): string | undefined {
   const edge = world.edges.find(
     (e) => peerCorridorId(e.id) === target.corridorId,
@@ -607,6 +756,17 @@ function coSignUpgrade(
   if (!isActive(world, partner.id))
     return `${partner.name}'s company has retired`;
   const own = world.grids[world.seats.findIndex((s) => s.id === sender)];
+  const territorial = world.spec.territorialVersion === 1;
+  if (territorial) {
+    if (edge.disabled || !edge.crossing || edge.proposal)
+      return "Finish the connection before upgrading it";
+    if (!("intent" in target) || staleProposal(target, edge.approvalRevision))
+      return changedProposal;
+    if (target.intent === "accept" && edge.approval === sender)
+      return "Only the other company can accept this proposal";
+    if (target.intent === "withdraw" && edge.approval !== sender)
+      return "Only the proposer can withdraw";
+  }
   if (
     own.transmission?.lines.find((l) => l.corridorId === target.corridorId)
       ?.upgrade
@@ -615,11 +775,13 @@ function coSignUpgrade(
   if (!edge.approval) {
     edge.approval = sender;
     edge.approvalFinanced = target.financed;
+    if (territorial) edge.approvalRevision = world.revision;
     return;
   }
   if (edge.approval === sender) {
     delete edge.approval;
     delete edge.approvalFinanced;
+    delete edge.approvalRevision;
     return;
   }
   const owners = [edge.a, edge.b].map((id) =>
@@ -631,7 +793,7 @@ function coSignUpgrade(
     return commandResult(
       grid,
       reducer(
-        grid,
+        territorial ? cloneGrid(grid) : grid,
         upgradeTransmissionLine({
           corridorId: target.corridorId,
           financed:
@@ -656,6 +818,7 @@ function coSignUpgrade(
   });
   delete edge.approval;
   delete edge.approvalFinanced;
+  delete edge.approvalRevision;
 }
 
 export function stepWorld(world: World): void {
@@ -753,14 +916,20 @@ export function stepWorld(world: World): void {
     );
     edge.disabled =
       lines.length !== 2 ||
-      lines.some((l) => l.paused) ||
+      lines.some(
+        (l) =>
+          l.paused ||
+          (world.spec.territorialVersion === 1 && l.yearsToBuildLeft > 0),
+      ) ||
       !isActive(world, edge.a) ||
       !isActive(world, edge.b);
-    edge.capacityW = Math.min(...lines.map((l) => l.capacityW));
-    edge.annualOperatingCost = lines.reduce(
-      (sum, l) => sum + l.annualOperatingCost,
-      0,
-    );
+    if (lines.length) {
+      edge.capacityW = Math.min(...lines.map((l) => l.capacityW));
+      edge.annualOperatingCost = lines.reduce(
+        (sum, l) => sum + l.annualOperatingCost,
+        0,
+      );
+    }
   });
   // Each refresh uses the same settlement owner and a fresh regional budget. The barrier
   // leaves every company settled before reserve, history and month-opening work continues.
@@ -853,6 +1022,24 @@ export function stepWorld(world: World): void {
       line.currentFlowW = 0;
     });
   });
+  if (world.spec.territorialVersion === 1)
+    for (const edge of world.edges) {
+      if (isActive(world, edge.a) && isActive(world, edge.b)) continue;
+      edge.disabled = true;
+      edge.ratingW = 0;
+      edge.flowW = 0;
+      if (edge.proposal) delete edge.crossing;
+      delete edge.proposal;
+      delete edge.approval;
+      delete edge.approvalFinanced;
+      delete edge.approvalRevision;
+      for (const grid of world.grids) {
+        const line = grid.transmission?.lines.find(
+          (entry) => entry.corridorId === peerCorridorId(edge.id),
+        );
+        if (line) line.currentFlowW = 0;
+      }
+    }
   world.revision++;
   syncClock(world);
 }
@@ -894,6 +1081,26 @@ export function roomView(world: World, seatId: string): RoomView {
   return roomViewBuilder(world)(seatId);
 }
 
+function publicFacility(facility: FacilityOperatingType, seat: string) {
+  return {
+    seat,
+    name: facility.name,
+    peakW: facility.peakW,
+    yearsToBuildLeft: facility.yearsToBuildLeft,
+    ...(facility.yearsToBuildLeft > 0
+      ? { yearsToBuild: facility.yearsToBuild }
+      : {}),
+    ...(facility.fuel !== undefined ? { fuel: facility.fuel } : {}),
+    ...(facility.peakWh !== undefined ? { peakWh: facility.peakWh } : {}),
+  };
+}
+
+function crossingForSeat(crossing: BorderConnection, edge: Edge, seat: string) {
+  return seat === edge.a
+    ? { here: crossing.a, there: crossing.b }
+    : { here: crossing.b, there: crossing.a };
+}
+
 function buildRoomView(
   world: World,
   seatId: string,
@@ -909,6 +1116,7 @@ function buildRoomView(
     ownership,
   );
   const visible = hasTerritoryNetwork(game) ? visibleTerritoryTiles(game) : [];
+  const territorial = game.multiplayer?.territorial !== undefined;
   const visibleIds = new Set(visible.map(({ tile }) => tile.id));
   const visibleCells = new Set(
     visible.map(({ tile }) => `${tile.q},${tile.r}`),
@@ -945,17 +1153,40 @@ function buildRoomView(
       const edgeId = edgeIdFromPeerCorridor(peer.corridor.id);
       const edge = world.edges.find((e) => e.id === edgeId)!;
       const retired = !isActive(world, peer.id);
+      const crossing =
+        edge.crossing ??
+        (territorial && !retired && isActive(world, seatId)
+          ? seatId === edge.a
+            ? multiplayerBorderConnection(game, other)
+            : multiplayerBorderConnection(other, game)
+          : undefined);
       return {
         ...peer,
         retired,
         ratingW: retired ? 0 : edge.ratingW,
-        availableSupplyW: retired
-          ? 0
-          : Math.max(0, tick.exportedW || 0, tick.supplyW - tick.demandW),
+        availableSupplyW:
+          retired || (territorial && !peer.connected)
+            ? 0
+            : Math.max(0, tick.exportedW || 0, tick.supplyW - tick.demandW),
+        ...(crossing && { border: crossingForSeat(crossing, edge, seatId) }),
+        ...(edge.crossing &&
+          !edge.proposal && {
+            endpoints: crossingForSeat(edge.crossing, edge, seatId),
+          }),
+        ...(edge.proposal && {
+          connectionRequestedBy: world.seats.find(
+            (seat) => seat.id === edge.proposal?.seat,
+          )?.name,
+          connectionRequestedBySelf: edge.proposal.seat === seatId,
+          connectionProposalRevision: edge.proposal.revision,
+        }),
         upgradeRequestedBy: world.seats.find(
           (seat) => seat.id === edge.approval,
         )?.name,
         upgradeRequestedBySelf: edge.approval === seatId,
+        ...(edge.approvalRevision !== undefined && {
+          upgradeProposalRevision: edge.approvalRevision,
+        }),
       };
     }),
     results: Object.keys(world.outcomes).length
@@ -966,44 +1197,31 @@ function buildRoomView(
         visibleRegions.has(id as import("../Types").TerritoryId),
       ),
     ),
-    tileOwners: Object.fromEntries(
-      Object.entries(tileOwners).filter(([id]) =>
-        visibleIds.has(id as import("../Types").TerritoryTileId),
-      ),
-    ),
-    ...(hasTerritoryNetwork(game)
+    tileOwners: territorial
+      ? tileOwners
+      : Object.fromEntries(
+          Object.entries(tileOwners).filter(([id]) =>
+            visibleIds.has(id as TerritoryTileId),
+          ),
+        ),
+    ...(territorial || hasTerritoryNetwork(game)
       ? {
           tileFacilities: Object.fromEntries(
             world.grids.flatMap((grid, owner) =>
               grid.facilities.flatMap((facility) => {
-                const tile = getFacilityTile(facility, grid);
+                const tile = territorial
+                  ? undefined
+                  : getFacilityTile(facility, grid);
+                const id = territorial ? facility.tileId : tile?.id;
+                const seat = world.seats[owner].id;
                 if (
-                  !tile ||
-                  tileOwners[tile.id]?.seat !== world.seats[owner].id ||
-                  !ownership.owns[owner](tile) ||
-                  !visibleIds.has(tile.id)
+                  !id ||
+                  tileOwners[id]?.seat !== seat ||
+                  (tile &&
+                    (!ownership.owns[owner](tile) || !visibleIds.has(id)))
                 )
                   return [];
-                return [
-                  [
-                    tile.id,
-                    {
-                      seat: world.seats[owner].id,
-                      name: facility.name,
-                      peakW: facility.peakW,
-                      yearsToBuildLeft: facility.yearsToBuildLeft,
-                      ...(facility.yearsToBuildLeft > 0
-                        ? { yearsToBuild: facility.yearsToBuild }
-                        : {}),
-                      ...(facility.fuel !== undefined
-                        ? { fuel: facility.fuel }
-                        : {}),
-                      ...(facility.peakWh !== undefined
-                        ? { peakWh: facility.peakWh }
-                        : {}),
-                    },
-                  ],
-                ];
+                return [[id, publicFacility(facility, seat)]];
               }),
             ),
           ),
@@ -1224,7 +1442,17 @@ function validGrid(
     }
   }
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
+  const territorial = world.spec.territorialVersion === 1;
   const expectedConnections = initial.grids[i].transmission!.lines;
+  const constructedPeerCorridors = territorial
+    ? world.edges.flatMap((edge) =>
+        edge.crossing &&
+        !edge.proposal &&
+        (edge.a === g.multiplayer?.seat || edge.b === g.multiplayer?.seat)
+          ? [peerCorridorId(edge.id)]
+          : [],
+      )
+    : [];
   const nativeLines = isUtilityExpansionGame(g)
     ? (g.transmission?.lines ?? []).filter((line) =>
         [
@@ -1239,12 +1467,20 @@ function validGrid(
   const lineCount =
     expectedConnections.filter(
       (line) => !isUtilityExpansionGame(g) || isPeerCorridorId(line.corridorId),
-    ).length + nativeLines.length;
+    ).length +
+    nativeLines.length +
+    constructedPeerCorridors.length;
   return (
     !!parseSave(
       serializeSave({
         ...g,
         multiplayer: undefined,
+        ...(territorial && {
+          facilities: g.facilities.map((facility) => ({
+            ...facility,
+            tileId: undefined,
+          })),
+        }),
         objectiveProgress,
         transmission: intertiesEnabledForScenario(scenario, g.location)
           ? {
@@ -1281,11 +1517,16 @@ function validGrid(
           peer.corridor.annualOperatingCost,
         ].every((n) => Number.isFinite(n) && n >= 0) &&
         peer.corridor.capacityW > 0 &&
+        (!territorial ||
+          Object.keys(peer).length === Object.keys(expected).length) &&
         Object.keys(peer.corridor).length ===
           Object.keys(expected.corridor).length &&
         Object.entries(expected.corridor).every(
           ([key, value]) =>
-            ["capacityW", "buildCost", "annualOperatingCost"].includes(key) ||
+            (!territorial &&
+              ["capacityW", "buildCost", "annualOperatingCost"].includes(
+                key,
+              )) ||
             peer.corridor[key as keyof typeof peer.corridor] === value,
         )
       );
@@ -1300,6 +1541,7 @@ function validGrid(
         (expectedConnections.some(
           (expected) => expected.corridorId === line.corridorId,
         ) ||
+          constructedPeerCorridors.includes(line.corridorId) ||
           nativeLines.includes(line)) &&
         validTransmissionLine(line, g.date.year, accessContextForGame(g)),
     )
@@ -1310,6 +1552,8 @@ function validGrid(
 function validEdges(world: World, ids: Set<string>, initial: World) {
   const pairs = new Set<string>();
   return world.edges.every((edge) => {
+    if (!edge || typeof edge !== "object") return false;
+    const territorial = world.spec.territorialVersion === 1;
     const pair = [edge.a, edge.b].sort().join(":");
     const expected = initial.edges.find((e) => e.id === edge.id);
     const endpoints = [edge.a, edge.b].map(
@@ -1326,17 +1570,14 @@ function validEdges(world: World, ids: Set<string>, initial: World) {
         (line) => line.corridorId === peerCorridorId(edge.id),
       ),
     );
+    const unbuilt = territorial && (!edge.crossing || edge.proposal);
     if (
       !expected ||
       pair !== [expected.a, expected.b].sort().join(":") ||
       corridors.some((corridor) => !corridor) ||
-      lines.some((line) => !line) ||
       !(["capacityW", "buildCost", "annualOperatingCost"] as const).every(
         (key) => corridors[0]?.[key] === corridors[1]?.[key],
       ) ||
-      edge.capacityW !== Math.min(...lines.map((line) => line!.capacityW)) ||
-      edge.annualOperatingCost !==
-        lines.reduce((sum, line) => sum + line!.annualOperatingCost, 0) ||
       !ids.has(edge.a) ||
       !ids.has(edge.b) ||
       edge.a === edge.b ||
@@ -1353,6 +1594,28 @@ function validEdges(world: World, ids: Set<string>, initial: World) {
       (edge.approval && edge.approval !== edge.a && edge.approval !== edge.b) ||
       (edge.approvalFinanced !== undefined &&
         typeof edge.approvalFinanced !== "boolean")
+    )
+      return false;
+    if (unbuilt) {
+      if (
+        lines.some(Boolean) ||
+        edge.capacityW !== expected.capacityW ||
+        edge.annualOperatingCost !== expected.annualOperatingCost
+      )
+        return false;
+    } else if (
+      lines.some((line) => !line) ||
+      edge.capacityW !== Math.min(...lines.map((line) => line!.capacityW)) ||
+      edge.annualOperatingCost !==
+        lines.reduce((sum, line) => sum + line!.annualOperatingCost, 0)
+    )
+      return false;
+    if (
+      territorial
+        ? !validTerritorialCrossing(world, edge, expected, endpoints)
+        : edge.crossing !== undefined ||
+          edge.proposal !== undefined ||
+          edge.approvalRevision !== undefined
     )
       return false;
     pairs.add(pair);
@@ -1406,6 +1669,7 @@ function reassignSeats(world: World, seats: Seat[]) {
     edge.a = id(edge.a);
     edge.b = id(edge.b);
     if (edge.approval) edge.approval = id(edge.approval);
+    if (edge.proposal) edge.proposal.seat = id(edge.proposal.seat);
   });
   world.grids.forEach((grid) => {
     const multiplayer = grid.multiplayer!;
@@ -1451,6 +1715,9 @@ export function hydrateWorld(value: unknown): World {
   const history = territoryPurchaseHistory(world);
   if (
     !history ||
+    !validTerritorialOwnership(world, initial) ||
+    // A malformed territorial edge must be rejected before deriving any per-company line list.
+    !world.edges.every((edge) => edge && typeof edge === "object") ||
     !world.grids.every((_grid, i) =>
       validGrid(world, initial, i, history[i]),
     ) ||
@@ -1535,8 +1802,15 @@ function territoryGameForWorld(
       landOwners: ownership.landOwners,
       peers: world.grids[index].multiplayer?.peers?.map((peer) => {
         const other = world.seats.findIndex((seat) => seat.id === peer.id);
+        const edge = game.multiplayer?.territorial
+          ? world.edges.find(
+              ({ id }) => peerCorridorId(id) === peer.corridor.id,
+            )
+          : undefined;
         const connected =
           other >= 0 &&
+          (!game.multiplayer?.territorial ||
+            (!!edge?.crossing && !edge.proposal)) &&
           active(world.seats[index].id) &&
           active(peer.id) &&
           [index, other].every((owner) =>
@@ -1701,19 +1975,28 @@ function worldOwnedTerritoryTiles(
 
 /** Host-only projection from validated receipts. Historical replay supplies its own grids. */
 function worldTerritoryOwnership(world: World, grids = world.grids) {
-  const owns = grids.map(createTerritoryTileOwnership);
-  const ownedTiles = grids.map((grid, index) =>
-    hasTerritoryNetwork(grid)
+  const owns = grids.map((grid) => {
+    if (!grid.multiplayer?.territorial)
+      return createTerritoryTileOwnership(grid);
+    const ids = new Set<TerritoryTileId>(multiplayerOwnedTileIds(grid));
+    return (tile: TerritoryTileDefinition) => ids.has(tile.id);
+  });
+  const ownedTiles = grids.map((grid, index) => {
+    if (grid.multiplayer?.territorial)
+      return multiplayerTerritoryTiles(grid).filter(owns[index]);
+    return hasTerritoryNetwork(grid)
       ? worldOwnedTerritoryTiles(grid, owns[index])
-      : [],
-  );
+      : [];
+  });
   const pending = grids.map(pendingTileConnections);
   const tileOwners = Object.fromEntries(
     ownedTiles.flatMap((tiles, index) =>
       tiles
         .filter(
           (tile) =>
-            isLandTerritoryId(tile.territoryId) || tile.id.includes(":legacy-"),
+            grids[index].multiplayer?.territorial ||
+            isLandTerritoryId(tile.territoryId) ||
+            tile.id.includes(":legacy-"),
         )
         .map(
           (tile) =>

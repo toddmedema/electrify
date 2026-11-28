@@ -44,6 +44,11 @@ const selectedDifficulty = () =>
 
 type SetupProps = Omit<StateProps, "scenario"> & { scenario?: ScenarioType };
 
+const DEFAULT_CUSTOM_SETUP: ScenarioType = {
+  ...DEFAULT_CUSTOM_SCENARIO,
+  startingFleetSource: "regional",
+};
+
 // An explicit second parameter lets connect observe synced unlock changes.
 export const mapStateToProps = (
   state: AppStateType,
@@ -74,7 +79,7 @@ export const mapStateToProps = (
     coop,
     game,
     unlockedThrough,
-    scenario: current ?? getCustomScenario(DEFAULT_CUSTOM_SCENARIO),
+    scenario: current ?? getCustomScenario(DEFAULT_CUSTOM_SETUP),
   };
 };
 

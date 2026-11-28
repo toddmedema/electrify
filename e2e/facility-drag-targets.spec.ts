@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { openPane } from "./layout";
+import { openFleet } from "./layout";
 
 for (const theme of ["light", "dark"]) {
   test(`compact facility grips and icons share a drag target in ${theme}`, async ({
@@ -13,10 +13,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto("/?scenario=108");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     await page
       .getByRole("group", { name: "game speed" })
       .getByRole("button", { name: "pause", exact: true })

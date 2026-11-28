@@ -1,4 +1,4 @@
-import { DIFFICULTY_IDS } from "../Constants";
+import { COOP_CUSTOM_FACILITY_LIMIT, DIFFICULTY_IDS } from "../Constants";
 import { CUSTOM_SCENARIO_ID, getScenario } from "../data/Scenarios";
 import { storyHash } from "../data/WorldEvents";
 import { getScenarioLocation, isValidLocation } from "../helpers/Locations";
@@ -19,8 +19,6 @@ export const BROWSE_CARDS = [
   "MODS",
 ] as const;
 export type BrowseCard = (typeof BROWSE_CARDS)[number];
-
-const MAX_CUSTOM_FACILITIES = 40;
 
 /** What the host is looking at, mirrored to every guest. The host is its only author. */
 export interface BrowseState {
@@ -85,8 +83,8 @@ export function selectionKey(browse: BrowseState): string {
 const finite = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value);
 
-/** A custom game a guest can render and forecast; the host's start validates it in full. */
-function validCustom(value: unknown): value is ScenarioType {
+/** A bounded custom setup both lobby guests and the match worker can prepare. */
+export function validCoopCustomScenario(value: unknown): value is ScenarioType {
   if (!value || typeof value !== "object") return false;
   const custom = value as ScenarioType;
   return (
@@ -100,7 +98,7 @@ function validCustom(value: unknown): value is ScenarioType {
     finite(custom.cash) &&
     finite(custom.dollarsPerkWh) &&
     Array.isArray(custom.facilities) &&
-    custom.facilities.length <= MAX_CUSTOM_FACILITIES &&
+    custom.facilities.length <= COOP_CUSTOM_FACILITY_LIMIT &&
     isValidLocation(getScenarioLocation(custom))
   );
 }
@@ -143,7 +141,7 @@ export function validBrowseState(value: unknown): value is BrowseState {
       (Number.isSafeInteger(browse.scenarioId) &&
         !getScenario(browse.scenarioId)?.tutorialSteps &&
         !!getScenario(browse.scenarioId))) &&
-    (browse.custom === undefined || validCustom(browse.custom)) &&
+    (browse.custom === undefined || validCoopCustomScenario(browse.custom)) &&
     (browse.mod === undefined ||
       (browse.card === "MODS" &&
         browse.custom === undefined &&

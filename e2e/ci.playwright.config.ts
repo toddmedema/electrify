@@ -38,6 +38,7 @@ const layout = [
   "project-build.spec.ts",
   "cities-capacity.spec.ts",
   "map-3d.spec.ts",
+  "regional-map.spec.ts",
   "chernobyl-recovery.spec.ts",
   "difficulty-unlocks.spec.ts",
   "toggle-borders.spec.ts",
@@ -62,6 +63,15 @@ const layout = [
 // minimum phone owns space-constrained layouts. One invocation shards them together.
 export default defineConfig({
   ...production,
+  // Ordinary journeys exercise the real WebGL scene with motion reduced.
+  // Motion contracts opt in to full animation where they measure it.
+  use: {
+    ...production.use,
+    contextOptions: {
+      ...production.use?.contextOptions,
+      reducedMotion: "reduce",
+    },
+  },
   projects: prBrowserViewports.map((project) =>
     project.name === "desktop-chromium"
       ? { ...project, testMatch: [...smoke, ...layout] }

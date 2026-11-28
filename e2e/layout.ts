@@ -256,8 +256,9 @@ export async function readTerritoryMapCamera(viewport: Locator) {
 export async function selectTerritoryMapTile(
   page: Page,
   tile: { id: string; q: number; r: number },
+  map?: Locator,
 ): Promise<Locator> {
-  const map = await returnToTerritoryMap(page);
+  map ??= await returnToTerritoryMap(page);
   const target = map.locator(`[data-map-target="${tile.id}"]`);
   const viewport = map.locator(".territoryMapViewport");
   const point = hexCenter(tile);
@@ -348,6 +349,21 @@ export async function openBuild(page: Page): Promise<Locator> {
   return build;
 }
 
+/** Select Fleet when the game opens on its map, then bring the fleet into view. */
+export async function openFleet(page: Page): Promise<Locator> {
+  const fleet = page.locator("#facilitiesPane");
+  const action = page.getByRole("button", { name: "Fleet", exact: true });
+  await expect(fleet.or(action).first()).toBeAttached();
+  if (!(await fleet.isVisible()) && (await action.isVisible())) {
+    await action.click();
+    await expect(fleet).toBeAttached();
+  }
+  if (await page.locator('[data-persistent-map="true"]').count())
+    await expect(fleet).toBeVisible();
+  else await openPane(fleet, action);
+  return fleet;
+}
+
 /**
  * Show a game tool, opening it from the dock when it is closed.
  * Returns whether the nav button was clicked.
@@ -385,6 +401,24 @@ export async function openPane(
   await navButton.filter({ visible: true }).first().click();
   await expect(visiblePane.first()).toBeVisible();
   return true;
+}
+
+export async function openCustomSetup(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      "plays",
+      JSON.stringify({
+        plays: [{ scenarioId: 0, timesPlayed: 1, date: new Date().toString() }],
+      }),
+    );
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("button", { name: "View Custom Game details" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Custom setup" }),
+  ).toBeVisible();
 }
 
 /** Open the saved-game library from the menu and wait for its screen. */

@@ -862,6 +862,12 @@ test("a host can leave the interruption only after a confirmed epoch replaces it
   const lobby = { ...f.session.getSnapshot().lobby, authorityEpoch };
   f.event({ kind: "state", state: lobby });
   await f.session.start({ spec: COOP_TEST_SPEC });
+  expect(f.posts).toContainEqual(
+    expect.objectContaining({
+      kind: "create",
+      spec: { ...COOP_TEST_SPEC, territorialVersion: 1 },
+    }),
+  );
   expect(f.session.getSnapshot().view?.epoch).toBe("epoch");
   const checkpoint = {
     ...lobby,

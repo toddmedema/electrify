@@ -85,10 +85,12 @@ the starting year, or that the location cannot build, are left out of the blend,
 are rounded to the two significant digits the game builds them at. A shortfall that no plant in
 the blend can cover is made up with one firm gas, steam, coal or oil plant of the era.
 
-The fleet is sized at the hardest difficulty and the setup's seed, so every easier difficulty is
-covered too, and is made again whenever the location, starting year or customers change. Adding
-or removing a plant keeps the player's own fleet until one of those changes. The Year 1 outlook
-then forecasts the fleet that will be played.
+The regional fleet is sized at the hardest difficulty and the setup's seed, so every easier
+difficulty is covered too. Changing the location, starting year or customer count triggers a new
+calibration. Adding or removing a plant switches to a manual fleet. It keeps the player's plant
+choices when the location or year changes, and flags any that the new grid cannot support.
+Changing the customer count scales manual generators with demand. **Use regional fleet** restores
+automatic sizing. The Year 1 outlook forecasts the fleet that will be played.
 
 ## Existing data centers and growth
 

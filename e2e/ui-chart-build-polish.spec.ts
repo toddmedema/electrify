@@ -1,6 +1,6 @@
 import path from "node:path";
-import { expect, test, type Locator } from "./fixtures";
-import { openBuild, openPane, sortBuildCatalog } from "./layout";
+import { expect, test, type Locator, type Page } from "./fixtures";
+import { openBuild, openPane, sortBuildCatalog, openFleet } from "./layout";
 import { chartScale } from "../src/components/base/UPlotHelpers";
 import { editSavedGame, readSavedGame } from "./save-fixture";
 import { MINUTES_PER_MONTH } from "../src/helpers/DateTime";
@@ -187,10 +187,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.reload();
       await page.getByRole("button", { name: "Continue", exact: true }).click();
       const fleet = page.locator(".facilities");
-      await openPane(
-        fleet,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+      await openFleet(page);
       const nuclear = fleet.locator('.facilityRow[data-fuel="Uranium"]');
       await expect(nuclear.locator(".facilityStatus")).toContainText(
         "0/300 294MW",
@@ -207,9 +204,12 @@ for (const theme of ["light", "dark"] as const) {
         page.getByRole("button", { name: /^Upcoming:/ }),
       ).toBeVisible();
       await limit.hover();
-      await expect(page.getByRole("tooltip")).toHaveText(
-        "Limited due to Extreme heat",
-      );
+      await expect(
+        page.getByRole("tooltip", {
+          name: "Limited due to Extreme heat",
+          exact: true,
+        }),
+      ).toBeVisible();
       expect(
         await nuclear.evaluate((el) => el.scrollWidth - el.clientWidth),
       ).toBeLessThanOrEqual(1);
@@ -551,18 +551,23 @@ async function expectFullRowFocus(row: Locator) {
   expect(header.x + header.width).toBeLessThanOrEqual(pane.x + pane.width);
 }
 
+async function openConstructionCatalog(page: Page, theme: "light" | "dark") {
+  await page.addInitScript((mode) => {
+    localStorage.clear();
+    localStorage.setItem("theme", mode);
+    localStorage.setItem("audioEnabled", "false");
+  }, theme);
+  await page.goto("/?scenario=100");
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+  await page.getByRole("button", { name: "pause", exact: true }).click();
+  return openBuild(page);
+}
+
 for (const theme of ["light", "dark"] as const) {
   test(`construction cards share spacing and icon silhouettes in ${theme}`, async ({
     page,
   }, info) => {
-    await page.addInitScript((mode) => {
-      localStorage.clear();
-      localStorage.setItem("theme", mode);
-      localStorage.setItem("audioEnabled", "false");
-    }, theme);
-    await page.goto("/?scenario=100");
-    await page.getByRole("button", { name: "Start game", exact: true }).click();
-    const build = await openBuild(page);
+    const build = await openConstructionCatalog(page, theme);
     const layouts = [];
     const colors = [];
     for (const category of ["Generators", "Storage", "Interties"]) {
@@ -632,8 +637,13 @@ for (const theme of ["light", "dark"] as const) {
     expect(layouts[2]).toEqual(layouts[0]);
     expect(colors[0]).toBe(colors[1]);
     expect(colors[2]).toBe(colors[1]);
+  });
 
-    // Check the silhouettes and edge-to-edge focus after buying both kinds of project.
+  test(`purchased storage and interties retain their Fleet silhouettes and row focus in ${theme}`, async ({
+    page,
+  }, info) => {
+    const build = await openConstructionCatalog(page, theme);
+    await build.getByRole("tab", { name: "Interties", exact: true }).click();
     await build
       .getByRole("button", {
         name: "Review purchase of Pacific Northwest intertie",
@@ -645,20 +655,22 @@ for (const theme of ["light", "dark"] as const) {
       .click();
     await openBuild(page);
     await build.getByRole("tab", { name: "Storage", exact: true }).click();
+    const reviewBattery = page.getByRole("button", {
+      name: "Review purchase of Lithium Battery",
+      exact: true,
+    });
     await build
-      .getByRole("button", {
-        name: "Review purchase of Lithium Battery",
-        exact: true,
-      })
+      .getByRole("listitem")
+      .filter({ has: reviewBattery })
+      .getByRole("button", { name: "Use max size", exact: true })
       .click();
+    await expect(reviewBattery).toBeEnabled();
+    await reviewBattery.click();
     await page
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })
       .click();
-    await openPane(
-      page.locator(".facilities"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const battery = page.locator('.facilityRow[data-facility="Battery"]');
     await expect(battery.locator(".MuiAvatar-root")).toHaveCSS(
       "border-radius",
@@ -709,10 +721,7 @@ for (const theme of ["light", "dark"] as const) {
     }, theme);
     await page.goto("/?scenario=111");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
-    await openPane(
-      page.locator(".facilities:visible"),
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const line = page.locator(".transmissionLine").first();
     const icon = line.locator(".transmissionIcon");
     const badge = icon.locator(".facilityActivity");

@@ -20,6 +20,8 @@ import {
   TutorialUiIdType,
 } from "../Types";
 import { getTimeFromTimeline } from "../helpers/DateTime";
+import { getScenarioLocation } from "../helpers/Locations";
+import { regionalizeVariableStartingCapacity } from "./DataCenterPowerMix";
 
 const MISSION_ONE_PAUSED: TutorialUiIdType[] = [
   "menu",
@@ -1140,8 +1142,8 @@ export const SCENARIOS: ScenarioType[] = [
     dollarsPerkWh: 0.24,
     cash: 180000000,
     feePerKgCO2e: 50 / 1000,
-    // A 1%-scale model of Spain's 2024 national fleet: 32.043GW solar PV, 32.007GW
-    // wind, 20.4% combined cycle, 13.3% hydro, 5.5% nuclear, and 3.356GW storage.
+    // A 1%-scale model of Spain's 2024 national fleet. The starting year's observed
+    // wind and solar shares divide the reference fleet's combined renewables budget.
     // https://www.ree.es/sites/default/files/2025-02/EN_0402_NP_Solar_FV_kuder_potencia_instalada.pdf
     facilities: [
       {
@@ -1576,7 +1578,22 @@ export const SCENARIOS: ScenarioType[] = [
   CHERNOBYL_SCENARIO,
 ];
 
-// The opening missions, in the order a new player should work through them
+// These challenges have a wind/solar budget independent of their core supply and story assets.
+// Resolve it in the canonical catalogue so previews, saves, co-op and simulation agree.
+// Other openings keep their authored utility fleet, historical assets or tutorial checkpoints.
+for (const scenario of SCENARIOS) {
+  if (![108, 110, 111, 113, 115].includes(scenario.id)) continue;
+  const location = getScenarioLocation(scenario);
+  if (location) {
+    scenario.facilities = regionalizeVariableStartingCapacity(
+      location,
+      scenario.startingYear,
+      scenario.facilities,
+    );
+  }
+}
+
+// The opening missions, in the order a new player should work through them.
 export const TUTORIALS = SCENARIOS.filter((s) => s.tutorialSteps);
 
 /**

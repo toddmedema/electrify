@@ -687,3 +687,21 @@ html:has(
     }
   }
 }
+
+.tutorialMapView.MuiButton-root {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 40px;
+  margin-inline-end: 8px;
+  padding: 4px 8px;
+  text-transform: none;
+
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+}
+
+.gameStatusBar:has(> .tutorialMapView) .gridHealth {
+  flex-basis: 0;
+  flex-grow: 1;
+}

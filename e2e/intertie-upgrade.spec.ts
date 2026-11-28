@@ -1,7 +1,7 @@
 import { expectContinuousDialogSurface } from "./dialog-surface";
 import path from "path";
 import { expect, test } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 for (const theme of ["light", "dark"] as const) {
   test(`intertie upgrades can be reviewed, purchased and resumed in ${theme}`, async ({
@@ -21,11 +21,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const facilities = page.locator(".facilities:visible");
-    const showFacilities = () =>
-      openPane(
-        facilities,
-        page.getByRole("button", { name: "Facilities", exact: true }),
-      );
+    const showFacilities = () => openFleet(page);
     await showFacilities();
     await openBuild(page);
     await page.getByRole("tab", { name: "Interties", exact: true }).click();

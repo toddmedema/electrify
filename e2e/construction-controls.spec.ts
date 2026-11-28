@@ -1,5 +1,5 @@
 import { expect, test, Locator } from "./fixtures";
-import { openPane, openBuild } from "./layout";
+import { openBuild, openFleet } from "./layout";
 
 async function expectExpandedActions(row: Locator, touch: boolean) {
   const actions = row.locator(".facilityActions");
@@ -57,10 +57,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const operating = pane.locator(".facilityRow").first();
     await operating.locator(".facilityDisclosure").click();
     await expect(operating).toContainText("Capacity");
@@ -149,11 +146,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    const facilities = page.getByRole("button", {
-      name: "Facilities",
-      exact: true,
-    });
-    await openPane(pane, facilities);
+    await openFleet(page);
     await openBuild(page);
     await page.getByRole("tab", { name: "Generators", exact: true }).click();
     await page
@@ -174,7 +167,7 @@ for (const theme of ["light", "dark"] as const) {
       .getByRole("dialog")
       .getByRole("button", { name: "Take loan" })
       .click();
-    await openPane(pane, facilities);
+    await openFleet(page);
     const plant = pane.locator('.facilityRow[data-facility="Solar"]');
     const line = pane.locator(".transmissionLine").first();
     await expect(plant).toContainText(/Building \d+%/);
@@ -281,10 +274,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.goto("/?scenario=100");
     await page.getByRole("button", { name: "Start game", exact: true }).click();
     const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     const build = async () => {
       await openBuild(page);
       await page.getByRole("tab", { name: "Interties", exact: true }).click();

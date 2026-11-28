@@ -1,7 +1,7 @@
 import path from "node:path";
 import { expect, test } from "./fixtures";
 import { foregroundContrast } from "./contrast";
-import { openPane } from "./layout";
+import { openPane, openFleet } from "./layout";
 import { reviewScreenshot } from "./review-screenshot";
 
 for (const theme of ["light", "dark"] as const) {
@@ -40,11 +40,7 @@ for (const theme of ["light", "dark"] as const) {
       true,
     );
 
-    const pane = page.locator(".facilities:visible");
-    await openPane(
-      pane,
-      page.getByRole("button", { name: "Facilities", exact: true }),
-    );
+    await openFleet(page);
     // The dock's Build action is an icon on the dock surface: measure the icon against the
     // nearest painted background, to the 3:1 non-text contrast an icon-only control needs.
     const build = page.locator("#buildNav");

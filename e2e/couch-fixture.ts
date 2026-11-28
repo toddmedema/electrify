@@ -1,6 +1,12 @@
 import { BrowserContext, Frame, Page, errors, expect } from "@playwright/test";
 import type { DesktopInputAction, DesktopInputFrame } from "../src/Desktop";
-import type { World } from "../src/multiplayer/Types";
+import type { RoomView, World } from "../src/multiplayer/Types";
+import type { SeatEvent } from "../src/couch/Protocol";
+
+type CouchFixtureWindow = Window & { observedCouchView?: RoomView };
+
+export const readCouchRoomView = (actor: Page | Frame) =>
+  actor.evaluate(() => (window as CouchFixtureWindow).observedCouchView);
 
 type Device = DesktopInputFrame & { id: string };
 const defaultDevices: Device[] = ["101", "202"].map((id) => ({
@@ -134,6 +140,7 @@ const actorClosed = (actor: Page | Frame) =>
 interface CouchCapabilities {
   steamOnline?: boolean;
   steamInputAvailable?: boolean;
+  reduceSeatMotion?: boolean;
 }
 
 export function createCouchFixture(
@@ -612,7 +619,11 @@ export async function createCouchFixture(
               const frame = await handle?.contentFrame();
               if (!frame) throw new Error("Could not create the seat document");
               seatPage = frame;
-            } else seatPage = await context.newPage();
+            } else {
+              seatPage = await context.newPage();
+              if (options?.reduceSeatMotion)
+                await seatPage.emulateMedia({ reducedMotion: "reduce" });
+            }
             const currentGeneration =
               native?.manager.seats.get(seat.id)?.generation ?? ++generation;
             seats.set(seat.id, {
@@ -734,7 +745,9 @@ export async function createCouchFixture(
     const callbacks = new Set<(message: unknown) => void>();
     const pending: unknown[] = [];
     if (seatId) {
-      subscribe("couchPortMessage", (message) => {
+      subscribe<SeatEvent>("couchPortMessage", (message) => {
+        if (message.kind === "view" && message.view.game)
+          (window as CouchFixtureWindow).observedCouchView = message.view;
         if (!callbacks.size) pending.push(message);
         else callbacks.forEach((callback) => callback(message));
       });

@@ -5,7 +5,7 @@
 // run at 60 Hz even when the physical display supports 120 Hz. E2E_CPU_RATE is a lab proxy only.
 import { expect, Page, test } from "./fixtures";
 import fs from "fs";
-import { openPane, waitForSettled, openBuild } from "./layout";
+import { openPane, waitForSettled, openBuild, openFleet } from "./layout";
 
 interface FrameGap {
   at: number;
@@ -177,13 +177,12 @@ for (const journey of journeys) {
     const appbar = page.locator("#appbar:visible").first();
     const pause = appbar.getByRole("button", { name: "pause", exact: true });
     await expect(pause).toHaveAttribute("aria-pressed", "true");
-    await openPane(
-      page.locator(journey.pane === "insights" ? ".insights" : ".facilities"),
-      page.getByRole("button", {
-        name: journey.pane === "insights" ? "Insights" : "Facilities",
-        exact: true,
-      }),
-    );
+    if (journey.pane === "insights")
+      await openPane(
+        page.locator(".insights"),
+        page.getByRole("button", { name: "Insights", exact: true }),
+      );
+    else await openFleet(page);
     if (journey.name === "monthly shortfalls") {
       const insights = page.locator(".insights:visible");
       // The scenario's twelve-year planning horizon selects monthly ranges rather than the
