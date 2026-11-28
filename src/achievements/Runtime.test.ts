@@ -173,6 +173,47 @@ test("guest progress uploads on login, cloud awards download silently and offlin
   stop();
 });
 
+test("a tutorial finished on one device joins legacy progress on another device", async () => {
+  const origin = fixture("alice");
+  let remote = emptyRecord();
+  const transport: AchievementTransport = {
+    async merge(_uid, local) {
+      remote = mergeRecords(remote, local);
+      return remote;
+    },
+  };
+  const stopOrigin = startAchievementServices(
+    origin.observer,
+    origin.journal,
+    transport,
+  );
+  await flush();
+  origin.publish({ inGame: true });
+  origin.publish({
+    desktopAchievements: {
+      ...origin.game().desktopAchievements!,
+      completion: { scenarioId: 1, difficulty: "Intern" },
+    },
+  });
+  await flush();
+  expect(remote.tutorials).toEqual([1]);
+  stopOrigin();
+
+  const other = fixture();
+  other.journal.importTutorialHistory([0]);
+  const stopOther = startAchievementServices(
+    other.observer,
+    other.journal,
+    transport,
+  );
+  other.publish({}, "alice");
+  await flush();
+  expect(remote.tutorials).toEqual([0, 1]);
+  expect(other.journal.getSnapshot().progress.tutorials).toEqual([0, 1]);
+  expect(other.journal.getSnapshot().notifications).toEqual([]);
+  stopOther();
+});
+
 test("a late cloud response and the prior account's active run cannot leak into another account", async () => {
   const f = fixture("alice");
   let resolve!: (record: ReturnType<typeof emptyRecord>) => void;
@@ -365,6 +406,26 @@ test("initial cloud ownership does not discard an asynchronous native achievemen
   expect(f.journal.getSnapshot().progress.earned).toEqual(["LIGHTS_ON"]);
   stop();
   delete window.electrifyDesktop;
+});
+
+test("Steam tutorial progress arriving after startup reaches the active journal", async () => {
+  const f = fixture("steam:alice");
+  const readAchievements = jest.fn(async () => emptyRecord());
+  window.electrifyDesktop = {
+    apiVersion: 1,
+    readAchievements,
+    getState: async () => ({ steam: { available: true } }),
+    onStateChanged: () => () => {},
+  } as unknown as DesktopBridge;
+  const stop = startAchievementServices(f.observer, f.journal);
+  await flush();
+  expect(f.journal.getSnapshot().progress.tutorials).toEqual([]);
+  readAchievements.mockResolvedValue({ ...emptyRecord(), tutorials: [0, 1] });
+  jest.advanceTimersByTime(30_000);
+  await flush();
+  expect(f.journal.getSnapshot().progress.tutorials).toEqual([0, 1]);
+  expect(f.journal.getSnapshot().notifications).toEqual([]);
+  stop();
 });
 test("followers receive account-scoped sync status without duplicate merges", async () => {
   const leader = fixture("alice"),

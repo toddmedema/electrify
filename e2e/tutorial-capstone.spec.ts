@@ -20,11 +20,27 @@ async function completeMission(
   const activate = (button: Locator) =>
     testInfo.project.use.hasTouch ? button.tap() : button.press("Enter");
   await page.addInitScript(
-    (theme) => {
+    ({ theme, previousTutorials }) => {
       window.localStorage.clear();
       window.localStorage.setItem("theme", theme);
+      localStorage.setItem(
+        "plays",
+        JSON.stringify({
+          plays: previousTutorials.map((scenarioId) => ({
+            scenarioId,
+            date: new Date().toISOString(),
+            timesPlayed: 1,
+          })),
+        }),
+      );
     },
-    testInfo.project.name.startsWith("mobile-") ? "dark" : "light",
+    {
+      theme: testInfo.project.name.startsWith("mobile-") ? "dark" : "light",
+      // Mission 1 can be the last tutorial the player completes.
+      previousTutorials: keepPlaying
+        ? []
+        : TUTORIALS.slice(1).map(({ id }) => id),
+    },
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Tutorials", exact: true }).click();
@@ -116,24 +132,6 @@ async function completeMission(
     page.getByRole("button", { name: "Resume Coal", exact: true }),
   ).toHaveCount(0);
 
-  if (!keepPlaying) {
-    // Mission 1 can be the last tutorial the player completes.
-    await page.evaluate(
-      (ids) => {
-        localStorage.setItem(
-          "plays",
-          JSON.stringify({
-            plays: ids.map((scenarioId) => ({
-              scenarioId,
-              date: new Date().toISOString(),
-              timesPlayed: 1,
-            })),
-          }),
-        );
-      },
-      TUTORIALS.slice(1).map(({ id }) => id),
-    );
-  }
   await activate(page.getByRole("button", { name: "fast speed" }));
   await expect(
     page.getByRole("heading", { name: /Mission complete!/ }),

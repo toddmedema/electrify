@@ -8,7 +8,8 @@ import {
   Typography,
 } from "@mui/material";
 import { NAV_CARDS } from "../../Constants";
-import { getPlayedScenarioIds, recordScenarioPlayed } from "../../LocalStorage";
+import { getStorageBoolean, setStorageKeyValue } from "../../LocalStorage";
+import { useAchievements } from "../../achievements/useAchievements";
 import { TUTORIALS } from "../../data/Scenarios";
 import { useAppDispatch, useAppSelector } from "../../Store";
 import { CardNameType, TutorialStepType } from "../../Types";
@@ -20,9 +21,14 @@ import { isSideToolLayout } from "../../Globals";
 import TutorialHud from "./TutorialHud";
 import TutorialPrompt from "./TutorialPrompt";
 
+const GUIDE_OFFERED_KEY = "dataCenterGuideOffered";
+
 /** The standard tutorial HUD guides the chosen grid without changing its scenario. */
 export default function DataCenterGuide() {
   const dispatch = useAppDispatch();
+  const missionOneComplete = useAchievements().progress.tutorials.includes(
+    TUTORIALS[0].id,
+  );
   const requested = useAppSelector(
     (state) => state.ui.dataCenterGuideRequested,
   );
@@ -136,13 +142,13 @@ export default function DataCenterGuide() {
     if (!inGame) setOpen(false);
     if (!requested || !inGame || !ready || blocked) return;
     dispatch(uiDelta({ dataCenterGuideRequested: false }));
-    if (getPlayedScenarioIds().includes(TUTORIALS[0].id)) return;
-    // Count the offer itself, including ignoring it or reloading, exactly once.
-    recordScenarioPlayed(TUTORIALS[0].id);
+    if (missionOneComplete || getStorageBoolean(GUIDE_OFFERED_KEY, false))
+      return;
+    setStorageKeyValue(GUIDE_OFFERED_KEY, true);
     dispatch(setSpeed("PAUSED"));
     setStep(-1);
     setOpen(true);
-  }, [requested, inGame, ready, blocked, dispatch]);
+  }, [requested, inGame, ready, blocked, missionOneComplete, dispatch]);
 
   React.useLayoutEffect(() => {
     if (open && inGame && speed !== "PAUSED") dispatch(setSpeed("PAUSED"));

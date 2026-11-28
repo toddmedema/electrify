@@ -2,6 +2,7 @@ import { ForegroundSync } from "../ForegroundSync";
 import type { AppStore } from "../Store";
 import { firebaseAppAuth } from "../Globals";
 import { getDesktop } from "../Desktop";
+import { getPlayedScenarioIds } from "../LocalStorage";
 import { achievementHooks } from "./Achievements";
 import { installSimulationHooks } from "./SimulationHooks";
 import {
@@ -15,6 +16,7 @@ import { recordIntent } from "./Progress";
 
 export function initializeAchievements(): void {
   installSimulationHooks(achievementHooks);
+  achievementJournal.importTutorialHistory(getPlayedScenarioIds());
 }
 let retrySync = () => {};
 export function retryAchievementSync() {
@@ -211,6 +213,7 @@ export function startAchievementServices(
   void sync();
   const unsubscribe = store.subscribe(publish);
   const wake = () => {
+    refreshNative();
     if (
       journal.getSnapshot().sync === "offline" ||
       journal.getSnapshot().sync === "failed"
@@ -238,6 +241,8 @@ export function startAchievementServices(
   // Local storage recovery is cheap and never forces an unchanged cloud transaction.
   const retry = setInterval(() => {
     journal.retryStorage();
+    // Steam can populate account stats after the first renderer read.
+    if (!document.hidden) refreshNative();
   }, 30_000);
   const stopJournal = journal.subscribe(() => {
     if (

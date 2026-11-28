@@ -1,6 +1,7 @@
 import type { Middleware } from "@reduxjs/toolkit";
 import { createSelector } from "@reduxjs/toolkit";
-import { getPlayedScenarioIds, recordScenarioPlayed } from "../LocalStorage";
+import { recordScenarioPlayed } from "../LocalStorage";
+import { achievementJournal } from "../achievements/Journal";
 import { getNextTutorial, getScenario, TUTORIALS } from "../data/Scenarios";
 import type { AppDispatch } from "../Store";
 import {
@@ -137,7 +138,7 @@ export function changeTutorialStep(
   // Finishing the walkthrough is what counts as doing the tutorial - the rest of the
   // scenario is optional practice, and requiring it meant a checkmark cost up to four
   // minutes of watching the sim run
-  const played = getPlayedScenarioIds();
+  const played = achievementJournal.getSnapshot().progress.tutorials;
   const allTutorialsCompleted =
     !played.includes(scenarioId) &&
     TUTORIALS.every(({ id }) => id === scenarioId || played.includes(id));
