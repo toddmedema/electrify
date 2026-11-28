@@ -376,6 +376,7 @@ export default function MultiplayerRoot() {
           syncCoop();
         });
       },
+      pickUtilityLogo: (logo) => void session.selectUtilityLogo(logo),
       ready: (ready) => {
         const browse = session.getSnapshot().browse;
         void session

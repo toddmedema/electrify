@@ -17,6 +17,7 @@ import { startWithSaveGuard } from "./StartGame";
 import { AppStateType, GameType } from "../../Types";
 import NewGameDetails, { DispatchProps, StateProps } from "./NewGameDetails";
 import { coopControls } from "../../multiplayer/Registry";
+import { randomUtilityLogo } from "../../helpers/UtilityLogoAssignment";
 
 // Co-op guests follow the host's selection.
 const coopRole = () => store.getState().ui.coop?.role;
@@ -76,7 +77,7 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
       if (d.difficulty && !difficultyAllowed(d.difficulty)) return;
       dispatch(uiDelta({ previewDifficulty: d.difficulty }));
     },
-    onStart: (scenarioId: number) => {
+    onStart: (scenarioId, utilityLogo) => {
       const role = coopRole();
       if (role) {
         if (role === "host")
@@ -90,7 +91,12 @@ export const mapDispatchToProps = (dispatch: AppDispatch): DispatchProps => {
         getHistoryApi().replaceState(null, "", scenarioListUrl());
         const difficulty = selectedDifficulty();
         dispatch(quit());
-        dispatch(delta({ difficulty }));
+        dispatch(
+          delta({
+            difficulty,
+            utilityLogo: utilityLogo ?? randomUtilityLogo(),
+          }),
+        );
         dispatch(start(scenarioId));
       });
     },

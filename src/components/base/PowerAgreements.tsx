@@ -31,6 +31,8 @@ import AgreementForecastDetails, {
 import { useAgreementForecast } from "./useAgreementForecast";
 import DecisionDialog from "./DecisionDialog";
 import ConceptIcon from "./ConceptIcon";
+import UtilityLogoIcon from "./UtilityLogoIcon";
+import { gameUtilityBranding } from "../../helpers/UtilityBranding";
 import BuildDetails, { BuildDetailRow } from "./BuildDetails";
 import { multiplayerRuntime } from "../../multiplayer/Registry";
 
@@ -166,6 +168,7 @@ export default function PowerAgreements({
   const [acceptanceError, setAcceptanceError] = React.useState<string>();
   const utility = inheritedUtilityForCorridor(line.corridorId);
   const sources = utility ? connectionAgreements(game, utility) : [];
+  const branding = gameUtilityBranding(game);
   const replacement =
     review &&
     sources.some(
@@ -257,7 +260,10 @@ export default function PowerAgreements({
             className="powerAgreement"
           >
             <header className="powerAgreementHeader">
-              <h4>{source.name}</h4>
+              <h4 className="tradeUtilityName">
+                <UtilityLogoIcon logo={branding.forTrade(source.id)} />
+                {source.name}
+              </h4>
               <span className="powerAgreementStatus">
                 {expired
                   ? `Expired ${agreementDate(source.endMinute)}`
@@ -420,7 +426,10 @@ export default function PowerAgreements({
               className="powerAgreement powerAgreementOffer"
             >
               <header className="powerAgreementHeader">
-                <h4>{quote.name}</h4>
+                <h4 className="tradeUtilityName">
+                  <UtilityLogoIcon logo={branding.forTrade(quote.id)} />
+                  {quote.name}
+                </h4>
                 <span className="powerAgreementStatus">Offer</span>
               </header>
               <AgreementMetrics

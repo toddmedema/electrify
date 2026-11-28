@@ -238,6 +238,12 @@ test("Mission 6 · read a shortage forecast and finish a new generator", async (
 
 async function signValleyAgreement(page: Page) {
   await action(page, "Trade");
+  const logo = page
+    .getByRole("article", { name: "Valley Electric supply", exact: true })
+    .locator("[data-utility-logo]");
+  await expect(logo).toBeVisible();
+  const supplierLogo = await logo.getAttribute("data-utility-logo");
+  expect(supplierLogo).toBeTruthy();
   await page
     .getByRole("button", {
       name: "Review Valley Electric supply trade",
@@ -251,6 +257,7 @@ async function signValleyAgreement(page: Page) {
   ).toBeVisible();
   await page.getByRole("button", { name: "Accept trade", exact: true }).click();
   await goal(page, "Open Fleet to see power flows");
+  return supplierLogo;
 }
 
 async function openFleetBesideAgreements(page: Page) {
@@ -345,6 +352,38 @@ test("an open tile keeps Trade waiting until Fleet is revealed", async ({
   await goal(page, "Run the clock until your grid imports power");
 });
 
+test("a chosen company logo appears at the left of the player's city label @minimum-phone", async ({
+  page,
+}) => {
+  await page.goto("/?scenario=116");
+  const picker = page.getByRole("combobox", { name: /Company logo/ });
+  await expect(picker).toContainText("Random");
+  await expect(picker.getByTestId("QuestionMarkIcon")).toBeVisible();
+  await picker.click();
+  await expect(page.getByRole("option")).toHaveCount(21);
+  await page.getByRole("option", { name: "Sunburst", exact: true }).click();
+  await page.getByRole("button", { name: "Start game", exact: true }).click();
+
+  const map = tutorialMap(page);
+  await expect(map.locator('canvas[data-renderer="ready"]')).toBeVisible();
+  const name = map
+    .locator('[data-owned="true"] > strong')
+    .filter({ hasText: "Burlington" });
+  const logo = name.locator('img[data-utility-logo="sunburst"]');
+  await expect(logo.first()).toBeVisible();
+  await expect
+    .poll(() =>
+      logo.first().evaluate((img: HTMLImageElement) => img.naturalWidth),
+    )
+    .toBeGreaterThan(0);
+  const leftEdges = await name
+    .first()
+    .evaluate((label) =>
+      [...label.children].map((child) => child.getBoundingClientRect().left),
+    );
+  expect(leftEdges[0]).toBeLessThan(leftEdges[1]);
+});
+
 test("Mission 7 · sign a trade and find live imports in Fleet", async ({
   page,
 }) => {
@@ -355,7 +394,7 @@ test("Mission 7 · sign a trade and find live imports in Fleet", async ({
     await action(page, "Fleet");
     await expect(fleet).toHaveAttribute("data-map-window-front", "true");
   }
-  await signValleyAgreement(page);
+  const supplierLogo = await signValleyAgreement(page);
   if (floating) {
     await expect(fleet).toHaveAttribute("data-map-window-front", "false");
   } else {
@@ -408,6 +447,10 @@ test("Mission 7 · sign a trade and find live imports in Fleet", async ({
     name: /^Reorder Valley Electric supply, Importing/,
   });
   await expect(valley).toBeVisible();
+  await expect(valley.locator("img")).toHaveAttribute(
+    "data-utility-logo",
+    supplierLogo!,
+  );
   const lastId = (await rows.last().getAttribute("data-rfd-draggable-id"))!;
   const last = rows.and(page.locator(`[data-rfd-draggable-id="${lastId}"]`));
   await expect(last).toBeInViewport({ ratio: 0.9 });

@@ -1,3 +1,5 @@
+import UtilityLogoIcon from "../base/UtilityLogoIcon";
+import { gameUtilityBranding } from "../../helpers/UtilityBranding";
 import { CouchPlayerText } from "../../couch/PlayerColor";
 import { CurrencyType } from "../../helpers/Currency";
 import { currencyFormatters } from "../../helpers/Format";
@@ -953,6 +955,11 @@ export default function TransmissionPanel({
                     const peer = game.multiplayer?.peers?.find(
                       (p) => p.corridor.id === line.corridorId,
                     );
+                    const logo = gameUtilityBranding(game).forOwner(
+                      peer
+                        ? `peer:${peer.id}`
+                        : inheritedUtilityForCorridor(line.corridorId),
+                    );
                     const market = adjacentMarketForCorridor(line.corridorId);
                     const capacities = intertieDirectionalCapacities(
                       line.corridorId,
@@ -1038,11 +1045,18 @@ export default function TransmissionPanel({
                         className="transmissionIcon"
                         style={constructionStyle}
                       >
-                        <img
-                          className="transmissionListIcon facilityRowIcon"
-                          src="/images/transmission.svg"
-                          alt=""
-                        />
+                        {logo ? (
+                          <UtilityLogoIcon
+                            logo={logo}
+                            className="transmissionListIcon facilityRowIcon"
+                          />
+                        ) : (
+                          <img
+                            className="transmissionListIcon facilityRowIcon"
+                            src="/images/transmission.svg"
+                            alt=""
+                          />
+                        )}
                         <span className="facilityActivity" aria-hidden>
                           {building ? (
                             <ConceptIcon concept="construction" />

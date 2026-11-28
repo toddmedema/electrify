@@ -2,6 +2,8 @@ import * as React from "react";
 import { Button, Typography } from "@mui/material";
 import type { GameType } from "../../Types";
 import { CouchPlayerText } from "../../couch/PlayerColor";
+import UtilityLogoIcon from "../base/UtilityLogoIcon";
+import { claimedUtilityLogo } from "../../data/UtilityLogos";
 import { getCostTableIndex } from "../../data/Economy";
 import { accessContextForGame } from "../../data/IntertieAccess";
 import { formatBuildMonths, formatWatts } from "../../helpers/Format";
@@ -68,6 +70,10 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
   const [notice, setNotice] = React.useState<string>();
   const title = React.useId();
   const corridor = peer.corridor;
+  const logo = claimedUtilityLogo(
+    game.multiplayer?.utilityLogos ?? {},
+    peer.id,
+  );
   const line = game.transmission?.lines.find(
     (line) => line.corridorId === corridor.id,
   );
@@ -182,7 +188,13 @@ function PeerAgreement({ game, peer }: { game: GameType; peer: Peer }) {
       data-peer-id={peer.id}
       data-connection-status={status}
     >
-      <Typography component="h3" variant="subtitle1" id={title}>
+      <Typography
+        component="h3"
+        variant="subtitle1"
+        id={title}
+        className="tradeUtilityName"
+      >
+        {logo && <UtilityLogoIcon logo={logo} />}
         <CouchPlayerText seatId={peer.id}>{peer.name}</CouchPlayerText>
       </Typography>
       <Typography variant="body2" color="textSecondary" role="status">

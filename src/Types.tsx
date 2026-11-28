@@ -1569,6 +1569,8 @@ export interface LegacyCampaignType {
 }
 
 export interface GameType {
+  /** Selected company mark. An absent selection is resolved from the game's seed. */
+  utilityLogo?: import("./data/UtilityLogos").UtilityLogoId;
   territoryWeather?: import("./helpers/TerritoryWildfire").TerritoryWeatherState;
   territoryNetwork?: {
     version: 3;
@@ -1604,6 +1606,8 @@ export interface GameType {
   /** Isolated co-op grid; never publish its score or run the single-player clock/effects. */
   multiplayer?: {
     seat: string;
+    /** Resolved marks for the shared roster. Published for rendering. */
+    utilityLogos?: import("./data/UtilityLogos").UtilityLogoClaims;
     territorial?: import("./helpers/MultiplayerTerritory").TerritorialState;
     /** Shared finite land claim, projected by the host from all company receipts. */
     landOwner?: { seat: string; name: string };
@@ -1977,6 +1981,9 @@ export interface VictoryDebriefType {
 /** Choosing a co-op game together: who drives the selection screens, and who is Ready. */
 export interface CoopSelectionType {
   role: "host" | "guest";
+  selfId?: string;
+  utilityLogos?: import("./data/UtilityLogos").UtilityLogoClaims;
+  utilityLogoError?: string;
   hostName: string;
   /** Everyone in the lobby, with Ready meaning ready for the selection on screen now. */
   players: {

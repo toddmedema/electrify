@@ -31,6 +31,15 @@ describe("SaveGame", () => {
     expect(save!.game).toEqual(JSON.parse(JSON.stringify(game)));
   });
 
+  it("preserves an assigned company logo and validates its ID", () => {
+    const save = serializeSave({ ...game, utilityLogo: "sunburst" });
+    expect(parseSave(save)?.game.utilityLogo).toBe("sunburst");
+    expect(
+      parseSave({ ...save, game: { ...save.game, utilityLogo: "unknown" } }),
+    ).toBeNull();
+    expect(parseSave(serializeSave(game))?.game.utilityLogo).toBeUndefined();
+  });
+
   it("accepts older absent fuel baselines and preserves a current baseline across repeated loads", () => {
     expect(game.fuelPriceBaseline).toBeUndefined();
     expect(parseSave(serializeSave(game))).not.toBeNull();

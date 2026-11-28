@@ -321,6 +321,93 @@ const savedCampaign = () =>
     outcomes: { retired: { outcome: "completed" } },
   }) as unknown as World;
 
+test("first player to claim a logo keeps it until releasing it or leaving", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const pick = (sender: string, logo: "sunburst" | null) =>
+    f.event({
+      kind: "message",
+      sender,
+      payload: { kind: "utility-logo-pick", logo },
+    });
+  pick("spectator", "sunburst");
+  expect(f.session.getSnapshot().utilityLogos).toBeUndefined();
+
+  pick(guest, "sunburst");
+  await f.session.selectUtilityLogo("sunburst");
+  expect(f.session.getSnapshot()).toMatchObject({
+    utilityLogos: { [guest]: "sunburst" },
+    utilityLogoError: "That logo is already taken.",
+  });
+  pick(guest, null);
+  expect(f.session.getSnapshot().utilityLogos).toEqual({});
+  await f.session.selectUtilityLogo("sunburst");
+  pick(guest, "sunburst");
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: {
+      kind: "utility-logo-claims",
+      claims: { [host]: "sunburst" },
+      taken: true,
+    },
+  });
+
+  await f.session.selectUtilityLogo(null);
+  pick(guest, "sunburst");
+  const lobby = f.session.getSnapshot().lobby;
+  f.event({ kind: "state", state: { ...lobby, connected: [] } });
+  expect(f.session.getSnapshot().utilityLogos).toEqual({ [guest]: "sunburst" });
+  f.event({
+    kind: "state",
+    state: {
+      ...lobby,
+      connected: [],
+      members: lobby.members.filter(({ id }) => id !== guest),
+    },
+  });
+  expect(f.session.getSnapshot().utilityLogos).toEqual({});
+});
+
+test("guests send their own choice and accept only the host's claim roster", async () => {
+  const f = fixture();
+  await f.session.initialize();
+  await f.session.selectUtilityLogo("sunburst");
+  expect(f.requests.at(-1)).toEqual({
+    kind: "send",
+    to: host,
+    payload: { kind: "utility-logo-pick", logo: "sunburst" },
+  });
+  const payload = {
+    kind: "utility-logo-claims",
+    claims: { [guest]: "sunburst" },
+  } as const;
+  f.event({ kind: "message", sender: "other", payload });
+  expect(f.session.getSnapshot().utilityLogos).toBeUndefined();
+  f.event({ kind: "message", sender: host, payload });
+  expect(coopSelection(f.session.getSnapshot()).utilityLogos).toEqual(
+    payload.claims,
+  );
+});
+
+test("the host sends claimed company logos to the game worker", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.selectUtilityLogo("sunburst");
+  f.event({
+    kind: "message",
+    sender: guest,
+    payload: { kind: "utility-logo-pick", logo: "grid-pylon" },
+  });
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  expect(f.posts.find(({ kind }) => kind === "create")).toMatchObject({
+    seats: [
+      { id: host, utilityLogo: "sunburst" },
+      { id: guest, utilityLogo: "grid-pylon" },
+    ],
+  });
+});
+
 test("an invite received during startup supersedes an older launch invite", async () => {
   const f = fixture();
   const initial = {

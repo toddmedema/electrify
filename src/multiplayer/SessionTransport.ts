@@ -1,3 +1,4 @@
+import type { UtilityLogoClaims, UtilityLogoId } from "../data/UtilityLogos";
 import type { ScenarioType } from "../Types";
 import type { BrowseState } from "./Browse";
 import type { CommandEnvelope, Seat, World } from "./Types";
@@ -90,7 +91,9 @@ export type WireMessage =
   | { kind: "command"; envelope: CommandEnvelope }
   | { kind: "browse"; browse: BrowseState }
   | { kind: "scenario"; selectionKey: string; scenario: ScenarioType }
-  | { kind: "campaign"; campaign?: PendingCampaign };
+  | { kind: "campaign"; campaign?: PendingCampaign }
+  | { kind: "utility-logo-pick"; logo: UtilityLogoId | null }
+  | { kind: "utility-logo-claims"; claims: UtilityLogoClaims; taken?: true };
 export type SessionRequest =
   | {
       kind: "state" | "leave" | "restart-host";

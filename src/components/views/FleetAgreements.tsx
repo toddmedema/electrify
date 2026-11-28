@@ -10,6 +10,8 @@ import { formatWatts, formatWattsOfPeak } from "../../helpers/Format";
 import { currentTick } from "../../helpers/GameSelectors";
 import FacilityRowText from "../base/FacilityRowText";
 import FlowBar from "../base/FlowBar";
+import UtilityLogoIcon from "../base/UtilityLogoIcon";
+import { gameUtilityBranding } from "../../helpers/UtilityBranding";
 
 export default function FleetAgreements({
   game,
@@ -21,6 +23,7 @@ export default function FleetAgreements({
   onDragEnd: (move: ReprioritizePowerAgreementAction | null) => void;
 }) {
   const agreements = dispatchOrderedAgreements(game);
+  const branding = gameUtilityBranding(game);
   const tick = currentTick(game);
   const importedW = tick?.importedW ?? 0;
   const exportedW = tick?.exportedW ?? 0;
@@ -72,6 +75,7 @@ export default function FleetAgreements({
               aria-label="Trade dispatch order"
             >
               {agreements.map((agreement, index) => {
+                const logo = branding.forTrade(agreement.id);
                 const ratingW = agreement.nominalW * agreement.deliverability;
                 const flowW = agreement.active
                   ? (meteredW?.[agreement.id] ??
@@ -109,10 +113,9 @@ export default function FleetAgreements({
                                 className="fleetAgreementGrip"
                                 aria-hidden
                               />
-                              <img
-                                src="/images/transmission.svg"
+                              <UtilityLogoIcon
+                                logo={logo}
                                 className="transmissionListIcon"
-                                alt=""
                               />
                               <FacilityRowText
                                 name={

@@ -1,3 +1,4 @@
+import { isUtilityLogo, validUtilityLogoClaims } from "../data/UtilityLogos";
 import type { WireMessage } from "./SessionTransport";
 import { decodeWire, encodeWire } from "./WireJson";
 
@@ -194,6 +195,19 @@ export function validTurnPayload(
         senderIsHost &&
         exact(value, ["kind", "campaign"]) &&
         (value.campaign === undefined || object(value.campaign))
+      );
+    case "utility-logo-pick":
+      return (
+        !senderIsHost &&
+        exact(value, ["kind", "logo"]) &&
+        (value.logo === null || isUtilityLogo(value.logo))
+      );
+    case "utility-logo-claims":
+      return (
+        senderIsHost &&
+        exact(value, ["kind", "claims", "taken"]) &&
+        validUtilityLogoClaims(value.claims) &&
+        (value.taken === undefined || value.taken === true)
       );
     case "transfer":
       return (

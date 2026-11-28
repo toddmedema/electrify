@@ -59,8 +59,8 @@ for (const mission of missions) {
     for (const [name, key] of [
       ["Fleet", "q"],
       ["Fleet", "f"],
-      ["Agreements", "w"],
-      ["Agreements", "a"],
+      ["Trade", "w"],
+      ["Trade", "a"],
       ["Events", "e"],
       ["Programs", "r"],
       ["Programs", "p"],

@@ -13,6 +13,11 @@ import PlayCircleIcon from "@mui/icons-material/PlayCircleOutlined";
 import { coopControls } from "../../multiplayer/Registry";
 import type { CoopSelectionType } from "../../Types";
 import CoopInviteCode from "./CoopInviteCode";
+import UtilityLogoPicker from "./UtilityLogoPicker";
+import {
+  claimedUtilityLogo,
+  type UtilityLogoId,
+} from "../../data/UtilityLogos";
 
 /** State labels stay visible alongside the roster icons. */
 function PlayerState({
@@ -159,6 +164,13 @@ export default function CoopBrowseBar({
 }): React.JSX.Element | null {
   const kicked = React.useRef<string>();
   if (!coop) return null;
+  const pickUtilityLogo = coopControls()?.pickUtilityLogo;
+  const choices = coop.utilityLogos ?? {};
+  const taken = new Map<UtilityLogoId, string>();
+  for (const player of coop.players) {
+    const logo = claimedUtilityLogo(choices, player.id);
+    if (logo && player.id !== coop.selfId) taken.set(logo, player.name);
+  }
   const guests = coop.players.filter((player) => !player.host);
   const ready = guests.filter((player) => player.ready).length;
   const host = coop.role === "host";
@@ -252,6 +264,19 @@ export default function CoopBrowseBar({
               </RemovalCollapse>
             ))}
           </TransitionGroup>
+          {coop.selfId && pickUtilityLogo && (
+            <UtilityLogoPicker
+              logo={claimedUtilityLogo(choices, coop.selfId)}
+              onChange={pickUtilityLogo}
+              taken={taken}
+              disabled={coop.starting}
+            />
+          )}
+          {coop.utilityLogoError && (
+            <Typography variant="body2" color="error" role="status">
+              {coop.utilityLogoError}
+            </Typography>
+          )}
           {!coop.starting && host && coop.inviteCode && (
             <div className="coopBrowseActions">
               <CoopInviteCode

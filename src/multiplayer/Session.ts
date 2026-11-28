@@ -1,4 +1,12 @@
 import manifest from "../data/RunCompatibility.json";
+import {
+  claimedUtilityLogo,
+  isUtilityLogo,
+  updateUtilityLogoClaim,
+  validUtilityLogoClaims,
+  type UtilityLogoClaims,
+  type UtilityLogoId,
+} from "../data/UtilityLogos";
 import type {
   Command,
   CommandEnvelope,
@@ -128,6 +136,8 @@ export interface SessionState {
   /** Validated, detached scenario; never written into the installed library. */
   scenarioSnapshot?: ScenarioType;
   pendingCampaign?: PendingCampaign;
+  utilityLogos?: UtilityLogoClaims;
+  utilityLogoError?: string;
   /** The host's multiplayer saves, loaded when it opens a lobby. */
   library?: SharedSaveLibrary;
   loadingSaves: boolean;
@@ -309,6 +319,14 @@ export class MultiplayerSession {
   private event(event: Exclude<SessionEvent, { kind: "invite" }>) {
     if (event.kind === "state") {
       const { hostId, lobbyId, members } = event.state;
+      const previousLobby = this.state.lobby;
+      const brandingChanged =
+        lobbyId !== previousLobby.lobbyId ||
+        hostId !== previousLobby.hostId ||
+        (!!event.state.authorityEpoch &&
+          this.lastHost &&
+          this.lastHost.room === lobbyId &&
+          this.lastHost.epoch !== event.state.authorityEpoch);
       // Steam can publish the old roster as it closes each peer connection.
       if (lobbyId && lobbyId === this.departingLobbyId) return;
       // Before a match, a lobby without its host has nobody left to choose or start a game.
@@ -379,7 +397,19 @@ export class MultiplayerSession {
         this.services.authority?.()?.epoch === authorityEpoch
           ? { confirmedRevision }
           : this.state.checkpointRecovery;
-      this.update({ lobby: event.state, checkpointRecovery });
+      const oldClaims = brandingChanged ? undefined : this.state.utilityLogos;
+      const memberIds = new Set(members.map(({ id }) => id));
+      const remaining = Object.entries(oldClaims ?? {}).filter(([id]) =>
+        memberIds.has(id),
+      );
+      const removedClaim =
+        remaining.length !== Object.keys(oldClaims ?? {}).length;
+      this.update({
+        lobby: event.state,
+        checkpointRecovery,
+        utilityLogos: removedClaim ? Object.fromEntries(remaining) : oldClaims,
+        ...(brandingChanged && { utilityLogoError: undefined }),
+      });
       if (this.worker) this.relayAuthority();
       if (this.isHost()) {
         // A friend who just joined lands on the page the host is showing, straight away.
@@ -393,7 +423,9 @@ export class MultiplayerSession {
         if (joined.length) {
           this.sendBrowse(joined);
           this.sendCampaign(joined);
+          if (!removedClaim) this.sendUtilityLogoClaims(joined);
         }
+        if (removedClaim) this.sendUtilityLogoClaims(event.state.connected);
       }
       if (this.worker) {
         const now = new Set(event.state.connected);
@@ -447,6 +479,28 @@ export class MultiplayerSession {
         )
       )
         return;
+      if (event.payload.kind === "utility-logo-pick") {
+        if (this.isHost())
+          this.claimUtilityLogo(event.sender, event.payload.logo);
+        return;
+      }
+      if (event.payload.kind === "utility-logo-claims") {
+        if (
+          !this.isHost() &&
+          !this.closing &&
+          !!this.state.lobby.lobbyId &&
+          event.sender === this.state.lobby.hostId &&
+          validUtilityLogoClaims(event.payload.claims)
+        )
+          this.update({
+            utilityLogos: event.payload.claims,
+            utilityLogoError:
+              event.payload.taken === true
+                ? "That logo is already taken."
+                : undefined,
+          });
+        return;
+      }
       if (
         this.worker &&
         this.state.lobby.connected.includes(event.sender) &&
@@ -1143,6 +1197,8 @@ export class MultiplayerSession {
       busy: true,
       entryOperation: "create",
       error: undefined,
+      utilityLogos: undefined,
+      utilityLogoError: undefined,
       pendingCampaign: undefined,
     });
     try {
@@ -1166,6 +1222,8 @@ export class MultiplayerSession {
       busy: true,
       entryOperation: "join",
       error: undefined,
+      utilityLogos: undefined,
+      utilityLogoError: undefined,
       pendingCampaign: undefined,
       browse: undefined,
       scenarioSnapshot: undefined,
@@ -1479,7 +1537,13 @@ export class MultiplayerSession {
         ? recovery
           ? world.seats
           : resumeSeats(campaign!, members)
-        : members.map(({ id, name }) => ({ id, name }));
+        : members.map(({ id, name }) => {
+            const utilityLogo = claimedUtilityLogo(
+              this.state.utilityLogos ?? {},
+              id,
+            );
+            return { id, name, ...(utilityLogo && { utilityLogo }) };
+          });
       const requiredSeats = seats.filter(
         (_, index) => !world?.outcomes?.[world.seats[index].id],
       );
@@ -1810,6 +1874,8 @@ export class MultiplayerSession {
         browse: undefined,
         scenarioSnapshot: undefined,
         pendingCampaign: undefined,
+        utilityLogos: undefined,
+        utilityLogoError: undefined,
         library: undefined,
         loadingSaves: false,
         lobby: {
@@ -1845,6 +1911,79 @@ export class MultiplayerSession {
   private isHost() {
     const { lobbyId, hostId, selfId } = this.state.lobby;
     return !!lobbyId && !!hostId && hostId === selfId;
+  }
+  private canPickUtilityLogo() {
+    return (
+      !!this.state.lobby.lobbyId &&
+      this.authorityIsCurrent() &&
+      !this.state.busy &&
+      !this.state.view &&
+      !this.state.pendingCampaign &&
+      this.state.browse?.phase !== "playing" &&
+      !this.closing
+    );
+  }
+  async selectUtilityLogo(logo: UtilityLogoId | null) {
+    if (!this.canPickUtilityLogo()) return;
+    const { hostId, selfId } = this.state.lobby;
+    if (!hostId || !selfId) return;
+    if (this.isHost()) {
+      this.claimUtilityLogo(selfId, logo);
+      return;
+    }
+    this.update({ utilityLogoError: undefined });
+    const lobbyId = this.state.lobby.lobbyId;
+    try {
+      await this.request({
+        kind: "send",
+        to: hostId,
+        payload: { kind: "utility-logo-pick", logo },
+      });
+    } catch {
+      if (lobbyId === this.state.lobby.lobbyId)
+        this.update({
+          utilityLogoError: "Could not choose a logo. Try again.",
+        });
+    }
+  }
+  private claimUtilityLogo(id: string, logo: UtilityLogoId | null) {
+    const { lobby } = this.state;
+    if (
+      !this.canPickUtilityLogo() ||
+      (logo !== null && !isUtilityLogo(logo)) ||
+      !lobby.members.some((member) => member.id === id) ||
+      (id !== lobby.selfId && !lobby.connected.includes(id))
+    )
+      return;
+    const claims = updateUtilityLogoClaim(
+      this.state.utilityLogos ?? {},
+      id,
+      logo,
+    );
+    if (!claims) {
+      if (id === lobby.selfId)
+        this.update({ utilityLogoError: "That logo is already taken." });
+      else this.sendUtilityLogoClaims([id], true);
+      return;
+    }
+    this.update({ utilityLogos: claims, utilityLogoError: undefined });
+    this.sendUtilityLogoClaims(lobby.connected);
+  }
+  private sendUtilityLogoClaims(recipients: string[], taken?: true) {
+    const { utilityLogos } = this.state;
+    if (!this.isHost() || this.worker || !utilityLogos) return;
+    for (const id of recipients) {
+      if (id === this.state.lobby.selfId) continue;
+      void this.request({
+        kind: "send",
+        to: id,
+        payload: {
+          kind: "utility-logo-claims",
+          claims: utilityLogos,
+          ...(taken && { taken }),
+        },
+      }).catch(() => {});
+    }
   }
   /**
    * The host mirrors what it is looking at. Changes coalesce to the view rate; an unchanged

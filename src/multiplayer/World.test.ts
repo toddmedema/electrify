@@ -61,6 +61,30 @@ test.each(["new", "restored"])(
   },
 );
 
+test("co-op logos are unique across viewpoints and follow saved companies to new players", () => {
+  const seats = coopSeats(3);
+  seats[1].utilityLogo = "sunburst";
+  const world = createWorld(COOP_TEST_SPEC, seats, "logo-match", "epoch");
+  const logos = roomView(world, "0").game!.multiplayer!.utilityLogos!;
+  expect(logos["1"]).toBe("sunburst");
+  expect(new Set(Object.values(logos)).size).toBe(3);
+  expect(roomView(world, "1").game!.multiplayer!.utilityLogos).toEqual(logos);
+  const restored = restoreWorld(checkpointWorld(world), "claimed", [
+    { id: "4", name: "First" },
+    { id: "5", name: "Second" },
+    { id: "6", name: "Third" },
+  ]);
+  expect(roomView(restored, "5").game!.multiplayer!.utilityLogos).toEqual({
+    4: logos["0"],
+    5: logos["1"],
+    6: logos["2"],
+  });
+  seats[2].utilityLogo = "sunburst";
+  expect(() =>
+    createWorld(COOP_TEST_SPEC, seats, "duplicate", "epoch"),
+  ).toThrow("Each company needs a different logo");
+});
+
 test("resuming hands saved companies to the players who claimed them", () => {
   const world = create(3);
   world.outcomes["2"] = {

@@ -2506,6 +2506,7 @@ export const gameSlice = createSlice({
         return {
           ...cloneDeep(initialGame),
           difficulty: state.difficulty,
+          ...(state.utilityLogo && { utilityLogo: state.utilityLogo }),
           scenarioId: LEGACY_CAMPAIGN_ID,
           startingYear: LEGACY_GENERATIONS[0].startYear,
           date: getDateFromMinute(0, LEGACY_GENERATIONS[0].startYear),
@@ -2816,9 +2817,16 @@ export const {
 export function startLegacyCampaign(
   dispatch: (action: { type: string; payload?: unknown }) => unknown,
   difficulty: DifficultyType,
+  utilityLogo?: GameType["utilityLogo"],
 ): void {
   dispatch(quit(undefined));
-  dispatch(delta({ difficulty, customScenario: undefined }));
+  dispatch(
+    delta({
+      difficulty,
+      customScenario: undefined,
+      ...(utilityLogo && { utilityLogo }),
+    }),
+  );
   dispatch(start(LEGACY_CAMPAIGN_ID));
 }
 
