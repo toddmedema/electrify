@@ -98,6 +98,9 @@ export default function FleetAgreements({
                         ref={row.innerRef}
                         {...row.draggableProps}
                         role="listitem"
+                        data-reorder-drop={
+                          snapshot.isDropAnimating || undefined
+                        }
                         className={`fleetAgreementRow${snapshot.isDragging ? " dragging" : ""}`}
                       >
                         <div className="facilityRowHeader">

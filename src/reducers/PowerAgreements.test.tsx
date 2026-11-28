@@ -227,6 +227,56 @@ it("reassigns live and forecast imports in the new order without resettling prio
   expect(currentTick(reordered)!.agreementUsefulMWh![to]).toBe(0);
 });
 
+it("reserves scarce shared capacity in Fleet order across legacy and newer trades", () => {
+  const opening = at(180);
+  opening.transmission!.inheritedAgreementTerms = 1;
+  const game = sign(opening);
+  const newer = "champlain-nuclear:0";
+  const legacy = "champlain-quebec";
+  const limitW = 50e6;
+  const legacyLimits = Transmission.intertieOfferLimits;
+  const firmLimits = Transmission.firmIntertieOfferLimits;
+  jest
+    .spyOn(Transmission, "intertieOfferLimits")
+    .mockImplementation((...args) => ({
+      ...legacyLimits(...args),
+      marketImportLimitW: limitW,
+      accessImportLimitW: limitW,
+      importLimitW: limitW,
+    }));
+  jest
+    .spyOn(Transmission, "firmIntertieOfferLimits")
+    .mockImplementation((...args) => ({
+      ...firmLimits(...args),
+      marketImportLimitW: limitW,
+      accessImportLimitW: limitW,
+      importLimitW: limitW,
+    }));
+  const reordered = copyOfficialGame(
+    reducer(
+      copyOfficialGame(game),
+      reprioritizePowerAgreement({
+        id: legacy,
+        targetId: newer,
+        place: "before",
+      }),
+    ),
+  );
+  request(game, limitW);
+  request(reordered, limitW);
+  tickState(game);
+  tickState(reordered);
+  expect(currentTick(game)!.agreementImportedW).toMatchObject({
+    [newer]: limitW,
+    [legacy]: 0,
+  });
+  expect(currentTick(reordered)!.entitlementImportedW).toBe(limitW);
+  expect(currentTick(reordered)!.agreementImportedW).toMatchObject({
+    [legacy]: limitW,
+    [newer]: 0,
+  });
+});
+
 it("retains explicit order across save import and rejects unknown or duplicate positions", () => {
   const game = createGame({
     scenarioId: 112,

@@ -1243,7 +1243,7 @@ it("hovers and activates the hex under the pointer while keyboard and explicit p
       true,
     );
     const company = map.target("valley-electric:city"),
-      companyLabel = within(company).getByText("Valley Electric");
+      companyLabel = within(company).getByText("Winooski");
     fireEvent.pointerMove(companyLabel, {
       pointerId: 1,
       clientX: 100,

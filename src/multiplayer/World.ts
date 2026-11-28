@@ -67,6 +67,7 @@ import {
 import { publicRateCap } from "../helpers/Customers";
 import { storyHash } from "../data/WorldEvents";
 import {
+  isRetiredUtilityLogo,
   validUtilityLogoRoster,
   type UtilityLogoClaims,
 } from "../data/UtilityLogos";
@@ -2177,6 +2178,12 @@ function upgradeTerritoryWorld(value: unknown): unknown {
   )
     return value;
   const result = cloneDeep(old) as World;
+  if (old.gameSchema === 30 && Array.isArray(result.seats)) {
+    for (const seat of result.seats) {
+      if (seat && isRetiredUtilityLogo(seat.utilityLogo))
+        delete seat.utilityLogo;
+    }
+  }
   const publishedValleyRules =
     old.rules === SCHEMA_22_MASTER_RULES || old.rules === SCHEMA_23_MAP_RULES
       ? "published-master"

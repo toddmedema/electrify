@@ -1,4 +1,4 @@
-import { CouchPlayerText, couchPlayerColor } from "../../couch/PlayerColor";
+import { couchPlayerColor } from "../../couch/PlayerColor";
 import * as React from "react";
 import { Button, Tooltip, useTheme } from "@mui/material";
 import ConceptIcon from "../base/ConceptIcon";
@@ -1771,24 +1771,7 @@ export default function TerritoryHexMap({
                         className="territoryCityLogo"
                       />
                     )}
-                    <span className="territoryCityLabelText">
-                      <span>{cityLabel}</span>
-                      {utility && (
-                        <span>
-                          <CouchPlayerText
-                            seatId={
-                              view.ownerKey?.startsWith("peer:")
-                                ? view.ownerKey.slice(5)
-                                : view.owned
-                                  ? game.multiplayer?.seat
-                                  : undefined
-                            }
-                          >
-                            {view.owned && !regional ? "You" : view.ownerName}
-                          </CouchPlayerText>
-                        </span>
-                      )}
-                    </span>
+                    <span>{cityLabel}</span>
                   </strong>
                 )}
                 {projectSite && (

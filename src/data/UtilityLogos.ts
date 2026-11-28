@@ -3,22 +3,14 @@ export const UTILITY_LOGOS = [
   { id: "clipped-bolt", name: "Clipped bolt" },
   { id: "grid-pylon", name: "Grid pylon" },
   { id: "turbine-rotor", name: "Turbine rotor" },
-  { id: "cell-stack", name: "Cell stack" },
-  { id: "transformer-coil", name: "Transformer coil" },
-  { id: "reservoir-spillway", name: "Reservoir spillway" },
   { id: "geothermal-plume", name: "Geothermal plume" },
-  { id: "switch-contacts", name: "Switch contacts" },
   { id: "heavy-flywheel", name: "Heavy flywheel" },
   { id: "riven-peak", name: "Riven Peak" },
-  { id: "hookwater", name: "Hookwater" },
   { id: "starharbor", name: "Starharbor" },
   { id: "spanford", name: "Spanford" },
   { id: "pinesward", name: "Pinesward" },
   { id: "northmere", name: "Northmere" },
-  { id: "stonestep", name: "Stonestep" },
-  { id: "beaconfell", name: "Beaconfell" },
   { id: "lowreach", name: "Lowreach" },
-  { id: "dawnshore", name: "Dawnshore" },
 ] as const;
 
 export type UtilityLogoId = (typeof UTILITY_LOGOS)[number]["id"];
@@ -27,6 +19,21 @@ export type UtilityLogoClaims = Readonly<Record<string, UtilityLogoId>>;
 const byId = new Map<string, (typeof UTILITY_LOGOS)[number]>(
   UTILITY_LOGOS.map((logo) => [logo.id, logo]),
 );
+
+// The save upgrade accepts these former choices without putting them back in the picker.
+const retiredUtilityLogos = new Set([
+  "reservoir-spillway",
+  "hookwater",
+  "dawnshore",
+  "beaconfell",
+  "cell-stack",
+  "stonestep",
+  "switch-contacts",
+  "transformer-coil",
+]);
+
+export const isRetiredUtilityLogo = (value: unknown): boolean =>
+  typeof value === "string" && retiredUtilityLogos.has(value);
 
 export const isUtilityLogo = (value: unknown): value is UtilityLogoId =>
   typeof value === "string" && byId.has(value);

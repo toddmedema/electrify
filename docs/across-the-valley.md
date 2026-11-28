@@ -226,6 +226,9 @@ plants, and dated power contracts. Confirmation requires a shared border, an up-
 quote, and enough cash. Trade shows the forecasted cash impact against
 omitting the agreement rather than assuming unlimited substitute purchases.
 
+Drag a supply trade higher in **Fleet** to give it first access to shared capacity.
+That order applies across inherited and newly signed trades.
+
 Scenario's Supply plan shares the existing tariff-sensitive projection. It shows
 the next year's customer count and peak demand, the first projected month below
 the difficulty's service threshold and future contract limits. Preparation dates use the real dated, difficulty-scaled quote

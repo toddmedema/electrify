@@ -6202,53 +6202,51 @@ function* supplyFacilitiesFinancesPhases(
     preRoll || !advanceConstruction ? now.minute : agreementEnd - stepMinutes;
   // A pregame build estimate includes the inherited supply already in place on opening day.
   const entitlementMinute = simulated && now.minute < 0 ? 0 : agreementStart;
-  // Eligibility belongs to the elapsed contract interval; physical readiness must
-  // share this dispatch frame's weather/scarcity budget with ordinary imports.
-  const readyAgreements = entitlementSources(
+  // Eligibility belongs to the elapsed interval, with this frame's physical supply.
+  // Reserve a manually ordered portfolio together so an older trade can claim capacity
+  // before a lower-ranked firm trade. Automatic dispatch keeps firm readiness first.
+  const manualAgreementOrder = !!transmission.agreementDispatchOrder?.length;
+  const readinessAgreements = entitlementSources(
     state,
     now,
     sharedClearing?.commitments,
-    true,
+    !manualAgreementOrder,
     false,
     excludedAgreementId,
     entitlementMinute,
   );
+  const readinessReservations = readinessAgreements.map((source) => ({
+    offer: source.offer,
+    watts: source.capacityW,
+  }));
   if (sharedClearing) {
-    sharedClearing.commitments.push(
-      ...readyAgreements.map((source) => ({
-        offer: source.offer,
-        watts: source.capacityW,
-      })),
-    );
-    // Every company's supplier readiness is assigned before buyer dispatch and physical spot flows.
+    sharedClearing.commitments.push(...readinessReservations);
+    // Every company assigns supplier readiness before buyer dispatch and physical spot flows.
     yield { kind: "ready" };
   }
   const commitmentReservations =
-    sharedClearing?.commitments ??
-    readyAgreements.map((source) => ({
-      offer: source.offer,
-      watts: source.capacityW,
-    }));
-  const legacyAgreements = entitlementSources(
-    state,
-    now,
-    [
-      ...commitmentReservations,
-      ...(sharedImports ?? []).filter(
-        (reservation) =>
-          !commitmentReservations.some(
-            (commitment) => commitment.offer === reservation.offer,
+    sharedClearing?.commitments ?? readinessReservations;
+  const legacyAgreements = manualAgreementOrder
+    ? []
+    : entitlementSources(
+        state,
+        now,
+        [
+          ...commitmentReservations,
+          ...(sharedImports ?? []).filter(
+            (reservation) =>
+              !commitmentReservations.some(
+                (commitment) => commitment.offer === reservation.offer,
+              ),
           ),
-      ),
-    ],
-    false,
-    true,
-    excludedAgreementId,
-    entitlementMinute,
-  );
-  // Honor the player's order when set. Otherwise use fully paid blocks first.
+        ],
+        false,
+        true,
+        excludedAgreementId,
+        entitlementMinute,
+      );
   const entitlementOffers = [
-    ...readyAgreements.map((source) => ({
+    ...readinessAgreements.map((source) => ({
       ...source,
       capacityW: source.paused ? 0 : source.capacityW,
     })),
@@ -7050,7 +7048,7 @@ function* supplyFacilitiesFinancesPhases(
     entitlementLeftW -= delivered;
     importCostPerHour += delivered * offer.pricePerMWh;
     const availableW = (
-      readyAgreements.find((source) => source.id === offer.id) ?? offer
+      readinessAgreements.find((source) => source.id === offer.id) ?? offer
     ).capacityW;
     const minutes = agreementIntervalMinutes(
       agreementStart,
