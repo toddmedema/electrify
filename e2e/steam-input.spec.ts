@@ -72,42 +72,6 @@ async function select(
   await expect(page.locator("#appStartup")).toHaveCount(0);
   await expect(control).toBeVisible();
   await expect(control).toBeEnabled();
-  const group = control.locator("..");
-  const roving =
-    (await control.getAttribute("tabindex")) === "-1" &&
-    ["group", "tablist"].includes((await group.getAttribute("role")) ?? "");
-  if (roving) {
-    // Roving groups expose one vertical tab stop. Enter it before moving within
-    // the group, just as a player does with the D-pad.
-    const entry = group.locator('button[tabindex="0"]');
-    await expect(entry).toHaveCount(1);
-    await select(page, entry, "down", limit);
-    const forward = await control.evaluate(
-      (element) =>
-        !!(
-          document.activeElement!.compareDocumentPosition(element) &
-          Node.DOCUMENT_POSITION_FOLLOWING
-        ),
-    );
-    const vertical =
-      (await group.getAttribute("aria-orientation")) === "vertical";
-    action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
-  }
-
-  if (
-    (await control.evaluate((element) => !!element.closest("#menuCard"))) &&
-    !(await page.locator(".couchSettingsPrompt").count())
-  ) {
-    for (let attempt = 0; attempt < limit; attempt++) {
-      if (
-        await control.evaluate((element) => element === document.activeElement)
-      )
-        return;
-      await input(page, action);
-    }
-    await expect(control, "reachable through the home menu loop").toBeFocused();
-    return;
-  }
   // Resolve the target and inspect each real D-pad stop in one browser call. Re-running
   // role queries across the map for every focus and geometry read dominates the journey on CI.
   const navigation = () =>
@@ -133,6 +97,12 @@ async function select(
           : undefined;
       const state = {
         count: targets.length,
+        homeLoop:
+          !!element?.closest("#menuCard") &&
+          !document.querySelector(".couchSettingsPrompt"),
+        roving:
+          element?.getAttribute("tabindex") === "-1" &&
+          !!element.parentElement?.matches('[role="group"],[role="tablist"]'),
         surfaces: visibleSurfaces.map((node) => [
           node.getAttribute("role"),
           node.id,
@@ -148,13 +118,13 @@ async function select(
         focused,
       };
       if (!element || !active || active === document.body || state.focused)
-        return { ...state, direction: "down", key: "body" };
+        return { ...state, directions: ["down"], key: "body" };
       if (
         active.matches(".worldMapMarker,.territoryTileTarget") &&
         !element.matches(".worldMapMarker,.territoryTileTarget")
       ) {
         // Every arrow belongs to map geography. Back returns to its toolbar.
-        return { ...state, direction: "back", key: "map" };
+        return { ...state, directions: ["back"], key: "map" };
       }
       const target = element.getBoundingClientRect();
       const from = active.getBoundingClientRect();
@@ -162,24 +132,85 @@ async function select(
         Math.min(from.bottom, target.bottom) >
         Math.max(from.top, target.top) +
           Math.min(from.height, target.height) / 2;
+      const horizontalDirection = target.left > from.left ? "right" : "left";
+      const verticalDirection = target.top > from.top ? "down" : "up";
       const horizontal =
         sameRow &&
         !active.matches(
           'input[type="range"],select,[role="combobox"],.accessibleChart > [role="img"]',
         );
+      // If the nearest row leads back here, try the other axis toward the
+      // destination before exploring directions that take us farther away.
+      const directions = horizontal
+        ? [horizontalDirection, verticalDirection]
+        : [verticalDirection, horizontalDirection];
+      // Roving groups consume arrows on their own axis. To leave one, try
+      // the perpendicular directions before exploring the other routes.
+      const group = active.parentElement;
+      if (
+        active.matches("button[tabindex]") &&
+        group?.matches('[role="group"],[role="tablist"]') &&
+        !group.contains(element) &&
+        group.querySelector(':scope > button[tabindex="-1"]')
+      ) {
+        const orientation =
+          group.getAttribute("aria-orientation") ??
+          (group.matches(".MuiToggleButtonGroup-vertical")
+            ? "vertical"
+            : group.matches('.MuiToggleButtonGroup-horizontal,[role="tablist"]')
+              ? "horizontal"
+              : undefined);
+        if (orientation === "vertical")
+          directions.unshift(
+            horizontalDirection,
+            horizontalDirection === "left" ? "right" : "left",
+          );
+        if (orientation === "horizontal")
+          directions.unshift(
+            verticalDirection,
+            verticalDirection === "up" ? "down" : "up",
+          );
+      }
       return {
         ...state,
-        direction: horizontal
-          ? target.left > from.left
-            ? "right"
-            : "left"
-          : target.top > from.top
-            ? "down"
-            : "up",
+        directions,
         key: `${active.tagName}/${active.id}/${active.getAttribute("aria-label")}/${active.textContent?.slice(0, 50)}/${active.parentElement?.textContent?.slice(0, 60)}`,
       };
     });
   let movement = await navigation();
+  expect(movement.count, "unique control at the start of navigation").toBe(1);
+  const roving = movement.roving;
+  if (roving) {
+    // Roving groups expose one vertical tab stop. Enter it before moving within
+    // the group, just as a player does with the D-pad.
+    const group = control.locator("..");
+    const entry = group.locator('button[tabindex="0"]');
+    await expect(entry).toHaveCount(1);
+    await select(page, entry, "down", limit);
+    const forward = await control.evaluate(
+      (element) =>
+        !!(
+          document.activeElement!.compareDocumentPosition(element) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+    );
+    const vertical =
+      (await group.getAttribute("aria-orientation")) === "vertical";
+    action = vertical ? (forward ? "down" : "up") : forward ? "right" : "left";
+    movement = await navigation();
+  }
+
+  if (movement.homeLoop) {
+    for (let attempt = 0; attempt < limit; attempt++) {
+      if (
+        await control.evaluate((element) => element === document.activeElement)
+      )
+        return;
+      await input(page, action);
+    }
+    await expect(control, "reachable through the home menu loop").toBeFocused();
+    return;
+  }
   const expectedSurfaces = movement.surfaces;
   const visited = new Map<string, number>();
   for (let attempt = 0; attempt <= limit; attempt++) {
@@ -202,13 +233,19 @@ async function select(
     if (movement.focused || attempt === limit) break;
     const count = visited.get(movement.key) ?? 0;
     visited.set(movement.key, count + 1);
-    const direction =
-      count < 2
-        ? roving
-          ? action
-          : movement.direction
-        : ["down", "right", "up", "left"][count % 4];
-    await input(page, direction as InputAction);
+    // Reaching the same stop again means the preceding choice led back here.
+    // Try a different direction before repeating that route.
+    const directions = [
+      ...new Set([
+        ...(roving ? [action] : []),
+        ...movement.directions,
+        "down",
+        "right",
+        "up",
+        "left",
+      ]),
+    ];
+    await input(page, directions[count % directions.length] as InputAction);
     movement = await navigation();
   }
   expect(
