@@ -98,16 +98,19 @@ npm run check:repair -- --base origin/master \
   --case 'controller:deck-800-light:e2e/steam-input.spec.ts:semantic actions play, build, adjust pricing, inspect charts and save at 125% interface scale'
 ```
 
-Each run verifies the clean candidate and target base, runs `check:prepush` plus types, lint
-and formatting, then runs the selected Jest files, check gates and browser cases. Repeat
-`--suite`, `--gate` or `--case` to cover affected callers. For a red covered Jest gate, include
-`--gate tests` to retain coverage and suite interactions. For prose-only changes, use the
-Markdown checks in [AGENTS.md](../AGENTS.md#start-here).
+Each run verifies a clean candidate and the resolved base, runs `check:prepush`, then the
+selected check gates. Types, lint, and formatting always run, followed by any `--gate` and the
+renderer builds the selected cases need. Selected Jest files, `--simulation`, and browser cases
+run after those gates. `--resume` can reuse verified gate evidence; every browser case still
+runs. Repeat `--suite`, `--gate`, or `--case` to cover affected callers. For a red covered Jest
+gate, include `--gate tests` to retain coverage and suite interactions. For prose-only changes,
+use the Markdown checks in [AGENTS.md](../AGENTS.md#start-here).
 
 - **Web UI, setup or fixtures.** Select the failed file, project and exact Playwright title with
-  the `web` runner to use the PR matrix. Use `web-all` for a case outside the matrix against
-  the production web build, and check any required motion preference there. Include desktop
-  and 390 px for changed UI flows or layouts, plus 360 px when minimum-width behavior can change.
+  the `web` runner to use the PR matrix, including its reduced motion. Use `web-all` for a case
+  outside the matrix against the production web build; that run does not force reduced motion.
+  Include desktop and 390 px for changed UI flows or layouts, plus 360 px when minimum-width
+  behavior can change.
 - **Map, motion, focus or controller.** Add the `controller` runner for affected Deck and TV
   journeys on the production desktop renderer. A workspace change can affect Map-to-Fleet chart
   focus and menu Escape. Shared motion changes can also affect pointer reorder and the TV
@@ -120,8 +123,8 @@ Markdown checks in [AGENTS.md](../AGENTS.md#start-here).
 - **Repairs spanning shared runtime boundaries.** Add `--full` for the complete local
   `check:ci` profile, such as a repair touching both map startup and multiplayer persistence.
   Keep any affected cases outside that profile, including cross-play. Use `--resume` to reuse
-  only evidence that the existing check runner verifies. Packaged Electron window tests stay
-  in hosted CI.
+  only check-gate evidence that the existing check runner verifies. Packaged Electron window
+  tests stay in hosted CI.
 
 For each explicit browser case, the command verifies the selection before launching it and
 requires an actual first-attempt pass. It retains the selection, results and failure artifacts

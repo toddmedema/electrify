@@ -2,39 +2,76 @@ const { execFileSync, spawnSync } = require("node:child_process");
 const { mkdirSync, mkdtempSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 const { parseArgs } = require("node:util");
-const { parseCheckArguments } = require("../check");
+const { configuredStep, parseCheckArguments, steps } = require("../check");
 
-const webBuild = ".tmp/check-builds/web";
-const desktopBuild = ".tmp/check-builds/desktop";
-const web = { E2E_BUILD_DIR: webBuild };
+// Follow check:ci. Local runs split web and desktop under .tmp/check-builds;
+// a hosted run keeps both in build/. A fixed .tmp path would test a stale tree.
+function buildDirectories(hosted = process.env.GITHUB_ACTIONS === "true") {
+  const step = (id) =>
+    configuredStep(
+      steps.find((entry) => entry.id === id),
+      hosted,
+    );
+  return {
+    web: step("build").env?.BUILD_PATH || "build",
+    desktop: step("desktop-build").env?.BUILD_PATH || "build",
+  };
+}
+
 const runners = {
-  web: { script: "test:e2e:ci", build: "build", env: web },
+  web: {
+    script: "test:e2e:ci",
+    build: "build",
+    env: (dirs) => ({ E2E_BUILD_DIR: dirs.web }),
+  },
   "web-all": {
     script: "test:e2e:production",
     build: "build",
-    env: { ...web, ELECTRIFY_E2E_ALL_SPECS: "1" },
+    env: (dirs) => ({
+      E2E_BUILD_DIR: dirs.web,
+      ELECTRIFY_E2E_ALL_SPECS: "1",
+    }),
   },
   controller: {
     script: "test:steam-input",
     build: "desktop-build",
-    env: { STEAM_INPUT_BUILD_DIR: desktopBuild },
+    env: (dirs) => ({ STEAM_INPUT_BUILD_DIR: dirs.desktop }),
   },
   multiplayer: {
     script: "test:multiplayer",
     build: "desktop-build",
-    env: { MULTIPLAYER_BUILD_DIR: desktopBuild },
+    env: (dirs) => ({ MULTIPLAYER_BUILD_DIR: dirs.desktop }),
   },
   crossplay: {
     script: "test:crossplay",
     build: "desktop-build",
-    env: { CROSSPLAY_BUILD_DIR: desktopBuild, CROSSPLAY_WEB_ONLY: "" },
+    env: (dirs) => ({
+      CROSSPLAY_BUILD_DIR: dirs.desktop,
+      CROSSPLAY_WEB_ONLY: "",
+    }),
   },
   "crossplay-web": {
     script: "test:crossplay",
     build: "build",
-    env: { CROSSPLAY_BUILD_DIR: webBuild, CROSSPLAY_WEB_ONLY: "1" },
+    env: (dirs) => ({
+      CROSSPLAY_BUILD_DIR: dirs.web,
+      CROSSPLAY_WEB_ONLY: "1",
+    }),
   },
 };
+
+function browserEnvironment(
+  name,
+  hosted = process.env.GITHUB_ACTIONS === "true",
+) {
+  return {
+    // Match the check gate: forbid-only, trace weight, and CI-only skips.
+    CI: "true",
+    E2E_BASE_URL: "",
+    ELECTRIFY_E2E_ALL_SPECS: "",
+    ...runners[name].env(buildDirectories(hosted)),
+  };
+}
 
 const usage = `Usage: npm run check:repair -- --base <PR-base-ref>
        [--suite <Jest-test-file>] [--gate <check-step>]
@@ -57,20 +94,25 @@ function parseRepairArguments(args) {
       resume: { type: "boolean" },
     },
   });
-  if (
-    !values.base?.trim() ||
-    !(
-      values.suite.length ||
-      values.gate.length ||
-      values.case.length ||
-      values.full
-    )
-  )
+  const selected =
+    values.suite.length ||
+    values.gate.length ||
+    values.case.length ||
+    values.full;
+  if (!values.base?.trim() || !selected) {
+    if (values.base?.trim() && values.simulation && !selected)
+      throw new Error(
+        "--simulation only adds npm run sim -- --all. Also select a suite, gate, case, or --full.\n" +
+          usage,
+      );
     throw new Error(usage);
-  for (const suite of values.suite) {
-    if (!/^src\/[\w./-]+\.(test|spec)\.[jt]sx?$/.test(suite))
-      throw new Error(`Use a Jest test file under src/ for --suite: ${suite}`);
   }
+  const suite = values.suite.map((file) => {
+    const normalized = path.posix.normalize(file);
+    if (!/^src\/[\w./-]+\.(test|spec)\.[jt]sx?$/.test(normalized))
+      throw new Error(`Use a Jest test file under src/ for --suite: ${file}`);
+    return normalized;
+  });
   const cases = values.case.map((selector) => {
     const match = /^([\w-]+):([\w-]+):(e2e\/[\w./-]+\.spec\.ts):(.+)$/.exec(
       selector,
@@ -90,7 +132,7 @@ function parseRepairArguments(args) {
     ]),
   ];
   parseCheckArguments(["--steps", gates.join(",")]);
-  return { ...values, cases, gates };
+  return { ...values, suite, cases, gates };
 }
 
 function reportedCases(suites) {
@@ -102,19 +144,29 @@ function reportedCases(suites) {
   ]);
 }
 
+function sameCase(entry, wanted) {
+  return (
+    `e2e/${entry.spec.file}` === wanted.file &&
+    entry.spec.title === wanted.title &&
+    entry.test.projectName === wanted.project
+  );
+}
+
 function requireCase(report, wanted) {
-  const cases = reportedCases(report.suites);
-  const [{ spec, test } = {}] = cases;
-  if (
-    cases.length !== 1 ||
-    `e2e/${spec.file}` !== wanted.file ||
-    spec.title !== wanted.title ||
-    test.projectName !== wanted.project
-  )
+  const cases = reportedCases(report.suites ?? []);
+  if (cases.length !== 1 || !sameCase(cases[0], wanted)) {
+    const found = cases
+      .slice(0, 3)
+      .map(
+        ({ spec, test }) =>
+          `${test.projectName} / e2e/${spec.file} / ${spec.title}`,
+      )
+      .join("; ");
     throw new Error(
-      `Expected exactly one matching case for ${wanted.project} / ${wanted.file} / ${wanted.title}; selected ${cases.length}.`,
+      `Expected exactly one matching case for ${wanted.project} / ${wanted.file} / ${wanted.title}; selected ${cases.length}${found ? `: ${found}` : ""}.`,
     );
-  return test;
+  }
+  return cases[0].test;
 }
 
 function requireFirstAttemptPass(report, wanted) {
@@ -183,18 +235,30 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Playwright greps the file, describes, title, and tags joined by spaces.
+// Anchor the leaf title so "save" does not also run "save the game".
+// Option tags are appended after the title, so a trailing @tag is allowed.
+// requireCase still rejects a different title that only adds that tag.
+function grepPattern(title) {
+  return `(?:^|\\s)${escapeRegex(title)}(?:\\s@\\S+)*$`;
+}
+
+function browserSelection(wanted) {
+  return [
+    `(?:^|[/\\\\])${escapeRegex(wanted.file)}$`,
+    `--project=${wanted.project}`,
+    `--grep=${grepPattern(wanted.title)}`,
+  ];
+}
+
 function runBrowserCase(wanted, directory) {
   mkdirSync(directory);
   print(`\nChecking ${wanted.runner} / ${wanted.project} / ${wanted.title}`);
-  const { script, env } = runners[wanted.runner];
-  const selection = [
-    `${escapeRegex(wanted.file)}$`,
-    `--project=${wanted.project}`,
-    `--grep=${escapeRegex(wanted.title)}`,
-  ];
+  const { script } = runners[wanted.runner];
+  const selection = browserSelection(wanted);
   const listReport = path.join(directory, "selection.json");
   const runReport = path.join(directory, "results.json");
-  const browserEnv = { E2E_BASE_URL: "", ELECTRIFY_E2E_ALL_SPECS: "", ...env };
+  const browserEnv = browserEnvironment(wanted.runner);
   npm(script, [...selection, "--list", "--reporter=json"], {
     ...browserEnv,
     PLAYWRIGHT_JSON_OUTPUT_FILE: listReport,
@@ -258,4 +322,12 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseRepairArguments, requireCase, requireFirstAttemptPass };
+module.exports = {
+  parseRepairArguments,
+  requireCase,
+  requireFirstAttemptPass,
+  browserEnvironment,
+  browserSelection,
+  grepPattern,
+  buildDirectories,
+};
