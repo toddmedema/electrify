@@ -81,6 +81,7 @@ export function hexWires<T extends HexPosition>(
 export function waterPorts(
   tile: Pick<HexPosition, "q" | "r"> & { terrain: string },
   terrainAt: ReadonlyMap<string, string>,
+  offMapRiverEdge?: number | null,
 ): number[] {
   const neighbors = HEX_NEIGHBORS.map(([dq, dr]) =>
     terrainAt.get(key({ q: tile.q + dq, r: tile.r + dr })),
@@ -95,7 +96,13 @@ export function waterPorts(
   const opposite = ((rivers[0] ?? 3) + 3) % HEX_NEIGHBORS.length;
   const mouth = closestHexEdge(coast, opposite);
   const ports = [...rivers, ...lakes, ...(mouth === undefined ? [] : [mouth])];
-  if (ports.length === 1 && !lakes.length && mouth === undefined) {
+  if (offMapRiverEdge != null) ports.push(offMapRiverEdge);
+  else if (
+    offMapRiverEdge === undefined &&
+    ports.length === 1 &&
+    !lakes.length &&
+    mouth === undefined
+  ) {
     const exit = closestHexEdge(
       edges((terrain) => terrain === undefined),
       opposite,

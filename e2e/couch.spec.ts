@@ -573,6 +573,8 @@ async function checkCouchPurchases(
   );
   const couch = await createCouchFixture(context, page, {
     nativeBindings: true,
+    // Separate pages need the same emulated motion preference as the shell.
+    reduceSeatMotion: true,
   });
   await startCouch(page, couch, seed);
   const p1 = couch.seats.get("local-p1")!.page;
@@ -732,29 +734,21 @@ async function checkCouchPurchases(
   await expect(
     p2.getByRole("region", { name: "Insights", exact: true }),
   ).toBeVisible();
-  for (const seat of [p1, p2]) {
-    const dismiss = seat.getByRole("button", {
-      name: "Dismiss notification",
-      exact: true,
-    });
-    if (await dismiss.isVisible()) await dismiss.click();
-    await expect(dismiss).toHaveCount(0);
-  }
   if (megawatts === 50 && process.env.REVIEW_SCREENSHOT_DIR) {
-    await p1.screenshot({
-      path: path.join(
-        process.env.REVIEW_SCREENSHOT_DIR,
-        `couch-p1-${info.project.name}.png`,
-      ),
-      animations: "disabled",
-    });
-    await p2.screenshot({
-      path: path.join(
-        process.env.REVIEW_SCREENSHOT_DIR,
-        `couch-p2-${info.project.name}.png`,
-      ),
-      animations: "disabled",
-    });
+    // A toast can expire during a click. Hide it only in the capture and leave both seats intact.
+    for (const [id, seat] of [
+      ["p1", p1],
+      ["p2", p2],
+    ] as const) {
+      await seat.screenshot({
+        path: path.join(
+          process.env.REVIEW_SCREENSHOT_DIR,
+          `couch-${id}-${info.project.name}.png`,
+        ),
+        animations: "disabled",
+        style: ".snackbar { visibility: hidden !important; }",
+      });
+    }
   }
   await couch.input({ "101": ["back"] });
   await expect(purchase1).toHaveCount(0);
@@ -918,7 +912,7 @@ test("TV couch intertie construction requires approval from both company owners"
   await expect.poll(() => couch.seats.size).toBe(0);
   const complete = couch.checkpoint()!;
   const edge = complete.edges[0];
-  expect(complete.spec.territorialVersion).toBe(1);
+  expect(complete.spec.territorialVersion).toBe(2);
   expect(edge).toMatchObject({ ratingW: 0, flowW: 0 });
   const lines = complete.grids.map(({ transmission }) =>
     transmission!.lines.find(

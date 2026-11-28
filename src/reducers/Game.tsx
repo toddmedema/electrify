@@ -18,6 +18,7 @@ import {
 } from "../helpers/TerritoryTiles";
 import {
   createMultiplayerTerritory,
+  type TerritorialState,
   multiplayerBuildAvailability,
   multiplayerClaimQuote,
   multiplayerHydroAvailability,
@@ -500,7 +501,10 @@ interface NewGameAction {
   customers: number;
   location: LocationType;
   seed?: number; // Omitted in normal play; pin it to get a reproducible run (headless sim, bug repros)
-  territorialStart?: { seatIndex: number; seatCount: number };
+  territorialStart?: Pick<
+    TerritorialState,
+    "seatIndex" | "seatCount" | "version"
+  >;
 }
 
 let previousTickMs = 0;
@@ -2152,11 +2156,12 @@ export const gameSlice = createSlice({
         state.timeline = reforecastDemand(state);
       }
       if (a.territorialStart) {
-        const { seatIndex, seatCount } = a.territorialStart;
+        const { seatIndex, seatCount, version } = a.territorialStart;
         const { facilities, multiplayer } = createMultiplayerTerritory(
           state,
           seatIndex,
           seatCount,
+          version,
         );
         state.facilities = facilities;
         state.multiplayer = multiplayer;

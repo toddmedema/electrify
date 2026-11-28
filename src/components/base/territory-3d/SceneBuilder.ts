@@ -48,6 +48,7 @@ import type {
 interface TileScene {
   weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
+  offMapRiverEdge?: TerritoryTileView["offMapRiverEdge"];
   kind?: StructureKind;
   size?: FacilitySize;
   growth?: readonly CityGrowthSector[];
@@ -305,6 +306,7 @@ export class SceneBuilder {
       if (
         !cell ||
         cell.tile !== tile ||
+        cell.offMapRiverEdge !== view.offMapRiverEdge ||
         cell.kind !== kind ||
         cell.size !== size ||
         cell.growth !== growth ||
@@ -319,7 +321,7 @@ export class SceneBuilder {
         const position = tilePosition3D(tile);
         const ports =
           tile.terrain === "river" || tile.terrain === "lake"
-            ? waterPorts(tile, this.terrainAt)
+            ? waterPorts(tile, this.terrainAt, view.offMapRiverEdge)
             : undefined;
         const terrain = this.factories.terrain(tile.terrain, {
           footprint: model?.footprint ?? 0,
@@ -333,7 +335,9 @@ export class SceneBuilder {
                 ? terrainArtHash(tile.q, tile.r) >>> 30
                 : undefined,
           ports,
-          ...(tile.terrain === "mountain" || tile.terrain === "forest"
+          ...(tile.terrain === "mountain" ||
+          tile.terrain === "forest" ||
+          tile.terrain === "lake"
             ? {
                 adjacentEdges: HEX_NEIGHBORS.reduce(
                   (edges, [dq, dr], edge) =>
@@ -378,6 +382,7 @@ export class SceneBuilder {
           : undefined;
         cell = {
           tile,
+          offMapRiverEdge: view.offMapRiverEdge,
           weather,
           cabled,
           kind,

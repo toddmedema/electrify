@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { waterPorts } from "../components/base/TerritoryHexGeometry";
 import { resolve } from "node:path";
 import {
   getRegionalGeography,
@@ -76,6 +77,53 @@ it("uses the drawn water direction and keeps local references distinct from fall
     getRegionalGeography(arbitrary, 2050, 999, customerSources).utility,
   ).toBe("Example City model grid");
 });
+
+it("renders isolated inland water as lakes, including a lone edge sample", () => {
+  const { terrainAt } = getRegionalGeography(cities.Manassas, 2026, 106);
+  expect(terrainAt({ q: 1, r: 2 })).toBe("lake");
+  expect(terrainAt({ q: 0, r: 5 })).toBe("lake");
+});
+
+it("keeps coastal water, including a clipped shore with a known offshore point", () => {
+  const oslo = getRegionalGeography(cities.Oslo, 2026, 999);
+  const sanFrancisco = getRegionalGeography(cities.SF, 2026, 100);
+  expect(oslo.terrainAt({ q: -5, r: 5 })).toBe("ocean");
+  expect(sanFrancisco.terrainAt({ q: -4, r: 0 })).toBe("ocean");
+});
+
+it("preserves tidal water where the sampled harbor opening is too narrow", () => {
+  const { terrainAt } = getRegionalGeography(cities.Auckland, 2026, 999);
+  expect(terrainAt({ q: -2, r: 2 })).toBe("ocean");
+  expect(terrainAt({ q: -1, r: 2 })).toBe("ocean");
+});
+
+it.each([
+  { city: "Belgrade", q: 0, r: -5, ports: [1, 5] },
+  { city: "MexicoCity", q: -3, r: -2, ports: [0] },
+])(
+  "keeps the river approach stable at $city's opening map edge",
+  ({ city, q, r, ports }) => {
+    const game = createGame({ scenarioId: 106, seed: 931 });
+    const location = cities[city];
+    const board = regionalMapViews({ ...game, location });
+    const cell = board.find(({ tile }) => tile.q === q && tile.r === r)!;
+    expect(cell.tile.terrain).toBe("river");
+    const visibleTerrain = new Map(
+      board.map(({ tile }) => [`${tile.q},${tile.r}`, tile.terrain]),
+    );
+    expect(waterPorts(cell.tile, visibleTerrain, cell.offMapRiverEdge)).toEqual(
+      ports,
+    );
+    const { terrainAt } = getRegionalGeography(location, 2026, 106);
+    const expandedTerrain = new Map(
+      regionalHexes(REGIONAL_MAP_RADIUS + 1).map((coordinate) => [
+        `${coordinate.q},${coordinate.r}`,
+        terrainAt(coordinate),
+      ]),
+    );
+    expect(waterPorts(cell.tile, expandedTerrain)).toEqual(ports);
+  },
+);
 
 it.each([
   { city: "Austin", upstream: { q: -5, r: 1 }, downstream: { q: 3, r: 2 } },

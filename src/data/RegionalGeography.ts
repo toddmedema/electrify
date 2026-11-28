@@ -26,6 +26,8 @@ export function regionalHexes(radius: number): HexCoordinate[] {
 }
 
 type Ridge = readonly [q: number, r: number, width: number];
+export type RegionalMapVersion = 1 | 2;
+
 interface ResearchedRegion {
   city: string;
   utility: readonly (readonly [since: number, name: string])[];
@@ -33,6 +35,8 @@ interface ResearchedRegion {
   treeCover?: "sparse" | "wooded";
   /** Small waterways identifiable from local maps but below the global layer's resolution. */
   river?: readonly (readonly [q: number, r: number])[];
+  /** Later samples omitted when reconstructing a published version 1 board. */
+  riverAddedInVersion2?: readonly (readonly [q: number, r: number])[];
 }
 
 /** Local source notes and historical utility attribution are in docs/regional-maps.md. */
@@ -109,17 +113,19 @@ const RESEARCHED_REGIONS: Readonly<Partial<Record<string, ResearchedRegion>>> =
         [-3, -1, 2],
       ],
       treeCover: "sparse",
+      riverAddedInVersion2: [
+        [-2, 1],
+        [2, 2],
+      ],
       river: [
         [-5, 1],
         [-4, 0],
         [-3, 0],
         [-2, 0],
-        [-2, 1],
         [-1, 1],
         [0, 1],
         [1, 1],
         [2, 1],
-        [2, 2],
         [3, 2],
       ],
     },
@@ -233,9 +239,7 @@ const waterEntries: Readonly<
 > = waterAtlas.regions;
 const coreHexes = regionalHexes(REGIONAL_MAP_RADIUS);
 
-// Adjacent entries in each ring also border each other. Two consecutive river
-// neighbors would draw a tiny loop at the corner shared by all three tiles.
-const riverRoutingCells = new Map(
+const regionalWaterCells = new Map(
   coreHexes.map((cell) => [
     `${cell.q}:${cell.r}`,
     {
@@ -245,16 +249,40 @@ const riverRoutingCells = new Map(
   ]),
 );
 
+function classifyInlandWater(water: Map<string, TerrainType>) {
+  const unclassified = new Set(
+    Array.from(water).flatMap(([id, terrain]) =>
+      terrain === "ocean" ? [id] : [],
+    ),
+  );
+  for (const root of unclassified) {
+    const basin = [root];
+    unclassified.delete(root);
+    for (const id of basin) {
+      for (const neighbor of regionalWaterCells.get(id)!.ring)
+        if (unclassified.delete(neighbor)) basin.push(neighbor);
+    }
+    const reachesEdge = basin.some(
+      (id) => regionalWaterCells.get(id)!.radius === REGIONAL_MAP_RADIUS,
+    );
+    // An isolated sample at the edge is weak evidence of a coast.
+    if (reachesEdge && basin.length > 1) continue;
+    for (const id of basin) water.set(id, "lake");
+  }
+}
+
 function routeRivers(water: Map<string, TerrainType>) {
   const rivers = new Set(
     Array.from(water).flatMap(([id, terrain]) =>
-      terrain === "river" && id !== "0:0" && riverRoutingCells.has(id)
+      terrain === "river" && id !== "0:0" && regionalWaterCells.has(id)
         ? [id]
         : [],
     ),
   );
-  const ring = (id: string) => riverRoutingCells.get(id)!.ring;
+  const ring = (id: string) => regionalWaterCells.get(id)!.ring;
   const neighbors = (id: string) => ring(id).filter((next) => rivers.has(next));
+  // Adjacent entries in each ring also border each other. Two consecutive river
+  // neighbors would draw a tiny loop at the corner shared by all three tiles.
   const trianglesAt = (id: string) =>
     ring(id).filter(
       (next, edge, cells) =>
@@ -291,7 +319,7 @@ function routeRivers(water: Map<string, TerrainType>) {
     const candidates = ring(id).filter(
       (next) =>
         next !== "0:0" &&
-        riverRoutingCells.has(next) &&
+        regionalWaterCells.has(next) &&
         !rivers.has(next) &&
         water.get(next) !== "ocean" &&
         water.get(next) !== "lake",
@@ -336,8 +364,8 @@ function routeRivers(water: Map<string, TerrainType>) {
         .sort(
           (a, b) =>
             b.triangles - a.triangles ||
-            riverRoutingCells.get(b.id)!.radius -
-              riverRoutingCells.get(a.id)!.radius,
+            regionalWaterCells.get(b.id)!.radius -
+              regionalWaterCells.get(a.id)!.radius,
         );
       if (crowded.length === 0) break;
       if (crowded.some(({ id }) => removeRedundant(id))) continue;
@@ -358,10 +386,10 @@ function routeRivers(water: Map<string, TerrainType>) {
   }
 
   const boundary = (id: string) =>
-    riverRoutingCells.get(id)!.radius === REGIONAL_MAP_RADIUS;
+    regionalWaterCells.get(id)!.radius === REGIONAL_MAP_RADIUS;
   const dry = (id: string) =>
     id !== "0:0" &&
-    riverRoutingCells.has(id) &&
+    regionalWaterCells.has(id) &&
     !rivers.has(id) &&
     water.get(id) !== "ocean" &&
     water.get(id) !== "lake";
@@ -435,7 +463,7 @@ function routeRivers(water: Map<string, TerrainType>) {
   completeReaches();
 
   for (const [id, terrain] of water)
-    if (terrain === "river" && riverRoutingCells.has(id) && !rivers.has(id))
+    if (terrain === "river" && regionalWaterCells.has(id) && !rivers.has(id))
       water.delete(id);
   for (const id of rivers) water.set(id, "river");
 }
@@ -520,7 +548,9 @@ function towardOffshore(location: LocationType, point: GeographicPoint) {
   const longitude = ((point.long - location.long + 540) % 360) - 180;
   const east = longitude * cos((location.lat * Math.PI) / 180);
   const south = location.lat - point.lat;
-  return { east, south, distance: Math.hypot(east, south) };
+  // Engines implement Math.hypot differently. Square root is correctly rounded everywhere,
+  // so every crossplay device derives the same coastline.
+  return { east, south, distance: Math.sqrt(east * east + south * south) };
 }
 
 function nearestOffshore(location: LocationType): GeographicPoint | undefined {
@@ -548,6 +578,7 @@ export function getRegionalGeography(
   startingYear: number,
   scenarioId: number,
   sources?: DataCenterCustomerSources,
+  version: RegionalMapVersion = 2,
 ): RegionalGeography {
   const entry = Object.hasOwn(waterEntries, location.id)
     ? waterEntries[location.id]
@@ -579,12 +610,12 @@ export function getRegionalGeography(
     sourcedUtility ??
     `${city} model grid`;
   const [, , samples, offshoreLat, offshoreLong] = sameLocation ? entry : [];
-  const offshore =
+  const mappedCoast =
     typeof offshoreLat === "number" && typeof offshoreLong === "number"
       ? { lat: offshoreLat, long: offshoreLong }
-      : location.offshore
-        ? nearestOffshore(location)
-        : undefined;
+      : undefined;
+  const offshore =
+    mappedCoast ?? (location.offshore ? nearestOffshore(location) : undefined);
   const water = new Map<string, TerrainType>();
   if (typeof samples === "string") {
     coreHexes.forEach(({ q, r }, index) => {
@@ -592,8 +623,12 @@ export function getRegionalGeography(
         WATER_TERRAIN[samples[index] as keyof typeof WATER_TERRAIN];
       if (terrain) water.set(`${q}:${r}`, terrain);
     });
+    // A vetted offshore reference preserves sampled tidal water where the atlas
+    // is too coarse to show a narrow strait. Explicit lake samples stay lakes.
+    if (version === 2 && !mappedCoast) classifyInlandWater(water);
   }
-  for (const [q, r] of region?.river ?? []) {
+  const additions = version === 2 ? region?.riverAddedInVersion2 : undefined;
+  for (const [q, r] of [...(region?.river ?? []), ...(additions ?? [])]) {
     const key = `${q}:${r}`;
     if (!water.has(key)) water.set(key, "river");
   }
@@ -618,8 +653,9 @@ export function getRegionalGeography(
       if (!water.has(key) && [q, r, q + r][axis] === 1) water.set(key, "river");
     }
   }
-  routeRivers(water);
-  const exits = riverExits(water);
+  // Version 1 match saves replay the published board from the original samples.
+  if (version === 2) routeRivers(water);
+  const exits = version === 2 ? riverExits(water) : [];
   // Texture between landmarks is schematic and fixed to the location, across starts and saves.
   const treeChance =
     region?.treeCover === "wooded"

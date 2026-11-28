@@ -379,6 +379,56 @@ it.each(["river", "lake"] as const)(
   },
 );
 
+it.each([
+  { ports: [1, 2], shape: "tight bend" },
+  { ports: [1, 3], shape: "wide bend" },
+  { ports: [0, 2, 4], shape: "junction" },
+])("keeps the interior banks smooth at a $shape", ({ ports }) => {
+  const faces = waterTriangles(getTerrainModel("river", { ports }));
+  const edges = new Map<string, { a: Vec3; b: Vec3; count: number }>();
+  for (const face of faces) {
+    face.forEach((a, i) => {
+      const b = face[(i + 1) % face.length];
+      const key = [a.join(","), b.join(",")].sort().join("|");
+      const edge = edges.get(key);
+      if (edge) edge.count++;
+      else edges.set(key, { a, b, count: 1 });
+    });
+  }
+  const banks = new Map<string, { point: Vec3; neighbors: Vec3[] }>();
+  for (const { a, b, count } of edges.values()) {
+    if (count !== 1) continue;
+    for (const [point, neighbor] of [
+      [a, b],
+      [b, a],
+    ]) {
+      const [x, , z] = point;
+      // Port lips are joined to their neighbors and are not interior bank points.
+      if (
+        Math.abs(x) >= 0.5 - EPSILON ||
+        Math.abs(z) + Math.abs(x) / Math.sqrt(3) >= GROUND_RADIUS - EPSILON
+      )
+        continue;
+      const key = point.join(",");
+      const bank = banks.get(key) ?? { point, neighbors: [] };
+      bank.neighbors.push(neighbor);
+      banks.set(key, bank);
+    }
+  }
+  expect(banks.size).toBeGreaterThan(0);
+  for (const {
+    point: [x, , z],
+    neighbors,
+  } of banks.values()) {
+    expect(neighbors).toHaveLength(2);
+    const [[ax, , az], [bx, , bz]] = neighbors;
+    const cosine =
+      ((x - ax) * (bx - x) + (z - az) * (bz - z)) /
+      (Math.hypot(x - ax, z - az) * Math.hypot(bx - x, bz - z));
+    expect(cosine).toBeGreaterThan(Math.SQRT1_2);
+  }
+});
+
 it.each(["river", "lake"] as const)(
   "joins a river to a %s at identical world-space water cross-sections",
   (terrain) => {
@@ -409,13 +459,65 @@ it.each(["river", "lake"] as const)(
   },
 );
 
-it("draws three feeder streams inside an inland headwater", () => {
-  const mesh = getTerrainModel("river", { ports: [1] });
-  const banks = waterTriangles(mesh)
-    .flat()
-    .filter(([x]) => Math.abs(x + 0.19) < EPSILON);
-  expect(new Set(banks.map(([, , z]) => z.toFixed(5))).size).toBe(6);
+it("gives neighboring lake tiles a shared basin and retains the narrower river mouth", () => {
+  const west = getTerrainModel("lake", {
+    adjacentEdges: 1 << 1,
+    ports: [4],
+    variant: 1,
+  });
+  const east = getTerrainModel("lake", { adjacentEdges: 1 << 4, variant: 2 });
+  const westShore = edgeWater(west, 1)
+    .map(([, y, z]) => [y, z])
+    .sort();
+  const eastShore = edgeWater(east, 4)
+    .map(([, y, z]) => [y, z])
+    .sort();
+  expect(westShore).toEqual(eastShore);
+  expect(westShore).toHaveLength(2);
+  expect(Math.abs(westShore[0][1] - westShore[1][1])).toBeGreaterThan(
+    GROUND_RADIUS * 0.8,
+  );
+  const [[, , a], [, , b]] = edgeWater(west, 4);
+  expect(Math.abs(a - b)).toBeCloseTo(0.29, 6);
 });
+
+it("gives isolated lakes distinct shore shapes for each art variant", () => {
+  const shapes = [0, 1, 2, 3].map((variant) =>
+    waterTriangles(getTerrainModel("lake", { variant })),
+  );
+  expect(new Set(shapes.map((shape) => JSON.stringify(shape))).size).toBe(4);
+});
+
+it.each([0, 1])(
+  "joins headwater feeders one at a time for variant %i",
+  (variant) => {
+    const model = getTerrainModel("river", { ports: [1], variant });
+    const water = waterTriangles(model);
+    const sections = [-0.21, 0.025, 0.34].map((distance) => {
+      const spans = water.flatMap((face) => {
+        const banks = face.flatMap(([x, , z], index) => {
+          const [nextX, , nextZ] = face[(index + 1) % face.length];
+          const before = x < distance;
+          const nextBefore = nextX < distance;
+          return before === nextBefore
+            ? []
+            : [z + ((distance - x) / (nextX - x)) * (nextZ - z)];
+        });
+        return banks.length ? [[Math.min(...banks), Math.max(...banks)]] : [];
+      });
+      spans.sort(([a], [b]) => a - b);
+      let bank = -Infinity;
+      let channels = 0;
+      for (const [left, right] of spans) {
+        if (left > bank + EPSILON) channels++;
+        bank = Math.max(bank, right);
+      }
+      return channels;
+    });
+    expect(sections).toEqual([3, 2, 1]);
+    expect(edgeWater(model, 1)).toHaveLength(2);
+  },
+);
 
 it("keeps a river crossing open even at the lowest water level", () => {
   const [lowWater] = WATERSHED_LEVEL_OFFSETS;

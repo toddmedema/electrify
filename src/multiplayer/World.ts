@@ -295,7 +295,7 @@ export function matchScenario(spec: MatchSpec): {
         scenario.mod.parameters.difficulty !== spec.difficulty)) ||
     (scenario.id === CUSTOM_SCENARIO_ID && scenario.rules !== undefined) ||
     (spec.territorialVersion !== undefined &&
-      (spec.territorialVersion !== 1 ||
+      ((spec.territorialVersion !== 1 && spec.territorialVersion !== 2) ||
         !validCoopCustomScenario(spec.customScenario))) ||
     (spec.scenarioId === CUSTOM_SCENARIO_ID) !== !!spec.customScenario ||
     !DIFFICULTY_IDS.includes(spec.difficulty) ||
@@ -320,7 +320,8 @@ export function createWorld(
   // A running match owns its selection; later library edits cannot replace its snapshot.
   spec = cloneDeep(spec);
   const { scenario, location } = matchScenario(spec);
-  const territorial = spec.territorialVersion === 1;
+  const { territorialVersion } = spec;
+  const territorial = territorialVersion !== undefined;
   // Every company plays the scenario as authored, on one seed, so weather and stories match.
   const seed = scenario.seed ?? storyHash(matchId) >>> 0;
   selectWeatherLocation(location.id);
@@ -342,9 +343,14 @@ export function createWorld(
         customers: scenario.startingCustomers || getStartingCustomers(location),
         location,
         seed,
-        territorialStart: territorial
-          ? { seatIndex: index, seatCount: seats.length }
-          : undefined,
+        territorialStart:
+          territorialVersion !== undefined
+            ? {
+                seatIndex: index,
+                seatCount: seats.length,
+                version: territorialVersion,
+              }
+            : undefined,
       }),
     );
     const result = cloneGrid(game);
@@ -564,7 +570,10 @@ function applyCommandOnce(
       name = "acquireTile";
       validation.payload = { tileId: quote.tileId, quoteKey: quote.quoteKey };
     }
-    if (name === "buildTransmissionLine" && world.spec.territorialVersion === 1)
+    if (
+      name === "buildTransmissionLine" &&
+      world.spec.territorialVersion !== undefined
+    )
       return coSignBuild(world, sender, validation.payload as ConnectionOrder);
     if (
       name === "upgradeTransmissionLine" &&
@@ -756,7 +765,7 @@ function coSignUpgrade(
   if (!isActive(world, partner.id))
     return `${partner.name}'s company has retired`;
   const own = world.grids[world.seats.findIndex((s) => s.id === sender)];
-  const territorial = world.spec.territorialVersion === 1;
+  const territorial = world.spec.territorialVersion !== undefined;
   if (territorial) {
     if (edge.disabled || !edge.crossing || edge.proposal)
       return "Finish the connection before upgrading it";
@@ -919,7 +928,8 @@ export function stepWorld(world: World): void {
       lines.some(
         (l) =>
           l.paused ||
-          (world.spec.territorialVersion === 1 && l.yearsToBuildLeft > 0),
+          (world.spec.territorialVersion !== undefined &&
+            l.yearsToBuildLeft > 0),
       ) ||
       !isActive(world, edge.a) ||
       !isActive(world, edge.b);
@@ -1022,7 +1032,7 @@ export function stepWorld(world: World): void {
       line.currentFlowW = 0;
     });
   });
-  if (world.spec.territorialVersion === 1)
+  if (world.spec.territorialVersion !== undefined)
     for (const edge of world.edges) {
       if (isActive(world, edge.a) && isActive(world, edge.b)) continue;
       edge.disabled = true;
@@ -1442,7 +1452,7 @@ function validGrid(
     }
   }
   const scenario = getScenario(g.scenarioId, g.customScenario)!;
-  const territorial = world.spec.territorialVersion === 1;
+  const territorial = world.spec.territorialVersion !== undefined;
   const expectedConnections = initial.grids[i].transmission!.lines;
   const constructedPeerCorridors = territorial
     ? world.edges.flatMap((edge) =>
@@ -1553,7 +1563,7 @@ function validEdges(world: World, ids: Set<string>, initial: World) {
   const pairs = new Set<string>();
   return world.edges.every((edge) => {
     if (!edge || typeof edge !== "object") return false;
-    const territorial = world.spec.territorialVersion === 1;
+    const territorial = world.spec.territorialVersion !== undefined;
     const pair = [edge.a, edge.b].sort().join(":");
     const expected = initial.edges.find((e) => e.id === edge.id);
     const endpoints = [edge.a, edge.b].map(

@@ -69,6 +69,25 @@ function setup() {
   };
 }
 
+test("neighboring lake tiles share wide basin edges without adding river ports", () => {
+  const west = view();
+  west.tile = { ...west.tile, terrain: "lake" };
+  const east = view(1);
+  east.tile = { ...east.tile, terrain: "lake" };
+  const { builder, terrain } = setup();
+  builder.build([west, east], [west.tile, east.tile], [], 0, "run");
+  expect(terrain).toHaveBeenNthCalledWith(
+    1,
+    "lake",
+    expect.objectContaining({ adjacentEdges: 1 << 1, ports: [] }),
+  );
+  expect(terrain).toHaveBeenNthCalledWith(
+    2,
+    "lake",
+    expect.objectContaining({ adjacentEdges: 1 << 4, ports: [] }),
+  );
+});
+
 test("a wildfire follows raised terrain and joins only adjacent active fuel", () => {
   const burning = { ground: "burning", condition: "Wildfire burning" } as const;
   const slope: TerritoryTileView = {

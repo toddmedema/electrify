@@ -76,14 +76,19 @@ function surface(builder: MeshBuilder, polygon: readonly Vec3[], color: RGB) {
   }
 }
 
-function substrate(builder: MeshBuilder, water: boolean, riverPorts: number) {
+function substrate(
+  builder: MeshBuilder,
+  water: boolean,
+  ports: number,
+  lakeEdges = 0,
+) {
   const side = water ? PALETTE.oceanFloor : PALETTE.earthShade;
   for (let i = 0; i < 6; i++) {
     const a = HEX[i],
       b = HEX[(i + 1) % 6];
     const edge = [point(a)];
-    if (riverPorts & (1 << i)) {
-      const [left, right] = riverPort(a, b);
+    if (ports & (1 << i)) {
+      const [left, right] = riverPort(a, b, !!(lakeEdges & (1 << i)));
       const [bedLeft, bedRight] = riverBed(left, right);
       // The same shelf profile cuts the tile wall below the waterline.
       const [leftRim, leftShelf, leftBed] = riverShelfProfile(left, bedLeft);
@@ -261,10 +266,16 @@ type RiverSection = readonly [
   leftBank: GroundPoint,
   rightBank: GroundPoint,
   rightLand: GroundPoint,
+  dryWaterRise?: number,
 ];
 
-function riverPort(a: GroundPoint, b: GroundPoint): [GroundPoint, GroundPoint] {
-  const half = RIVER_PORT_HALF_WIDTH / GROUND_RADIUS;
+function riverPort(
+  a: GroundPoint,
+  b: GroundPoint,
+  sharedLake = false,
+): [GroundPoint, GroundPoint] {
+  // A shared basin has only a narrow shore at the corners of its join.
+  const half = sharedLake ? 0.425 : RIVER_PORT_HALF_WIDTH / GROUND_RADIUS;
   return [lerp(a, b, 0.5 - half), lerp(a, b, 0.5 + half)];
 }
 
@@ -277,9 +288,10 @@ function riverStrip(
   water: MeshBuilder,
   from: RiverSection,
   to: RiverSection,
+  toBed?: readonly [GroundPoint, GroundPoint],
 ) {
-  const [landA, a, b, landB] = from;
-  const [landC, c, d, landD] = to;
+  const [landA, a, b, landB, riseA] = from;
+  const [landC, c, d, landD, riseB] = to;
   surface(
     floor,
     [landA, landC, c, a].map((p) => point(p)),
@@ -292,12 +304,12 @@ function riverStrip(
   );
   surface(
     water,
-    [a, c, d, b].map((p) => point(p)),
+    [point(a, riseA), point(c, riseB), point(d, riseB), point(b, riseA)],
     PALETTE.riverWater,
   );
   if (a !== b || c !== d) {
     const [bedA, bedB] = riverBed(a, b);
-    const [bedC, bedD] = riverBed(c, d);
+    const [bedC, bedD] = toBed ?? riverBed(c, d);
     riverShelf(floor, a, c, bedA, bedC);
     riverShelf(floor, d, b, bedD, bedB);
   }
@@ -327,6 +339,7 @@ function channelSection(
   halfWidth: number,
   leftLand: number,
   rightLand: number,
+  dryWaterRise?: number,
 ): RiverSection {
   const leftBank = along(x, center - halfWidth);
   return [
@@ -334,38 +347,54 @@ function channelSection(
     leftBank,
     halfWidth ? along(x, center + halfWidth) : leftBank,
     along(x, rightLand),
+    dryWaterRise,
   ];
 }
 
 function riverAlongAxis(
   floor: MeshBuilder,
   water: MeshBuilder,
-  axis: number,
+  along: ReturnType<typeof riverAxis>,
   profile: readonly ChannelProfile[],
+  dryWaterRiseAt?: (x: number) => number,
 ) {
-  const along = riverAxis(axis);
   let previous: RiverSection | undefined;
   for (const [x, center, halfWidth] of profile) {
     const land = GROUND_RADIUS * (1 - Math.abs(x));
-    const section = channelSection(along, x, center, halfWidth, -land, land);
+    const section = channelSection(
+      along,
+      x,
+      center,
+      halfWidth,
+      -land,
+      land,
+      dryWaterRiseAt?.(x),
+    );
     if (previous) riverStrip(floor, water, previous, section);
     previous = section;
   }
 }
 
-function headwaters(floor: MeshBuilder, water: MeshBuilder, axis: number) {
-  const along = riverAxis(axis);
-  const profiles = [
-    [-0.5, [-0.2, 0], [0, 0], [0.21, 0]],
-    [-0.45, [-0.2, 0], [0, 0], [0.22, 0]],
-    [-0.39, [-0.21, 0], [-0.012, 0.013], [0.24, 0]],
-    [-0.29, [-0.193, 0.014], [0, 0.027], [0.215, 0]],
-    [-0.19, [-0.157, 0.023], [0.01, 0.031], [0.174, 0.016]],
-    [-0.09, [-0.121, 0.029], [0.007, 0.035], [0.129, 0.029]],
-    [0, [-0.08, 0.04], [0, 0.04], [0.08, 0.04]],
-  ] as const;
+type FeederProfile = readonly [
+  distance: number,
+  ...channels: (readonly [center: number, halfWidth: number])[],
+];
+
+/** Narrow feeder water remains visible at low runoff and grades down before the tile edge. */
+function headwaterRise(x: number) {
+  const t = Math.min(1, Math.max(0, (x - 0.14) / 0.31));
+  return 0.04 * (1 - t * t * (3 - 2 * t));
+}
+
+function feederReach(
+  floor: MeshBuilder,
+  water: MeshBuilder,
+  along: ReturnType<typeof riverAxis>,
+  profile: readonly FeederProfile[],
+  joiningBank: number,
+) {
   let previous: RiverSection[] = [];
-  for (const [x, ...branches] of profiles) {
+  for (const [row, [x, ...branches]] of profile.entries()) {
     const land = GROUND_RADIUS * (1 - Math.abs(x));
     const sections = branches.map(([center, width], index) => {
       const left = branches[index - 1];
@@ -377,20 +406,85 @@ function headwaters(floor: MeshBuilder, water: MeshBuilder, axis: number) {
         width,
         left ? (left[0] + left[1] + center - width) / 2 : -land,
         right ? (right[0] - right[1] + center + width) / 2 : land,
+        headwaterRise(x),
       );
     });
-    previous.forEach((from, index) =>
-      riverStrip(floor, water, from, sections[index]),
-    );
+    previous.forEach((from, index) => {
+      const to = sections[index];
+      const bed = riverBed(to[1], to[2]);
+      if (row === profile.length - 1) {
+        // Both inner shelves taper away where the feeder joins the channel.
+        if (index === joiningBank) bed[1] = to[2];
+        if (index === joiningBank + 1) bed[0] = to[1];
+      }
+      riverStrip(floor, water, from, to, bed);
+    });
     previous = sections;
   }
-  riverAlongAxis(floor, water, axis, [
-    [0, 0, 0.12],
-    [0.13, -0.016, 0.136],
-    [0.28, -0.022, 0.148],
-    [0.4, -0.007, 0.148],
-    [0.5, 0, RIVER_PORT_HALF_WIDTH],
-  ]);
+}
+
+function headwaters(
+  floor: MeshBuilder,
+  water: MeshBuilder,
+  axis: number,
+  variant: number,
+) {
+  const rotate = riverAxis(axis);
+  const along = (x: number, z: number) => rotate(x, variant ? -z : z);
+  // Irregular source lengths and two staggered confluences give the main
+  // stream a continuous course between the smaller, rounded feeder streams.
+  feederReach(
+    floor,
+    water,
+    along,
+    [
+      [-0.5, [-0.205, 0], [-0.041, 0], [0.243, 0]],
+      [-0.465, [-0.205, 0], [-0.04, 0], [0.243, 0]],
+      [-0.446, [-0.205, 0], [-0.037, 0.014], [0.243, 0]],
+      [-0.408, [-0.226, 0], [-0.025, 0.023], [0.25, 0]],
+      [-0.392, [-0.228, 0.01], [-0.014, 0.025], [0.255, 0]],
+      [-0.372, [-0.224, 0.018], [0.007, 0.03], [0.26, 0]],
+      [-0.328, [-0.195, 0.028], [0.04, 0.036], [0.275, 0]],
+      [-0.31, [-0.18, 0.027], [0.049, 0.04], [0.276, 0.014]],
+      [-0.278, [-0.174, 0.025], [0.057, 0.046], [0.274, 0.022]],
+      [-0.236, [-0.185, 0.025], [0.045, 0.053], [0.252, 0.024]],
+      [-0.191, [-0.191, 0.029], [0.021, 0.058], [0.217, 0.023]],
+      [-0.147, [-0.176, 0.034], [-0.011, 0.063], [0.199, 0.026]],
+      [-0.105, [-0.149, 0.035], [-0.028, 0.067], [0.203, 0.028]],
+      [-0.07, [-0.12, 0.03], [-0.02, 0.07], [0.217, 0.025]],
+    ],
+    0,
+  );
+  feederReach(
+    floor,
+    water,
+    along,
+    [
+      [-0.07, [-0.05, 0.1], [0.217, 0.025]],
+      [-0.025, [-0.029, 0.101], [0.233, 0.025]],
+      [0, [-0.017, 0.104], [0.235, 0.025]],
+      [0.02, [-0.008, 0.106], [0.233, 0.025]],
+      [0.06, [0.008, 0.107], [0.207, 0.027]],
+      [0.09, [0.003, 0.106], [0.174, 0.028]],
+      [0.121, [-0.014, 0.103], [0.136, 0.032]],
+      [0.16, [-0.025, 0.1], [0.11, 0.035]],
+    ],
+    0,
+  );
+  riverAlongAxis(
+    floor,
+    water,
+    along,
+    [
+      [0.16, 0.01, 0.135],
+      [0.22, -0.012, 0.138],
+      [0.3, -0.037, 0.147],
+      [0.38, -0.026, 0.149],
+      [0.45, -0.008, 0.147],
+      [0.5, 0, RIVER_PORT_HALF_WIDTH],
+    ],
+    headwaterRise,
+  );
 }
 
 /** The widest bends sit inside the hex. Both banks straighten as they meet
@@ -416,7 +510,7 @@ function throughRiver(
       RIVER_PORT_HALF_WIDTH + envelope * spread,
     ];
   });
-  riverAlongAxis(floor, water, axis, profile);
+  riverAlongAxis(floor, water, riverAxis(axis), profile);
 }
 
 function edgeFraction(p: GroundPoint, a: GroundPoint, b: GroundPoint) {
@@ -424,6 +518,9 @@ function edgeFraction(p: GroundPoint, a: GroundPoint, b: GroundPoint) {
   const z = b[1] - a[1];
   return ((p[0] - a[0]) * x + (p[1] - a[1]) * z) / (x * x + z * z);
 }
+
+const isHeadwater = (ports: number) =>
+  ports !== 0 && (ports & (ports - 1)) === 0;
 
 function river(
   floor: MeshBuilder,
@@ -437,25 +534,137 @@ function river(
     return;
   }
 
-  const exits = HEX.flatMap((a, edge) =>
-    ports & (1 << edge) ? [lerp(a, HEX[(edge + 1) % 6], 0.5)] : [],
-  );
-  if (exits.length === 1) {
-    headwaters(floor, water, Math.log2(ports));
+  if (isHeadwater(ports)) {
+    headwaters(floor, water, Math.log2(ports), variant);
     return;
   }
+  if (ports) {
+    curvedRiver(floor, water, ports, variant);
+    return;
+  }
+  riverBasin(
+    floor,
+    water,
+    0,
+    HEX.map((corner) => scaled(corner, 0.2)),
+    [0, 0],
+  );
+}
 
-  // Move the join toward the exits of a bend. Junctions keep a compact shared basin.
-  const center =
-    exits.length === 2
-      ? scaled(lerp(exits[0], exits[1], 0.5), 0.42)
-      : ([0, 0] as const);
-  const radius = exits.length ? 0.35 : 0.2;
-  const inner = HEX.map(([x, z]): GroundPoint => [
-    x * radius + center[0],
-    z * radius + center[1],
-  ]);
-  riverBasin(floor, water, ports, inner, center);
+const turn = (a: GroundPoint, b: GroundPoint, c: GroundPoint) =>
+  (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+
+/** A shoreline and its piece of dry land can both be concave. Cut off convex
+ * triangles whose diagonals lie inside the outline. */
+function shorelineSurface(
+  builder: MeshBuilder,
+  outline: readonly GroundPoint[],
+  color: RGB,
+) {
+  const corners = [...outline];
+  const tolerance = 1e-12;
+  while (corners.length > 3) {
+    const ear = corners.findIndex((b, i) => {
+      const a = corners.at(i - 1)!;
+      const c = corners[(i + 1) % corners.length];
+      return (
+        turn(a, b, c) > tolerance &&
+        corners.every(
+          (p) =>
+            p === a ||
+            p === b ||
+            p === c ||
+            turn(a, b, p) < -tolerance ||
+            turn(b, c, p) < -tolerance ||
+            turn(c, a, p) < -tolerance,
+        )
+      );
+    });
+    if (ear < 0) throw new Error("River shoreline must form a simple polygon");
+    const [a, b, c] = [
+      corners.at(ear - 1)!,
+      corners[ear],
+      corners[(ear + 1) % corners.length],
+    ];
+    builder.triangle(point(a), point(c), point(b), color);
+    corners.splice(ear, 1);
+  }
+  surface(
+    builder,
+    corners.map((p) => point(p)),
+    color,
+  );
+}
+
+const BANK_REACH = [0, 0.14, 0.27, 0.4, 0.52, 0.64] as const;
+const BANK_SKEW = [-0.06, 0.1, -0.14, 0.18] as const;
+
+/** Both bank tangents meet the tile edge at right angles to preserve the
+ * same water and submerged shelf cross-sections on every neighboring tile. */
+function curvedBank(first: number, last: number, skew: number) {
+  const a = HEX[first];
+  const b = HEX[(first + 1) % 6];
+  const c = HEX[last];
+  const d = HEX[(last + 1) % 6];
+  const [start, end] = [riverPort(a, b)[1], riverPort(c, d)[0]];
+  const span = BANK_REACH[(last + 6 - first) % 6];
+  const reach = (
+    port: GroundPoint,
+    v: GroundPoint,
+    w: GroundPoint,
+    depth: number,
+  ): GroundPoint => [
+    port[0] - (v[0] + w[0]) * depth,
+    port[1] - (v[1] + w[1]) * depth,
+  ];
+  const from = reach(start, a, b, span * (1 + skew));
+  const to = reach(end, c, d, span * (1 - skew));
+  const inset = 2 * RIVER_PORT_HALF_WIDTH * RIVER_BANK_INSET;
+  return Array.from({ length: 13 }, (_, step) => {
+    const t = step / 12;
+    const middle = lerp(from, to, t);
+    const left = lerp(lerp(start, from, t), middle, t);
+    const right = lerp(middle, lerp(to, end, t), t);
+    const rim = lerp(left, right, t);
+    const dx = right[0] - left[0];
+    const dz = right[1] - left[1];
+    const depth = inset / Math.hypot(dx, dz);
+    const bed: GroundPoint = [rim[0] - dz * depth, rim[1] + dx * depth];
+    return { rim, bed };
+  });
+}
+
+function curvedRiver(
+  floor: MeshBuilder,
+  water: MeshBuilder,
+  ports: number,
+  variant: number,
+) {
+  const edges = HEX.flatMap((_, edge) => (ports & (1 << edge) ? [edge] : []));
+  const outline: GroundPoint[] = [];
+  for (const [index, first] of edges.entries()) {
+    const last = edges[(index + 1) % edges.length];
+    const bank = curvedBank(first, last, BANK_SKEW[variant]);
+    const shore = bank.map(({ rim }) => rim);
+    outline.push(...shore);
+
+    // Each dry patch follows the hex's edge around the outside and the bank
+    // curve back around the water. Adjacent patches meet only at river mouths.
+    const land = [shore[0]];
+    for (let edge = (first + 1) % 6; ; edge = (edge + 1) % 6) {
+      land.push(HEX[edge]);
+      if (edge === last) break;
+    }
+    land.push(...shore.slice(1).reverse());
+    shorelineSurface(floor, land, PALETTE.grass);
+
+    for (let i = 1; i < bank.length; i++) {
+      const a = bank[i - 1];
+      const b = bank[i];
+      riverShelf(floor, a.rim, b.rim, a.bed, b.bed);
+    }
+  }
+  shorelineSurface(water, outline, PALETTE.riverWater);
 }
 
 function riverBasin(
@@ -464,6 +673,7 @@ function riverBasin(
   ports: number,
   inner: readonly GroundPoint[],
   center: GroundPoint,
+  lakeEdges = 0,
 ) {
   const bed = (p: GroundPoint) => lerp(center, p, 0.8);
   surface(
@@ -477,7 +687,7 @@ function riverBasin(
       ia = inner[i],
       ib = inner[(i + 1) % 6];
     if (ports & (1 << i)) {
-      const [wa, wb] = riverPort(a, b);
+      const [wa, wb] = riverPort(a, b, !!(lakeEdges & (1 << i)));
       const iwa = lerp(ia, ib, 0.06);
       const iwb = lerp(ia, ib, 0.94);
       // Ease the arm into the bend while keeping the same approach at the seam.
@@ -517,14 +727,15 @@ function lake(
   relief: MeshBuilder,
   water: MeshBuilder,
   clear: number,
-  riverPorts: number,
+  ports: number,
   variant: number,
+  lakeEdges: number,
 ) {
   const shore = HEX.map((p, index) =>
     scaled(p, LAKE_CORNERS[variant & 3][index]),
   );
-  if (riverPorts) {
-    riverBasin(floor, water, riverPorts, shore, [0, 0]);
+  if (ports) {
+    riverBasin(floor, water, ports, shore, [0, 0], lakeEdges);
     return;
   }
   // Bow each side outward between pinned corners, so a closed lake reads as a
@@ -578,6 +789,7 @@ function build(
   bucket: number,
   mask: number,
   variant = 0,
+  lakeEdges = 0,
 ): MapModel {
   const clear =
     (terrain === "plains" ? FARM_CLEAR_WIDTHS : CLEAR_WIDTHS)[bucket] / 2;
@@ -591,13 +803,14 @@ function build(
       floor,
       terrain === "ocean",
       terrain === "river" || terrain === "lake" ? mask : 0,
+      lakeEdges,
     );
   switch (terrain) {
     case "river":
       river(floor, water, mask, variant);
       break;
     case "lake":
-      lake(floor, relief, water, clear, mask, variant);
+      lake(floor, relief, water, clear, mask, variant, lakeEdges);
       break;
     case "ocean":
       // The ocean shader derives depth, texture and foam from nearby land.
@@ -661,7 +874,7 @@ function build(
   const floorMesh = sharedFloor ?? floor.build();
   if (terrain === "mountain") mountainFloor = floorMesh;
   return {
-    key: `terrain:${terrain}:${bucket}:${mask}${variant ? `:${variant}` : ""}`,
+    key: `terrain:${terrain}:${bucket}:${mask}${variant ? `:${variant}` : ""}${lakeEdges ? `:lake:${lakeEdges}` : ""}`,
     parts: [
       { mesh: floorMesh, castsShadow: false, receivesShadow: true },
       ...(raised.positions.length
@@ -746,13 +959,25 @@ export function getTerrainModel(
   if ((terrain === "river" || terrain === "lake") && options?.ports)
     for (const port of options.ports)
       if (Number.isInteger(port) && port >= 0 && port < 6) ports |= 1 << port;
-  // Bent rivers and closed lakes have alternative shapes.
-  const bend =
-    (terrain === "river" && OPPOSITE_RIVER_PORTS.includes(ports)) ||
-    (terrain === "lake" && ports === 0)
-      ? variant
-      : 0;
-  const index = (bend * CLEAR_WIDTHS.length + bucket) * 64 + ports;
-  const model = (cache[terrain][index] ??= build(terrain, bucket, ports, bend));
+  const lakeEdges = terrain === "lake" ? (options?.adjacentEdges ?? 0) & 63 : 0;
+  ports |= lakeEdges;
+  const modelVariant =
+    terrain === "river" && ports
+      ? isHeadwater(ports)
+        ? variant & 1
+        : variant
+      : terrain === "lake" && ports === 0
+        ? variant
+        : 0;
+  // Connected lakes use their wide edge mask. Closed lakes use their art variant.
+  const shape = lakeEdges || modelVariant;
+  const index = (shape * CLEAR_WIDTHS.length + bucket) * 64 + ports;
+  const model = (cache[terrain][index] ??= build(
+    terrain,
+    bucket,
+    ports,
+    modelVariant,
+    lakeEdges,
+  ));
   return terrain === "hills" && scorched ? scorchedRelief(model) : model;
 }

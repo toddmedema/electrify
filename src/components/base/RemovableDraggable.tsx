@@ -46,7 +46,13 @@ export default function RemovableDraggable({
           isDragDisabled={isDragDisabled}
           disableInteractiveElementBlocking
         >
-          {children}
+          {(provided, snapshot) => {
+            const draggableProps = {
+              ...provided.draggableProps,
+              "data-reorder-drop": snapshot.isDropAnimating || undefined,
+            };
+            return children({ ...provided, draggableProps }, snapshot);
+          }}
         </Draggable>
       )}
     </RemovalCollapse>
