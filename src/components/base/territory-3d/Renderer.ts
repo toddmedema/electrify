@@ -60,6 +60,8 @@ void main() {
   vec4 world = aTransform * vec4(aPosition, 1.0);
   if (aMaterial.z == 2.0 || aMaterial.z == ${RIVER_WATER_MATERIAL}.0) {
     world.y += mix(${WATERSHED_LEVEL_OFFSETS[0]}, ${WATERSHED_LEVEL_OFFSETS[1]}, uWeather.z);
+    // Elevated headwater vertices represent a higher *dry* channel only.
+    if (aMaterial.z == ${RIVER_WATER_MATERIAL}.0) world.y -= aPosition.y * uWeather.z;
   }
   vSurfacePosition = world.xyz;
   if (uShadow) {
@@ -442,17 +444,16 @@ export class MapRenderer {
       for (const { part, pose } of items) {
         const vertices = part.mesh.positions;
         triangles += vertices.length / 9;
-        const watershed =
-          part.material === "watershed-water" ||
-          part.material === "river-water";
+        const river = part.material === "river-water";
+        const watershed = river || part.material === "watershed-water";
+        const waterLevel = this.paintedFrame?.weather?.waterLevel;
+        const riverRiseFade = river ? waterLevelOffset([0, 1], waterLevel) : 0;
         const surfaceOffset = watershed
-          ? waterLevelOffset(
-              WATERSHED_LEVEL_OFFSETS,
-              this.paintedFrame?.weather?.waterLevel,
-            )
+          ? waterLevelOffset(WATERSHED_LEVEL_OFFSETS, waterLevel)
           : 0;
+        const offsetAt = (y: number) => surfaceOffset - y * riverRiseFade;
         if (watershed || part.material === "water")
-          waterSurfaceY.push(pose[13] + vertices[1] + surfaceOffset);
+          waterSurfaceY.push(pose[13] + vertices[1] + offsetAt(vertices[1]));
         for (let i = 0; i < vertices.length; i += 3)
           for (let axis = 0; axis < 3; axis++) {
             const value =
@@ -460,7 +461,7 @@ export class MapRenderer {
               pose[axis + 4] * vertices[i + 1] +
               pose[axis + 8] * vertices[i + 2] +
               pose[axis + 12] +
-              (axis === 1 ? surfaceOffset : 0);
+              (axis === 1 ? offsetAt(vertices[i + 1]) : 0);
             min[axis] = Math.min(min[axis], value);
             max[axis] = Math.max(max[axis], value);
           }

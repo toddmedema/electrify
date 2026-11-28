@@ -1013,15 +1013,18 @@ it("retains the motion phase while charging switches to discharge and materials 
 
 it("raises river and lake water in the same draw passes when the watershed gets wetter", () => {
   const { renderer, gl } = setup();
-  const instances: MapInstance[] = (["lake", "river", "ocean"] as const).map(
-    (kind, index) => ({
-      id: kind,
-      model: getTerrainModel(kind),
-      position: [index, 0, 0],
-      active: false,
-      fog: 0,
-    }),
-  );
+  const instances: MapInstance[] = (
+    ["lake", "river", "ocean", "headwaters"] as const
+  ).map((kind, index) => ({
+    id: kind,
+    model:
+      kind === "headwaters"
+        ? getTerrainModel("river", { ports: [1] })
+        : getTerrainModel(kind),
+    position: [index, 0, 0],
+    active: false,
+    fog: 0,
+  }));
   const weather = {
     rain: 0,
     snowfall: 0,
@@ -1041,6 +1044,8 @@ it("raises river and lake water in the same draw passes when the watershed gets 
   expect(dryLevels.lake).toBeCloseTo(-0.045);
   expect(dryLevels.river).toBeCloseTo(dryLevels.lake!);
   expect(dryLevels.ocean).toBe(0);
+  expect(dryLevels.headwaters).toBeGreaterThan(-0.01);
+  expect(dryLevels.headwaters).toBeLessThan(0);
   expect(gl.uniform4f).toHaveBeenCalledWith(
     { name: "uWeather" },
     0.4,
@@ -1061,6 +1066,7 @@ it("raises river and lake water in the same draw passes when the watershed gets 
   expect(wetLevels.lake).toBeGreaterThan(dryLevels.lake! + 0.04);
   expect(wetLevels.river).toBeCloseTo(wetLevels.lake!);
   expect(wetLevels.ocean).toBe(dryLevels.ocean);
+  expect(wetLevels.headwaters).toBeCloseTo(wetLevels.river!);
   expect(wet.drawCalls).toBe(dry.drawCalls);
   expect(gl.bufferSubData).not.toHaveBeenCalled();
   expect(callbacks.size).toBe(0);
