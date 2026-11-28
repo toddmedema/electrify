@@ -668,7 +668,7 @@ test(
     }
     await saveAndQuit(guest);
     const saved = await campaign.fixture.checkpoint();
-    expect(saved?.spec.territorialVersion).toBe(1);
+    expect(saved?.spec.territorialVersion).toBe(2);
     expect(
       saved?.grids.find((grid) => grid.multiplayer?.seat === hostId)
         ?.multiplayer?.territorial?.claims.length,

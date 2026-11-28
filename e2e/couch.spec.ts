@@ -5,6 +5,7 @@ import type {
   Locator,
   Page,
   Route,
+  TestInfo,
 } from "@playwright/test";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -84,6 +85,7 @@ test("TV couch setup explains missing Steam Input through the normal entry", asy
 async function startCouch<Actor extends Page | Frame>(
   page: Page,
   couch: CouchFixture<Actor>,
+  seed?: number,
 ) {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
@@ -121,6 +123,10 @@ async function startCouch<Actor extends Page | Frame>(
   await duration.click();
   await page.getByRole("option", { name: "10 years", exact: true }).click();
   await expect(duration).toContainText("10 years");
+  if (seed !== undefined)
+    await page
+      .getByRole("textbox", { name: "Seed", exact: true })
+      .fill(String(seed));
   // Start with a controlled two-plant fleet so pausing Coal creates a shortfall.
   const starterPlants = page
     .locator(".startingFacility")
@@ -536,10 +542,31 @@ async function expectSeatChromeRemoved(seat: Page | Frame) {
     await expect(seat.getByRole("button", { name, exact: true })).toBeVisible();
 }
 
-test("TV couch companies keep independent dialogs and purchases through atomic save and resume", async ({
-  context,
-  page,
-}, info) => {
+for (const purchase of [
+  { megawatts: 20, seed: undefined }, // Fits every opening terrain, including mountains.
+  { megawatts: 50, seed: 4242 }, // Both companies and the second review have room for 50 MW.
+]) {
+  test(`TV couch companies keep independent dialogs and purchases through atomic save and resume (${purchase.megawatts} MW)`, async ({
+    context,
+    page,
+  }, info) => {
+    await checkCouchPurchases(
+      context,
+      page,
+      info,
+      purchase.megawatts,
+      purchase.seed,
+    );
+  });
+}
+
+async function checkCouchPurchases(
+  context: BrowserContext,
+  page: Page,
+  info: TestInfo,
+  megawatts: number,
+  seed?: number,
+) {
   test.skip(
     !["tv-1080-light", "tv-1080-dark"].includes(info.project.name),
     "Two seat renderer journey at 1080p in each palette",
@@ -549,7 +576,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
     // Separate pages need the same emulated motion preference as the shell.
     reduceSeatMotion: true,
   });
-  await startCouch(page, couch);
+  await startCouch(page, couch, seed);
   const p1 = couch.seats.get("local-p1")!.page;
   const p2 = couch.seats.get("local-p2")!.page;
   for (const seat of [p1, p2]) {
@@ -578,11 +605,10 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   const build2 = p2.getByRole("dialog", { name: "Build", exact: true });
   await expect(build1).toBeVisible();
   await expect(build2).toBeVisible();
-  // Both opening sites must support the project, including a mountain's 25 MW limit.
   const sizeSolar = (build: Locator) =>
     build
       .getByRole("slider", { name: /^Capacity / })
-      .fill(String(wToSliderTick(20e6)));
+      .fill(String(wToSliderTick(megawatts * 1e6)));
   await Promise.all([sizeSolar(build1), sizeSolar(build2)]);
   const review1 = build1.getByRole("button", {
     name: "Review purchase of Solar",
@@ -598,8 +624,12 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await review1.focus();
   await review2.focus();
   await couch.input({ "101": ["confirm"], "202": ["confirm"] });
-  const purchase1 = p1.getByRole("dialog", { name: "Build 20MW Solar?" });
-  const purchase2 = p2.getByRole("dialog", { name: "Build 20MW Solar?" });
+  const purchase1 = p1.getByRole("dialog", {
+    name: `Build ${megawatts}MW Solar?`,
+  });
+  const purchase2 = p2.getByRole("dialog", {
+    name: `Build ${megawatts}MW Solar?`,
+  });
   await expect(purchase1).toBeVisible();
   await expect(purchase2).toBeVisible();
   await purchase1
@@ -627,6 +657,8 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expectSharedMenu(page, gameMenu);
   await expect(clock(p1)).toHaveAttribute("data-active-speed", "PAUSED");
   await expect(clock(p2)).toHaveAttribute("data-active-speed", "PAUSED");
+  const forecast = p2.locator(".insights:visible .uplot").first();
+  await expect(forecast).toBeVisible();
   await expect(
     page.getByRole("complementary", {
       name: "Controller controls",
@@ -691,7 +723,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expect(
     p1.getByRole("region", { name: "Insights", exact: true }),
   ).toHaveCount(0);
-  await expect(p2.locator(".insights:visible .uplot").first()).toBeVisible();
+  await expect(forecast).toBeVisible();
   // A purchase review remains usable while the partner's real forecast/chart is open.
   await couch.input({ "101": ["build"] });
   await sizeSolar(build1);
@@ -702,7 +734,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   await expect(
     p2.getByRole("region", { name: "Insights", exact: true }),
   ).toBeVisible();
-  if (process.env.REVIEW_SCREENSHOT_DIR) {
+  if (megawatts === 50 && process.env.REVIEW_SCREENSHOT_DIR) {
     // A toast can expire during a click. Hide it only in the capture and leave both seats intact.
     for (const [id, seat] of [
       ["p1", p1],
@@ -810,7 +842,7 @@ test("TV couch companies keep independent dialogs and purchases through atomic s
   expect(
     couch.checkpoint()!.grids.map((grid) => grid.facilities.length),
   ).toEqual(complete.grids.map((grid) => grid.facilities.length));
-});
+}
 
 test("TV couch intertie construction requires approval from both company owners", async ({
   context,
@@ -880,7 +912,7 @@ test("TV couch intertie construction requires approval from both company owners"
   await expect.poll(() => couch.seats.size).toBe(0);
   const complete = couch.checkpoint()!;
   const edge = complete.edges[0];
-  expect(complete.spec.territorialVersion).toBe(1);
+  expect(complete.spec.territorialVersion).toBe(2);
   expect(edge).toMatchObject({ ratingW: 0, flowW: 0 });
   const lines = complete.grids.map(({ transmission }) =>
     transmission!.lines.find(

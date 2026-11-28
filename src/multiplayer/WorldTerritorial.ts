@@ -104,7 +104,7 @@ function retainsOpeningCapacity(
 
 /** Regenerate the immutable opening, then replay each company's connected claim ledger. */
 export function validTerritorialOwnership(world: World, initial: World) {
-  if (world.spec.territorialVersion !== 1)
+  if (world.spec.territorialVersion === undefined)
     return world.grids.every(
       (grid) => grid.multiplayer?.territorial === undefined,
     );

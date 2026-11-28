@@ -19,6 +19,7 @@ export interface ModelPart {
     | "city-window"
     | "water"
     | "watershed-water"
+    | "river-water"
     | "mountain"
     | "map-border";
   /** Tile-width offsets at empty and full storage, respectively. */
@@ -56,6 +57,7 @@ export interface TerrainModelOptions {
   footprint?: number;
   /** Stable tile artwork choice for plains and natural mountain relief. */
   variant?: number;
+  /** Open water edges, in HEX_NEIGHBORS order. */
   ports?: readonly number[];
   /** Bits for edges shared with the same terrain, in HEX_NEIGHBORS order. */
   adjacentEdges?: number;

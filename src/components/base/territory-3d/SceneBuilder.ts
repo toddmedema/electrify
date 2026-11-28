@@ -19,7 +19,7 @@ import {
   facilityMapStatus,
   facilityOperatingStatus,
 } from "../FacilityMapStatus";
-import { HEX_NEIGHBORS, riverPorts } from "../TerritoryHexGeometry";
+import { HEX_NEIGHBORS, waterPorts } from "../TerritoryHexGeometry";
 import type { HexWire } from "../TerritoryHexGeometry";
 import { hailModel } from "./Hailstones";
 import { getTowerConstructionModel } from "./StructureModels";
@@ -41,6 +41,7 @@ import type {
 interface TileScene {
   weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
+  offMapRiverEdge?: TerritoryTileView["offMapRiverEdge"];
   kind?: StructureKind;
   size?: FacilitySize;
   growth?: readonly CityGrowthSector[];
@@ -288,6 +289,7 @@ export class SceneBuilder {
       if (
         !cell ||
         cell.tile !== tile ||
+        cell.offMapRiverEdge !== view.offMapRiverEdge ||
         cell.kind !== kind ||
         cell.size !== size ||
         cell.growth !== growth ||
@@ -305,12 +307,16 @@ export class SceneBuilder {
           variant:
             tile.terrain === "plains"
               ? farmLayout(tile.q, tile.r, this.farms)
-              : tile.terrain === "mountain"
+              : tile.terrain === "mountain" || tile.terrain === "river"
                 ? terrainArtHash(tile.q, tile.r) >>> 30
                 : undefined,
           ports:
-            tile.terrain === "river" ? riverPorts(tile, allTiles) : undefined,
-          ...(tile.terrain === "mountain" || tile.terrain === "forest"
+            tile.terrain === "river" || tile.terrain === "lake"
+              ? waterPorts(tile, this.terrainAt, view.offMapRiverEdge)
+              : undefined,
+          ...(tile.terrain === "mountain" ||
+          tile.terrain === "forest" ||
+          tile.terrain === "lake"
             ? {
                 adjacentEdges: HEX_NEIGHBORS.reduce(
                   (edges, [dq, dr], edge) =>
@@ -325,6 +331,7 @@ export class SceneBuilder {
         });
         cell = {
           tile,
+          offMapRiverEdge: view.offMapRiverEdge,
           weather,
           kind,
           size,

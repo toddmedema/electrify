@@ -164,13 +164,13 @@ for (const theme of ["light", "dark"] as const) {
             ".resilienceBuildOptionDetail, .closableDialogTitleText, .decisionImpactFact strong",
           ),
         );
-        const title = (await dialog
-          .locator(".closableDialogTitleText")
-          .boundingBox())!;
-        const close = (await dialog
-          .getByRole("button", { name: "close", exact: true })
-          .boundingBox())!;
-        expect(title.x + title.width + 7).toBeLessThanOrEqual(close.x);
+        const [title, close] = await Promise.all([
+          dialog.locator(".closableDialogTitleText").boundingBox(),
+          dialog
+            .getByRole("button", { name: "close", exact: true })
+            .boundingBox(),
+        ]);
+        expect(title!.x + title!.width + 7).toBeLessThanOrEqual(close!.x);
         if (name === "Solar") {
           const description = dialog.getByText(
             "Follows the sun for about 20% more energy a year, mostly in the morning and evening.",

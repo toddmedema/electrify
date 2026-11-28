@@ -43,6 +43,8 @@ export function territoryMapTileKey({
 }
 export interface TerritoryTileView {
   tile: TerritoryTileDefinition;
+  /** The regional river's continuation outside the visible board, or null for a mapped source. */
+  offMapRiverEdge?: number | null;
   ownerKey?: string;
   ownerName: string;
   owned: boolean;

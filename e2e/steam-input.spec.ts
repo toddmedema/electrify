@@ -201,10 +201,12 @@ async function reopenReorderedFleetChart(
   rows: Locator,
   firstId: string,
 ) {
+  const fleet = page.getByRole("region", { name: "Fleet", exact: true });
+  const charts = fleet.locator('.accessibleChart > [role="img"][tabindex="0"]');
+  await expect(charts.first()).toBeHidden();
   await input(page, "nextChart");
-  const chart = page.locator(
-    '.accessibleChart > [role="img"][tabindex="0"]:focus',
-  );
+  await expect(charts.first()).toBeVisible();
+  const chart = charts.and(page.locator(":focus"));
   await expect(chart).toBeFocused();
   await expect(rows.nth(1)).toHaveAttribute("data-rfd-draggable-id", firstId);
   return chart;
