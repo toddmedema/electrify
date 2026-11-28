@@ -41,6 +41,7 @@ import type {
 interface TileScene {
   weather?: TerrainModelOptions["weather"];
   tile: TerritoryTileDefinition;
+  offMapRiverEdge?: TerritoryTileView["offMapRiverEdge"];
   kind?: StructureKind;
   size?: FacilitySize;
   growth?: readonly CityGrowthSector[];
@@ -288,6 +289,7 @@ export class SceneBuilder {
       if (
         !cell ||
         cell.tile !== tile ||
+        cell.offMapRiverEdge !== view.offMapRiverEdge ||
         cell.kind !== kind ||
         cell.size !== size ||
         cell.growth !== growth ||
@@ -310,9 +312,11 @@ export class SceneBuilder {
                 : undefined,
           ports:
             tile.terrain === "river" || tile.terrain === "lake"
-              ? waterPorts(tile, this.terrainAt)
+              ? waterPorts(tile, this.terrainAt, view.offMapRiverEdge)
               : undefined,
-          ...(tile.terrain === "mountain" || tile.terrain === "forest"
+          ...(tile.terrain === "mountain" ||
+          tile.terrain === "forest" ||
+          tile.terrain === "lake"
             ? {
                 adjacentEdges: HEX_NEIGHBORS.reduce(
                   (edges, [dq, dr], edge) =>
@@ -327,6 +331,7 @@ export class SceneBuilder {
         });
         cell = {
           tile,
+          offMapRiverEdge: view.offMapRiverEdge,
           weather,
           kind,
           size,

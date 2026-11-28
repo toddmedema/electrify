@@ -243,10 +243,7 @@ const regionalWaterCells = new Map(
   ]),
 );
 
-function classifyInlandWater(
-  water: Map<string, TerrainType>,
-  hasOffshorePoint: boolean,
-) {
+function classifyInlandWater(water: Map<string, TerrainType>) {
   const unclassified = new Set(
     Array.from(water).flatMap(([id, terrain]) =>
       terrain === "ocean" ? [id] : [],
@@ -262,8 +259,8 @@ function classifyInlandWater(
     const reachesEdge = basin.some(
       (id) => regionalWaterCells.get(id)!.radius === REGIONAL_MAP_RADIUS,
     );
-    // One isolated edge sample is weak evidence of a coast without an offshore point.
-    if (reachesEdge && (basin.length > 1 || hasOffshorePoint)) continue;
+    // An isolated sample at the edge is weak evidence of a coast.
+    if (reachesEdge && basin.length > 1) continue;
     for (const id of basin) water.set(id, "lake");
   }
 }
@@ -606,12 +603,12 @@ export function getRegionalGeography(
     sourcedUtility ??
     `${city} model grid`;
   const [, , samples, offshoreLat, offshoreLong] = sameLocation ? entry : [];
-  const offshore =
+  const mappedCoast =
     typeof offshoreLat === "number" && typeof offshoreLong === "number"
       ? { lat: offshoreLat, long: offshoreLong }
-      : location.offshore
-        ? nearestOffshore(location)
-        : undefined;
+      : undefined;
+  const offshore =
+    mappedCoast ?? (location.offshore ? nearestOffshore(location) : undefined);
   const water = new Map<string, TerrainType>();
   if (typeof samples === "string") {
     coreHexes.forEach(({ q, r }, index) => {
@@ -619,7 +616,9 @@ export function getRegionalGeography(
         WATER_TERRAIN[samples[index] as keyof typeof WATER_TERRAIN];
       if (terrain) water.set(`${q}:${r}`, terrain);
     });
-    classifyInlandWater(water, offshore !== undefined);
+    // A vetted offshore reference preserves sampled tidal water where the atlas
+    // is too coarse to show a narrow strait. Explicit lake samples stay lakes.
+    if (!mappedCoast) classifyInlandWater(water);
   }
   for (const [q, r] of region?.river ?? []) {
     const key = `${q}:${r}`;

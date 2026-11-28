@@ -458,6 +458,24 @@ it.each(["river", "lake"] as const)(
   },
 );
 
+it("gives neighboring lake tiles a shared basin and retains the narrower river mouth", () => {
+  const west = getTerrainModel("lake", { adjacentEdges: 1 << 1, ports: [4] });
+  const east = getTerrainModel("lake", { adjacentEdges: 1 << 4 });
+  const westShore = edgeWater(west, 1)
+    .map(([, y, z]) => [y, z])
+    .sort();
+  const eastShore = edgeWater(east, 4)
+    .map(([, y, z]) => [y, z])
+    .sort();
+  expect(westShore).toEqual(eastShore);
+  expect(westShore).toHaveLength(2);
+  expect(Math.abs(westShore[0][1] - westShore[1][1])).toBeGreaterThan(
+    GROUND_RADIUS * 0.8,
+  );
+  const [[, , a], [, , b]] = edgeWater(west, 4);
+  expect(Math.abs(a - b)).toBeCloseTo(0.29, 6);
+});
+
 it.each([0, 1])(
   "joins headwater feeders one at a time for variant %i",
   (variant) => {

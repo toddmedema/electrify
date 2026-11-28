@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { waterPorts } from "../components/base/TerritoryHexGeometry";
 import { resolve } from "node:path";
 import {
   getRegionalGeography,
@@ -89,6 +90,40 @@ it("keeps coastal water, including a clipped shore with a known offshore point",
   expect(oslo.terrainAt({ q: -5, r: 5 })).toBe("ocean");
   expect(sanFrancisco.terrainAt({ q: -4, r: 0 })).toBe("ocean");
 });
+
+it("preserves tidal water where the sampled harbor opening is too narrow", () => {
+  const { terrainAt } = getRegionalGeography(cities.Auckland, 2026, 999);
+  expect(terrainAt({ q: -2, r: 2 })).toBe("ocean");
+  expect(terrainAt({ q: -1, r: 2 })).toBe("ocean");
+});
+
+it.each([
+  { city: "Belgrade", q: 0, r: -5, ports: [1, 5] },
+  { city: "MexicoCity", q: -3, r: -2, ports: [0] },
+])(
+  "keeps the river approach stable at $city's opening map edge",
+  ({ city, q, r, ports }) => {
+    const game = createGame({ scenarioId: 106, seed: 931 });
+    const location = cities[city];
+    const board = regionalMapViews({ ...game, location });
+    const cell = board.find(({ tile }) => tile.q === q && tile.r === r)!;
+    expect(cell.tile.terrain).toBe("river");
+    const visibleTerrain = new Map(
+      board.map(({ tile }) => [`${tile.q},${tile.r}`, tile.terrain]),
+    );
+    expect(waterPorts(cell.tile, visibleTerrain, cell.offMapRiverEdge)).toEqual(
+      ports,
+    );
+    const { terrainAt } = getRegionalGeography(location, 2026, 106);
+    const expandedTerrain = new Map(
+      regionalHexes(REGIONAL_MAP_RADIUS + 1).map((coordinate) => [
+        `${coordinate.q},${coordinate.r}`,
+        terrainAt(coordinate),
+      ]),
+    );
+    expect(waterPorts(cell.tile, expandedTerrain)).toEqual(ports);
+  },
+);
 
 it.each([
   { city: "Austin", upstream: { q: -5, r: 1 }, downstream: { q: 3, r: 2 } },

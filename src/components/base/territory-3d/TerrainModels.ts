@@ -61,14 +61,19 @@ function surface(builder: MeshBuilder, polygon: readonly Vec3[], color: RGB) {
   }
 }
 
-function substrate(builder: MeshBuilder, water: boolean, riverPorts: number) {
+function substrate(
+  builder: MeshBuilder,
+  water: boolean,
+  ports: number,
+  lakeEdges = 0,
+) {
   const side = water ? PALETTE.deepWater : PALETTE.earthShade;
   for (let i = 0; i < 6; i++) {
     const a = HEX[i],
       b = HEX[(i + 1) % 6];
     const edge = [point(a)];
-    if (riverPorts & (1 << i)) {
-      const [left, right] = riverPort(a, b);
+    if (ports & (1 << i)) {
+      const [left, right] = riverPort(a, b, !!(lakeEdges & (1 << i)));
       const [bedLeft, bedRight] = riverBed(left, right);
       // The same shelf profile cuts the tile wall below the waterline.
       const [leftRim, leftShelf, leftBed] = riverShelfProfile(left, bedLeft);
@@ -247,8 +252,13 @@ type RiverSection = readonly [
   dryWaterRise?: number,
 ];
 
-function riverPort(a: GroundPoint, b: GroundPoint): [GroundPoint, GroundPoint] {
-  const half = RIVER_PORT_HALF_WIDTH / GROUND_RADIUS;
+function riverPort(
+  a: GroundPoint,
+  b: GroundPoint,
+  sharedLake = false,
+): [GroundPoint, GroundPoint] {
+  // A shared basin has only a narrow shore at the corners of its join.
+  const half = sharedLake ? 0.425 : RIVER_PORT_HALF_WIDTH / GROUND_RADIUS;
   return [lerp(a, b, 0.5 - half), lerp(a, b, 0.5 + half)];
 }
 
@@ -646,6 +656,7 @@ function riverBasin(
   ports: number,
   inner: readonly GroundPoint[],
   center: GroundPoint,
+  lakeEdges = 0,
 ) {
   const bed = (p: GroundPoint) => lerp(center, p, 0.8);
   surface(
@@ -659,7 +670,7 @@ function riverBasin(
       ia = inner[i],
       ib = inner[(i + 1) % 6];
     if (ports & (1 << i)) {
-      const [wa, wb] = riverPort(a, b);
+      const [wa, wb] = riverPort(a, b, !!(lakeEdges & (1 << i)));
       const iwa = lerp(ia, ib, 0.06);
       const iwb = lerp(ia, ib, 0.94);
       // Ease the arm into the bend while keeping the same approach at the seam.
@@ -699,13 +710,14 @@ function lake(
   relief: MeshBuilder,
   water: MeshBuilder,
   clear: number,
-  riverPorts: number,
+  ports: number,
+  lakeEdges: number,
 ) {
   const shore = HEX.map((p, index) =>
     scaled(p, [0.73, 0.76, 0.69, 0.75, 0.7, 0.74][index]),
   );
-  if (riverPorts) {
-    riverBasin(floor, water, riverPorts, shore, [0, 0]);
+  if (ports) {
+    riverBasin(floor, water, ports, shore, [0, 0], lakeEdges);
     return;
   }
   surface(
@@ -731,6 +743,7 @@ function build(
   bucket: number,
   mask: number,
   variant = 0,
+  lakeEdges = 0,
 ): MapModel {
   const clear =
     (terrain === "plains" ? FARM_CLEAR_WIDTHS : CLEAR_WIDTHS)[bucket] / 2;
@@ -744,13 +757,14 @@ function build(
       floor,
       terrain === "ocean",
       terrain === "river" || terrain === "lake" ? mask : 0,
+      lakeEdges,
     );
   switch (terrain) {
     case "river":
       river(floor, water, mask, variant);
       break;
     case "lake":
-      lake(floor, relief, water, clear, mask);
+      lake(floor, relief, water, clear, mask, lakeEdges);
       break;
     case "ocean":
       ground(water, PALETTE.water);
@@ -813,7 +827,7 @@ function build(
   const floorMesh = sharedFloor ?? floor.build();
   if (terrain === "mountain") mountainFloor = floorMesh;
   return {
-    key: `terrain:${terrain}:${bucket}:${mask}${variant ? `:${variant}` : ""}`,
+    key: `terrain:${terrain}:${bucket}:${mask}${variant ? `:${variant}` : ""}${lakeEdges ? `:lake:${lakeEdges}` : ""}`,
     parts: [
       { mesh: floorMesh, castsShadow: false, receivesShadow: true },
       ...(raised.positions.length
@@ -904,12 +918,16 @@ export function getTerrainModel(
         ? variant & 1
         : variant
       : 0;
-  const index = (riverVariant * CLEAR_WIDTHS.length + bucket) * 64 + ports;
+  const lakeEdges = terrain === "lake" ? (options?.adjacentEdges ?? 0) & 63 : 0;
+  ports |= lakeEdges;
+  const shape = terrain === "lake" ? lakeEdges : riverVariant;
+  const index = (shape * CLEAR_WIDTHS.length + bucket) * 64 + ports;
   const model = (cache[terrain][index] ??= build(
     terrain,
     bucket,
     ports,
     riverVariant,
+    lakeEdges,
   ));
   return terrain === "hills" && scorched ? scorchedRelief(model) : model;
 }
