@@ -342,8 +342,8 @@ export class MapRenderer {
 
   constructor(
     private canvas: MapCanvas,
-    private hasOcean: boolean,
     private onState?: (state: State) => void,
+    private readonly inlandOnly = false,
   ) {
     Object.defineProperty(canvas, "map3DDiagnostics", {
       value: this.sampleDiagnostics,
@@ -594,7 +594,7 @@ export class MapRenderer {
 
   private createProgram(gl: WebGL2RenderingContext): WebGLProgram {
     // Even an unused ocean branch slows land draws on software WebGL.
-    if (!this.hasOcean) return createMapProgram(gl, vertex(false), fragment());
+    if (this.inlandOnly) return createMapProgram(gl, vertex(false), fragment());
     const coastalVertex = vertex(true);
     try {
       return createMapProgram(gl, coastalVertex, fragment(OCEAN_FRAGMENT));

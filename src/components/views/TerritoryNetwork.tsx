@@ -35,8 +35,8 @@ import {
   tileFitsFacility,
 } from "../../helpers/TerritoryTiles";
 import {
+  territoryMapBoard,
   territoryMapTileKey,
-  territoryTileViews,
   type TerritoryMapTileKey,
   type TerritoryTileView,
 } from "../../helpers/TerritoryMapState";
@@ -215,7 +215,10 @@ function TileNetwork(props: Props) {
   const { purchase, pendingIds, availableCash } = useTerritoryTilePurchases();
   const dispatch = useAppDispatch();
   const { formatMoneyConcise: money, formatPurchasePrice } = useMoney();
-  const views = React.useMemo(() => territoryTileViews(game), [game]);
+  const { views, authoredInland } = React.useMemo(
+    () => territoryMapBoard(game),
+    [game],
+  );
   const view =
     inspected && (!panel?.open || tileWindow) && !planning
       ? views.find(({ tile }) => territoryMapTileKey(tile) === inspected)
@@ -567,6 +570,7 @@ function TileNetwork(props: Props) {
           onDeselect={close}
           game={game}
           views={views}
+          authoredInland={authoredInland}
           selected={selected}
           inspected={view ? inspected : undefined}
           onSelect={inspect}

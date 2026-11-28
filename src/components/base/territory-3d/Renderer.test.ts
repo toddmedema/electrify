@@ -161,13 +161,13 @@ function flush(timestamp: number) {
   callbacks.clear();
   for (const callback of pending) callback(timestamp);
 }
-function setup(gl = mockContext(), hasOcean = false) {
+function setup(gl = mockContext(), inlandOnly?: true) {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest
     .spyOn(canvas, "getContext")
     .mockReturnValue(gl as unknown as WebGL2RenderingContext);
   const state = jest.fn();
-  const renderer = new MapRenderer(canvas, hasOcean, state);
+  const renderer = new MapRenderer(canvas, state, inlandOnly);
   return { canvas, gl, state, renderer };
 }
 beforeEach(() => {
@@ -712,7 +712,7 @@ it("fails gracefully without WebGL2 or when shader compilation fails", () => {
   const canvas = document.createElement("canvas") as MapCanvas;
   jest.spyOn(canvas, "getContext").mockReturnValue(null);
   const state = jest.fn(),
-    renderer = new MapRenderer(canvas, false, state);
+    renderer = new MapRenderer(canvas, state);
   renderer.update(scene(), frame);
   expect(state).toHaveBeenCalledWith("unavailable");
   expect(callbacks.size).toBe(0);
@@ -735,7 +735,7 @@ it("draws inland geometry without compiling an ocean program", () => {
   (gl.getShaderParameter as jest.Mock).mockImplementation(
     (shader: unknown) => !sources.get(shader)?.includes("shoreDistance"),
   );
-  const { renderer, state } = setup(gl);
+  const { renderer, state } = setup(gl, true);
   renderer.update(scene(), frame);
   flush(0);
   expect(state).toHaveBeenLastCalledWith("ready");
@@ -744,7 +744,7 @@ it("draws inland geometry without compiling an ocean program", () => {
   renderer.dispose();
 });
 
-it("falls back to a flat sea when a driver rejects the ocean shader", () => {
+it("compiles the ocean shader by default and falls back to a flat sea if rejected", () => {
   const gl = mockContext();
   const sources = new Map<unknown, string>();
   (gl.shaderSource as jest.Mock).mockImplementation(
@@ -753,7 +753,7 @@ it("falls back to a flat sea when a driver rejects the ocean shader", () => {
   (gl.getShaderParameter as jest.Mock).mockImplementation(
     (shader: unknown) => !sources.get(shader)?.includes("shoreDistance"),
   );
-  const { renderer, state } = setup(gl, true);
+  const { renderer, state } = setup(gl);
   renderer.update([{ ...scene()[0], model: getTerrainModel("ocean") }], frame);
   flush(0);
   expect(state).toHaveBeenLastCalledWith("ready");

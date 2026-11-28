@@ -17,14 +17,14 @@ import type { MapFrame } from "./Types";
 
 const factories = { terrain: getTerrainModel, structure: getStructureModel };
 const rendererLoader =
-  (hasOcean: boolean): RendererLoader =>
+  (inlandOnly?: true): RendererLoader =>
   async () => {
     if (typeof WebGL2RenderingContext === "undefined")
       throw new Error("WebGL2 unavailable");
-    return (canvas, onState) => new MapRenderer(canvas, hasOcean, onState);
+    return (canvas, onState) => new MapRenderer(canvas, onState, inlandOnly);
   };
-const loadInlandRenderer = rendererLoader(false);
-const loadCoastalRenderer = rendererLoader(true);
+const loadStandardRenderer = rendererLoader();
+const loadInlandRenderer = rendererLoader(true);
 
 export interface SceneCamera {
   subscribe: (listener: () => void) => () => void;
@@ -35,6 +35,7 @@ export interface SceneCamera {
 export default function TerritoryScene3D({
   views,
   tiles,
+  authoredInland,
   cityGrowth,
   ownership,
   ownerPalette,
@@ -54,6 +55,7 @@ export default function TerritoryScene3D({
 }: {
   views: readonly TerritoryTileView[];
   tiles: readonly TerritoryTileDefinition[];
+  authoredInland?: true;
   cityGrowth: ReadonlyMap<TerritoryId, readonly CityGrowthSector[]>;
   ownership: readonly Pick<TerritoryTileView, "tile" | "ownerKey">[];
   ownerPalette: Readonly<Record<string, string>>;
@@ -85,10 +87,13 @@ export default function TerritoryScene3D({
   } = React.useSyncExternalStore(camera.subscribe, camera.getSnapshot);
   const frame = { ...viewport, cameraX, cameraY, scale: baseScale * zoom };
   const builder = React.useMemo(() => new SceneBuilder(factories), []);
-  // Use the whole board so panning toward an offscreen coast keeps its shader.
-  const hasOcean = React.useMemo(
-    () => tiles.some((tile) => tile.terrain === "ocean"),
-    [tiles],
+  // Check the whole board so an offscreen coast still gets the full shader.
+  const inlandOnly = React.useMemo(
+    () =>
+      authoredInland === true &&
+      tiles.length > 0 &&
+      tiles.every((tile) => tile.terrain !== "ocean"),
+    [authoredInland, tiles],
   );
   const scene = React.useMemo(
     () => builder.build(views, tiles, wires, minute, runKey, cityGrowth),
@@ -127,7 +132,7 @@ export default function TerritoryScene3D({
       instances={instances}
       frame={{ ...frame, lighting, lightingTransitionMs }}
       runKey={runKey}
-      loadRenderer={hasOcean ? loadCoastalRenderer : loadInlandRenderer}
+      loadRenderer={inlandOnly ? loadInlandRenderer : loadStandardRenderer}
       onState={onState}
     />
   );
