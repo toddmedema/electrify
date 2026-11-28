@@ -328,7 +328,7 @@ test("first player to claim a logo keeps it until releasing it or leaving", asyn
     f.event({
       kind: "message",
       sender,
-      payload: { kind: "utility-logo-pick", logo },
+      payload: { kind: "utility-logo-pick", logo, requestId: "pick-logo" },
     });
   pick("spectator", "sunburst");
   expect(f.session.getSnapshot().utilityLogos).toBeUndefined();
@@ -349,7 +349,7 @@ test("first player to claim a logo keeps it until releasing it or leaving", asyn
     payload: {
       kind: "utility-logo-claims",
       claims: { [host]: "sunburst" },
-      taken: true,
+      reply: { requestId: "pick-logo", error: "taken" },
     },
   });
 
@@ -369,22 +369,45 @@ test("first player to claim a logo keeps it until releasing it or leaving", asyn
   expect(f.session.getSnapshot().utilityLogos).toEqual({});
 });
 
-test("guests send their own choice and accept only the host's claim roster", async () => {
+test("guests wait for the host to acknowledge their logo before marking Ready", async () => {
   const f = fixture();
   await f.session.initialize();
+  const selectedScenario = browse();
+  sendBrowse(f, selectedScenario);
+  const ready = selectionKey(selectedScenario);
   await f.session.selectUtilityLogo("sunburst");
+  const { utilityLogoRequest: requestId } = f.session.getSnapshot();
+  expect(requestId).toBeTruthy();
+  await expect(f.session.setReady(ready)).rejects.toThrow(
+    "Waiting for the host",
+  );
   expect(f.requests.at(-1)).toEqual({
     kind: "send",
     to: host,
-    payload: { kind: "utility-logo-pick", logo: "sunburst" },
+    payload: { kind: "utility-logo-pick", logo: "sunburst", requestId },
   });
   const payload = {
     kind: "utility-logo-claims",
     claims: { [guest]: "sunburst" },
+    reply: { requestId: requestId! },
   } as const;
   f.event({ kind: "message", sender: "other", payload });
   expect(f.session.getSnapshot().utilityLogos).toBeUndefined();
+  f.event({
+    kind: "message",
+    sender: host,
+    payload: { ...payload, reply: undefined },
+  });
+  expect(f.session.getSnapshot().utilityLogoRequest).toBe(requestId);
   f.event({ kind: "message", sender: host, payload });
+  expect(f.session.getSnapshot().utilityLogoRequest).toBeUndefined();
+  await f.session.setReady(ready);
+  await f.session.selectUtilityLogo(null);
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "member",
+    key: "ready",
+    value: ready,
+  });
   expect(coopSelection(f.session.getSnapshot()).utilityLogos).toEqual(
     payload.claims,
   );
@@ -397,7 +420,11 @@ test("the host sends claimed company logos to the game worker", async () => {
   f.event({
     kind: "message",
     sender: guest,
-    payload: { kind: "utility-logo-pick", logo: "grid-pylon" },
+    payload: {
+      kind: "utility-logo-pick",
+      logo: "grid-pylon",
+      requestId: "pick-logo",
+    },
   });
   await f.session.start({ spec: COOP_TEST_SPEC });
   expect(f.posts.find(({ kind }) => kind === "create")).toMatchObject({
@@ -405,6 +432,48 @@ test("the host sends claimed company logos to the game worker", async () => {
       { id: host, utilityLogo: "sunburst" },
       { id: guest, utilityLogo: "grid-pylon" },
     ],
+  });
+});
+
+test("the host rejects logo edits from an already-ready guest", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  const { session } = f;
+  session.publishBrowse({
+    phase: "browsing",
+    card: "NEW_GAME",
+    difficulty: "Employee",
+  });
+  const lobby = session.getSnapshot().lobby;
+  f.event({
+    kind: "state",
+    state: {
+      ...lobby,
+      members: lobby.members.map((member) =>
+        member.id === guest
+          ? { ...member, ready: selectionKey(session.getSnapshot().browse!) }
+          : member,
+      ),
+    },
+  });
+  f.event({
+    kind: "message",
+    sender: guest,
+    payload: {
+      kind: "utility-logo-pick",
+      logo: "sunburst",
+      requestId: "late-pick",
+    },
+  });
+  expect(session.getSnapshot().utilityLogos).toBeUndefined();
+  expect(f.requests.at(-1)).toMatchObject({
+    kind: "send",
+    to: guest,
+    payload: {
+      kind: "utility-logo-claims",
+      claims: {},
+      reply: { requestId: "late-pick", error: "locked" },
+    },
   });
 });
 

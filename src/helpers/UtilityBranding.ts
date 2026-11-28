@@ -1,4 +1,8 @@
 import type { GameType } from "../Types";
+import {
+  frontierCoordinates,
+  territoryCoordinateHash,
+} from "../data/Territories";
 import { MUNICIPAL_UTILITIES } from "../data/MunicipalUtilities";
 import {
   POWER_AGREEMENT_BLOCKS,
@@ -28,11 +32,26 @@ export function utilityBranding(
   const assigned = new Set([player, ...Object.values(players ?? {})]);
   const pool = shuffled.filter((id) => !assigned.has(id));
   const npcs = new Map(NPC_UTILITIES.map((key, index) => [key, pool[index]]));
+  const frontierLogos = pool.slice(NPC_UTILITIES.length);
   return {
     forOwner(owner?: string): UtilityLogoId | undefined {
       if (owner === "you") return player;
       if (owner?.startsWith("peer:") && players)
         return claimedUtilityLogo(players, owner.slice(5));
+      if (owner?.startsWith("municipal:frontier:")) {
+        const coordinates = frontierCoordinates(
+          owner.slice("municipal:".length),
+        );
+        if (coordinates) {
+          const { q, r } = coordinates;
+          // Older maps can retain an open-ended frontier. Its marks never use the player
+          // or established utility palettes, and discovery order cannot change a town's logo.
+          return frontierLogos[
+            territoryCoordinateHash(q, r, `utility-logo:${seed}`) %
+              frontierLogos.length
+          ];
+        }
+      }
       return owner ? npcs.get(owner) : undefined;
     },
     forTrade(id: string): UtilityLogoId {

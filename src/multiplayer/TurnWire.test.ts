@@ -96,7 +96,11 @@ test("rejects obsolete, reordered, deep and role-invalid gameplay", () => {
 });
 
 test("only the host can announce unique company logo claims", () => {
-  const pick = { kind: "utility-logo-pick", logo: "sunburst" };
+  const pick = {
+    kind: "utility-logo-pick",
+    logo: "sunburst",
+    requestId: "pick-logo",
+  };
   expect(validTurnPayload(pick, false, epoch)).toBe(true);
   expect(validTurnPayload({ ...pick, logo: null }, false, epoch)).toBe(true);
   expect(validTurnPayload({ ...pick, logo: "unknown" }, false, epoch)).toBe(
@@ -106,12 +110,29 @@ test("only the host can announce unique company logo claims", () => {
     false,
   );
   expect(validTurnPayload(pick, true, epoch)).toBe(false);
+  expect(
+    validTurnPayload({ ...pick, requestId: undefined }, false, epoch),
+  ).toBe(false);
 
   const announce = {
     kind: "utility-logo-claims",
     claims: { guest: "sunburst" },
   };
   expect(validTurnPayload(announce, true, epoch)).toBe(true);
+  expect(
+    validTurnPayload(
+      { ...announce, reply: { requestId: "pick-logo", error: "locked" } },
+      true,
+      epoch,
+    ),
+  ).toBe(true);
+  expect(
+    validTurnPayload(
+      { ...announce, reply: { requestId: "pick-logo", error: "unknown" } },
+      true,
+      epoch,
+    ),
+  ).toBe(false);
   expect(validTurnPayload(announce, false, epoch)).toBe(false);
   expect(
     validTurnPayload(

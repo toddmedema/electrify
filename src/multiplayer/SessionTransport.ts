@@ -49,6 +49,10 @@ export interface PendingCampaign {
   players: Seat[];
   requiredPlayerIds: string[];
 }
+export type UtilityLogoReply = {
+  requestId: string;
+  error?: "taken" | "locked";
+};
 export type WireMessage =
   | { kind: "heartbeat" }
   | {
@@ -92,8 +96,12 @@ export type WireMessage =
   | { kind: "browse"; browse: BrowseState }
   | { kind: "scenario"; selectionKey: string; scenario: ScenarioType }
   | { kind: "campaign"; campaign?: PendingCampaign }
-  | { kind: "utility-logo-pick"; logo: UtilityLogoId | null }
-  | { kind: "utility-logo-claims"; claims: UtilityLogoClaims; taken?: true };
+  | { kind: "utility-logo-pick"; logo: UtilityLogoId | null; requestId: string }
+  | {
+      kind: "utility-logo-claims";
+      claims: UtilityLogoClaims;
+      reply?: UtilityLogoReply;
+    };
 export type SessionRequest =
   | {
       kind: "state" | "leave" | "restart-host";

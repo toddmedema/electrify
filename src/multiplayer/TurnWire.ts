@@ -199,15 +199,22 @@ export function validTurnPayload(
     case "utility-logo-pick":
       return (
         !senderIsHost &&
-        exact(value, ["kind", "logo"]) &&
+        exact(value, ["kind", "logo", "requestId"]) &&
+        id(value.requestId) &&
         (value.logo === null || isUtilityLogo(value.logo))
       );
     case "utility-logo-claims":
       return (
         senderIsHost &&
-        exact(value, ["kind", "claims", "taken"]) &&
+        exact(value, ["kind", "claims", "reply"]) &&
         validUtilityLogoClaims(value.claims) &&
-        (value.taken === undefined || value.taken === true)
+        (value.reply === undefined ||
+          (object(value.reply) &&
+            exact(value.reply, ["requestId", "error"]) &&
+            id(value.reply.requestId) &&
+            (value.reply.error === undefined ||
+              value.reply.error === "taken" ||
+              value.reply.error === "locked")))
       );
     case "transfer":
       return (

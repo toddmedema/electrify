@@ -16,7 +16,7 @@ function Choice({ logo }: { logo?: UtilityLogoId }) {
       {logo ? (
         <UtilityLogoIcon logo={logo} />
       ) : (
-        <QuestionMarkIcon aria-hidden />
+        <QuestionMarkIcon className="utilityLogoIcon" aria-hidden />
       )}
       <span>{logo ? utilityLogoName(logo) : "Random"}</span>
     </span>

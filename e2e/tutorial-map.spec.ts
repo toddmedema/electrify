@@ -358,7 +358,7 @@ test("a chosen company logo appears at the left of the player's city label @mini
   await page.goto("/?scenario=116");
   const picker = page.getByRole("combobox", { name: /Company logo/ });
   await expect(picker).toContainText("Random");
-  await expect(picker.getByTestId("QuestionMarkIcon")).toBeVisible();
+  await expect(picker.locator("svg.utilityLogoIcon")).toBeVisible();
   await picker.click();
   await expect(page.getByRole("option")).toHaveCount(21);
   await page.getByRole("option", { name: "Sunburst", exact: true }).click();

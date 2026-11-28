@@ -9314,8 +9314,10 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
   height: 40px;
 }
 
-.utilityLogoOption.MuiMenuItem-root {
-  min-height: 40px;
+.utilityLogoPicker .utilityLogoIcon,
+.utilityLogoOption .utilityLogoIcon {
+  width: 40px;
+  height: 40px;
 }
 
 .utilityLogoTaken {
@@ -9332,10 +9334,9 @@ html:is(:not([data-touch-input="true"]), [data-controller-input="true"])
 }
 
 @media (pointer: coarse) {
-  .utilityLogoPicker .MuiSelect-select {
-    min-height: 27px;
-  }
-  .utilityLogoOption.MuiMenuItem-root {
-    min-height: 44px;
+  .utilityLogoPicker .utilityLogoIcon,
+  .utilityLogoOption .utilityLogoIcon {
+    width: 44px;
+    height: 44px;
   }
 }

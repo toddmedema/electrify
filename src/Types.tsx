@@ -1984,6 +1984,7 @@ export interface CoopSelectionType {
   selfId?: string;
   utilityLogos?: import("./data/UtilityLogos").UtilityLogoClaims;
   utilityLogoError?: string;
+  utilityLogoPending?: boolean;
   hostName: string;
   /** Everyone in the lobby, with Ready meaning ready for the selection on screen now. */
   players: {

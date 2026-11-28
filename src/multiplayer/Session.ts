@@ -23,6 +23,7 @@ import type {
   SessionServices,
   PendingCampaign,
   SharedSaveLibrary,
+  UtilityLogoReply,
   WireMessage,
 } from "./SessionTransport";
 import type { ReplicaBaseline } from "./Replication";
@@ -119,6 +120,11 @@ export const CONNECTION_LOST = "Connection to the host was interrupted.";
  * refused command. Native lobby errors come only from its connection failures. */
 export const isConnectionLoss = (error?: string, lobbyError?: string) =>
   error === CONNECTION_LOST || (!error && !!lobbyError);
+const UTILITY_LOGO_TAKEN = "That logo is already taken.";
+const UTILITY_LOGO_LOCKED =
+  "Your logo is locked while you're ready or starting.";
+const UTILITY_LOGO_TIMEOUT_MS = 6000;
+
 export interface SessionState {
   lobby: LobbyState;
   view?: RoomView;
@@ -138,6 +144,7 @@ export interface SessionState {
   pendingCampaign?: PendingCampaign;
   utilityLogos?: UtilityLogoClaims;
   utilityLogoError?: string;
+  utilityLogoRequest?: string;
   /** The host's multiplayer saves, loaded when it opens a lobby. */
   library?: SharedSaveLibrary;
   loadingSaves: boolean;
@@ -210,6 +217,7 @@ export class MultiplayerSession {
   private browseRevision = 0;
   private publishedSelection?: string;
   private browseTimer?: ReturnType<typeof setTimeout>;
+  private utilityLogoTimer?: ReturnType<typeof setTimeout>;
   private lastBrowseSend = 0;
   private browsePeers = new Set<string>();
   private outboundScenario = new Map<string, string>();
@@ -408,7 +416,10 @@ export class MultiplayerSession {
         lobby: event.state,
         checkpointRecovery,
         utilityLogos: removedClaim ? Object.fromEntries(remaining) : oldClaims,
-        ...(brandingChanged && { utilityLogoError: undefined }),
+        ...(brandingChanged && {
+          utilityLogoError: undefined,
+          utilityLogoRequest: undefined,
+        }),
       });
       if (this.worker) this.relayAuthority();
       if (this.isHost()) {
@@ -480,8 +491,16 @@ export class MultiplayerSession {
       )
         return;
       if (event.payload.kind === "utility-logo-pick") {
-        if (this.isHost())
-          this.claimUtilityLogo(event.sender, event.payload.logo);
+        if (
+          this.isHost() &&
+          typeof event.payload.requestId === "string" &&
+          /^[a-zA-Z0-9-]{1,64}$/.test(event.payload.requestId)
+        )
+          this.claimUtilityLogo(
+            event.sender,
+            event.payload.logo,
+            event.payload.requestId,
+          );
         return;
       }
       if (event.payload.kind === "utility-logo-claims") {
@@ -491,14 +510,24 @@ export class MultiplayerSession {
           !!this.state.lobby.lobbyId &&
           event.sender === this.state.lobby.hostId &&
           validUtilityLogoClaims(event.payload.claims)
-        )
+        ) {
+          const { claims, reply } = event.payload;
+          const acknowledged =
+            reply && reply.requestId === this.state.utilityLogoRequest;
+          if (acknowledged) clearTimeout(this.utilityLogoTimer);
           this.update({
-            utilityLogos: event.payload.claims,
-            utilityLogoError:
-              event.payload.taken === true
-                ? "That logo is already taken."
-                : undefined,
+            utilityLogos: claims,
+            ...(acknowledged && {
+              utilityLogoRequest: undefined,
+              utilityLogoError:
+                reply.error === "taken"
+                  ? UTILITY_LOGO_TAKEN
+                  : reply.error === "locked"
+                    ? UTILITY_LOGO_LOCKED
+                    : undefined,
+            }),
           });
+        }
         return;
       }
       if (
@@ -1199,6 +1228,7 @@ export class MultiplayerSession {
       error: undefined,
       utilityLogos: undefined,
       utilityLogoError: undefined,
+      utilityLogoRequest: undefined,
       pendingCampaign: undefined,
     });
     try {
@@ -1224,6 +1254,7 @@ export class MultiplayerSession {
       error: undefined,
       utilityLogos: undefined,
       utilityLogoError: undefined,
+      utilityLogoRequest: undefined,
       pendingCampaign: undefined,
       browse: undefined,
       scenarioSnapshot: undefined,
@@ -1823,6 +1854,7 @@ export class MultiplayerSession {
     }
   }
   private clearLobbySelection() {
+    clearTimeout(this.utilityLogoTimer);
     clearTimeout(this.browseTimer);
     this.browseTimer = undefined;
     this.browseSession = undefined;
@@ -1876,6 +1908,7 @@ export class MultiplayerSession {
         pendingCampaign: undefined,
         utilityLogos: undefined,
         utilityLogoError: undefined,
+        utilityLogoRequest: undefined,
         library: undefined,
         loadingSaves: false,
         lobby: {
@@ -1931,56 +1964,94 @@ export class MultiplayerSession {
       this.claimUtilityLogo(selfId, logo);
       return;
     }
-    this.update({ utilityLogoError: undefined });
-    const lobbyId = this.state.lobby.lobbyId;
+    const { browse, lobby, utilityLogoRequest } = this.state;
+    if (
+      utilityLogoRequest ||
+      (browse &&
+        lobby.members.find(({ id }) => id === selfId)?.ready ===
+          selectionKey(browse))
+    )
+      return;
+    const requestId = crypto.randomUUID();
+    this.update({ utilityLogoRequest: requestId, utilityLogoError: undefined });
+    const failed = () => {
+      if (this.state.utilityLogoRequest === requestId)
+        this.update({
+          utilityLogoRequest: undefined,
+          utilityLogoError: "Could not choose a logo. Try again.",
+        });
+    };
+    const timer = setTimeout(failed, UTILITY_LOGO_TIMEOUT_MS);
+    this.utilityLogoTimer = timer;
     try {
       await this.request({
         kind: "send",
         to: hostId,
-        payload: { kind: "utility-logo-pick", logo },
+        payload: { kind: "utility-logo-pick", logo, requestId },
       });
     } catch {
-      if (lobbyId === this.state.lobby.lobbyId)
-        this.update({
-          utilityLogoError: "Could not choose a logo. Try again.",
-        });
+      clearTimeout(timer);
+      failed();
     }
   }
-  private claimUtilityLogo(id: string, logo: UtilityLogoId | null) {
-    const { lobby } = this.state;
+  private claimUtilityLogo(
+    id: string,
+    logo: UtilityLogoId | null,
+    requestId?: string,
+  ) {
+    const { lobby, browse } = this.state;
+    const member = lobby.members.find((member) => member.id === id);
+    const remote = id !== lobby.selfId;
     if (
-      !this.canPickUtilityLogo() ||
-      (logo !== null && !isUtilityLogo(logo)) ||
-      !lobby.members.some((member) => member.id === id) ||
-      (id !== lobby.selfId && !lobby.connected.includes(id))
+      !member ||
+      (remote && !lobby.connected.includes(id)) ||
+      (logo !== null && !isUtilityLogo(logo))
     )
       return;
+    if (
+      !this.canPickUtilityLogo() ||
+      (remote && browse && member.ready === selectionKey(browse))
+    ) {
+      if (requestId)
+        this.sendUtilityLogoClaims([id], { id, requestId, error: "locked" });
+      return;
+    }
     const claims = updateUtilityLogoClaim(
       this.state.utilityLogos ?? {},
       id,
       logo,
     );
     if (!claims) {
-      if (id === lobby.selfId)
-        this.update({ utilityLogoError: "That logo is already taken." });
-      else this.sendUtilityLogoClaims([id], true);
+      if (requestId)
+        this.sendUtilityLogoClaims([id], { id, requestId, error: "taken" });
+      else this.update({ utilityLogoError: UTILITY_LOGO_TAKEN });
       return;
     }
     this.update({ utilityLogos: claims, utilityLogoError: undefined });
-    this.sendUtilityLogoClaims(lobby.connected);
+    this.sendUtilityLogoClaims(
+      lobby.connected,
+      requestId ? { id, requestId } : undefined,
+    );
   }
-  private sendUtilityLogoClaims(recipients: string[], taken?: true) {
+  private sendUtilityLogoClaims(
+    recipients: string[],
+    response?: UtilityLogoReply & { id: string },
+  ) {
     const { utilityLogos } = this.state;
-    if (!this.isHost() || this.worker || !utilityLogos) return;
+    if (!this.isHost() || (!response && (this.worker || !utilityLogos))) return;
     for (const id of recipients) {
       if (id === this.state.lobby.selfId) continue;
+      const reply =
+        id === response?.id
+          ? { requestId: response.requestId, error: response.error }
+          : undefined;
       void this.request({
         kind: "send",
         to: id,
         payload: {
           kind: "utility-logo-claims",
-          claims: utilityLogos,
-          ...(taken && { taken }),
+          claims: utilityLogos ?? {},
+          ...(reply && { reply }),
         },
       }).catch(() => {});
     }
@@ -2162,6 +2233,8 @@ export class MultiplayerSession {
   }
   /** Marks Ready for exactly this selection; any later change by the host clears it. */
   async setReady(key: string) {
+    if (key && this.state.utilityLogoRequest)
+      throw new Error("Waiting for the host to confirm your logo.");
     const browse = this.state.browse;
     if (
       key &&
@@ -2232,6 +2305,7 @@ export class MultiplayerSession {
     this.receivedScenario = undefined;
     this.outboundScenario.clear();
     clearTimeout(this.browseTimer);
+    clearTimeout(this.utilityLogoTimer);
     this.lifecycle++;
     this.campaignGeneration++;
     this.stopEvents?.();

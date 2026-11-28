@@ -269,8 +269,13 @@ export default function CoopBrowseBar({
               logo={claimedUtilityLogo(choices, coop.selfId)}
               onChange={pickUtilityLogo}
               taken={taken}
-              disabled={coop.starting}
+              disabled={coop.starting || coop.ready || coop.utilityLogoPending}
             />
+          )}
+          {coop.utilityLogoPending && (
+            <span className="srOnly" role="status">
+              Confirming logo…
+            </span>
           )}
           {coop.utilityLogoError && (
             <Typography variant="body2" color="error" role="status">
@@ -345,7 +350,12 @@ export function CoopStartButton({
       size="large"
       variant={coop.ready ? "outlined" : "contained"}
       color="primary"
-      disabled={coop.starting || disabled || coop.receivingScenario}
+      disabled={
+        coop.starting ||
+        disabled ||
+        coop.receivingScenario ||
+        coop.utilityLogoPending
+      }
       aria-pressed={coop.ready}
       onClick={() => coopControls()?.ready(!coop.ready)}
       startIcon={coop.ready ? <CheckIcon /> : undefined}
