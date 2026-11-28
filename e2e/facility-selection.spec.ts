@@ -330,6 +330,13 @@ for (const theme of ["light", "dark"]) {
       await page.setViewportSize({ width, height: 800 });
       await page.keyboard.press("Escape");
       await expect(heading).toContainText("Generating");
+      // The stacked top bar remounts the mission summary and its forecast can wrap
+      // the headline when the announced event appears.
+      await expect(
+        page.locator("#appbar > .gameStatusBar").getByRole("button", {
+          name: /announced event: carbon fee rising/i,
+        }),
+      ).toBeVisible();
       // The responsive chrome and ResizeObserver-driven chart must settle before
       // recording the baseline; selection itself must still preserve it exactly.
       await disclosure(0).click({ trial: true });

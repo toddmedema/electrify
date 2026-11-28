@@ -545,7 +545,9 @@ function towardOffshore(location: LocationType, point: GeographicPoint) {
   const longitude = ((point.long - location.long + 540) % 360) - 180;
   const east = longitude * cos((location.lat * Math.PI) / 180);
   const south = location.lat - point.lat;
-  return { east, south, distance: Math.hypot(east, south) };
+  // Engines implement Math.hypot differently. Square root is correctly rounded everywhere,
+  // so every crossplay device derives the same coastline.
+  return { east, south, distance: Math.sqrt(east * east + south * south) };
 }
 
 function nearestOffshore(location: LocationType): GeographicPoint | undefined {

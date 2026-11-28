@@ -175,6 +175,8 @@ test("installed play preloads official weather and enables custom cities after s
   ).toBeVisible();
 
   await page.goto("/?dataCenters=1");
+  // The direct-link screen can mount under the startup cover while the app is still inert.
+  await expect(page.locator("#appStartup")).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Explore data center growth" }),
   ).toBeVisible();

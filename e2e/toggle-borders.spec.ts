@@ -233,7 +233,7 @@ for (const theme of ["light", "dark"] as const) {
     });
   });
 
-  test(`toolbar glyphs maintain contrast at rest, while hovered and while held in ${theme}`, async ({
+  test(`speed glyphs maintain contrast at rest, while hovered and while held in ${theme}`, async ({
     page,
   }) => {
     await startToolbarGame(page, theme);
@@ -241,11 +241,6 @@ for (const theme of ["light", "dark"] as const) {
     const supportsHover = await page.evaluate(
       () => matchMedia("(hover: hover) and (pointer: fine)").matches,
     );
-    const build = page
-      .getByRole("navigation", { name: "Game actions" })
-      .getByRole("button", { name: "Build", exact: true });
-    await expect(build).toHaveAttribute("aria-expanded", "false");
-    await expectGlyphContrast(build, supportsHover, blue);
     const speeds = page.getByRole("group", { name: "game speed", exact: true });
     const slow = speeds.getByRole("button", {
       name: "slow speed",
@@ -270,7 +265,24 @@ for (const theme of ["light", "dark"] as const) {
       await expectHeldSpeedContrast(slow);
       await expectHeldSpeedContrast(pause);
     }
-    await pause.click();
+  });
+
+  test(`Build glyph maintains contrast while collapsed and open in ${theme}`, async ({
+    page,
+  }) => {
+    await startToolbarGame(page, theme);
+    const blue = theme === "light" ? "rgb(0, 132, 248)" : "rgb(98, 155, 225)";
+    const supportsHover = await page.evaluate(
+      () => matchMedia("(hover: hover) and (pointer: fine)").matches,
+    );
+    const build = page
+      .getByRole("navigation", { name: "Game actions" })
+      .getByRole("button", { name: "Build", exact: true });
+    await expect(build).toHaveAttribute("aria-expanded", "false");
+    await expectGlyphContrast(build, supportsHover, blue);
+    await expect(
+      page.getByRole("button", { name: "pause", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
     await build.click();
     await expect(build).toHaveAttribute("aria-expanded", "true");
     await page.mouse.move(0, 0);
