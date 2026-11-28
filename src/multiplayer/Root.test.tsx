@@ -274,11 +274,9 @@ test("an unavailable guest room offers only the main menu and makes no save prom
     },
   });
   const dialog = screen.getByRole("dialog", {
-    name: "Multiplayer session ended",
+    name: "This match isn't open",
   });
-  expect(dialog).toHaveAccessibleDescription(
-    "The multiplayer room is no longer available. Host a game from Play with friends, then choose Load multiplayer save.",
-  );
+  expect(dialog).toHaveAccessibleDescription("This match isn't open.");
   expect(screen.getAllByRole("button")).toHaveLength(1);
   expect(
     screen.getByRole("button", { name: "Return to main menu" }),

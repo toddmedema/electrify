@@ -980,7 +980,7 @@ test("the desktop exit checkpoint pauses the worker and propagates a failed disk
   f.fail();
   await expect(f.session.save(true)).rejects.toThrow("Disk full");
   expect(f.posts.at(-1)).toMatchObject({ kind: "checkpoint", pause: true });
-  expect(f.session.getSnapshot().error).toMatch(/Disk full/);
+  expect(f.session.getSnapshot().error).toBeUndefined();
   f.session.dispose();
 });
 
@@ -1540,21 +1540,32 @@ test("a local ready while disconnected rejects its promise without blocking late
   f.session.dispose();
 });
 
-test("a guest whose host cannot save stays in the match and can leave without saving", async () => {
+test("a guest leaves without asking the host to save", async () => {
   const f = fixture();
   await f.session.initialize();
   await deliver(f, {});
-  const leaving = f.session.leave();
-  jest.advanceTimersByTime(5000);
-  await expect(leaving).rejects.toThrow("host could not finish the save");
-  expect(f.requests.some((r) => r.kind === "leave")).toBe(false);
-  expect(f.session.getSnapshot().view).toBeDefined();
-  // A failed save must not wedge the session: later commands still reach the host.
-  f.session.command({ kind: "speed", speed: "SLOW" });
-  expect(sentCommands(f)).toEqual([{ kind: "speed", speed: "SLOW" }]);
-  await f.session.leave({ skipSave: true });
+  await f.session.leave();
+  expect(
+    f.requests.some(
+      (request) =>
+        request.kind === "send" && request.payload.kind === "save-request",
+    ),
+  ).toBe(false);
   expect(f.requests.at(-1)).toEqual({ kind: "leave" });
   expect(f.session.getSnapshot().view).toBeUndefined();
+  f.session.dispose();
+});
+
+test("a host still leaves when the checkpoint cannot be written", async () => {
+  const f = fixture(true);
+  await f.session.initialize();
+  await f.session.start({ spec: COOP_TEST_SPEC });
+  f.fail();
+  await f.session.leave();
+  expect(f.posts.some((post) => post.kind === "checkpoint")).toBe(true);
+  expect(f.requests.some((request) => request.kind === "leave")).toBe(true);
+  expect(f.session.getSnapshot().view).toBeUndefined();
+  expect(f.session.getSnapshot().error).toBeUndefined();
   f.session.dispose();
 });
 

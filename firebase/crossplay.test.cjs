@@ -197,8 +197,8 @@ test("host renewal and publication fail at the authoritative write after the ori
       room: { ...expired.room, head: { revision: 6 } },
     }),
   );
-  // An original guest may now acquire the lease with the original checkpoint pinned.
-  await assertSucceeds(
+  // Only the current host can take the lease again. A guest cannot.
+  await assertFails(
     setDoc(doc(writer(), "coopRooms", ID), {
       ...expired,
       leaseExpiry: at(8000),

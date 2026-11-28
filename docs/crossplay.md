@@ -15,12 +15,10 @@ border, both must approve and fund an intertie. After construction, the link
 carries trades according to each company's buying and selling policies and
 its available capacity.
 
-Any player can host. The host's device runs the simulation and each guest's
-device replays the records to produce its own views. Backgrounding or losing a
-required device pauses play. If the host lease expires, an original player can
-reconnect to acquire it and resume from the last confirmed online save. Progress
-since that save can be lost. **Save & Quit** asks the host for a fresh confirmed
-save and pauses the campaign until the original players return.
+Any player can host a new match. The host's device runs the simulation and
+each guest's device follows it. **Leave** returns to the menu. The host's match
+keeps itself, and that same host continues it later. A guest can rejoin while
+the host is still in the match. If the host is gone, the match waits for them.
 
 Private co-op is unranked. Joined players receive the entire world and can keep
 an offline copy after leaving. The host can change or stall the simulation.

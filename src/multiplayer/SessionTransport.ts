@@ -18,6 +18,8 @@ export interface LobbyState {
   inviteExpiresAt?: number;
   inviteVersion?: string;
   campaignLocked?: boolean;
+  /** Online rooms: false once the host's lease is no longer open. */
+  hostLeaseOpen?: boolean;
   requiredPlayers?: string[];
   recoveryAvailable?: boolean;
   authorityEpoch?: string;

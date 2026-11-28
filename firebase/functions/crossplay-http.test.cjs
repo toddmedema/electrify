@@ -548,15 +548,12 @@ test("only an original player can upgrade an expired saved campaign to the deplo
   assert.deepEqual((await resume(guest, `coop-2-${"c".repeat(64)}`)).body, {
     error: "incompatible",
   });
-  const upgraded = await resume(guest);
+  assert.deepEqual((await resume(guest)).body, { error: "incompatible" });
+  const upgraded = await resume(host);
   assert.equal(upgraded.status, 200);
   assert.notEqual(upgraded.body.authority.epoch, room.authority.epoch);
   assert.deepEqual(upgraded.body.authority.head, published.body);
-  assert.deepEqual((await resume(host, RULES)).body, { error: "incompatible" });
-  assert.equal(
-    (await resume(host)).body.authority.epoch,
-    upgraded.body.authority.epoch,
-  );
+  assert.equal(upgraded.body.lobby.hostId, room.lobby.selfId);
 });
 
 test("a published checkpoint stays resumable after an intermediate build acquires it", async () => {
@@ -586,7 +583,7 @@ test("a published checkpoint stays resumable after an intermediate build acquire
   const stepped = await ctx.call(
     "room/reconnect",
     { roomId, rules: intermediate },
-    { token: guest },
+    { token: host },
   );
   assert.equal(stepped.status, 200);
   assert.equal(stepped.body.authority.head.rules, RULES);
@@ -596,14 +593,14 @@ test("a published checkpoint stays resumable after an intermediate build acquire
   const upgraded = await ctx.call(
     "room/reconnect",
     { roomId, rules: current },
-    { token: guest },
+    { token: host },
   );
   assert.equal(upgraded.status, 200);
   assert.deepEqual(upgraded.body.authority.head, published.body);
   assert.notEqual(upgraded.body.authority.epoch, stepped.body.authority.epoch);
 });
 
-test("expired host loses publication rights and a single original seat acquires the pinned checkpoint", async () => {
+test("an expired campaign stays with the original host", async () => {
   const ctx = setup();
   const host = await ctx.login("host");
   const guest = await ctx.login("guest");
@@ -649,16 +646,15 @@ test("expired host loses publication rights and a single original seat acquires 
   );
   const resume = async (token) =>
     ctx.call("room/reconnect", { roomId, rules: RULES }, { token });
-  const next = await resume(guest);
-  assert.equal(next.body.lobby.hostId, active.lobby.selfId);
-  assert.equal(
-    (await resume(host)).body.authority.epoch,
-    next.body.authority.epoch,
-  );
+  const guestNext = await resume(guest);
+  assert.notEqual(guestNext.body.lobby.hostId, active.lobby.selfId);
+  assert.equal(guestNext.body.authority.leaseRemainingMs, 0);
+  const next = await resume(host);
+  assert.equal(next.body.lobby.hostId, room.lobby.selfId);
   assert.notEqual(next.body.authority.epoch, room.authority.epoch);
   assert.deepEqual(next.body.authority.head, published.body);
   assert.equal(
-    (await ctx.call("save/publish", { roomId }, { token: host })).status,
+    (await ctx.call("save/publish", { roomId }, { token: guest })).status,
     403,
   );
   assert.equal(
@@ -722,6 +718,7 @@ test("an expired guest presence cannot borrow the live host lease", async () => 
     { token: guest },
   );
   assert.ok(returned.body.authority.leaseRemainingMs > 0);
+  assert.notEqual(returned.body.lobby.hostId, returned.body.lobby.selfId);
 });
 
 test("a late suspend cannot invalidate a newer foreground binding", async () => {

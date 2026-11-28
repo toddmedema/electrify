@@ -103,7 +103,7 @@ function validPendingCampaign(value: unknown): value is PendingCampaign {
 }
 
 /** A guest's lobby closed before the match began, because its host left. */
-export const HOST_LEFT = "The host closed the lobby.";
+export const HOST_LEFT = "The host left.";
 
 /** A guest's match lost its host mid-game; the connection notice shows this message. */
 export const CONNECTION_LOST = "Connection to the host was interrupted.";
@@ -1225,8 +1225,14 @@ export class MultiplayerSession {
   }
   canLeaveInterruption() {
     const { lobby, view, checkpointRecovery } = this.state;
+    const hostAway =
+      !!view &&
+      !this.isHost() &&
+      !!lobby.campaignLocked &&
+      lobby.hostLeaseOpen === false;
     return (
       !!checkpointRecovery ||
+      hostAway ||
       (!this.worker &&
         !this.isHost() &&
         (view ? !this.hostedView : !!lobby.selfId && !!lobby.hostId))
@@ -1511,7 +1517,7 @@ export class MultiplayerSession {
       const onlineAuthority = this.services.authority?.();
       if (this.services.authority && (!onlineAuthority || !this.isHost())) {
         worker.terminate();
-        throw new Error("Host authority expired. Reconnect to continue.");
+        throw new Error("Reconnect to continue this match.");
       }
       const epoch = onlineAuthority?.epoch ?? crypto.randomUUID();
       this.worker = worker;
@@ -1565,10 +1571,10 @@ export class MultiplayerSession {
               });
             },
             (error) => {
-              if (!current()) return;
-              const message = `Multiplayer save failed: ${crossplayFailure(error, "The save did not finish.")}`;
-              if (first) rollback(message);
-              else this.update({ error: message });
+              if (!current() || !first) return;
+              rollback(
+                `Multiplayer save failed: ${crossplayFailure(error, "The save did not finish.")}`,
+              );
             },
           );
           if (data.requestId) {
@@ -1649,8 +1655,7 @@ export class MultiplayerSession {
       };
       this.worker.onerror = () => {
         if (!current() || this.worker !== worker) return;
-        const error =
-          "The simulation worker stopped. Resume the multiplayer save to continue.";
+        const error = "The match stopped. Continue it from the menu.";
         if (!receivedView) rollback(error);
         else this.update({ busy: false, error });
       };
@@ -1768,19 +1773,19 @@ export class MultiplayerSession {
     this.outboundScenario.clear();
   }
   /**
-   * Saves, then leaves the match: the host checkpoints its world and a guest waits for the
-   * host's save. skipSave keeps the last multiplayer save instead, so a player can always leave a
-   * match whose host is gone.
+   * Leaves the match. The host tries once to keep the latest moment, then leaves
+   * even if that write does not land. A guest just leaves.
    */
   async leave({ skipSave = false }: { skipSave?: boolean } = {}) {
     this.campaignGeneration++;
     this.closing = true;
-    try {
-      if (!skipSave) await this.save(!!this.worker || this.onlineCampaigns);
-    } catch (error) {
-      // The player stays in the match to retry or to leave without saving.
-      this.closing = false;
-      throw error;
+    if (!skipSave && this.worker) {
+      try {
+        await this.save(true);
+      } catch {
+        // The previous checkpoint remains. Leaving does not fail.
+      }
+      this.closing = true;
     }
     this.startGeneration++;
     this.matchSpec = undefined;

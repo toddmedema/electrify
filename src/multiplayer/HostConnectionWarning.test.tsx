@@ -11,7 +11,6 @@ function warning() {
   ) => (
     <HostConnectionWarning
       open
-      rollback={false}
       waiting
       onReconnect={onReconnect}
       onReturnToMenu={onReturnToMenu}
@@ -103,12 +102,12 @@ test("a checkpoint-only interruption offers only the main menu route", async () 
   const user = userEvent.setup();
   const view = warning();
   await user.click(screen.getByRole("button", { name: "Reconnect" }));
-  view.update({ endReason: "checkpoint", rollback: true });
+  view.update({ endReason: "checkpoint" });
   const dialog = screen.getByRole("dialog", {
-    name: "Multiplayer session ended",
+    name: "This match isn't open",
   });
   expect(dialog).toHaveAccessibleDescription(
-    /Play with friends, then choose Load multiplayer save.*Changes since that save will be lost/,
+    /Wait for the host to continue it/,
   );
   expect(
     screen.getByRole("button", { name: "Return to main menu" }),

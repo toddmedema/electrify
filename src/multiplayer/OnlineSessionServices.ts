@@ -253,6 +253,7 @@ export function onlineSessionServices(
       inviteToken: refreshedInvite?.token,
       authorityEpoch: grant?.epoch,
       campaignLocked: grant?.locked,
+      hostLeaseOpen: (grant?.leaseRemainingMs ?? 0) > 0,
       requiredPlayers: grant?.requiredIds,
       recoveryAvailable: !!grant?.head && grant.head.epoch !== grant?.epoch,
     };
