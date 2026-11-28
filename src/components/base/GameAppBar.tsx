@@ -315,7 +315,7 @@ export function GameAppBar(props: Props) {
           </MenuItem>
         )}
         <MenuItem onClick={handleQuit}>
-          {isTutorial ? "Main menu" : "Save & Quit"}
+          {isTutorial ? "Main menu" : inMultiplayer ? "Leave" : "Save & Quit"}
         </MenuItem>
         {process.env.REACT_APP_DESKTOP === "true" &&
           isDesktopApp() &&

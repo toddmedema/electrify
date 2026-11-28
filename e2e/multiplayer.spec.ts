@@ -334,9 +334,7 @@ const captureState = (page: Page) =>
 
 async function saveAndQuit(page: Page) {
   await page.getByRole("button", { name: /^menu/i }).click();
-  await page
-    .getByRole("menuitem", { name: "Save & Quit", exact: true })
-    .click();
+  await page.getByRole("menuitem", { name: "Leave", exact: true }).click();
   await expect(entry(page)).toBeVisible();
 }
 
@@ -603,7 +601,7 @@ for (const count of [2, 3, 4]) {
         count === 2 ? "NORMAL" : "SLOW",
       );
       await saveAndQuit(buyer);
-      await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
+      await saveAndQuit(host);
       await expect
         .poll(
           async () =>
@@ -724,6 +722,7 @@ test(
       expect(peer.connected).toBeFalsy();
     }
     await saveAndQuit(guest);
+    await saveAndQuit(host);
     const saved = await campaign.fixture.checkpoint();
     expect(saved?.spec.territorialVersion).toBe(2);
     expect(
@@ -736,7 +735,7 @@ test(
 );
 
 test(
-  "V2 restores the confirmed save under a new host and keeps both company seats",
+  "V2 restores the confirmed save with the original host and keeps both company seats",
   { tag: "@mobile" },
   async ({ newIsolatedContext }, info) => {
     const campaign = await startCustom(
@@ -753,10 +752,8 @@ test(
     await saveAndQuit(host);
     const confirmed = await campaign.fixture.checkpoint();
     expect(confirmed?.matchId).toBe(original[0].matchId);
-    await campaign.resume(guest);
-    expect(campaign.fixture.hostSeat(guest)).toBe(
-      campaign.fixture.seatId(guest),
-    );
+    await campaign.resume(host);
+    expect(campaign.fixture.hostSeat(host)).toBe(campaign.fixture.seatId(host));
     for (const [index, page] of campaign.players.entries()) {
       const now = await captureState(page);
       expect(now.matchId).toBe(original[index].matchId);
@@ -821,7 +818,7 @@ test(
       exact: true,
     });
     await expect(warning).toHaveAccessibleDescription(
-      /(?:waiting for the host|connection .* was interrupted).*Reconnect to continue this session.*won't create a new save.*Play with friends, then choose Load multiplayer save/i,
+      /(?:waiting for the host|connection .* was interrupted).*Reconnect to get back into this match/i,
     );
     const reconnect = warning.getByRole("button", {
       name: "Reconnect",
@@ -914,14 +911,14 @@ test(
       .click();
 
     const ended = guest.getByRole("dialog", {
-      name: "Multiplayer session ended",
+      name: "This match isn't open",
       exact: true,
     });
-    expect(campaign.fixture.hostSeat(guest)).toBe(
+    expect(campaign.fixture.hostSeat(guest)).not.toBe(
       campaign.fixture.seatId(guest),
     );
     await expect(ended).toHaveAccessibleDescription(
-      /Play with friends, then choose Load multiplayer save.*Changes since that save will be lost/,
+      /Wait for the host to continue it/,
     );
     await expect(guest.getByRole("dialog")).toHaveCount(1);
     await expect(ended.getByRole("button")).toHaveCount(1);
@@ -971,30 +968,8 @@ test(
     expect(await campaign.fixture.checkpoint()).toEqual(confirmed);
     campaign.fixture.restoreAuthority(guest);
 
-    const saves = await openCampaignSaves(guest);
-    await saves.getByRole("button", { name: "Load", exact: true }).click();
-    await expect(
-      lobby(guest).getByRole("button", {
-        name: "Resume campaign",
-        exact: true,
-      }),
-    ).toBeVisible();
-
-    const hostEnded = host.getByRole("dialog", {
-      name: "Multiplayer session ended",
-      exact: true,
-    });
-    await hostEnded
-      .getByRole("button", { name: "Return to main menu", exact: true })
-      .click();
-    const hostSaves = await openCampaignSaves(host);
-    await hostSaves.getByRole("button", { name: "Load", exact: true }).click();
-    const resume = lobby(guest).getByRole("button", {
-      name: "Resume campaign",
-      exact: true,
-    });
-    await expect(resume).toBeEnabled();
-    await resume.click();
+    await saveAndQuit(host);
+    await campaign.resume(host);
     for (const [index, page] of campaign.players.entries()) {
       await expect(grid(page)).toBeVisible();
       expect(await captureState(page)).toMatchObject({
@@ -1622,7 +1597,7 @@ for (const [scenarioId, width] of [
         scenarioId === 106 && index === 0 ? 15e6 : 0,
       );
     }
-    await campaign.resume(guest);
+    await campaign.resume(host);
     await showGoal(guest);
     expect((await captureState(guest)).seat).toBe(opening.seat);
     expect((await captureState(guest)).matchId).toBe(opening.matchId);
@@ -1630,7 +1605,7 @@ for (const [scenarioId, width] of [
   });
 }
 
-test("an unavailable V2 checkpoint leaves the match open until Save & Quit can retry", async ({
+test("players can leave while saves are unavailable and the last checkpoint remains", async ({
   newIsolatedContext,
 }) => {
   const campaign = await startCustom(newIsolatedContext, 2, false);
@@ -1639,35 +1614,11 @@ test("an unavailable V2 checkpoint leaves the match open until Save & Quit can r
   expect(confirmed?.matchId).toBeTruthy();
 
   campaign.fixture.failSaves("unavailable");
-  await guest.getByRole("button", { name: /^menu/i }).click();
-  await guest
-    .getByRole("menuitem", { name: "Save & Quit", exact: true })
-    .click();
-  const error = guest.getByRole("dialog", {
-    name: "Your game could not be saved",
-  });
-  await expect(error).toBeVisible();
-  await expect(
-    error.getByRole("button", { name: "Disconnect", exact: true }),
-  ).toHaveCount(0);
-  await expect(grid(guest)).toBeVisible();
-  expect(await campaign.fixture.checkpoint()).toEqual(confirmed);
-  campaign.fixture.failSaves();
-  const beforeRetry = campaign.fixture.elapsedMs();
-  await error.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect
-    .poll(() =>
-      campaign.fixture.operations.some(
-        ({ startedMs, explicit, operation, status }) =>
-          startedMs >= beforeRetry &&
-          explicit &&
-          operation === "save/publish" &&
-          status === 200,
-      ),
-    )
-    .toBe(true);
-
+  await saveAndQuit(guest);
+  await expect(grid(host)).toBeVisible();
+  await saveAndQuit(host);
+  await expect(entry(host)).toBeVisible();
   await expect(entry(guest)).toBeVisible();
-  await expect(clock(host)).toHaveAttribute("data-active-speed", "PAUSED");
+  expect(await campaign.fixture.checkpoint()).toEqual(confirmed);
   expect(campaign.errors).toEqual([]);
 });

@@ -12,7 +12,7 @@ import {
 export default function HostConnectionWarning({
   open,
   endReason,
-  rollback,
+  canContinue = false,
   waiting,
   synchronizing,
   error,
@@ -21,7 +21,7 @@ export default function HostConnectionWarning({
 }: {
   open: boolean;
   endReason?: "checkpoint" | "roomUnavailable";
-  rollback: boolean;
+  canContinue?: boolean;
   waiting: boolean;
   synchronizing?: boolean;
   error?: string;
@@ -105,7 +105,7 @@ export default function HostConnectionWarning({
       }}
     >
       <DialogTitle id="multiplayer-interruption-title">
-        {menuOnly ? "Multiplayer session ended" : "Multiplayer connection"}
+        {menuOnly ? "This match isn't open" : "Multiplayer connection"}
       </DialogTitle>
       <DialogContent>
         <Typography
@@ -117,23 +117,14 @@ export default function HostConnectionWarning({
         </Typography>
         <Typography id="multiplayer-interruption-description">
           {endReason === "checkpoint"
-            ? "Host a game from Play with friends, then choose Load multiplayer save to continue from the last confirmed save."
+            ? canContinue
+              ? "Continue this match from the menu."
+              : "Wait for the host to continue it."
             : endReason === "roomUnavailable"
-              ? "The multiplayer room is no longer available. Host a game from Play with friends, then choose Load multiplayer save."
+              ? "This match isn't open."
               : syncing
                 ? "The game will continue once it has the latest state from the host."
-                : "Reconnect to continue this session."}
-          {endReason === "checkpoint" &&
-            rollback &&
-            " Changes since that save will be lost."}
-          {!menuOnly && onReturnToMenu && (
-            <>
-              {" Leaving now won't create a new save. Progress may be lost."}
-              {
-                " Host a game from Play with friends, then choose Load multiplayer save."
-              }
-            </>
-          )}
+                : "Reconnect to get back into this match."}
         </Typography>
       </DialogContent>
       <DialogActions

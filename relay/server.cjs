@@ -191,9 +191,7 @@ function createRelay({
       lobbyId: room?.id,
       inviteCode: room?.code,
       hostId: room?.hostId,
-      error: room?.closed
-        ? "The host closed the lobby. Resume the multiplayer save to continue."
-        : undefined,
+      error: room?.closed ? "The host left." : undefined,
       members: members.map(({ id, name, ready, slot }) => ({
         id,
         name,

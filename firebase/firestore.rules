@@ -351,8 +351,7 @@ service cloud.firestore {
           && request.resource.data.room.epoch != resource.data.room.epoch
           && request.resource.data.room.hostId == guard().seatId
           && activeActor(request.resource.data)
-          && (resource.data.room.hostId == guard().seatId
-            || (resource.data.room.locked && resource.data.room.head != null))
+          && resource.data.room.hostId == guard().seatId
           && (request.resource.data.room.get('rules', '') == resource.data.room.get('rules', '')
             || (resource.data.room.locked && resource.data.room.head != null
               && request.resource.data.room.locked

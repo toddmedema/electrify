@@ -82,9 +82,7 @@ async function saveAndQuit(page: Page) {
   const menu = page.getByRole("menu", { name: "Game menu" });
   // The menu paper scales into place and can move the item during the click.
   await expect(menu.locator("..")).toHaveCSS("transform", "none");
-  await menu
-    .getByRole("menuitem", { name: "Save & Quit", exact: true })
-    .click();
+  await menu.getByRole("menuitem", { name: "Leave", exact: true }).click();
   await expect(mainEntry(page)).toBeVisible();
 }
 
@@ -105,8 +103,9 @@ async function saveAndResume(
   guest: Page,
   fixture: ReturnType<typeof crossplayFixture>,
 ) {
-  const beforeQuit = fixture.elapsedMs();
   await saveAndQuit(guest);
+  const beforeQuit = fixture.elapsedMs();
+  await saveAndQuit(host);
   await expect
     .poll(() =>
       fixture.operations.some(
@@ -118,7 +117,6 @@ async function saveAndResume(
       ),
     )
     .toBe(true);
-  await saveAndQuit(host);
   const confirmed = await fixture.checkpoint();
   expect(confirmed?.matchId).toBeTruthy();
 

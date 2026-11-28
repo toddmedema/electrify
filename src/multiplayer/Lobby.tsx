@@ -313,14 +313,7 @@ export default function Lobby({
           )}
           {mode === "waiting" && lobby.campaignLocked && (
             <>
-              <Typography>
-                {lobby.sharedAt
-                  ? `Online save confirmed ${new Date(lobby.sharedAt).toLocaleString()}`
-                  : "Waiting for the confirmed online save."}
-              </Typography>
-              <Typography>
-                The campaign resumes with its original players.
-              </Typography>
+              <Typography>Waiting for the host.</Typography>
               {host &&
               lobby.recoveryAvailable &&
               session.hasOnlineAuthority() ? (

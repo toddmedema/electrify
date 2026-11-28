@@ -427,6 +427,7 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
           body.rules === campaignRules?.current &&
             room.leaseUntil <= now &&
             room.locked &&
+            room.hostId === self.id &&
             checkpoint &&
             published &&
             Object.hasOwn(published, checkpoint.rules) &&
@@ -451,10 +452,7 @@ function createRooms({ store, inviteKey, extensions = {}, campaignRules }) {
         throw new CrossplayError(409, "host_lease_held");
       }
       let guard = "member";
-      if (
-        room.leaseUntil <= now &&
-        (room.hostId === self.id || (room.locked && room.head))
-      ) {
+      if (room.leaseUntil <= now && room.hostId === self.id) {
         await reserve(id, now);
         room.hostId = self.id;
         room.leaseUntil = now + LEASE_MS;

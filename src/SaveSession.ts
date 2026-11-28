@@ -682,40 +682,8 @@ export async function runSaveTransition(
     if (multiplayer && getStore().getState().game.multiplayer) {
       try {
         await multiplayer.leave();
-      } catch (error) {
-        const again =
-          retry ??
-          (() => {
-            void runSaveTransition(proceed);
-          });
-        showSaveFailureDialog({
-          message: getSaveErrorMessage(error),
-          retry: again,
-          exportGame:
-            multiplayer.exportSave &&
-            (() => {
-              void multiplayer
-                .exportSave?.()
-                .catch((exportError) =>
-                  notifySession(
-                    "failed",
-                    undefined,
-                    getSaveErrorMessage(exportError),
-                  ),
-                );
-            }),
-          lossMessage:
-            "Progress since the last multiplayer save will be lost. The multiplayer save will remain.",
-          // A host that has gone cannot save. Leaving the match ends it locally even if Steam
-          // could not leave the lobby cleanly, so the transition can always continue.
-          leaveWithoutSaving: () => {
-            void multiplayer
-              .leave({ skipSave: true })
-              .catch(() => undefined)
-              .then(again);
-          },
-        });
-        return false;
+      } catch {
+        await multiplayer.leave({ skipSave: true }).catch(() => undefined);
       }
     }
     const outgoing = active;
