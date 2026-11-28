@@ -404,7 +404,8 @@ test("selling an open facility collapses its row before removing it", async ({
   await openFleet(page);
   const row = pane.locator(".facilityRow").first();
   const id = (await row.getAttribute("data-facility-id"))!;
-  const sold = pane.locator(`.facilityRow[data-facility-id="${id}"]`);
+  const soldSelector = `.facilityRow[data-facility-id="${id}"]`;
+  const sold = pane.locator(soldSelector);
   await sold.locator(".facilityDisclosure").click();
   await sold.getByRole("button", { name: /^Sell / }).click();
   const confirm = page.getByRole("dialog", { name: /Sell .* facility/ });
@@ -436,7 +437,7 @@ test("selling an open facility collapses its row before removing it", async ({
     return sample;
   });
   await confirm.getByRole("button", { name: "Sell", exact: true }).click();
-  await expect(sold).toHaveCount(0);
+  await expect(page.locator(soldSelector)).toHaveCount(0);
   const { started, midpoint } = await measurements.jsonValue();
   expect(midpoint).toBeGreaterThan(1);
   expect(midpoint).toBeLessThan(started - 1);
