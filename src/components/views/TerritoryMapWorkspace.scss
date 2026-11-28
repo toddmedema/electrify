@@ -90,11 +90,16 @@
       text-overflow: ellipsis;
     }
 
+    &:has(> .territoryCityLogo) {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
     // Keep the name centered on the map anchor. The badge overlaps only its left edge.
     .territoryCityLogo {
       position: absolute;
       top: 50%;
-      right: calc(100% - 8px);
+      right: calc(100% - 6px);
       width: 36px;
       height: 36px;
       transform: translateY(-50%);

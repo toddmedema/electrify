@@ -376,7 +376,7 @@ test("a city name stays centered with its company logo overlapping the left edge
   await expect
     .poll(() => logo.evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
-  const { cityX, textX, showTop, showBottom, overlap, hangsLeft } =
+  const { cityX, textX, showTop, showBottom, overlap, hangsLeft, gap } =
     await label.evaluate((element) => {
       const rectangle = element.getBoundingClientRect();
       const city = element.parentElement!.getBoundingClientRect();
@@ -389,6 +389,7 @@ test("a city name stays centered with its company logo overlapping the left edge
         showBottom: badge.bottom - rectangle.bottom,
         overlap: badge.right - rectangle.left,
         hangsLeft: rectangle.left - badge.left,
+        gap: text.left - badge.right,
       };
     });
   expect(Math.abs(cityX - textX)).toBeLessThan(1);
@@ -396,6 +397,9 @@ test("a city name stays centered with its company logo overlapping the left edge
   expect(showBottom).toBeGreaterThan(0);
   expect(overlap).toBeGreaterThan(0);
   expect(hangsLeft).toBeGreaterThan(overlap);
+  expect(gap).toBeCloseTo(2, 0);
+  await expect(label).toHaveCSS("border-top-left-radius", "0px");
+  await expect(label).toHaveCSS("border-bottom-left-radius", "0px");
 });
 
 test("Mission 7 · sign a trade and find live imports in Fleet", async ({
