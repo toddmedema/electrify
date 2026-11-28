@@ -233,9 +233,7 @@ const waterEntries: Readonly<
 > = waterAtlas.regions;
 const coreHexes = regionalHexes(REGIONAL_MAP_RADIUS);
 
-// Adjacent entries in each ring also border each other. Two consecutive river
-// neighbors would draw a tiny loop at the corner shared by all three tiles.
-const riverRoutingCells = new Map(
+const regionalWaterCells = new Map(
   coreHexes.map((cell) => [
     `${cell.q}:${cell.r}`,
     {
@@ -245,16 +243,43 @@ const riverRoutingCells = new Map(
   ]),
 );
 
+function classifyInlandWater(
+  water: Map<string, TerrainType>,
+  hasOffshorePoint: boolean,
+) {
+  const unclassified = new Set(
+    Array.from(water).flatMap(([id, terrain]) =>
+      terrain === "ocean" ? [id] : [],
+    ),
+  );
+  for (const root of unclassified) {
+    const basin = [root];
+    unclassified.delete(root);
+    for (const id of basin) {
+      for (const neighbor of regionalWaterCells.get(id)!.ring)
+        if (unclassified.delete(neighbor)) basin.push(neighbor);
+    }
+    const reachesEdge = basin.some(
+      (id) => regionalWaterCells.get(id)!.radius === REGIONAL_MAP_RADIUS,
+    );
+    // One isolated edge sample is weak evidence of a coast without an offshore point.
+    if (reachesEdge && (basin.length > 1 || hasOffshorePoint)) continue;
+    for (const id of basin) water.set(id, "lake");
+  }
+}
+
 function routeRivers(water: Map<string, TerrainType>) {
   const rivers = new Set(
     Array.from(water).flatMap(([id, terrain]) =>
-      terrain === "river" && id !== "0:0" && riverRoutingCells.has(id)
+      terrain === "river" && id !== "0:0" && regionalWaterCells.has(id)
         ? [id]
         : [],
     ),
   );
-  const ring = (id: string) => riverRoutingCells.get(id)!.ring;
+  const ring = (id: string) => regionalWaterCells.get(id)!.ring;
   const neighbors = (id: string) => ring(id).filter((next) => rivers.has(next));
+  // Adjacent entries in each ring also border each other. Two consecutive river
+  // neighbors would draw a tiny loop at the corner shared by all three tiles.
   const trianglesAt = (id: string) =>
     ring(id).filter(
       (next, edge, cells) =>
@@ -291,7 +316,7 @@ function routeRivers(water: Map<string, TerrainType>) {
     const candidates = ring(id).filter(
       (next) =>
         next !== "0:0" &&
-        riverRoutingCells.has(next) &&
+        regionalWaterCells.has(next) &&
         !rivers.has(next) &&
         water.get(next) !== "ocean" &&
         water.get(next) !== "lake",
@@ -336,8 +361,8 @@ function routeRivers(water: Map<string, TerrainType>) {
         .sort(
           (a, b) =>
             b.triangles - a.triangles ||
-            riverRoutingCells.get(b.id)!.radius -
-              riverRoutingCells.get(a.id)!.radius,
+            regionalWaterCells.get(b.id)!.radius -
+              regionalWaterCells.get(a.id)!.radius,
         );
       if (crowded.length === 0) break;
       if (crowded.some(({ id }) => removeRedundant(id))) continue;
@@ -358,10 +383,10 @@ function routeRivers(water: Map<string, TerrainType>) {
   }
 
   const boundary = (id: string) =>
-    riverRoutingCells.get(id)!.radius === REGIONAL_MAP_RADIUS;
+    regionalWaterCells.get(id)!.radius === REGIONAL_MAP_RADIUS;
   const dry = (id: string) =>
     id !== "0:0" &&
-    riverRoutingCells.has(id) &&
+    regionalWaterCells.has(id) &&
     !rivers.has(id) &&
     water.get(id) !== "ocean" &&
     water.get(id) !== "lake";
@@ -435,7 +460,7 @@ function routeRivers(water: Map<string, TerrainType>) {
   completeReaches();
 
   for (const [id, terrain] of water)
-    if (terrain === "river" && riverRoutingCells.has(id) && !rivers.has(id))
+    if (terrain === "river" && regionalWaterCells.has(id) && !rivers.has(id))
       water.delete(id);
   for (const id of rivers) water.set(id, "river");
 }
@@ -592,6 +617,7 @@ export function getRegionalGeography(
         WATER_TERRAIN[samples[index] as keyof typeof WATER_TERRAIN];
       if (terrain) water.set(`${q}:${r}`, terrain);
     });
+    classifyInlandWater(water, offshore !== undefined);
   }
   for (const [q, r] of region?.river ?? []) {
     const key = `${q}:${r}`;

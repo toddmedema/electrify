@@ -77,6 +77,19 @@ it("uses the drawn water direction and keeps local references distinct from fall
   ).toBe("Example City model grid");
 });
 
+it("renders isolated inland water as lakes, including a lone edge sample", () => {
+  const { terrainAt } = getRegionalGeography(cities.Manassas, 2026, 106);
+  expect(terrainAt({ q: 1, r: 2 })).toBe("lake");
+  expect(terrainAt({ q: 0, r: 5 })).toBe("lake");
+});
+
+it("keeps coastal water, including a clipped shore with a known offshore point", () => {
+  const oslo = getRegionalGeography(cities.Oslo, 2026, 999);
+  const sanFrancisco = getRegionalGeography(cities.SF, 2026, 100);
+  expect(oslo.terrainAt({ q: -5, r: 5 })).toBe("ocean");
+  expect(sanFrancisco.terrainAt({ q: -4, r: 0 })).toBe("ocean");
+});
+
 it.each([
   { city: "Austin", upstream: { q: -5, r: 1 }, downstream: { q: 3, r: 2 } },
   { city: "Paris", upstream: { q: -3, r: -2 }, downstream: { q: 5, r: -1 } },
